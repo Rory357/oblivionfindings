@@ -29,6 +29,7 @@ class PriceBookController extends Controller
         return inertia('finance/price-books/Index', [
             'price_books' => $priceBooks,
             'filters' => $request->only(['active']),
+            'canManage' => (bool) $auth->canDo('finance.ar.manage'),
         ]);
     }
 
@@ -43,16 +44,11 @@ class PriceBookController extends Controller
             ->findOrFail($priceBook);
 
         return inertia('finance/price-books/Show', [
-            'priceBook' => $priceBook,
+            // NOTE: the page reads `price_book` (the old `priceBook` key never
+            // reached it). Kept snake_case to match the existing page contract.
+            'price_book' => $priceBook,
+            'canManage' => (bool) $auth->canDo('finance.ar.manage'),
         ]);
-    }
-
-    public function create(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
-
-        return inertia('finance/price-books/Create');
     }
 
     public function store(Request $request)
@@ -78,21 +74,6 @@ class PriceBookController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Price book created.');
-    }
-
-    public function edit(Request $request, $priceBook)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
-
-        $priceBook = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['items' => fn ($q) => $q->orderBy('name')])
-            ->findOrFail($priceBook);
-
-        return inertia('finance/price-books/Edit', [
-            'priceBook' => $priceBook,
-        ]);
     }
 
     public function update(Request $request, $priceBook)

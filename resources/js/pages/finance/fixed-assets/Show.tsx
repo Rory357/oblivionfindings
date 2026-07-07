@@ -1,11 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Table,
     TableBody,
@@ -15,17 +13,14 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+    FixedAssetDialog,
+    FixedAssetDisposeDialog,
+    type EditableFixedAsset,
+    type FixedAssetGlAccount,
+} from '@/components/finance';
 import { Cpu, Edit, Trash2 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 
 interface GlAccount {
     id: number;
@@ -62,6 +57,9 @@ interface FixedAsset {
     disposed_date: string | null;
     disposal_proceeds: string | null;
     notes: string | null;
+    gl_asset_account_id: number | null;
+    gl_depreciation_account_id: number | null;
+    gl_expense_account_id: number | null;
     gl_asset_account: GlAccount | null;
     gl_depreciation_account: GlAccount | null;
     gl_expense_account: GlAccount | null;
@@ -103,6 +101,10 @@ interface LinkedDeviceHealth {
 interface Props {
     asset: FixedAsset;
     depreciationSchedule: ScheduleEntry[];
+    hasDepreciations: boolean;
+    canManage: boolean;
+    assetAccounts: FixedAssetGlAccount[];
+    expenseAccounts: FixedAssetGlAccount[];
     linkedAsset?: LinkedAssetInfo | null;
     linkedDevices?: LinkedDeviceHealth[];
 }
@@ -145,14 +147,10 @@ const methodLabels: Record<string, string> = {
     diminishing_value: 'Diminishing Value',
 };
 
-export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsset, linkedDevices }: Props) {
+export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreciations, canManage, assetAccounts, expenseAccounts, linkedAsset, linkedDevices }: Props) {
     const devices = linkedDevices ?? [];
-    const [disposeModalOpen, setDisposeModalOpen] = useState(false);
-
-    const disposeForm = useForm({
-        disposed_date: new Date().toISOString().split('T')[0],
-        disposal_proceeds: '',
-    });
+    const [editOpen, setEditOpen] = useState(false);
+    const [disposeOpen, setDisposeOpen] = useState(false);
 
     const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
 
@@ -162,12 +160,22 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
         { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
     ];
 
-    function handleDispose(e: FormEvent) {
-        e.preventDefault();
-        disposeForm.post(`/finance/fixed-assets/${asset.id}/dispose`, {
-            onSuccess: () => setDisposeModalOpen(false),
-        });
-    }
+    const editableAsset: EditableFixedAsset = {
+        id: asset.id,
+        asset_name: asset.asset_name,
+        asset_tag: asset.asset_tag,
+        category: asset.category,
+        purchase_date: asset.purchase_date,
+        purchase_cost: asset.purchase_cost,
+        residual_value: asset.residual_value,
+        useful_life_months: asset.useful_life_months,
+        depreciation_method: asset.depreciation_method,
+        gl_asset_account_id: asset.gl_asset_account_id,
+        gl_depreciation_account_id: asset.gl_depreciation_account_id,
+        gl_expense_account_id: asset.gl_expense_account_id,
+        notes: asset.notes,
+        has_depreciations: hasDepreciations,
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -191,92 +199,18 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
                         }
                         description={asset.asset_tag ? `Tag: ${asset.asset_tag}` : undefined}
                         actions={
-                            <>
-                                {asset.status === 'active' && (
-                            <>
-                                <Link href={`/finance/fixed-assets/${asset.id}/edit`}>
-                                    <Button variant="outline">
+                            canManage && asset.status === 'active' ? (
+                                <>
+                                    <Button variant="outline" onClick={() => setEditOpen(true)}>
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
                                     </Button>
-                                </Link>
-                                <Dialog open={disposeModalOpen} onOpenChange={setDisposeModalOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="destructive">
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Dispose
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Dispose Asset</DialogTitle>
-                                            <DialogDescription>
-                                                Record the disposal of this asset. This will post a GL journal with any gain
-                                                or loss on disposal. This action cannot be undone.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleDispose}>
-                                            <div className="space-y-4 py-4">
-                                                <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                                                    <p>Current book value: <strong>{formatNZD(bookValue)}</strong></p>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="disposed_date">Disposal Date *</Label>
-                                                    <Input
-                                                        id="disposed_date"
-                                                        type="date"
-                                                        value={disposeForm.data.disposed_date}
-                                                        onChange={(e) => disposeForm.setData('disposed_date', e.target.value)}
-                                                    />
-                                                    {disposeForm.errors.disposed_date && (
-                                                        <p className="text-sm text-destructive">{disposeForm.errors.disposed_date}</p>
-                                                    )}
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="disposal_proceeds">Disposal Proceeds (NZD) *</Label>
-                                                    <Input
-                                                        id="disposal_proceeds"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={disposeForm.data.disposal_proceeds}
-                                                        onChange={(e) => disposeForm.setData('disposal_proceeds', e.target.value)}
-                                                        placeholder="0.00"
-                                                    />
-                                                    {disposeForm.errors.disposal_proceeds && (
-                                                        <p className="text-sm text-destructive">{disposeForm.errors.disposal_proceeds}</p>
-                                                    )}
-                                                </div>
-                                                {disposeForm.data.disposal_proceeds && (
-                                                    <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                                                        {(() => {
-                                                            const gainLoss = Number(disposeForm.data.disposal_proceeds) - bookValue;
-                                                            return (
-                                                                <p>
-                                                                    {gainLoss >= 0 ? 'Gain' : 'Loss'} on disposal:{' '}
-                                                                    <strong className={gainLoss >= 0 ? 'text-status-success' : 'text-destructive'}>
-                                                                        {formatNZD(Math.abs(gainLoss))}
-                                                                    </strong>
-                                                                </p>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <DialogFooter>
-                                                <Button type="button" variant="outline" onClick={() => setDisposeModalOpen(false)}>
-                                                    Cancel
-                                                </Button>
-                                                <Button type="submit" variant="destructive" disabled={disposeForm.processing}>
-                                                    {disposeForm.processing ? 'Processing...' : 'Dispose Asset'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </>
-                        )}
-                            </>
+                                    <Button variant="destructive" onClick={() => setDisposeOpen(true)}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Dispose
+                                    </Button>
+                                </>
+                            ) : undefined
                         }
                     />
                 }
@@ -559,6 +493,36 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
                     </Card>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <FixedAssetDialog
+                    open={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    asset={editableAsset}
+                    assetAccounts={assetAccounts}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
+
+            {canManage && (
+                <FixedAssetDisposeDialog
+                    open={disposeOpen}
+                    onClose={() => setDisposeOpen(false)}
+                    asset={{
+                        id: asset.id,
+                        asset_name: asset.asset_name,
+                        asset_tag: asset.asset_tag,
+                        purchase_cost: asset.purchase_cost,
+                        accumulated_depreciation: asset.accumulated_depreciation,
+                        gl_asset_account: asset.gl_asset_account
+                            ? { code: asset.gl_asset_account.code, name: asset.gl_asset_account.name }
+                            : null,
+                        gl_depreciation_account: asset.gl_depreciation_account
+                            ? { code: asset.gl_depreciation_account.code, name: asset.gl_depreciation_account.name }
+                            : null,
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

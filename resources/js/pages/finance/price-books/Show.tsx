@@ -12,8 +12,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { PriceBookDialog } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { CalendarDays, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,10 +35,12 @@ type Props = {
         name: string;
         description: string | null;
         is_default: boolean;
+        is_active: boolean;
         effective_from: string | null;
         effective_to: string | null;
         items: PriceBookItem[];
     };
+    canManage: boolean;
 };
 
 function formatCurrency(n: number): string {
@@ -49,7 +52,8 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function PriceBookShow({ price_book }: Props) {
+export default function PriceBookShow({ price_book, canManage = false }: Props) {
+    const [editOpen, setEditOpen] = useState(false);
     const [showItemForm, setShowItemForm] = useState(false);
     const itemForm = useForm({
         service_code: '',
@@ -88,13 +92,13 @@ export default function PriceBookShow({ price_book }: Props) {
                             {formatDate(price_book.effective_from)} — {formatDate(price_book.effective_to)}
                         </span>
                     )}
-                    <div className="ml-auto flex gap-1">
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={`/finance/price-books/${price_book.id}/edit`}>
+                    {canManage && (
+                        <div className="ml-auto flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-                            </Link>
-                        </Button>
-                    </div>
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Items table */}
@@ -227,6 +231,22 @@ export default function PriceBookShow({ price_book }: Props) {
                     </Card>
                 </div>
             </PageShell>
+
+            {/* Mounted only while open so each edit starts from fresh props. */}
+            {canManage && editOpen && (
+                <PriceBookDialog
+                    open
+                    onClose={() => setEditOpen(false)}
+                    priceBook={{
+                        id: price_book.id,
+                        name: price_book.name,
+                        description: price_book.description,
+                        effective_from: price_book.effective_from,
+                        effective_to: price_book.effective_to,
+                        is_active: price_book.is_active,
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, ConfirmDialog } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -305,10 +305,16 @@ export default function MatchRulesIndex({ rules }: PageProps) {
         { title: 'Match Rules', href: '/finance/match-rules' },
     ];
 
-    function handleDelete(id: number) {
-        if (confirm('Are you sure you want to delete this match rule?')) {
-            router.delete(`/finance/match-rules/${id}`);
-        }
+    const [deleteTarget, setDeleteTarget] = useState<MatchRule | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        router.delete(`/finance/match-rules/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     }
 
     const activeCount = rules.filter((r) => r.is_active).length;
@@ -398,7 +404,8 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleDelete(rule.id)}
+                                                        aria-label={`Delete ${rule.name}`}
+                                                        onClick={() => setDeleteTarget(rule)}
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
@@ -412,6 +419,23 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete match rule?"
+                description={
+                    <>
+                        This permanently deletes the match rule{' '}
+                        <span className="font-medium text-foreground">{deleteTarget?.name}</span>.
+                        New bank transactions will no longer be auto-matched by this rule.
+                    </>
+                }
+                confirmLabel="Delete rule"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

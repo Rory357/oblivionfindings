@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -307,11 +307,16 @@ function EditCurrencyDialog({ currency }: { currency: Currency }) {
 export default function CurrenciesIndex({ currencies }: PageProps) {
     const activeCurrencies = currencies.filter((c) => c.is_active);
     const baseCurrency = currencies.find((c) => c.is_base);
+    const [deleteTarget, setDeleteTarget] = useState<Currency | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
-    function handleDelete(id: number) {
-        if (confirm('Are you sure you want to delete this currency?')) {
-            router.delete(`/finance/currencies/${id}`);
-        }
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        router.delete(`/finance/currencies/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     }
 
     return (
@@ -425,7 +430,8 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            onClick={() => handleDelete(currency.id)}
+                                                            aria-label={`Delete ${currency.code}`}
+                                                            onClick={() => setDeleteTarget(currency)}
                                                         >
                                                             <Trash2 className="h-4 w-4 text-destructive" />
                                                         </Button>
@@ -440,6 +446,25 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete currency?"
+                description={
+                    <>
+                        This permanently deletes the currency{' '}
+                        <span className="font-medium text-foreground">
+                            {deleteTarget?.code} — {deleteTarget?.name}
+                        </span>
+                        . This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete currency"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

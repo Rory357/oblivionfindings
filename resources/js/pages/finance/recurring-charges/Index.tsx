@@ -12,10 +12,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import {
+    ReceivablesTabsFooter,
+    RecurringChargeDialog,
+    type ChargeClientOption,
+    type EditableRecurringCharge,
+} from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, DollarSign, Eye, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { CalendarDays, DollarSign, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
+import { useState } from 'react';
 
 const ANY = '__ANY__';
 
@@ -24,6 +30,8 @@ const nzd = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' 
 type RecurringCharge = {
     id: number;
     name: string;
+    client_id: number | null;
+    description: string;
     amount: number;
     frequency: string;
     is_active: boolean;
@@ -48,6 +56,8 @@ type Props = {
         monthly_total: number;
         next_due: number;
     };
+    canManage: boolean;
+    clients: ChargeClientOption[];
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -63,10 +73,24 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function RecurringChargesIndex({ charges = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function RecurringChargesIndex({ charges = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, canManage = false, clients = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editCharge, setEditCharge] = useState<EditableRecurringCharge | null>(null);
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/finance/recurring-charges', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
+
+    const openEdit = (charge: RecurringCharge) =>
+        setEditCharge({
+            id: charge.id,
+            client_id: charge.client_id ?? charge.client?.id ?? null,
+            description: charge.description || charge.name,
+            amount: charge.amount,
+            frequency: charge.frequency,
+            next_charge_date: charge.next_charge_date,
+            is_active: charge.is_active,
+        });
 
     return (
         <AppLayout>
@@ -111,12 +135,12 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                             <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/finance/recurring-charges/create">
+                    {canManage && (
+                        <Button size="sm" onClick={() => setCreateOpen(true)}>
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
                             New Charge
-                        </Link>
-                    </Button>
+                        </Button>
+                    )}
                 </div>
 
                 {/* List */}
@@ -127,9 +151,11 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                 <RefreshCw className="mb-4 h-12 w-12 text-muted-foreground/30" />
                                 <h2 className="text-lg font-semibold text-muted-foreground">No Recurring Charges</h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">Create your first recurring charge to get started.</p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/finance/recurring-charges/create">Create Charge</Link>
-                                </Button>
+                                {canManage && (
+                                    <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+                                        Create Charge
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -141,9 +167,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`} className="text-sm font-semibold hover:underline">
-                                            {charge.name}
-                                        </Link>
+                                        <span className="text-sm font-semibold">{charge.name}</span>
                                         <Badge variant={charge.is_active ? 'default' : 'secondary'} className="h-4 px-1.5 text-[9px]">
                                             {charge.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
@@ -166,18 +190,19 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`}>
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`}>
+                                {canManage && (
+                                    <div className="flex shrink-0 gap-1">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            aria-label={`Edit ${charge.name}`}
+                                            onClick={() => openEdit(charge)}
+                                        >
                                             <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                </div>
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     ))}
@@ -200,6 +225,24 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                     </div>
                 )}
             </PageShell>
+
+            {canManage && (
+                <RecurringChargeDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    clients={clients}
+                />
+            )}
+
+            {canManage && editCharge && (
+                <RecurringChargeDialog
+                    key={editCharge.id}
+                    open
+                    charge={editCharge}
+                    onClose={() => setEditCharge(null)}
+                    clients={clients}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -212,10 +212,16 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
         { title: 'Cost Centres', href: '/finance/cost-centres' },
     ];
 
-    function handleDelete(id: number) {
-        if (confirm('Are you sure you want to delete this cost centre?')) {
-            router.delete(`/finance/cost-centres/${id}`);
-        }
+    const [deleteTarget, setDeleteTarget] = useState<CostCentre | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        router.delete(`/finance/cost-centres/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     }
 
     const activeCount = costCentres.filter((c) => c.is_active).length;
@@ -290,7 +296,8 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleDelete(cc.id)}
+                                                        aria-label={`Delete ${cc.name}`}
+                                                        onClick={() => setDeleteTarget(cc)}
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
@@ -304,6 +311,25 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete cost centre?"
+                description={
+                    <>
+                        This permanently deletes cost centre{' '}
+                        <span className="font-medium text-foreground">
+                            {deleteTarget?.code} — {deleteTarget?.name}
+                        </span>
+                        . This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete cost centre"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

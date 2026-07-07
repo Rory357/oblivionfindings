@@ -500,13 +500,13 @@ test('operations onboarding create page loads', function () {
     });
 });
 
-test('finance price books create page loads', function () {
+test('finance price books create url redirects to the index (modal flow)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/price-books/create')
             ->waitForText('Price Book', 10)
-            ->assertPathIs('/finance/price-books/create');
+            ->assertPathIs('/finance/price-books');
     });
 });
 
@@ -520,13 +520,13 @@ test('finance quotes create page loads', function () {
     });
 });
 
-test('finance recurring charges create page loads', function () {
+test('finance recurring charges create url redirects to the index (modal flow)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/recurring-charges/create')
             ->waitForText('Recurring', 10)
-            ->assertPathIs('/finance/recurring-charges/create');
+            ->assertPathIs('/finance/recurring-charges');
     });
 });
 

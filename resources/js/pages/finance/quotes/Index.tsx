@@ -12,10 +12,17 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import {
+    QuoteDialog,
+    ReceivablesTabsFooter,
+    type EditableQuote,
+    type QuoteClientOption,
+    type QuotePriceBook,
+} from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
+import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { useState } from 'react';
 
 const ANY = '__ANY__';
 
@@ -31,6 +38,11 @@ type Quote = {
     client: { id: number; first_name: string; last_name: string } | null;
     creator: { id: number; name: string } | null;
     items_count: number;
+    // Raw header + lines for prefilling the edit modal (draft rows only).
+    client_id: number | null;
+    title: string;
+    notes: string | null;
+    lines: Array<{ description: string; quantity: number | string; unit_price: number | string }>;
 };
 
 type Props = {
@@ -51,6 +63,9 @@ type Props = {
         accepted: number;
         converted: number;
     };
+    canManage: boolean;
+    clients: QuoteClientOption[];
+    priceBooks: QuotePriceBook[];
 };
 
 const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -66,10 +81,30 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function QuotesIndex({ quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function QuotesIndex({
+    quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    filters = {} as any,
+    stats = {} as any,
+    canManage = false,
+    clients = [],
+    priceBooks = [],
+}: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editQuote, setEditQuote] = useState<EditableQuote | null>(null);
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/finance/quotes', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
+
+    const openEdit = (quote: Quote) =>
+        setEditQuote({
+            id: quote.id,
+            client_id: quote.client_id,
+            title: quote.title,
+            valid_until: quote.valid_until,
+            notes: quote.notes,
+            lines: quote.lines,
+        });
 
     return (
         <AppLayout>
@@ -119,12 +154,12 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                             <SelectItem value="converted">Converted</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/finance/quotes/create">
+                    {canManage && (
+                        <Button size="sm" onClick={() => setCreateOpen(true)}>
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
                             New Quote
-                        </Link>
-                    </Button>
+                        </Button>
+                    )}
                 </div>
 
                 {/* List */}
@@ -135,9 +170,11 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                 <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
                                 <h2 className="text-lg font-semibold text-muted-foreground">No Quotes Found</h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">Create your first quote to get started.</p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/finance/quotes/create">Create Quote</Link>
-                                </Button>
+                                {canManage && (
+                                    <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+                                        Create Quote
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -173,21 +210,22 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 gap-1">
-                                    {quote.status === 'draft' && (
-                                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                                            <Send className="mr-1 h-3 w-3" /> Send
-                                        </Button>
-                                    )}
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/quotes/${quote.id}`}>
+                                        <Link href={`/finance/quotes/${quote.id}`} aria-label={`View ${quote.reference}`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/quotes/${quote.id}/edit`}>
+                                    {canManage && quote.status === 'draft' && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            aria-label={`Edit ${quote.reference}`}
+                                            onClick={() => openEdit(quote)}
+                                        >
                                             <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -211,6 +249,26 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                     </div>
                 )}
             </PageShell>
+
+            {canManage && (
+                <QuoteDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    clients={clients}
+                    priceBooks={priceBooks}
+                />
+            )}
+
+            {canManage && editQuote && (
+                <QuoteDialog
+                    key={editQuote.id}
+                    open
+                    quote={editQuote}
+                    onClose={() => setEditQuote(null)}
+                    clients={clients}
+                    priceBooks={priceBooks}
+                />
+            )}
         </AppLayout>
     );
 }

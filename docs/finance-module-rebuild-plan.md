@@ -560,15 +560,38 @@ vendor, receipt) — the mould for C2.
   (5) + dashboard/nav tests 17 green ✓ browser-smoked all four tabs with screenshots, console clean.
   *(By design kept: FinanceHubsBar on Summary; genuine drill-downs site-dashboard + clients/Financials stay
   pages — they come on-contract in C3.)*
-- **[ ] C2 — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
+- **[~] C2 — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
   edit pattern for edits; `alert-dialog` for every one of the 16 native `confirm()` sites; payment-run
   approve/process get confirm modals; period-close gets a guarded impact-preview modal; GST Prepare becomes a
-  wizard ending in the return). Verified list: quotes C/E · credit-note C · recurring C/E · price-book C/E ·
-  bank-account C/E · fixed-asset C/E+dispose · petty-cash C (+top-up already inline→modalise) · fx-reval C
-  (needs a small preview endpoint) · donor-fund C+txn modals · funding-stream inline→modal · audit-export C ·
-  cash-flow-forecast C · statement generation stays read-only.
-  *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked; zero native confirm(); every new
-  modal browser-smoked.*
+  wizard ending in the return). Split into 3 batches:
+  - **[x] C2a (committed `f4a06c41` on finance/c2-modal-sweep):** recurring charge · price book · petty-cash
+    fund · bank account · audit export · cash-flow forecast → WizardShell dialogs; 9 retired URLs → NAMED
+    `Route::redirect`; all six browser-verified with REAL submissions (rows persist, KPIs move, success panes,
+    console clean). **2 real bugs fixed:** RecurringChargeController@store 500'd on every create (`starts_at`
+    NOT NULL, never set — retired full-page form had the same latent bug); FinanceDemoSeeder GL accounts had
+    no `sub_type` so the bank modal's GL picker was empty/unsubmittable on fresh seed. ModalSweepRedirectsTest
+    (redirects + renders + starts_at persistence). ⚠️ named redirects only — unnamed ones inside the
+    `->name('finance.')` group collide on `route:cache`.
+  - **[~] C2b (agent running):** quote C/E · credit-note C · fixed-asset C/E + disposal · donor-fund C +
+    receipt/expenditure transaction modals (post trust journals → PostingPreview) · funding-stream inline→modal.
+  - **[x] C2c (confirm sweep):** shared `components/finance/confirm-dialog.tsx` (`ConfirmDialog` wrapping
+    shadcn AlertDialog; `variant` destructive|default, `processing` guard) replaces **all 16 native `confirm()`
+    sites** — audit-exports, bank-feeds, bills/Show, CashFlowForecast (Index+Show), Consolidation/Show,
+    cost-centres, currencies, funding-streams, fx-reval post, gst-returns mark-filed, invoices send + mark-paid,
+    IrdFilings submit, match-rules, PO approve + convert, payment-run approve + process. `grep confirm(` under
+    pages/finance = **0**. **PLUS a guarded period-close impact modal** (fiscal-periods/Index — closing a period
+    previously fired on a single click with NO confirmation; now a destructive ConfirmDialog spelling out that no
+    further journals can post to a closed period). ⚠️ Fixed 3 defects in the sub-agent's partial work: it hit its
+    session limit having (a) DELETED both payment-run confirmations without replacing them (approve/process fired
+    unguarded — a regression), (b) left invoices/Show with the send + mark-paid triggers but NO dialog renders
+    (dead buttons), (c) left 3 confirm() stragglers (PO ×2, IRD ×1). All fixed + re-verified: every touched file
+    renders its dialog and every trigger opens it. types/eslint/build green.
+  - **[ ] C2c leftover — GST Prepare page → wizard.** `gst-returns/Prepare.tsx` is still a full page (frequency
+    + period selection → creates the return). It WORKS (no dead button) — this is purely an idiom upgrade to a
+    WizardShell dialog on the gst-returns index, deferred as a small follow-up (lower priority than banking the
+    verified conversion + confirm sweep).
+  *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked (except GST-Prepare, tracked above);
+  zero native confirm() ✓; every new modal browser-smoked.*
 - **[ ] C3 — Consistency sweep** (mechanical, per-hub ticks, screenshot-diff each): money.tsx migration (~80
   files); StatusBadge adoption (~25); shared `chart-palette.ts` reading CSS vars (kill hex in 10+ files);
   EmptyState/EmptySearch + Skeleton adoption; **count badges wired on every hub tab** (controllers pass counts);

@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -196,16 +196,19 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
 
 export default function FiscalPeriodsIndex({ periods }: PageProps) {
     const [closingId, setClosingId] = useState<number | null>(null);
+    const [closeTarget, setCloseTarget] = useState<FiscalPeriod | null>(null);
 
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Fiscal Periods', href: '/finance/fiscal-periods' },
     ];
 
-    function handleClose(periodId: number) {
-        setClosingId(periodId);
-        router.post(`/finance/fiscal-periods/${periodId}/close`, {}, {
+    function handleClose() {
+        if (!closeTarget) return;
+        setClosingId(closeTarget.id);
+        router.post(`/finance/fiscal-periods/${closeTarget.id}/close`, {}, {
             onFinish: () => setClosingId(null),
+            onSuccess: () => setCloseTarget(null),
         });
     }
 
@@ -281,7 +284,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => handleClose(period.id)}
+                                                            onClick={() => setCloseTarget(period)}
                                                             disabled={closingId === period.id}
                                                         >
                                                             <Lock className="mr-1 h-3 w-3" />
@@ -298,6 +301,27 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!closeTarget}
+                onOpenChange={(open) => !open && setCloseTarget(null)}
+                title="Close fiscal period?"
+                description={
+                    <>
+                        This closes{' '}
+                        <span className="font-medium text-foreground">
+                            {closeTarget?.name} ({closeTarget?.start_date} – {closeTarget?.end_date})
+                        </span>
+                        . Once closed, <span className="font-medium text-foreground">no further journals can be posted</span>{' '}
+                        to this period — invoices, bills, payments and manual journals dated inside it will be rejected.
+                        Make sure the period is fully reconciled first.
+                    </>
+                }
+                confirmLabel="Close period"
+                variant="destructive"
+                processing={closingId === closeTarget?.id}
+                onConfirm={handleClose}
+            />
         </AppLayout>
     );
 }

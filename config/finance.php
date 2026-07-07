@@ -114,6 +114,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fixed-asset disposal
+    |--------------------------------------------------------------------------
+    |
+    | The balancing (gain or loss) leg of a fixed-asset disposal journal posts
+    | to this account. It MUST be a dedicated account — `8100` was historically
+    | hardcoded in FixedAssetService but the seeded chart uses `8100` for Bank
+    | Fees, so a disposal at a gain/loss either mis-posted (real orgs) or silently
+    | dropped the balancing line and rolled the whole disposal back (demo/unseeded).
+    |
+    */
+
+    'fixed_asset' => [
+        'gain_loss_account' => '8400',   // Gain/Loss on Asset Disposal
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Account Name Assertions (config-driven name-parity check)
     |--------------------------------------------------------------------------
     |

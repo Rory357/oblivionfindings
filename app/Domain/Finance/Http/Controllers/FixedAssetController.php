@@ -42,9 +42,29 @@ class FixedAssetController extends Controller
             });
         }
 
-        $assets = $query->orderBy('asset_name')
+        $assets = $query->withCount('depreciations')
+            ->orderBy('asset_name')
             ->paginate(25)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (FinFixedAsset $asset) => [
+                'id' => $asset->id,
+                'asset_name' => $asset->asset_name,
+                'asset_tag' => $asset->asset_tag,
+                'category' => $asset->category,
+                'purchase_date' => $asset->purchase_date?->toDateString(),
+                'purchase_cost' => (string) $asset->purchase_cost,
+                'accumulated_depreciation' => (string) $asset->accumulated_depreciation,
+                'residual_value' => (string) $asset->residual_value,
+                'useful_life_months' => $asset->useful_life_months,
+                'depreciation_method' => $asset->depreciation_method,
+                'status' => $asset->status,
+                // Raw GL ids + depreciation flag so an active row can prefill the edit modal.
+                'gl_asset_account_id' => $asset->gl_asset_account_id,
+                'gl_depreciation_account_id' => $asset->gl_depreciation_account_id,
+                'gl_expense_account_id' => $asset->gl_expense_account_id,
+                'notes' => $asset->notes,
+                'has_depreciations' => $asset->depreciations_count > 0,
+            ]);
 
         // Summary totals
         $allAssets = FinFixedAsset::forOrganization($orgId)->get();
@@ -56,34 +76,26 @@ class FixedAssetController extends Controller
             'active_count' => $allAssets->where('status', 'active')->count(),
         ];
 
+        $canManage = (bool) $request->user()->can('create', FinFixedAsset::class);
+
         return Inertia::render('finance/fixed-assets/Index', [
             'assets' => $assets,
             'summary' => $summary,
             'filters' => $request->only(['category', 'status', 'search']),
+            'canManage' => $canManage,
+            'assetAccounts' => $canManage ? $this->glAccounts($orgId, 'asset') : [],
+            'expenseAccounts' => $canManage ? $this->glAccounts($orgId, 'expense') : [],
         ]);
     }
 
-    /**
-     * Show the create asset form.
-     */
-    public function create(Request $request)
+    /** Active GL accounts of a type for the fixed-asset modal pickers. */
+    private function glAccounts(?int $orgId, string $type)
     {
-        $this->authorize('create', FinFixedAsset::class);
-
-        $orgId = $request->user()->organization_id;
-
-        return Inertia::render('finance/fixed-assets/Create', [
-            'assetAccounts' => FinAccount::forOrganization($orgId)
-                ->active()
-                ->ofType('asset')
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
-            'expenseAccounts' => FinAccount::forOrganization($orgId)
-                ->active()
-                ->ofType('expense')
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
-        ]);
+        return FinAccount::forOrganization($orgId)
+            ->active()
+            ->ofType($type)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
     }
 
     /**
@@ -173,9 +185,17 @@ class FixedAssetController extends Controller
                 ->all();
         }
 
+        $orgId = $fixedAsset->organization_id;
+        $canManage = (bool) $request->user()->can('update', $fixedAsset);
+
         return Inertia::render('finance/fixed-assets/Show', [
             'asset' => $fixedAsset,
             'depreciationSchedule' => $schedule,
+            'hasDepreciations' => $fixedAsset->depreciations->isNotEmpty(),
+            'canManage' => $canManage,
+            // Reference data for the edit modal (only when the user can manage assets).
+            'assetAccounts' => $canManage ? $this->glAccounts($orgId, 'asset') : [],
+            'expenseAccounts' => $canManage ? $this->glAccounts($orgId, 'expense') : [],
             'linkedAsset' => $fixedAsset->linkedAsset ? [
                 'id' => $fixedAsset->linkedAsset->id,
                 'name' => $fixedAsset->linkedAsset->name,
@@ -184,34 +204,6 @@ class FixedAssetController extends Controller
                 'status' => $fixedAsset->linkedAsset->status,
             ] : null,
             'linkedDevices' => $linkedDevices,
-        ]);
-    }
-
-    /**
-     * Show the edit form for a fixed asset.
-     */
-    public function edit(Request $request, FinFixedAsset $fixedAsset)
-    {
-        $this->authorize('update', $fixedAsset);
-
-        $orgId = $request->user()->organization_id;
-
-        $fixedAsset->load('depreciations');
-        $hasDepreciations = $fixedAsset->depreciations->isNotEmpty();
-
-        return Inertia::render('finance/fixed-assets/Edit', [
-            'asset' => $fixedAsset,
-            'hasDepreciations' => $hasDepreciations,
-            'assetAccounts' => FinAccount::forOrganization($orgId)
-                ->active()
-                ->ofType('asset')
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
-            'expenseAccounts' => FinAccount::forOrganization($orgId)
-                ->active()
-                ->ofType('expense')
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
         ]);
     }
 

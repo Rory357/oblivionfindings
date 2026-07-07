@@ -35,32 +35,28 @@ class PettyCashController extends Controller
                 'is_active' => $fund->is_active,
             ]);
 
+        $canManage = (bool) $request->user()->canDo('finance.petty_cash.manage');
+
         return Inertia::render('finance/petty-cash/Index', [
             'funds' => $funds,
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $orgId = $request->user()->organization_id;
-
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name']);
-
-        $users = User::query()
-            ->when(
-                $orgId && Schema::hasColumn('users', 'organization_id'),
-                fn ($query) => $query->where('organization_id', $orgId),
-            )
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return Inertia::render('finance/petty-cash/Create', [
-            'accounts' => $accounts,
-            'users' => $users,
+            'canManage' => $canManage,
+            // Reference data for the New Fund modal (asset GL accounts + custodians).
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)
+                    ->active()
+                    ->whereIn('type', ['asset'])
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name'])
+                : [],
+            'users' => $canManage
+                ? User::query()
+                    ->when(
+                        $orgId && Schema::hasColumn('users', 'organization_id'),
+                        fn ($query) => $query->where('organization_id', $orgId),
+                    )
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                : [],
         ]);
     }
 

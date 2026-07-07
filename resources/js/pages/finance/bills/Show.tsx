@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Edit, XCircle, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/finance';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface BillLine {
     id: number;
@@ -79,14 +81,19 @@ export default function BillShow({ auth, bill }: Props) {
     const canCancel = bill.status === 'draft' || bill.status === 'awaiting_approval';
     const amountDue = Number(bill.total_amount) - Number(bill.amount_paid);
 
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+
     const handleApprove = () => {
         router.post(`/finance/bills/${bill.id}/approve`);
     };
 
-    const handleCancel = () => {
-        if (confirm('Are you sure you want to cancel this bill?')) {
-            router.post(`/finance/bills/${bill.id}/cancel`);
-        }
+    const confirmCancel = () => {
+        router.post(`/finance/bills/${bill.id}/cancel`, {}, {
+            onStart: () => setCancelling(true),
+            onFinish: () => setCancelling(false),
+            onSuccess: () => setCancelOpen(false),
+        });
     };
 
     return (
@@ -142,7 +149,7 @@ export default function BillShow({ auth, bill }: Props) {
                                     </>
                                 )}
                                 {canCancel && (
-                                    <Button variant="destructive" onClick={handleCancel}>
+                                    <Button variant="destructive" onClick={() => setCancelOpen(true)}>
                                         <XCircle className="w-4 h-4 mr-2" />
                                         Cancel
                                     </Button>
@@ -334,6 +341,24 @@ export default function BillShow({ auth, bill }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={cancelOpen}
+                onOpenChange={setCancelOpen}
+                title="Cancel this bill?"
+                description={
+                    <>
+                        This cancels bill{' '}
+                        <span className="font-medium text-foreground">{bill.bill_number}</span>. A
+                        cancelled bill can&rsquo;t be approved or paid.
+                    </>
+                }
+                confirmLabel="Cancel bill"
+                cancelLabel="Keep bill"
+                variant="destructive"
+                processing={cancelling}
+                onConfirm={confirmCancel}
+            />
         </AppLayout>
     );
 }

@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/finance';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface InvoiceLine {
     id: number;
@@ -82,16 +84,25 @@ export default function InvoiceShow({ auth, invoice }: Props) {
         { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
     ];
 
-    const handleSend = () => {
-        if (confirm('Send this invoice to ' + invoice.client_email + '?')) {
-            router.post(`/finance/invoices/${invoice.id}/send`);
-        }
+    const [sendOpen, setSendOpen] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [markPaidOpen, setMarkPaidOpen] = useState(false);
+    const [markingPaid, setMarkingPaid] = useState(false);
+
+    const confirmSend = () => {
+        router.post(`/finance/invoices/${invoice.id}/send`, {}, {
+            onStart: () => setSending(true),
+            onFinish: () => setSending(false),
+            onSuccess: () => setSendOpen(false),
+        });
     };
 
-    const handleMarkPaid = () => {
-        if (confirm('Mark this invoice as paid?')) {
-            router.post(`/finance/invoices/${invoice.id}/mark-paid`);
-        }
+    const confirmMarkPaid = () => {
+        router.post(`/finance/invoices/${invoice.id}/mark-paid`, {}, {
+            onStart: () => setMarkingPaid(true),
+            onFinish: () => setMarkingPaid(false),
+            onSuccess: () => setMarkPaidOpen(false),
+        });
     };
 
     return (
@@ -135,13 +146,13 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                     </a>
                                 </Button>
                                 {canSend && (
-                                    <Button onClick={handleSend}>
+                                    <Button onClick={() => setSendOpen(true)}>
                                         <Send className="w-4 h-4 mr-2" />
                                         Send Email
                                     </Button>
                                 )}
                                 {canMarkPaid && (
-                                    <Button variant="secondary" onClick={handleMarkPaid}>
+                                    <Button variant="secondary" onClick={() => setMarkPaidOpen(true)}>
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Mark Paid
                                     </Button>
@@ -320,6 +331,25 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={sendOpen}
+                onOpenChange={setSendOpen}
+                title="Send invoice?"
+                description={`This marks ${invoice.invoice_number} as sent and records the send date. The client can then be issued the invoice.`}
+                confirmLabel="Send invoice"
+                processing={sending}
+                onConfirm={confirmSend}
+            />
+            <ConfirmDialog
+                open={markPaidOpen}
+                onOpenChange={setMarkPaidOpen}
+                title="Mark invoice as paid?"
+                description={`This records ${invoice.invoice_number} as fully paid and posts the receipt to the general ledger. This can't be undone.`}
+                confirmLabel="Mark as paid"
+                processing={markingPaid}
+                onConfirm={confirmMarkPaid}
+            />
         </AppLayout>
     );
 }

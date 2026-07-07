@@ -1,13 +1,14 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { AuditExportDialog, ConfirmDialog, TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Download, Trash2, Loader2, CheckCircle, XCircle, Clock, FileText, History } from 'lucide-react';
+import { useState } from 'react';
 
 interface AuditExport {
     id: number;
@@ -37,6 +38,7 @@ interface PaginatedExports {
 
 interface PageProps {
     exports: PaginatedExports;
+    canManage: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -80,11 +82,18 @@ const getSections = (exp: AuditExport): string[] => {
     return sections;
 };
 
-export default function AuditExportsIndex({ exports: exportData }: PageProps) {
-    const handleDelete = (exportItem: AuditExport) => {
-        if (confirm(`Are you sure you want to delete "${exportItem.export_name}"?`)) {
-            router.delete(`/finance/audit-exports/${exportItem.id}`);
-        }
+export default function AuditExportsIndex({ exports: exportData, canManage = false }: PageProps) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<AuditExport | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        router.delete(`/finance/audit-exports/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     };
 
     const completedCount = exportData.data.filter((e) => e.status === 'completed').length;
@@ -108,12 +117,12 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                             { label: 'Failed', value: failedCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/audit-exports/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Export
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<TaxTabsFooter active="audit-exports" />}
                     />
@@ -192,13 +201,16 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                                                                 </a>
                                                             </Button>
                                                         )}
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDelete(exp)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                                        </Button>
+                                                        {canManage && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                aria-label={`Delete ${exp.export_name}`}
+                                                                onClick={() => setDeleteTarget(exp)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -226,6 +238,29 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            {canManage && (
+                <AuditExportDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+            )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete audit export?"
+                description={
+                    <>
+                        This permanently deletes{' '}
+                        <span className="font-medium text-foreground">
+                            &ldquo;{deleteTarget?.export_name}&rdquo;
+                        </span>{' '}
+                        and its generated file. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete export"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

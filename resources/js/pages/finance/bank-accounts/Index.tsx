@@ -1,14 +1,19 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import {
+    BankAccountDialog,
+    BankingTabsFooter,
+    type AccountOption,
+    type EditableBankAccount,
+} from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, AlertCircle, DollarSign, Landmark, Star, Banknote } from 'lucide-react';
+import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
 const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
@@ -17,7 +22,9 @@ interface BankAccount {
     id: number;
     name: string;
     bank_name: string;
+    account_number: string | null;
     account_type: string;
+    gl_account_id: number | null;
     current_balance: number;
     is_primary: boolean;
     is_active: boolean;
@@ -27,6 +34,8 @@ interface BankAccount {
 
 interface Props {
     bankAccounts: BankAccount[];
+    canManage: boolean;
+    glAccounts: AccountOption[];
 }
 
 const accountTypeLabels: Record<string, string> = {
@@ -36,11 +45,26 @@ const accountTypeLabels: Record<string, string> = {
     credit_card: 'Credit Card',
 };
 
-export default function BankAccountsIndex({ bankAccounts }: Props) {
+export default function BankAccountsIndex({ bankAccounts, canManage = false, glAccounts = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editAccount, setEditAccount] = useState<EditableBankAccount | null>(null);
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Accounts', href: '/finance/bank-accounts' },
     ];
+
+    const openEdit = (account: BankAccount) =>
+        setEditAccount({
+            id: account.id,
+            name: account.name,
+            bank_name: account.bank_name,
+            account_number: account.account_number,
+            account_type: account.account_type,
+            gl_account_id: account.gl_account_id ?? account.gl_account?.id ?? null,
+            is_primary: account.is_primary,
+            is_active: account.is_active,
+        });
 
     const totalCash = useMemo(() => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0), [bankAccounts]);
     const primaryAccount = useMemo(() => bankAccounts.find((a) => a.is_primary), [bankAccounts]);
@@ -74,12 +98,12 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             { label: 'Unreconciled', value: unreconciledTotal },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href={'/finance/bank-accounts/create'}>
+                            canManage && (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     Add Bank Account
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<BankingTabsFooter active="accounts" />}
                     />
@@ -93,12 +117,12 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             <p className="text-muted-foreground mb-4">
                                 Get started by adding your first bank account.
                             </p>
-                            <Button asChild>
-                                <Link href={'/finance/bank-accounts/create'}>
+                            {canManage && (
+                                <Button onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Bank Account
-                                </Link>
-                            </Button>
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 ) : (
@@ -188,24 +212,43 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         {/* Account Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {bankAccounts.map((account) => (
-                                <Link
+                                <Card
                                     key={account.id}
-                                    href={`/finance/bank-accounts/${account.id}`}
-                                    className="block"
+                                    role="link"
+                                    tabIndex={0}
+                                    aria-label={`Open ${account.name}`}
+                                    onClick={() => router.visit(`/finance/bank-accounts/${account.id}`)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') router.visit(`/finance/bank-accounts/${account.id}`);
+                                    }}
+                                    className="hover:shadow-md transition-shadow cursor-pointer h-full"
                                 >
-                                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                                         <CardHeader className="pb-3">
                                             <div className="flex items-start justify-between">
                                                 <div>
                                                     <CardTitle className="text-lg">{account.name}</CardTitle>
                                                     <p className="text-sm text-muted-foreground mt-1">{account.bank_name}</p>
                                                 </div>
-                                                <div className="flex gap-1">
+                                                <div className="flex items-center gap-1">
                                                     {account.is_primary && (
                                                         <Badge variant="default" className="bg-status-info-bg text-status-info border-status-info/30">Primary</Badge>
                                                     )}
                                                     {!account.is_active && (
                                                         <Badge variant="secondary">Inactive</Badge>
+                                                    )}
+                                                    {canManage && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 p-0"
+                                                            aria-label={`Edit ${account.name}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openEdit(account);
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </div>
@@ -243,13 +286,30 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                 )}
                                             </div>
                                         </CardContent>
-                                    </Card>
-                                </Link>
+                                </Card>
                             ))}
                         </div>
                     </>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <BankAccountDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    glAccounts={glAccounts}
+                />
+            )}
+
+            {canManage && editAccount && (
+                <BankAccountDialog
+                    key={editAccount.id}
+                    open
+                    bankAccount={editAccount}
+                    onClose={() => setEditAccount(null)}
+                    glAccounts={glAccounts}
+                />
+            )}
         </AppLayout>
     );
 }
