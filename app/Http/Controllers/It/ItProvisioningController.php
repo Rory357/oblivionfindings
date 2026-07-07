@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItSlaPolicy;
@@ -75,6 +77,7 @@ class ItProvisioningController extends Controller
             'requests' => $this->requestPage($tenantId, $filters),
             'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
             'assignees' => $this->tenantUserOptions($tenantId),
+            'employeeOptions' => $this->employeeOptions($tenantId),
             'filters' => $filters,
             'slaPolicies' => $canEditSla ? $this->slaPolicyGrid($tenantId) : null,
             'overview' => $this->overview($tenantId),
@@ -276,6 +279,79 @@ class ItProvisioningController extends Controller
         }
 
         return redirect()->back()->with('success', 'Request cancelled.');
+    }
+
+    /**
+     * §H manual "New provisioning request" — the ad-hoc path agents raise
+     * outside onboarding (a swapped device, a one-off access grant). Tenant
+     * ownership of the employee profile and any assignee is asserted here,
+     * mirroring assign/fulfil; a `created` event opens the activity trail.
+     */
+    public function storeProvisioning(StoreProvisioningRequestRequest $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $data = $request->validated();
+
+        $profile = HrEmployeeProfile::query()->find((int) $data['employee_profile_id']);
+        $this->assertHrTenantAccess($tenantId, $profile?->tenant_id);
+
+        $assigneeId = ! empty($data['assigned_to_user_id']) ? (int) $data['assigned_to_user_id'] : null;
+        if ($assigneeId) {
+            $inOtherTenant = HrEmployeeProfile::query()
+                ->where('user_id', $assigneeId)
+                ->whereNotNull('tenant_id')
+                ->where('tenant_id', '!=', $tenantId)
+                ->exists();
+            if ($inOtherTenant) {
+                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
+            }
+        }
+
+        $provisioning = ItProvisioningRequest::query()->create([
+            'tenant_id' => $tenantId,
+            'employee_profile_id' => (int) $data['employee_profile_id'],
+            'type' => $data['type'],
+            'item' => $data['item'],
+            'assigned_to_user_id' => $assigneeId,
+            'status' => $assigneeId ? 'in_progress' : 'pending',
+            'priority' => $data['priority'],
+            'due_date' => $data['due_date'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $user->id,
+        ]);
+
+        ItTicketEvent::record($provisioning, 'created', $user->id, array_filter([
+            'type' => $provisioning->type,
+            'assigned_to_user_id' => $assigneeId,
+        ]));
+
+        return redirect()->back()->with('success', "Provisioning request raised — {$provisioning->item}.");
+    }
+
+    /**
+     * Active tenant employee profiles for the manual-request employee picker.
+     * Guarded so a pre-migration read serves an empty list.
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function employeeOptions(int $tenantId): array
+    {
+        if (! Schema::hasTable('hr_employee_profiles')) {
+            return [];
+        }
+
+        return HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->with('user:id,name')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (HrEmployeeProfile $p) => [
+                'id' => $p->id,
+                'name' => $p->user?->name ?? $p->position_title ?? "Employee #{$p->id}",
+            ])
+            ->all();
     }
 
     /* ================================================================== */

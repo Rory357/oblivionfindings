@@ -7,6 +7,7 @@ import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import {
     ItWizard,
     type AssigneeOption,
+    type EmployeeOption,
     type ItModal,
     type RequestRow,
     type SlaPolicyGrid,
@@ -144,6 +145,8 @@ interface Props {
     requests?: Paginated<RequestRow> | null;
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
+    /** Tenant employee profiles for the manual provisioning-request picker. */
+    employeeOptions?: EmployeeOption[];
     filters?: Filters;
     /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
     overview?: OverviewPayload;
@@ -238,6 +241,7 @@ export default function ItIndex({
     requests,
     tickets,
     assignees = [],
+    employeeOptions = [],
     filters,
     overview,
     slaPolicies,
@@ -561,6 +565,7 @@ export default function ItIndex({
             <ItWizard
                 modal={modal}
                 assignees={assignees}
+                employeeOptions={employeeOptions}
                 slaPolicies={slaPolicies}
                 onClose={() => setModal(null)}
             />
@@ -632,6 +637,16 @@ export default function ItIndex({
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
+                            {can.manage ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="ml-auto"
+                                    onClick={() => setModal({ type: 'new-request' })}
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> New request
+                                </Button>
+                            ) : null}
                         </div>
 
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">

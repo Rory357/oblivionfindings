@@ -266,3 +266,53 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
     expect($cancelled)->not->toBeNull();
     expect($cancelled->payload['reason'] ?? null)->toBe('Duplicate');
 });
+
+test('an agent raises a manual provisioning request; requesters cannot', function () {
+    $profile = itProfile();
+    $agent = User::factory()->create();
+
+    // Assigned manual request → in_progress, with a `created` event.
+    $this->actingAs($this->hr)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'equipment',
+            'item' => 'Replacement laptop',
+            'assigned_to_user_id' => $agent->id,
+            'priority' => 'high',
+            'due_date' => now()->addDays(3)->toDateString(),
+            'notes' => 'Old one cracked',
+        ])
+        ->assertRedirect();
+
+    $req = ItProvisioningRequest::query()->firstWhere('item', 'Replacement laptop');
+    expect($req)->not->toBeNull();
+    expect($req->status)->toBe('in_progress');
+    expect($req->priority)->toBe('high');
+    expect((int) $req->assigned_to_user_id)->toBe($agent->id);
+    expect($req->events()->where('type', 'created')->count())->toBe(1);
+
+    // Unassigned manual request stays pending.
+    $this->actingAs($this->hr)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'account',
+            'item' => 'Email setup',
+            'priority' => 'normal',
+        ])
+        ->assertRedirect();
+    expect(ItProvisioningRequest::query()->firstWhere('item', 'Email setup')->status)->toBe('pending');
+
+    // Self-service requesters (no it.manage) cannot raise provisioning requests.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'account',
+            'item' => 'Nope',
+            'priority' => 'normal',
+        ])
+        ->assertForbidden();
+});

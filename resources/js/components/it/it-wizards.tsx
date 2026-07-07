@@ -100,6 +100,12 @@ export interface SlaPolicyRow {
 
 export type SlaPolicyGrid = Record<string, SlaPolicyRow>;
 
+/** A tenant employee profile, for the manual provisioning-request picker. */
+export interface EmployeeOption {
+    id: number;
+    name: string;
+}
+
 export type ItModal =
     | { type: 'ticket' }
     | { type: 'raise' }
@@ -107,6 +113,7 @@ export type ItModal =
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow }
+    | { type: 'new-request' }
     | { type: 'sla' };
 
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
@@ -127,11 +134,13 @@ const UNASSIGNED = 'unassigned';
 export function ItWizard({
     modal,
     assignees,
+    employeeOptions = [],
     slaPolicies,
     onClose,
 }: {
     modal: ItModal | null;
     assignees: AssigneeOption[];
+    employeeOptions?: EmployeeOption[];
     slaPolicies?: SlaPolicyGrid | null;
     onClose: () => void;
 }) {
@@ -139,6 +148,14 @@ export function ItWizard({
     switch (modal.type) {
         case 'ticket':
             return <CreateTicketWizard assignees={assignees} onClose={onClose} />;
+        case 'new-request':
+            return (
+                <NewProvisioningRequestDialog
+                    employeeOptions={employeeOptions}
+                    assignees={assignees}
+                    onClose={onClose}
+                />
+            );
         case 'raise':
             return <RaiseTicketDialog onClose={onClose} />;
         case 'sla':
@@ -380,6 +397,195 @@ function CreateTicketWizard({
                                 <ReviewRow label="Assign to" value={assignee?.name} />
                             ) : null}
                         </ReviewCard>
+                    </div>
+                </WizardStepPane>
+            )}
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  New provisioning request (agent, 2 steps)                         */
+/* ================================================================== */
+
+const PROVISIONING_STEPS: readonly WizardStep[] = [
+    { key: 'what', label: 'Request', blurb: 'Who & what', icon: FileText },
+    { key: 'assign', label: 'Assign', blurb: 'Owner & due', icon: Flag },
+];
+
+const REQUEST_TYPE_OPTIONS = [
+    { key: 'account', label: 'Account', description: 'Email, logins & software', icon: Mail },
+    { key: 'access', label: 'Access', description: 'Systems & permissions', icon: KeyRound },
+    { key: 'equipment', label: 'Equipment', description: 'Laptop, phone & devices', icon: Laptop },
+    { key: 'other', label: 'Other', description: 'Anything else to provision', icon: Server },
+] as const;
+
+function NewProvisioningRequestDialog({
+    employeeOptions,
+    assignees,
+    onClose,
+}: {
+    employeeOptions: EmployeeOption[];
+    assignees: AssigneeOption[];
+    onClose: () => void;
+}) {
+    const wizard = useWizard(PROVISIONING_STEPS.length);
+    const [done, setDone] = useState(false);
+
+    const form = useForm({
+        employee_profile_id: '',
+        type: 'account',
+        item: '',
+        assigned_to_user_id: UNASSIGNED,
+        priority: 'normal',
+        due_date: '',
+        notes: '',
+    });
+
+    const employee = employeeOptions.find((e) => String(e.id) === form.data.employee_profile_id) ?? null;
+    const detailsValid = form.data.employee_profile_id !== '' && form.data.item.trim().length > 0;
+
+    const submit = () => {
+        form.transform((data) => ({
+            ...data,
+            employee_profile_id: Number(data.employee_profile_id),
+            assigned_to_user_id: data.assigned_to_user_id === UNASSIGNED ? null : Number(data.assigned_to_user_id),
+            due_date: data.due_date === '' ? null : data.due_date,
+            notes: data.notes.trim() === '' ? null : data.notes,
+        }));
+        form.post('/it/provisioning', {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const err = pageFlashError(page);
+                if (err) {
+                    toast.error(err);
+                    return;
+                }
+                setDone(true);
+            },
+        });
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="New provisioning request"
+            description="Raise an ad-hoc account, access or equipment request."
+            railIcon={Server}
+            railTitle="New request"
+            railSub="Provisioning"
+            steps={PROVISIONING_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title="Request raised"
+                        blurb={
+                            <>
+                                “{form.data.item}” is on the provisioning queue
+                                {employee ? <> for {employee.name}</> : null}.
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={
+                wizard.isFirst ? null : (
+                    <Button variant="outline" onClick={wizard.back}>
+                        Back
+                    </Button>
+                )
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    {wizard.isLast ? (
+                        <Button onClick={submit} disabled={form.processing || !detailsValid}>
+                            {form.processing ? 'Raising…' : 'Raise request'}
+                        </Button>
+                    ) : (
+                        <Button onClick={wizard.next} disabled={!detailsValid}>
+                            Continue
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {wizard.index === 0 && (
+                <WizardStepPane>
+                    <StepHead icon={FileText} title="Who & what" blurb="Who’s this for, and what needs provisioning?" />
+                    <div className="grid gap-3.5">
+                        <Field label="Employee" required error={form.errors.employee_profile_id}>
+                            <SelectInput
+                                value={form.data.employee_profile_id}
+                                onChange={(v) => form.setData('employee_profile_id', v)}
+                                placeholder="Choose an employee"
+                                options={employeeOptions.map((e) => ({ value: String(e.id), label: e.name }))}
+                            />
+                        </Field>
+                        <Field label="Type" error={form.errors.type}>
+                            <TilePicker
+                                value={form.data.type}
+                                onChange={(v) => form.setData('type', v)}
+                                options={[...REQUEST_TYPE_OPTIONS]}
+                            />
+                        </Field>
+                        <Field label="Item" required error={form.errors.item}>
+                            <Input
+                                value={form.data.item}
+                                onChange={(e) => form.setData('item', e.target.value)}
+                                placeholder="e.g. Replacement laptop"
+                                maxLength={255}
+                            />
+                        </Field>
+                    </div>
+                </WizardStepPane>
+            )}
+            {wizard.index === 1 && (
+                <WizardStepPane>
+                    <StepHead icon={Flag} title="Assign & schedule" blurb="Owner, priority and a due date if there is one." />
+                    <div className="grid gap-3.5">
+                        <Field label="Priority" error={form.errors.priority}>
+                            <TilePicker
+                                value={form.data.priority}
+                                onChange={(v) => form.setData('priority', v)}
+                                options={[...PRIORITY_OPTIONS]}
+                            />
+                        </Field>
+                        {assignees.length > 0 ? (
+                            <Field label="Assign to" hint="optional" error={form.errors.assigned_to_user_id}>
+                                <SelectInput
+                                    value={form.data.assigned_to_user_id}
+                                    onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                    placeholder="Unassigned"
+                                    options={[
+                                        { value: UNASSIGNED, label: 'Unassigned' },
+                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
+                        <Field label="Due date" hint="optional" error={form.errors.due_date}>
+                            <Input
+                                type="date"
+                                value={form.data.due_date}
+                                onChange={(e) => form.setData('due_date', e.target.value)}
+                            />
+                        </Field>
+                        <Field label="Notes" hint="optional" error={form.errors.notes}>
+                            <Textarea
+                                value={form.data.notes}
+                                onChange={(e) => form.setData('notes', e.target.value)}
+                                rows={3}
+                                placeholder="Anything the fulfiller should know…"
+                            />
+                        </Field>
                     </div>
                 </WizardStepPane>
             )}

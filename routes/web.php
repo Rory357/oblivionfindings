@@ -159,6 +159,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
 
     Route::middleware('permission:it.manage')->group(function () {
+        Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
