@@ -205,7 +205,9 @@ class ControlRoomPlaybookController extends Controller
         $playbook = DB::transaction(function () use ($data, $user) {
             $playbook = Playbook::create([
                 'name' => $data['name'],
-                'code' => $data['code'] ?? null,
+                // `code` is a NOT NULL internal handle. The guided wizard doesn't
+                // ask for it (jargon), so derive a unique one from the name.
+                'code' => $data['code'] ?? $this->generatePlaybookCode($data['name']),
                 'description' => $data['description'] ?? null,
                 'category' => $data['category'],
                 'version' => 1,
@@ -352,6 +354,27 @@ class ControlRoomPlaybookController extends Controller
         ]);
 
         return back()->with('success', 'Playbook updated to version ' . $playbook->fresh()->version . '.');
+    }
+
+    /**
+     * Derive a unique, URL-safe code from a playbook name. `code` is NOT NULL
+     * and unique-ish; the guided wizard doesn't surface it, so we generate one.
+     */
+    private function generatePlaybookCode(string $name): string
+    {
+        $base = \Illuminate\Support\Str::of($name)->slug('_')->limit(40, '')->value();
+        if ($base === '') {
+            $base = 'playbook';
+        }
+
+        $code = $base;
+        $suffix = 1;
+        while (Playbook::where('code', $code)->exists()) {
+            $suffix++;
+            $code = $base.'_'.$suffix;
+        }
+
+        return $code;
     }
 
     /**

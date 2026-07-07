@@ -109,6 +109,39 @@ class ControlRoomPlaybookControllerTest extends TestCase
         $this->assertSame(2, $playbook->steps()->count());
     }
 
+    public function test_store_generates_code_when_omitted(): void
+    {
+        // The guided wizard never sends `code` (it's an internal handle), but
+        // the column is NOT NULL — the controller must derive a unique one.
+        $this->actingAs($this->admin)
+            ->post('/control-room/playbooks', [
+                'name' => 'Door Left Open Response',
+                'category' => 'safety',
+                'steps' => [['title' => 'Check the door on camera', 'type' => 'task']],
+            ])
+            ->assertRedirect();
+
+        $playbook = Playbook::where('name', 'Door Left Open Response')->first();
+        $this->assertNotNull($playbook);
+        $this->assertNotNull($playbook->code, 'A code must be generated when none is supplied.');
+        $this->assertSame('door_left_open_response', $playbook->code);
+    }
+
+    public function test_store_generated_code_is_unique(): void
+    {
+        $payload = [
+            'name' => 'Duplicate Name',
+            'category' => 'emergency',
+            'steps' => [['title' => 'Do a thing', 'type' => 'task']],
+        ];
+        $this->actingAs($this->admin)->post('/control-room/playbooks', $payload)->assertRedirect();
+        $this->actingAs($this->admin)->post('/control-room/playbooks', $payload)->assertRedirect();
+
+        $codes = Playbook::where('name', 'Duplicate Name')->pluck('code');
+        $this->assertCount(2, $codes);
+        $this->assertSame($codes->count(), $codes->unique()->count(), 'Generated codes must be unique.');
+    }
+
     public function test_store_blocked_without_manage_permission(): void
     {
         $this->actingAs($this->supportWorker)
