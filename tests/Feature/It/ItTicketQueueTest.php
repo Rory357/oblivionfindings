@@ -150,3 +150,21 @@ test('the summary counts the whole table, not the page', function () {
             ->where('summary.my.waiting', 1)
             ->where('summary.my.resolved_30d', 1));
 });
+
+test('the summary counts SLA-met settlements for the hero compliance ring', function () {
+    // Two tickets settled this month — one met its SLA target, one breached.
+    ItTicket::factory()->resolved()->create(['sla_state' => 'met']);
+    ItTicket::factory()->resolved()->create(['sla_state' => 'breached']);
+    // An older met settlement (>30d) is outside the window and must not count.
+    ItTicket::factory()->resolved()->create([
+        'sla_state' => 'met',
+        'resolved_at' => now()->subDays(40),
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('summary.tickets.resolved_30d', 2)
+            ->where('summary.tickets.met_30d', 1));
+});

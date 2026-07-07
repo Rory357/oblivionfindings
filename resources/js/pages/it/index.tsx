@@ -95,6 +95,7 @@ interface Summary {
         awaiting_reply: number;
         waiting: number;
         resolved_30d: number;
+        met_30d: number;
         by_status: Record<string, number>;
         views: Record<string, number>;
     };
