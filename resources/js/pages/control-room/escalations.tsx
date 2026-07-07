@@ -1,13 +1,11 @@
+import { AlertWorkspaceDialog, PaneNav, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { BulkAlertActionDialog } from '@/components/control-room/bulk-alert-action-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-} from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -18,12 +16,10 @@ import {
     ChevronRight,
     Clock,
     ExternalLink,
-    Hand,
     MoveRight,
     ShieldAlert,
     Timer,
     User,
-    UserCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -90,6 +86,8 @@ interface Props {
         manage: boolean;
         assign: boolean;
     };
+    /** Workspace-over-list: present when ?alert= is in the URL. */
+    detail?: AlertWorkspaceDetail | null;
 }
 
 // --- Severity config ---
@@ -312,65 +310,24 @@ function AlertCard({
     allQueues,
     currentQueueId,
     canManage,
-    canAssign,
     nowMs,
     selectedAlertIds,
     onToggleSelect,
+    onOpen,
 }: {
     alert: QueueAlert;
     allQueues: QueueOption[];
     currentQueueId: number;
     canManage: boolean;
-    canAssign: boolean;
     nowMs: number;
     selectedAlertIds: Set<number>;
     onToggleSelect: (id: number) => void;
+    onOpen: (id: number) => void;
 }) {
-    const [moving, setMoving] = useState(false);
-    const [acking, setAcking] = useState(false);
-    const [assigning, setAssigning] = useState(false);
+    const [moveOpen, setMoveOpen] = useState(false);
     const breached = isAlertBreached(alert.sla);
     const sev = severityConfig[alert.severity] ?? severityConfig.low;
     const isSelected = selectedAlertIds.has(alert.id);
-
-    const handleMove = (targetQueueId: string) => {
-        if (moving) return;
-        setMoving(true);
-        router.post(
-            `/control-room/escalations/${alert.id}/move`,
-            { target_queue_id: parseInt(targetQueueId, 10) },
-            {
-                preserveScroll: true,
-                onFinish: () => setMoving(false),
-            },
-        );
-    };
-
-    const handleAcknowledge = () => {
-        if (acking) return;
-        setAcking(true);
-        router.post(
-            `/control-room/escalations/${alert.id}/acknowledge`,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setAcking(false),
-            },
-        );
-    };
-
-    const handleAssignToMe = () => {
-        if (assigning) return;
-        setAssigning(true);
-        router.post(
-            `/control-room/escalations/${alert.id}/assign-to-me`,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setAssigning(false),
-            },
-        );
-    };
 
     const otherQueues = allQueues.filter((q) => q.id !== currentQueueId);
 
@@ -496,68 +453,104 @@ function AlertCard({
                     )}
                 </div>
 
-                {/* Action buttons row */}
+                {/* Action buttons row — work happens in the guided workspace */}
                 <div className="flex items-center gap-1.5 border-t border-border/50 pt-2">
-                    {/* Ack button (if open) */}
-                    {canManage && alert.status === 'open' && (
+                    <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => onOpen(alert.id)}
+                    >
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Open alert
+                    </Button>
+
+                    {/* Move to queue — stepped dialog */}
+                    {canManage && otherQueues.length > 0 && (
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 border-status-warning/30 px-2 text-xs text-status-warning hover:bg-status-warning-bg"
-                            onClick={handleAcknowledge}
-                            disabled={acking}
+                            className="ml-auto h-7 px-2 text-xs"
+                            onClick={() => setMoveOpen(true)}
                         >
-                            <Hand className="mr-1 h-3 w-3" />
-                            Ack
+                            <MoveRight className="mr-1 h-3 w-3" />
+                            Move
                         </Button>
                     )}
-
-                    {/* Assign to Me button (if unassigned) */}
-                    {canAssign && !alert.assigned_to && (
-                        <Button
-                            size="sm"
-                            variant="default"
-                            className="h-7 px-2 text-xs"
-                            onClick={handleAssignToMe}
-                            disabled={assigning}
-                        >
-                            <UserCheck className="mr-1 h-3 w-3" />
-                            Assign to Me
-                        </Button>
-                    )}
-
-                    {/* Move to queue dropdown */}
-                    {canManage && otherQueues.length > 0 && (
-                        <Select onValueChange={handleMove} disabled={moving}>
-                            <SelectTrigger className="h-7 w-auto min-w-0 gap-1 px-2 text-xs">
-                                <MoveRight className="h-3 w-3 shrink-0" />
-                                <span className="hidden sm:inline">Move</span>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {otherQueues.map((q) => (
-                                    <SelectItem key={q.id} value={String(q.id)}>
-                                        Tier {q.tier}: {q.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-
-                    {/* Link to detail page */}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="ml-auto h-7 w-7 p-0"
-                        onClick={() =>
-                            router.visit(`/control-room/alerts/${alert.id}`)
-                        }
-                        title="View alert detail"
-                    >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
                 </div>
             </div>
+
+            {moveOpen ? (
+                <MoveQueueDialog alert={alert} queues={otherQueues} onClose={() => setMoveOpen(false)} />
+            ) : null}
         </div>
+    );
+}
+
+/** Stepped queue move: review the alert → pick the target queue → confirm. */
+function MoveQueueDialog({
+    alert,
+    queues,
+    onClose,
+}: {
+    alert: QueueAlert;
+    queues: QueueOption[];
+    onClose: () => void;
+}) {
+    const [step, setStep] = useState(0);
+    const [targetId, setTargetId] = useState('');
+    const [busy, setBusy] = useState(false);
+    const target = queues.find((q) => String(q.id) === targetId);
+
+    const submit = () => {
+        if (!target || busy) return;
+        setBusy(true);
+        router.post(
+            `/control-room/escalations/${alert.id}/move`,
+            { target_queue_id: target.id },
+            {
+                preserveScroll: true,
+                onSuccess: onClose,
+                onFinish: () => setBusy(false),
+            },
+        );
+    };
+
+    return (
+        <Dialog open onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogTitle className="sr-only">Move alert to another queue</DialogTitle>
+                <DialogDescription className="sr-only">Choose the queue this alert should move to.</DialogDescription>
+                <div className="flex flex-col gap-4">
+                    <StepHead
+                        icon={MoveRight}
+                        title={`Move CR-${alert.id} to another queue`}
+                        blurb="The alert leaves its current queue and joins the target queue's worklist. The move is recorded on the queue history."
+                    />
+                    {step === 0 ? (
+                        <>
+                            <Field label="Target queue" required>
+                                <SelectInput
+                                    value={targetId}
+                                    onChange={setTargetId}
+                                    placeholder="Select a queue"
+                                    options={queues.map((q) => ({ value: String(q.id), label: `Tier ${q.tier}: ${q.name}` }))}
+                                />
+                            </Field>
+                            <PaneNav onCancel={onClose} onNext={() => setStep(1)} nextDisabled={!target} step={0} stepCount={2} />
+                        </>
+                    ) : (
+                        <>
+                            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-sm">
+                                <span className="font-medium text-foreground">CR-{alert.id} · {alert.alert_type}</span>
+                                <span className="text-muted-foreground"> → Tier {target?.tier}: {target?.name}</span>
+                            </div>
+                            <PaneNav onCancel={onClose} onBack={() => setStep(0)} onSubmit={submit} submitLabel="Move alert" processing={busy} step={1} stepCount={2} />
+                        </>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -565,18 +558,18 @@ function QueueColumn({
     queue,
     allQueues,
     canManage,
-    canAssign,
     nowMs,
     selectedAlertIds,
     onToggleSelect,
+    onOpen,
 }: {
     queue: QueueData;
     allQueues: QueueOption[];
     canManage: boolean;
-    canAssign: boolean;
     nowMs: number;
     selectedAlertIds: Set<number>;
     onToggleSelect: (id: number) => void;
+    onOpen: (id: number) => void;
 }) {
     const breachedCount = queue.alerts.filter((a) =>
         isAlertBreached(a.sla),
@@ -674,10 +667,10 @@ function QueueColumn({
                             allQueues={allQueues}
                             currentQueueId={queue.id}
                             canManage={canManage}
-                            canAssign={canAssign}
                             nowMs={nowMs}
                             selectedAlertIds={selectedAlertIds}
                             onToggleSelect={onToggleSelect}
+                            onOpen={onOpen}
                         />
                     ))
                 )}
@@ -693,12 +686,26 @@ export default function EscalationQueue({
     allQueues,
     serverTime,
     can,
+    detail = null,
 }: Props) {
     const [nowMs, setNowMs] = useState(() => new Date(serverTime).getTime());
     const [selectedAlertIds, setSelectedAlertIds] = useState<Set<number>>(
         new Set(),
     );
-    const [bulkEscalating, setBulkEscalating] = useState(false);
+    const [bulkOpen, setBulkOpen] = useState(false);
+
+    // Workspace-over-list: fetch only the `detail` prop and open the dialog
+    // over the board; closing drops the param again.
+    const openWorkspace = (id: number) => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('alert', String(id));
+        router.get(`/control-room/escalations?${params.toString()}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
+    const closeWorkspace = () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('alert');
+        router.get(`/control-room/escalations${params.size ? `?${params.toString()}` : ''}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(
         null,
@@ -744,21 +751,9 @@ export default function EscalationQueue({
         });
     }, []);
 
-    const handleBulkEscalate = () => {
-        if (selectedAlertIds.size === 0 || bulkEscalating) return;
-        setBulkEscalating(true);
-        router.post(
-            '/control-room/escalations/bulk-escalate',
-            { alert_ids: Array.from(selectedAlertIds) },
-            {
-                preserveScroll: true,
-                onFinish: () => {
-                    setBulkEscalating(false);
-                    setSelectedAlertIds(new Set());
-                },
-            },
-        );
-    };
+    const selectedAlerts = queues
+        .flatMap((q) => q.alerts)
+        .filter((a) => selectedAlertIds.has(a.id));
 
     const totalAlerts = queues.reduce((sum, q) => sum + q.alert_count, 0);
     const totalBreached = queues.reduce(
@@ -865,10 +860,10 @@ export default function EscalationQueue({
                                     queue={queue}
                                     allQueues={allQueues}
                                     canManage={can.manage}
-                                    canAssign={can.assign}
                                     nowMs={nowMs}
                                     selectedAlertIds={selectedAlertIds}
                                     onToggleSelect={handleToggleSelect}
+                                    onOpen={openWorkspace}
                                 />
                             </div>
                         ))}
@@ -887,8 +882,7 @@ export default function EscalationQueue({
                         <Button
                             size="sm"
                             variant="default"
-                            onClick={handleBulkEscalate}
-                            disabled={bulkEscalating}
+                            onClick={() => setBulkOpen(true)}
                         >
                             <ArrowUpRight className="mr-1.5 h-4 w-4" />
                             Escalate {selectedAlertIds.size} Selected
@@ -903,6 +897,28 @@ export default function EscalationQueue({
                     </Card>
                 </div>
             )}
+
+            {/* Stepped bulk escalate — review selection, then a required reason */}
+            {bulkOpen ? (
+                <BulkAlertActionDialog
+                    mode="escalate"
+                    open
+                    onClose={() => setBulkOpen(false)}
+                    alerts={selectedAlerts.map((a) => ({
+                        id: a.id,
+                        alert_type: a.alert_type,
+                        severity: a.severity,
+                        status: a.status,
+                        client_name: a.client_name,
+                    }))}
+                    onDone={() => setSelectedAlertIds(new Set())}
+                />
+            ) : null}
+
+            {/* Workspace-over-list */}
+            {detail ? (
+                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+            ) : null}
 
             {/* Pulse animation style */}
             <style>{`

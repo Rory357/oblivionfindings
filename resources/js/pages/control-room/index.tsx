@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -119,6 +120,8 @@ interface Props {
     recent_activity: ActivityEvent[];
     staff: { id: number; name: string }[];
     filters: Record<string, string>;
+    /** Workspace-over-list: present when ?alert= is in the URL. */
+    detail?: AlertWorkspaceDetail | null;
     can: {
         manage: boolean;
         assign: boolean;
@@ -288,6 +291,7 @@ export default function ControlRoomIndex({
     recent_activity,
     staff,
     filters,
+    detail = null,
     can,
     escalation_rate,
     attention_flags,
@@ -301,6 +305,19 @@ export default function ControlRoomIndex({
 }: Props) {
     const [searchValue, setSearchValue] = useState(filters.search || '');
     const prevCriticalRef = useRef(stats.critical);
+
+    // Workspace-over-list: fetch only the `detail` prop and open the dialog
+    // without leaving the dashboard; closing drops the param again.
+    const openWorkspace = (id: number) => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('alert', String(id));
+        router.get(`/control-room?${params.toString()}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
+    const closeWorkspace = () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('alert');
+        router.get(`/control-room${params.size ? `?${params.toString()}` : ''}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
 
     // Auto-refresh every 30 seconds
     useEffect(() => {
@@ -1497,10 +1514,11 @@ export default function ControlRoomIndex({
                     <div className="divide-y">
                         {alerts.data.length ? (
                             alerts.data.map((alert, idx) => (
-                                <Link
+                                <button
+                                    type="button"
                                     key={alert.id}
-                                    href={`/control-room/alerts/${alert.id}`}
-                                    className={`flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50 ${
+                                    onClick={() => openWorkspace(alert.id)}
+                                    className={`flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
                                         idx % 2 === 1 ? 'bg-muted/20' : ''
                                     } ${
                                         alert.severity === 'critical'
@@ -1560,26 +1578,6 @@ export default function ControlRoomIndex({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {can.manage &&
-                                            alert.status === 'open' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        router.post(
-                                                            `/control-room/alerts/${alert.id}/acknowledge`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        );
-                                                    }}
-                                                >
-                                                    Ack
-                                                </Button>
-                                            )}
                                         {alert.sla_status && (
                                             <span
                                                 className={`inline-block h-2.5 w-2.5 rounded-full ${
@@ -1613,7 +1611,7 @@ export default function ControlRoomIndex({
                                             {alert.status}
                                         </Badge>
                                     </div>
-                                </Link>
+                                </button>
                             ))
                         ) : (
                             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -1658,6 +1656,11 @@ export default function ControlRoomIndex({
                     )}
                 </div>
             </PageShell>
+
+            {/* Workspace-over-list */}
+            {detail ? (
+                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+            ) : null}
         </AppLayout>
     );
 }

@@ -1,19 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
+import { AlertWorkspaceDialog, ConfirmChip, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Head, Link, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import {
     AlertTriangle,
@@ -97,6 +89,8 @@ interface Props {
     my_shift: MyShift | null;
     stats: Stats;
     can: Can;
+    /** Workspace-over-list: present when ?alert= is in the URL. */
+    detail?: AlertWorkspaceDetail | null;
 }
 
 // --- Helpers ---
@@ -168,7 +162,7 @@ const breadcrumbs = [
     { title: 'My Tasks', href: '#' },
 ];
 
-export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can }: Props) {
+export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can, detail = null }: Props) {
     // Auto-refresh every 30 seconds
     const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -181,31 +175,14 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
         };
     }, []);
 
-    // Resolve dialog state
-    const [resolveAlertId, setResolveAlertId] = useState<number | null>(null);
-    const [resolveNotes, setResolveNotes] = useState('');
-    const [resolving, setResolving] = useState(false);
-
-    const handleAcknowledge = useCallback((alertId: number) => {
-        router.post(`/control-room/alerts/${alertId}/acknowledge`, {}, {
-            preserveScroll: true,
-        });
+    // Workspace-over-list: fetch only the `detail` prop and open the dialog
+    // over My Tasks; the guided panes replace the old inline Ack/Resolve.
+    const openWorkspace = useCallback((id: number) => {
+        router.get('/control-room/my-tasks', { alert: String(id) }, { preserveState: true, preserveScroll: true, only: ['detail'] });
     }, []);
-
-    const handleResolve = useCallback(() => {
-        if (!resolveAlertId || !resolveNotes.trim()) return;
-        setResolving(true);
-        router.post(`/control-room/alerts/${resolveAlertId}/resolve`, {
-            resolution_notes: resolveNotes,
-        }, {
-            preserveScroll: true,
-            onFinish: () => {
-                setResolving(false);
-                setResolveAlertId(null);
-                setResolveNotes('');
-            },
-        });
-    }, [resolveAlertId, resolveNotes]);
+    const closeWorkspace = useCallback(() => {
+        router.get('/control-room/my-tasks', {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    }, []);
 
     const handleCompleteFollowup = useCallback((noteId: number) => {
         router.post(`/control-room/my-tasks/followups/${noteId}/complete`, {}, {
@@ -295,12 +272,13 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <Link
-                                                                href={`/control-room/alerts/${alert.id}`}
-                                                                className="truncate font-semibold hover:underline"
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openWorkspace(alert.id)}
+                                                                className="truncate text-left font-semibold hover:underline"
                                                             >
                                                                 {alert.alert_type}
-                                                            </Link>
+                                                            </button>
                                                             {alert.client_name && (
                                                                 <span className="truncate text-xs text-muted-foreground">
                                                                     - {alert.client_name}
@@ -330,34 +308,16 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                                                     </div>
                                                 </div>
 
-                                                {/* Quick Actions */}
+                                                {/* Work happens in the guided workspace */}
                                                 <div className="ml-3 flex shrink-0 items-center gap-2">
-                                                    {can.manage && alert.status === 'open' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleAcknowledge(alert.id)}
-                                                        >
-                                                            Ack
-                                                        </Button>
-                                                    )}
-                                                    {can.manage && alert.status !== 'resolved' && alert.status !== 'closed' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setResolveAlertId(alert.id);
-                                                                setResolveNotes('');
-                                                            }}
-                                                        >
-                                                            Resolve
-                                                        </Button>
-                                                    )}
-                                                    <Link href={`/control-room/alerts/${alert.id}`}>
-                                                        <Button variant="ghost" size="sm">
-                                                            <ExternalLink className="h-4 w-4" />
-                                                        </Button>
-                                                    </Link>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openWorkspace(alert.id)}
+                                                    >
+                                                        <ExternalLink className="mr-1.5 h-4 w-4" />
+                                                        Open
+                                                    </Button>
                                                 </div>
                                             </div>
                                         ))}
@@ -406,26 +366,25 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                                                             {formatFollowupDate(note.followup_at)}
                                                         </span>
                                                         {note.alert && (
-                                                            <Link
-                                                                href={`/control-room/alerts/${note.alert.id}`}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openWorkspace(note.alert!.id)}
                                                                 className="flex items-center gap-1 text-xs text-primary hover:underline"
                                                             >
                                                                 Alert #{note.alert.id}
                                                                 <Badge className={`text-xs ${severityColors[note.alert.severity] ?? ''}`}>
                                                                     {note.alert.severity}
                                                                 </Badge>
-                                                            </Link>
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <div className="ml-3 shrink-0">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleCompleteFollowup(note.id)}
-                                                    >
-                                                        Complete
-                                                    </Button>
+                                                    <ConfirmChip
+                                                        label="Complete"
+                                                        icon={CheckCircle}
+                                                        onConfirm={() => handleCompleteFollowup(note.id)}
+                                                    />
                                                 </div>
                                             </div>
                                         ))}
@@ -518,35 +477,12 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                     </div>
                 </div>
 
-                {/* Resolve Dialog */}
-                <Dialog open={resolveAlertId !== null} onOpenChange={(open) => { if (!open) setResolveAlertId(null); }}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Resolve Alert</DialogTitle>
-                            <DialogDescription>
-                                Provide resolution notes to close this alert.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <Textarea
-                            placeholder="Describe the resolution..."
-                            value={resolveNotes}
-                            onChange={(e) => setResolveNotes(e.target.value)}
-                            rows={4}
-                        />
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setResolveAlertId(null)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleResolve}
-                                disabled={resolving || !resolveNotes.trim()}
-                            >
-                                {resolving ? 'Resolving...' : 'Resolve'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
             </PageShell>
+
+            {/* Workspace-over-list */}
+            {detail ? (
+                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+            ) : null}
         </AppLayout>
     );
 }

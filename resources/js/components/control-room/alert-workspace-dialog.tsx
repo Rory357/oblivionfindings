@@ -242,8 +242,9 @@ function summarise(alert: WorkspaceAlert): string {
 /*  Shared pane chrome                                                 */
 /* ------------------------------------------------------------------ */
 
-/** Footer nav for a guided action pane: Cancel · Back ← → Next / primary CTA. */
-function PaneNav({
+/** Footer nav for a guided action pane: Cancel · Back ← → Next / primary CTA.
+ *  Exported for the bulk-action and other control-room stepped dialogs. */
+export function PaneNav({
     onCancel,
     onBack,
     onNext,
@@ -298,7 +299,7 @@ function PaneNav({
 }
 
 /** Two-phase row action: click → inline "Sure?" confirm — nothing fires on a single click. */
-function ConfirmChip({
+export function ConfirmChip({
     label,
     icon: Icon,
     onConfirm,

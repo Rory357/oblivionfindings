@@ -1,16 +1,10 @@
+import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { BulkAlertActionDialog, type BulkAlertMode } from '@/components/control-room/bulk-alert-action-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -84,6 +78,8 @@ interface Props {
         manage: boolean;
         assign: boolean;
     };
+    /** Workspace-over-list: present when ?alert= is in the URL. */
+    detail?: AlertWorkspaceDetail | null;
     basePath?: string;
     pageTitle?: string;
     pageDescription?: string;
@@ -167,6 +163,7 @@ export default function AlertsIndex({
     stats,
     staff,
     can,
+    detail = null,
     basePath = '/control-room/alerts',
     pageTitle = 'Alerts',
     pageDescription = 'Monitor and manage all control room alerts',
@@ -176,9 +173,15 @@ export default function AlertsIndex({
     ],
 }: Props) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
-    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-    const [assignUserId, setAssignUserId] = useState<string>('');
+    const [bulkMode, setBulkMode] = useState<BulkAlertMode | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
+
+    // Workspace-over-list: fetch only the `detail` prop and open the dialog
+    // without navigating away; closing drops the param so `detail` goes null.
+    const openWorkspace = (id: number) =>
+        router.get(basePath, { ...filters, alert: String(id) } as Record<string, string>, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    const closeWorkspace = () =>
+        router.get(basePath, { ...filters } as Record<string, string>, { preserveState: true, preserveScroll: true, only: ['detail'] });
 
     // 30-second auto-refresh
     useEffect(() => {
@@ -280,55 +283,10 @@ export default function AlertsIndex({
     };
 
     // ------------------------------------------------------------------
-    // Bulk actions
+    // Bulk actions — stepped dialogs (review selection → details → submit)
     // ------------------------------------------------------------------
 
-    const bulkAcknowledge = () => {
-        router.post(
-            '/control-room/alerts/bulk-acknowledge',
-            { alert_ids: Array.from(selected) },
-            { preserveScroll: true, onSuccess: () => setSelected(new Set()) },
-        );
-    };
-
-    const bulkAssign = () => {
-        if (!assignUserId) return;
-        router.post(
-            '/control-room/alerts/bulk-assign',
-            {
-                alert_ids: Array.from(selected),
-                assigned_to_user_id: Number(assignUserId),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelected(new Set());
-                    setAssignDialogOpen(false);
-                    setAssignUserId('');
-                },
-            },
-        );
-    };
-
-    // ------------------------------------------------------------------
-    // Inline actions
-    // ------------------------------------------------------------------
-
-    const inlineAcknowledge = (id: number) => {
-        router.post(
-            `/control-room/alerts/${id}/acknowledge`,
-            {},
-            { preserveScroll: true },
-        );
-    };
-
-    const inlineAssignToMe = (id: number) => {
-        router.post(
-            `/control-room/alerts/${id}/assign-to-me`,
-            {},
-            { preserveScroll: true },
-        );
-    };
+    const selectedAlerts = alerts.data.filter((a) => selected.has(a.id));
 
     // ------------------------------------------------------------------
     // Quick filter tabs config
@@ -555,7 +513,7 @@ export default function AlertsIndex({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={bulkAcknowledge}
+                                onClick={() => setBulkMode('acknowledge')}
                             >
                                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                                 Acknowledge Selected
@@ -565,7 +523,7 @@ export default function AlertsIndex({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setAssignDialogOpen(true)}
+                                onClick={() => setBulkMode('assign')}
                             >
                                 <UserPlus className="mr-1.5 h-3.5 w-3.5" />
                                 Assign Selected
@@ -649,7 +607,8 @@ export default function AlertsIndex({
                                 alerts.data.map((alert, idx) => (
                                     <tr
                                         key={alert.id}
-                                        className={`border-b border-l-4 transition-colors hover:bg-muted/40 ${
+                                        onClick={() => openWorkspace(alert.id)}
+                                        className={`cursor-pointer border-b border-l-4 transition-colors hover:bg-muted/40 ${
                                             severityBorders[alert.severity] ??
                                             'border-l-transparent'
                                         } ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
@@ -658,7 +617,10 @@ export default function AlertsIndex({
                                                 : ''
                                         }`}
                                     >
-                                        <td className="px-3 py-2.5">
+                                        <td
+                                            className="px-3 py-2.5"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             <Checkbox
                                                 checked={selected.has(alert.id)}
                                                 onCheckedChange={() =>
@@ -770,52 +732,21 @@ export default function AlertsIndex({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-2.5">
+                                        <td
+                                            className="px-3 py-2.5"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             <div className="flex items-center justify-end gap-1">
-                                                {can.manage &&
-                                                    alert.status === 'open' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-7 px-2 text-xs"
-                                                            onClick={() =>
-                                                                inlineAcknowledge(
-                                                                    alert.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                            Ack
-                                                        </Button>
-                                                    )}
-                                                {can.assign &&
-                                                    !alert.assigned_to && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-7 px-2 text-xs"
-                                                            onClick={() =>
-                                                                inlineAssignToMe(
-                                                                    alert.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <UserPlus className="mr-1 h-3 w-3" />
-                                                            Me
-                                                        </Button>
-                                                    )}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     className="h-7 px-2 text-xs"
-                                                    asChild
+                                                    onClick={() =>
+                                                        openWorkspace(alert.id)
+                                                    }
                                                 >
-                                                    <Link
-                                                        href={`/control-room/alerts/${alert.id}`}
-                                                    >
-                                                        <Eye className="mr-1 h-3 w-3" />
-                                                        View
-                                                    </Link>
+                                                    <Eye className="mr-1 h-3 w-3" />
+                                                    Open
                                                 </Button>
                                             </div>
                                         </td>
@@ -867,46 +798,28 @@ export default function AlertsIndex({
                 )}
             </PageLayout>
 
-            {/* Bulk assign dialog */}
-            <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Assign Alerts</DialogTitle>
-                        <DialogDescription>
-                            Assign {selected.size} selected alert(s) to a staff
-                            member.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Select
-                            value={assignUserId}
-                            onValueChange={setAssignUserId}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select staff member..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {staff.map((s) => (
-                                    <SelectItem key={s.id} value={String(s.id)}>
-                                        {s.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setAssignDialogOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={bulkAssign} disabled={!assignUserId}>
-                            Assign
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Stepped bulk actions: review selection → details → submit */}
+            {bulkMode ? (
+                <BulkAlertActionDialog
+                    mode={bulkMode}
+                    open
+                    onClose={() => setBulkMode(null)}
+                    alerts={selectedAlerts.map((a) => ({
+                        id: a.id,
+                        alert_type: a.alert_type,
+                        severity: a.severity,
+                        status: a.status,
+                        client_name: a.client_name,
+                    }))}
+                    staff={staff}
+                    onDone={() => setSelected(new Set())}
+                />
+            ) : null}
+
+            {/* Workspace-over-list */}
+            {detail ? (
+                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+            ) : null}
         </AppLayout>
     );
 }

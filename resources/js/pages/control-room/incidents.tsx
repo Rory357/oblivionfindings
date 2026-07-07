@@ -1,5 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
+import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { FlagIncidentDialog } from '@/components/control-room/flag-incident-dialog';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Clock,
+    ExternalLink,
     FileWarning,
     MapPin,
     Pill,
@@ -75,6 +78,8 @@ interface Props {
     can: {
         createAlert: boolean;
     };
+    /** Workspace-over-list: present when ?alert= is in the URL. */
+    detail?: AlertWorkspaceDetail | null;
 }
 
 const severityColors: Record<string, string> = {
@@ -133,9 +138,17 @@ function truncate(text: string | null, length: number): string {
     return text.length > length ? text.slice(0, length) + '...' : text;
 }
 
-export default function IncidentTracker({ incidents, filters, stats, sites, clients, can }: Props) {
+export default function IncidentTracker({ incidents, filters, stats, sites, clients, can, detail = null }: Props) {
     const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
     const [sheetOpen, setSheetOpen] = useState(false);
+    const [flagOpen, setFlagOpen] = useState(false);
+
+    // Workspace-over-list for linked Control Room alerts (?alert=).
+    const closeWorkspace = () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('alert');
+        router.get(`/control-room/incidents${params.size ? `?${params.toString()}` : ''}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
     const [alertTarget, setAlertTarget] = useState<Incident | null>(null);
     const [alertSeverity, setAlertSeverity] = useState('high');
@@ -223,6 +236,19 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                         { label: 'High', value: stats.high },
                         { label: 'Unresolved', value: stats.unresolved },
                     ]}
+                    actions={
+                        can.createAlert ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setFlagOpen(true)}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Bell className="mr-2 h-4 w-4" />
+                                Flag incident
+                            </Button>
+                        ) : undefined
+                    }
                 />
 
                 {/* Stats Cards */}
@@ -629,6 +655,23 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                 </div>
 
                                 {/* Actions */}
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => {
+                                        setSheetOpen(false);
+                                        if (selectedIncident.source_type === 'client_incident') {
+                                            router.visit(`/incidents?incident=${selectedIncident.source_id}`);
+                                        } else if (selectedIncident.source_type === 'safeguarding') {
+                                            router.visit(`/safeguarding/${selectedIncident.source_id}`);
+                                        } else {
+                                            router.visit('/emar/errors');
+                                        }
+                                    }}
+                                >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Open source record
+                                </Button>
                                 {can.createAlert && (
                                     <Button
                                         className="w-full"
@@ -702,6 +745,19 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Quick-flag: raise an alert + create the incident together (Gap A) */}
+            <FlagIncidentDialog
+                open={flagOpen}
+                onClose={() => setFlagOpen(false)}
+                clients={clients}
+                onFlagged={(incidentId) => router.visit(`/incidents?incident=${incidentId}`)}
+            />
+
+            {/* Workspace-over-list for linked alerts */}
+            {detail ? (
+                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+            ) : null}
         </AppLayout>
     );
 }

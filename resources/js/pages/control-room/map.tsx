@@ -447,6 +447,8 @@ export default function ControlRoomMap({
                     (alert.notes
                         ? `<br/><span style="color:#888;font-size:11px">${alert.notes}</span>`
                         : '') +
+                    // Deep link into the guided alert workspace
+                    `<br/><a href="/control-room/alerts/${alert.id}" style="display:inline-block;margin-top:6px;font-weight:600;color:#2563eb">Open alert →</a>` +
                     `</div>`;
 
                 L.marker([alert.latitude!, alert.longitude!], {

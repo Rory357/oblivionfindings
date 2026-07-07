@@ -231,6 +231,9 @@ class ControlRoomEscalationController extends Controller
         $validated = $request->validate([
             'alert_ids' => ['required', 'array', 'min:1'],
             'alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            // Parity with single escalate — bulk moves carry a reason on each
+            // alert's escalation history so the audit trail stays complete.
+            'reason' => ['required', 'string', 'max:1000'],
         ]);
 
         $escalatedCount = 0;
@@ -271,11 +274,23 @@ class ControlRoomEscalationController extends Controller
             ]);
 
             // Update alert
+            $newLevel = ($alert->escalation_level ?? 0) + 1;
             $alert->update([
                 'queue_id' => $nextQueue->id,
-                'escalation_level' => ($alert->escalation_level ?? 0) + 1,
+                'escalation_level' => $newLevel,
                 'escalated_at' => now(),
                 'escalated_by_user_id' => $user->id,
+                'context' => array_merge($alert->context ?? [], [
+                    'escalation_history' => array_merge($alert->context['escalation_history'] ?? [], [
+                        [
+                            'level' => $newLevel,
+                            'reason' => $validated['reason'],
+                            'escalated_by' => $user->id,
+                            'escalated_at' => now()->toISOString(),
+                            'bulk' => true,
+                        ],
+                    ]),
+                ]),
             ]);
 
             $escalatedCount++;

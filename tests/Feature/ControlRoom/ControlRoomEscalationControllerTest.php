@@ -126,12 +126,16 @@ class ControlRoomEscalationControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/control-room/escalations/bulk-escalate', [
                 'alert_ids' => [$alert->id],
+                'reason' => 'Queue backlog — needs tier 2 eyes',
             ])
             ->assertRedirect();
 
         $alert->refresh();
         $this->assertSame($tier2->id, $alert->queue_id);
         $this->assertSame(1, $alert->escalation_level);
+        $history = $alert->context['escalation_history'] ?? [];
+        $this->assertNotEmpty($history, 'Bulk escalation must record a reason on the escalation history.');
+        $this->assertSame('Queue backlog — needs tier 2 eyes', end($history)['reason']);
     }
 
     public function test_bulk_escalate_validates_alert_ids(): void
@@ -139,5 +143,16 @@ class ControlRoomEscalationControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/control-room/escalations/bulk-escalate', [])
             ->assertSessionHasErrors('alert_ids');
+    }
+
+    public function test_bulk_escalate_requires_a_reason(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/escalations/bulk-escalate', [
+                'alert_ids' => [$alert->id],
+            ])
+            ->assertSessionHasErrors('reason');
     }
 }
