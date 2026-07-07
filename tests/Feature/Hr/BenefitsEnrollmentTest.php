@@ -118,9 +118,12 @@ test('a user without hr.benefits.manage cannot update an enrollment', function (
 test('the benefits index exposes plan employer rates + a salary map for the cost preview', function () {
     $this->profile->update(['annual_salary' => 65000]);
 
+    // json_encode drops the ".0" from integral floats (65000.0 → "65000"), so a
+    // strict float identity can never survive the Inertia JSON round-trip —
+    // assert the decrypted salary numerically instead.
     $this->actingAs($this->hr)->get('/hr/compensation/benefits')->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('hr/compensation/benefits/index')
-            ->where("annualSalaryByProfileId.{$this->profile->id}", 65000.0)
+            ->where("annualSalaryByProfileId.{$this->profile->id}", fn ($v) => is_numeric($v) && (float) $v === 65000.0)
             ->where('plans.0.employer_contribution_rate', fn ($v) => $v !== null));
 });

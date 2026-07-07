@@ -5,11 +5,12 @@
 > Row status: ⬜ not started · 🔶 partial · ✅ done.
 
 **Run log**
-- **Run 0 (2026-07-07)** — Ledger seeded. Slice 1 (My HR hub) audited + fixed. Gates green (see baselines below).
+- **Run 0 (2026-07-07)** — Ledger seeded. Slice 1 (My HR hub) audited + fixed. Gates green (see baselines below). Commit `145c101a`.
+- **Run 1 (2026-07-07)** — 🔴-queue-jump slice: fixed all three pre-existing HR Pest failures (TrainingService `source` crash = real production 500; two stale test contracts). **HR pest suite now green — future runs measure against 0 fails.**
 
 **Corrected baselines (measured this run, clean HEAD `4874c71a`)**
 - vitest: **8 pre-existing fails**, not 5 — my-day ×4, app-sidebar ×1, behaviour-abc-tab ×2, resident-tracking ×1 (last two reproduced via stash at clean HEAD). "No NEW failures" is measured against 8.
-- pest (HR scope): **3 pre-existing fails**, not the documented "RecruitmentJobPostingSync + ShiftPayroll" (those PASS now) — `SupervisionDialogTest` (performance-hub props), `AuditFixNotificationsTest` (training-assignment notify, ErrorException), `BenefitsEnrollmentTest` (benefits index cost-preview props). All three reproduced at clean HEAD via stash. Each is pinned to its slice row below — fix there, don't re-dismiss.
+- pest (HR scope): was 3 pre-existing fails (not the documented "RecruitmentJobPostingSync + ShiftPayroll" — those pass). **All three FIXED in Run 1 → baseline is now 0 fails.** Any pest failure in a future run is NEW by definition.
 - Prompt §6's `*_REDESIGN_PROMPT.md` files do **not exist** at repo root (those redesigns shipped and the prompts were removed). Deferral targets are therefore the future slice rows in this ledger, not prompt files.
 - Worktree note: browser screenshots (§9 gate 7) can't run against a worktree (Herd serves the parent repo only). Visual verification of merged changes follows the established post-deploy pattern (Chrome as demo admin / deployed-chunk grep).
 
@@ -27,13 +28,13 @@
 | 6 | Calendar hub + time-off calendar | `/hr/calendar*` | ⬜ | |
 | 7 | Leave (balances, holidays, reports) | `/hr/leave/*` | ⬜ | Slice-1 evidence: LeaveService uses `HrLeaveApprovalChain` directly, NOT `ApprovalWorkflowService` — check §2 approvals-spine expectation when auditing this + S14 |
 | 8 | Time | `/hr/time` | ⬜ | |
-| 9 | Compensation (+ expenses) | `/hr/compensation/*` | ⬜ | Slice-1 evidence: ExpenseService approvals are inline (notify-based), not ApprovalWorkflowService — same S14 question. 🔴 pre-existing test fail pinned here: `BenefitsEnrollmentTest` (benefits index missing plan employer rates / salary map props) |
+| 9 | Compensation (+ expenses) | `/hr/compensation/*` | ⬜ | Slice-1 evidence: ExpenseService approvals are inline (notify-based), not ApprovalWorkflowService — same S14 question. ~~🔴 `BenefitsEnrollmentTest`~~ **fixed Run 1** — controller was correct; the test asserted a strict float identity that can't survive `json_encode` (integral floats emit `65000`, not `65000.0`) → assertion made precision-independent |
 | 10 | Payroll + payslips | `/hr/payroll/*` | ⬜ | |
 | 11 | Compliance + Vetting + Drivers | `/hr/compliance/*`, `/hr/vetting`, `/hr/drivers` | ⬜ | Pre-seeded §7.1: Vetting on generic PageHero |
 | 12 | Documents (+ policies, attestations) | `/hr/documents/*` | ⬜ | Carry-over: policy re-attestation has no duplicate guard (same user+version can attest repeatedly — needed for periodic re-attestation, but no cooldown). Decide dedupe rule here. |
-| 13 | Performance (reviews, PIPs, supervision) | `/hr/performance/*` | ⬜ | Carry-over: 1:1 acknowledge sends no notification to supervisor (supervisor-side surface lives here); review `status='signed_off'` transition semantics (who flips it after both parties sign?). 🔴 pre-existing test fail pinned here: `SupervisionDialogTest` (performance hub missing supervision-dialog staff/session-type props) |
+| 13 | Performance (reviews, PIPs, supervision) | `/hr/performance/*` | ⬜ | Carry-over: 1:1 acknowledge sends no notification to supervisor (supervisor-side surface lives here); review `status='signed_off'` transition semantics (who flips it after both parties sign?). ~~🔴 `SupervisionDialogTest`~~ **fixed Run 1** — test asserted the pre-redesign contract (hub shipping `sessionTypes` for the retired SupervisionDialog); updated to current contract (`staff` for wizards). NEW findings for this slice: 🟠 supervision wizard hardcodes `session_type='supervision'` — the type taxonomy (one_to_one/check_in/…) exists in the model, endpoints and show page but is unreachable from the create wizard; 🟡 dead code: `components/hr/performance/supervision-dialog.tsx` orphaned (zero importers) + `SupervisionController` has an unrouted hub-render (~line 270) still shipping `sessionTypes` |
 | 14 | Goals + Development | `/hr/goals*` | ⬜ | Carry-over: my-area HrDevelopmentGoal completion doesn't notify manager (GoalCompletedNotification exists but is typed to HrGoal/OKR only) |
-| 15 | Training + catalog | `/hr/training/*` | ⬜ | Pre-seeded §7.1: Training on generic PageHero. My-area training cards don't deep-link to catalog/course detail (noted in slice 1). 🔴 pre-existing test fail pinned here: `AuditFixNotificationsTest` — "creating a training assignment notifies the assigned employee" throws ErrorException |
+| 15 | Training + catalog | `/hr/training/*` | ⬜ | Pre-seeded §7.1: Training on generic PageHero. My-area training cards don't deep-link to catalog/course detail (noted in slice 1). ~~🔴 `AuditFixNotificationsTest`~~ **fixed Run 1** — real production bug in `TrainingService::createAssignments`: `$form['source'] ?? 'manual'` guarded the `in_array` but the true-branch read `$form['source']` unguarded → ErrorException/500 for ANY caller omitting `source`; hoisted the default |
 | 16 | Feed | `/hr/feed` | ⬜ | Pre-seeded §7.3 looks STALE: feed already has react+reply endpoints & UI (FeedController::react/reply, parts.tsx ReactionBar) — verify at runtime then close |
 | 17 | Announcements | `/hr/announcements` | ⬜ | |
 | 18 | Feedback + surveys | `/hr/feedback` | ⬜ | |
@@ -99,6 +100,14 @@
 - **O-4 🟡** HrDevelopmentGoal completion doesn't notify manager (needs a new notification class; GoalCompletedNotification is typed to HrGoal) → slice 14.
 - **O-5 🟡** Deliberate non-notifications, documented as by-design: survey submit (anonymity), policy attest (would spam HR per-staff-per-policy; compliance lists cover it), clock-in/out (noise), expense draft creation (submit already notifies). Revisit only if a slice proves a waiting party.
 - **O-6 🟠** Policy re-attestation has no duplicate/cooldown guard → slice 12 decision.
+
+## Run 1 findings (🔴 queue-jump: pest suite to green)
+
+- **F-16 🔴 fixed** — `TrainingService::createAssignments` crashed with `Undefined array key "source"` for any caller omitting `source` (the `?? 'manual'` guarded only the `in_array` check; the ternary's true-branch re-read `$form['source']` raw). Laravel converts the warning to ErrorException, so this was a live 500 on the training-assignment path, not just a test artefact. Default now hoisted before validation.
+- **F-17 🟠 fixed (test)** — `BenefitsEnrollmentTest` demanded `annualSalaryByProfileId.{id} === 65000.0` (strict float). PHP's `json_encode` emits integral floats without the decimal (`65000`), so the assertion could never pass through the Inertia JSON round-trip regardless of the controller's (correct) `(float)` cast — it only ever passed under a non-default `serialize_precision`. Assertion made precision-independent; controller untouched.
+- **F-18 🟠 fixed (test) + new slice-13 findings** — `SupervisionDialogTest` asserted the hub ships `sessionTypes` for the SupervisionDialog. The performance-hub redesign replaced that dialog with the wizard flow (`performance-wizards.tsx`); the dialog now has zero importers and the prop was deliberately dropped. Test updated to the current contract (`staff` for wizard pickers; session_type acceptance covered by endpoint tests). Surfaced two slice-13 findings recorded on that row: the wizard hardcodes `session_type='supervision'` (taxonomy unreachable from create UI), and the orphaned dialog + unrouted `SupervisionController` hub-render are dead code.
+
+**Run 1 gates:** pest scoped (3 files) 17/17 ✅ · pest full HR scope ✅ 0 failed (see run log) · types/lint/build/vitest **not run — no TS/JS or route changes** (PHP service + two PHP test files only; those gates cannot be affected). Wayfinder n/a.
 
 ## Decisions needed (Chane)
 

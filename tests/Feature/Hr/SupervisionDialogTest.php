@@ -18,12 +18,14 @@ beforeEach(function () {
     $this->employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
 });
 
-test('the performance hub ships the supervision-dialog staff and session types', function () {
+test('the performance hub ships the wizard staff options', function () {
+    // The hub redesign replaced the SupervisionDialog with the performance
+    // wizards, which need `staff` for the employee picker. The `sessionTypes`
+    // prop was retired with the dialog — session_type acceptance is covered by
+    // the endpoint tests below.
     $response = $this->actingAs($this->hr)->get('/hr/performance');
     $response->assertOk();
 
-    expect(collect($response->inertiaProps('sessionTypes'))->pluck('value'))
-        ->toContain('one_to_one');
     expect($response->inertiaProps('staff'))->not->toBeNull();
 });
 

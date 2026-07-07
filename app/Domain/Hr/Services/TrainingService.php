@@ -452,9 +452,10 @@ class TrainingService
             return 0;
         }
 
-        $source = in_array($form['source'] ?? 'manual', HrCourseAssignment::SOURCES, true)
-            ? $form['source']
-            : 'manual';
+        $source = $form['source'] ?? 'manual';
+        if (! in_array($source, HrCourseAssignment::SOURCES, true)) {
+            $source = 'manual';
+        }
         $dueAt = $form['due_at'] ?? null;
         $sessionId = $form['session_id'] ?? null;
 
