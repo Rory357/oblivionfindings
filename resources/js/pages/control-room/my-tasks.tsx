@@ -452,10 +452,10 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can,
                             <CardContent>
                                 <div className="space-y-2">
                                     {can.create && (
-                                        <Link href="/control-room/alerts" className="block">
+                                        <Link href="/control-room/alerts?new=1" className="block">
                                             <Button variant="outline" className="w-full justify-start" size="sm">
                                                 <Plus className="mr-2 h-4 w-4" />
-                                                Create Manual Alert
+                                                New Alert
                                             </Button>
                                         </Link>
                                     )}

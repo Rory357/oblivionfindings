@@ -180,9 +180,15 @@ class ControlRoomAlertController extends Controller
             'stats' => $stats,
             'queues' => $queues,
             'staff' => $staff,
+            // For the New-alert wizard (manual alert creation).
+            'clients' => \App\Models\Client::orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
+            'sites' => \App\Models\Site::orderBy('name')->get(['id', 'name']),
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
+                'create' => $user->canDo('controlRoom.alerts.create'),
             ],
             // Polling metadata — frontend can use these to detect stale data.
             // latest_alert_at: timestamp of the most recently triggered unresolved alert.
@@ -842,6 +848,9 @@ class ControlRoomAlertController extends Controller
             'severity' => ['required', 'string', 'in:low,medium,high,critical'],
             'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
             'fleet_signal_id' => ['nullable', 'integer', 'exists:fleet_signals,id'],
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'priority' => ['nullable', 'in:critical,high,medium,low'],
             'context' => ['nullable', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -882,6 +891,14 @@ class ControlRoomAlertController extends Controller
                     'status' => $alert->status,
                 ],
             ], 201);
+        }
+
+        // The New-alert wizard reads created_alert_id from flash for its
+        // success pane; plain form posts still land on the alert workspace.
+        if ($request->header('X-Inertia')) {
+            return back()
+                ->with('success', 'Alert created.')
+                ->with('created_alert_id', $alert->id);
         }
 
         return redirect()->route('control-room.alerts.show', $alert)

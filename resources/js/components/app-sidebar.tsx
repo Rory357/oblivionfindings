@@ -1931,10 +1931,12 @@ function buildControlRoomSubPanelGroups({
     // All items assume `controlRoom.viewAny` because the icon itself is
     // already gated on that capability. We still gate sub-items that require
     // richer permissions (alerts, reports, messaging, settings).
+    // The old Dashboard / All Alerts / Escalation Queue / Incident Tracker
+    // entries merged into ONE command centre (tabs on the page itself).
     const live: NavItem[] = [];
     if (can?.controlRoom?.viewAny) {
         live.push({
-            title: 'Dashboard',
+            title: 'Command Centre',
             href: '/control-room',
             icon: LayoutDashboard,
         });
@@ -1951,28 +1953,6 @@ function buildControlRoomSubPanelGroups({
         });
     }
     if (live.length) groups.push({ label: 'Live Monitoring', items: live });
-
-    const alerts: NavItem[] = [];
-    if (can?.controlRoom?.alertsView || can?.controlRoom?.alertsManage)
-        alerts.push({
-            title: 'All Alerts',
-            href: '/control-room/alerts',
-            icon: AlertTriangle,
-        });
-    if (can?.controlRoom?.alertsEscalate || can?.controlRoom?.alertsManage)
-        alerts.push({
-            title: 'Escalation Queue',
-            href: '/control-room/escalations',
-            icon: ArrowUpCircle,
-        });
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        alerts.push({
-            title: 'Incident Tracker',
-            href: '/control-room/incidents',
-            icon: AlertCircle,
-        });
-    if (alerts.length)
-        groups.push({ label: 'Alerts & Escalations', items: alerts });
 
     const comms: NavItem[] = [];
     if (can?.controlRoom?.alertsCreate || can?.controlRoom?.alertsManage)

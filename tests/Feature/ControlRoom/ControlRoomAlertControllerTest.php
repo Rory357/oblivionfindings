@@ -539,6 +539,46 @@ class ControlRoomAlertControllerTest extends TestCase
         ]);
     }
 
+    public function test_create_alert_accepts_client_site_and_priority(): void
+    {
+        $client = \App\Models\Client::factory()->create();
+        $site = \App\Models\Site::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'welfare_check',
+                'severity' => 'medium',
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'priority' => 'high',
+                'notes' => 'Front door reported open since 6am.',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'source' => 'manual',
+            'alert_type' => 'welfare_check',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'priority' => 'high',
+        ]);
+    }
+
+    public function test_create_alert_inertia_flashes_created_id(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->post('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'security',
+                'severity' => 'low',
+            ], ['X-Inertia' => 'true']);
+
+        $alert = \App\Models\ControlRoomAlert::query()->latest('id')->first();
+        $this->assertNotNull($alert);
+        $response->assertSessionHas('created_alert_id', $alert->id);
+    }
+
     public function test_create_alert_via_json(): void
     {
         $this->actingAs($this->admin)

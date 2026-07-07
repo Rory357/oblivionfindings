@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
 import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -408,8 +409,8 @@ export default function ControlRoomIndex({
             <PageShell>
                 <PageHero
                     icon={Radio}
-                    title="Control Room"
-                    description="Centralized alert management and triage system."
+                    title="Command Centre"
+                    description="One workspace for alerts, escalations and incident triage."
                     stats={[
                         { label: 'Open alerts', value: stats.open },
                         { label: 'Critical', value: stats.critical },
@@ -447,20 +448,12 @@ export default function ControlRoomIndex({
                                     Shifts
                                 </Link>
                             </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/control-room/escalations">
-                                    <TrendingUp className="mr-2 h-4 w-4" />
-                                    Queues
-                                </Link>
-                            </Button>
                         </div>
                     }
                 />
+
+                {/* Command centre tabs — the four alert surfaces are one workspace */}
+                <CommandCentreTabs current="/control-room" badges={{ '/control-room/alerts': stats.open }} />
 
                 {/* Row 1: KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

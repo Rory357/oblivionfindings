@@ -1,5 +1,6 @@
 import { AlertWorkspaceDialog, PaneNav, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
 import { BulkAlertActionDialog } from '@/components/control-room/bulk-alert-action-dialog';
+import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -772,13 +773,20 @@ export default function EscalationQueue({
             <PageShell>
                 <PageHero
                     icon={AlertTriangle}
-                    title="Escalation Queue"
-                    description="Kanban-style triage queue management with SLA tracking and escalation workflows."
+                    title="Command Centre"
+                    description="Escalation queues — SLA-tracked tiers with guided moves and escalations."
                     stats={[
                         { label: 'Active queues', value: queues.length },
                         { label: 'Total alerts', value: totalAlerts },
                         { label: 'SLA breached', value: totalBreached },
                     ]}
+                />
+
+                {/* Command centre tabs — the four alert surfaces are one workspace */}
+                <CommandCentreTabs
+                    current="/control-room/escalations"
+                    badges={{ '/control-room/escalations': totalAlerts }}
+                    className="mb-6"
                 />
 
                 {/* Summary stats */}

@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import { FlagIncidentDialog } from '@/components/control-room/flag-incident-dialog';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
@@ -228,8 +229,8 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
             <PageShell>
                 <PageHero
                     icon={AlertOctagon}
-                    title="Incident Tracker"
-                    description="Live feed of incidents across all modules."
+                    title="Command Centre"
+                    description="Incident feed across all modules — flag new incidents straight to the desk."
                     stats={[
                         { label: 'Total', value: stats.total },
                         { label: 'Critical', value: stats.critical },
@@ -249,6 +250,13 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                             </Button>
                         ) : undefined
                     }
+                />
+
+                {/* Command centre tabs — the four alert surfaces are one workspace */}
+                <CommandCentreTabs
+                    current="/control-room/incidents"
+                    badges={{ '/control-room/incidents': stats.unresolved }}
+                    className="mb-6"
                 />
 
                 {/* Stats Cards */}

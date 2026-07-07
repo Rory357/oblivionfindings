@@ -1,5 +1,7 @@
 import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
 import { BulkAlertActionDialog, type BulkAlertMode } from '@/components/control-room/bulk-alert-action-dialog';
+import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
+import { NewAlertWizard } from '@/components/control-room/new-alert-wizard';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,9 +76,13 @@ interface Props {
         unassigned: number;
     };
     staff: Array<{ id: number; name: string; email: string }>;
+    /** For the New-alert wizard (manual creation). */
+    clients?: Array<{ id: number; name: string }>;
+    sites?: Array<{ id: number; name: string }>;
     can: {
         manage: boolean;
         assign: boolean;
+        create?: boolean;
     };
     /** Workspace-over-list: present when ?alert= is in the URL. */
     detail?: AlertWorkspaceDetail | null;
@@ -162,18 +168,24 @@ export default function AlertsIndex({
     filters,
     stats,
     staff,
+    clients = [],
+    sites = [],
     can,
     detail = null,
     basePath = '/control-room/alerts',
-    pageTitle = 'Alerts',
-    pageDescription = 'Monitor and manage all control room alerts',
+    pageTitle = 'Command Centre',
+    pageDescription = 'Alerts worklist — every alert opens a guided workspace.',
     pageBreadcrumbs = [
         { title: 'Control Room', href: '/control-room' },
-        { title: 'All Alerts', href: '/control-room/alerts' },
+        { title: 'Alerts', href: '/control-room/alerts' },
     ],
 }: Props) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [bulkMode, setBulkMode] = useState<BulkAlertMode | null>(null);
+    // ?new=1 deep-links straight into the New-alert wizard (house pattern).
+    const [newOpen, setNewOpen] = useState<boolean>(
+        () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1',
+    );
     const searchRef = useRef<HTMLInputElement>(null);
 
     // Workspace-over-list: fetch only the `detail` prop and open the dialog
@@ -349,18 +361,26 @@ export default function AlertsIndex({
                             { label: 'Unassigned', value: stats.unassigned },
                         ]}
                         actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/control-room">Dashboard</Link>
-                            </Button>
+                            can.create && basePath === '/control-room/alerts' ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setNewOpen(true)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Bell className="mr-2 h-4 w-4" />
+                                    New alert
+                                </Button>
+                            ) : undefined
                         }
                     />
                 }
             >
+                {/* Command centre tabs (hidden for the reused integration-alerts view) */}
+                {basePath === '/control-room/alerts' ? (
+                    <CommandCentreTabs current="/control-room/alerts" badges={{ '/control-room/alerts': stats.open }} />
+                ) : null}
+
                 {/* Quick filter tabs */}
                 <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
                     {tabs.map((tab) => (
@@ -820,6 +840,15 @@ export default function AlertsIndex({
             {detail ? (
                 <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
             ) : null}
+
+            {/* Manual alert creation — guided wizard */}
+            <NewAlertWizard
+                open={newOpen}
+                onClose={() => setNewOpen(false)}
+                clients={clients}
+                sites={sites}
+                onOpenAlert={openWorkspace}
+            />
         </AppLayout>
     );
 }
