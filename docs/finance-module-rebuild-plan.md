@@ -611,8 +611,18 @@ vendor, receipt) — the mould for C2.
     `formatMoney` for multi-currency — on-contract.) ⚠️ AGENT VERIFY LESSON: grep the module globally after
     parallel agents (a half-migrated sibling file showed as a transient tsc error mid-run — cleared when its
     owning agent finished; don't gate until ALL agents land).
-  - **[ ] C3b — StatusBadge + EmptyState + skeleton adoption** (~25 pages hand-roll `statusConfig` colour maps
-    → `@/components/ui/status-badge`; EmptyState/EmptySearch on empty lists; skeleton loaders).
+  - **[x] C3b — StatusBadge sweep — MERGED to main `b221252b` 2026-07-08.** Extended `resources/js/lib/
+    status-colors.ts` with the finance status vocabulary (sent/paid/partially_paid/awaiting_approval/processing/
+    failed/validated/submitted/accepted/received/reconciled/posted/filed/amended/reversed/discrepancy/generating/
+    eliminated/partial/final/fully_spent/…) — ONE shared map, so `<StatusBadge status={x}/>` renders the right
+    severity everywhere. 35 pages migrated off local statusConfig/statusColors/STATUS_VARIANTS maps + local
+    StatusBadge helper fns (3 parallel per-hub agents + Integrations/bank-feeds finished by hand). Module-wide
+    grep: hand-rolled status colour maps = 0. Categorical TYPE maps (account/txn type, category, frequency,
+    filing type) correctly LEFT. Intentional standardisation: cancelled→neutral, PO sent→info, some completed→
+    info (single source of truth). Per-status icons StatusBadge has no slot for were dropped. Gates: types 0,
+    eslint clean, build clean, suite 186 green. Browser-verified: invoices Paid=green/Sent=info, bills
+    Approved=green — right colours, no console errors. *(EmptyState/skeleton adoption folded into C3d/C3e — the
+    empty-list states are lower-risk and pair naturally with the command-layer list work.)*
   - **[ ] C3d — command layer** (search + filter chips synced to URL + sort + CSV export + pagination on every
     list tab; right-click context menus (shift-context-menu mould); **tab count badges** wired from controllers).
   - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
