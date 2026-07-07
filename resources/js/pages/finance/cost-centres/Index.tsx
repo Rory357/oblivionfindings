@@ -284,7 +284,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                                                     className={
                                                         cc.is_active
                                                             ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/80/10 text-muted-foreground border-border/30'
+                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
                                                     }
                                                 >
                                                     {cc.is_active ? 'Active' : 'Inactive'}

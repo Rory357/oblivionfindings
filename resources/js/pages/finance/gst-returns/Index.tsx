@@ -168,7 +168,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-muted-foreground/80/10 p-2">
+                                <div className="rounded-lg bg-muted-foreground/10 p-2">
                                     <FileText className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <div>

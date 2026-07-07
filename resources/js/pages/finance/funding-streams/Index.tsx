@@ -167,7 +167,7 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                                     className={
                                                         fs.is_active
                                                             ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/80/10 text-muted-foreground border-border/30'
+                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
                                                     }
                                                 >
                                                     {fs.is_active ? 'Active' : 'Inactive'}

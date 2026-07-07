@@ -68,7 +68,7 @@ type PageProps = {
 };
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
+    draft: 'bg-muted-foreground/10 text-muted-foreground border-border/30',
     processing: 'bg-status-info-bg text-status-info border-status-info/30',
     completed: 'bg-status-success-bg text-status-success border-status-success/30',
     failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',

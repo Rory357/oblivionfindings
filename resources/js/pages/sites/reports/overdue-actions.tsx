@@ -32,7 +32,7 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-muted-foreground/80/20 text-muted-foreground',
+    low: 'bg-muted-foreground/20 text-muted-foreground',
     medium: 'bg-status-warning-bg text-status-warning',
     high: 'bg-status-warning-bg text-status-warning',
     critical: 'bg-status-critical-bg text-status-critical',

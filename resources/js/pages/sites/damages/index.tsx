@@ -89,7 +89,7 @@ const formatCurrency = (amount: number | undefined | null) => {
 };
 
 const severityColors: Record<string, string> = {
-    minor: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+    minor: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
     moderate:
         'bg-status-warning-bg text-status-warning border-status-warning/30',
     major: 'bg-status-warning-bg text-status-warning border-status-warning/30',
@@ -106,7 +106,7 @@ const statusColors: Record<string, string> = {
         'bg-status-warning-bg text-status-warning border-status-warning/30',
     repaired:
         'bg-status-success-bg text-status-success border-status-success/30',
-    closed: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+    closed: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
 };
 
 const statusLabels: Record<string, string> = {

@@ -42,7 +42,7 @@ type Props = {
 
 const statusColors: Record<string, string> = {
     active: 'bg-status-success-bg text-status-success',
-    inactive: 'bg-muted-foreground/80/20 text-muted-foreground',
+    inactive: 'bg-muted-foreground/20 text-muted-foreground',
     maintenance: 'bg-status-warning-bg text-status-warning',
     retired: 'bg-status-critical-bg text-status-critical',
     disposed: 'bg-status-critical-bg text-status-critical',
@@ -126,7 +126,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <Badge className={statusColors[group.status] || 'bg-muted-foreground/80/20 text-muted-foreground'}>
+                                        <Badge className={statusColors[group.status] || 'bg-muted-foreground/20 text-muted-foreground'}>
                                             {group.status}
                                         </Badge>
                                         <span className="text-muted-foreground font-normal">

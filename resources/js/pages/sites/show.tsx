@@ -6158,7 +6158,7 @@ const coverageTypeConfig = {
     },
     custom: {
         label: 'Custom',
-        color: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        color: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
     },
 };
 
