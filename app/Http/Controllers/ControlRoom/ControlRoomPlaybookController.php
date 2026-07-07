@@ -478,6 +478,10 @@ class ControlRoomPlaybookController extends Controller
             if (!empty($data['decision_taken'])) {
                 $currentStep->recordDecision($data['decision_taken'], $user);
             }
+
+            // advanceToNextStep() only counts a step it completes itself; this
+            // one was completed above (to attach notes/evidence), so count it here.
+            $run->increment('completed_steps');
         }
 
         $nextStep = $run->advanceToNextStep();
@@ -530,8 +534,9 @@ class ControlRoomPlaybookController extends Controller
             return back()->withErrors(['step' => 'This step is required and blocking. It cannot be skipped.']);
         }
 
+        // A skipped step is not a completed one — the progress counter only
+        // tracks steps that were actually done.
         $currentStep->skip($user, $data['reason'] ?? null);
-        $run->increment('completed_steps');
 
         $nextStep = $run->steps()
             ->where('status', 'pending')

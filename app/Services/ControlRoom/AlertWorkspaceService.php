@@ -166,7 +166,9 @@ class AlertWorkspaceService
                 'id' => $alert->playbookRun->id,
                 'status' => $alert->playbookRun->status,
                 'current_step' => $alert->playbookRun->current_step,
-                'completed_steps' => $alert->playbookRun->completed_steps,
+                // Derived from the loaded steps so historical runs whose stored
+                // counter drifted still display the true progress.
+                'completed_steps' => $alert->playbookRun->steps->where('status', 'completed')->count(),
                 'total_steps' => $alert->playbookRun->total_steps,
                 'playbook' => [
                     'id' => $alert->playbookRun->playbook->id,

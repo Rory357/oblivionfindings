@@ -274,6 +274,61 @@ class ControlRoomPlaybookControllerTest extends TestCase
         $this->assertSame('Ring the emergency contact', $steps[1]['title']);
     }
 
+    public function test_completed_steps_counter_tracks_completes_but_not_skips(): void
+    {
+        // Regression: completing never incremented the counter (the controller
+        // pre-completed the step so advanceToNextStep() had nothing to count)
+        // while skipping incremented it — "0/3" after real work, "1/2" after a
+        // skip. Completes count; skips don't.
+        $playbook = Playbook::create([
+            'code' => 'pb-count',
+            'name' => 'Counter Check',
+            'category' => 'safety',
+            'is_active' => true,
+        ]);
+        foreach (['One', 'Two', 'Three'] as $i => $title) {
+            PlaybookStep::create([
+                'playbook_id' => $playbook->id,
+                'order' => $i,
+                'title' => $title,
+                'type' => 'task',
+            ]);
+        }
+
+        $alert = ControlRoomAlert::factory()->open()->create();
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/start", ['playbook_id' => $playbook->id])
+            ->assertRedirect();
+
+        $run = PlaybookRun::where('alert_id', $alert->id)->firstOrFail();
+        $this->assertSame(0, $run->completed_steps);
+
+        // Complete step 1 → counts.
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/advance", [])
+            ->assertRedirect();
+        $this->assertSame(1, $run->fresh()->completed_steps);
+
+        // Skip step 2 → does not count.
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/skip", [])
+            ->assertRedirect();
+        $this->assertSame(1, $run->fresh()->completed_steps);
+
+        // Complete step 3 → counts, run finishes at 2 completed of 3 total.
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/advance", [])
+            ->assertRedirect();
+        $run->refresh();
+        $this->assertSame(2, $run->completed_steps);
+        $this->assertSame('completed', $run->status);
+
+        // The workspace payload derives the count from the step rows too.
+        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+            ->build($this->admin, $alert->id);
+        $this->assertSame(2, $detail['playbook_run']['completed_steps']);
+    }
+
     public function test_start_run_blocks_inactive_playbook(): void
     {
         $playbook = Playbook::create([
