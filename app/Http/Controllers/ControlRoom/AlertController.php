@@ -87,6 +87,15 @@ class AlertController extends Controller
             $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
         }
 
+        // Snooze — mirrors the canonical worklist: the Snoozed tab shows
+        // currently-snoozed alerts, every other view hides them (auto-return
+        // once the window elapses).
+        if ($request->input('snoozed') === '1') {
+            $query->snoozed();
+        } else {
+            $query->notSnoozed();
+        }
+
         // Sorting — same as canonical controller
         $sortField = $request->input('sort', 'triggered_at');
         $sortDir = $request->input('dir', 'desc');
@@ -125,26 +134,29 @@ class AlertController extends Controller
                 ? trim($alert->client->first_name.' '.$alert->client->last_name)
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
+            'snoozed_until' => optional($alert->snoozed_until)->toISOString(),
             'notes' => $alert->notes ? Str::limit($alert->notes, 120) : null,
         ]);
 
-        // Stats — scoped to integration sources only
+        // Stats — scoped to integration sources only. The tab counts mirror the
+        // worklist, which hides currently-snoozed alerts.
         $statsBase = ControlRoomAlert::where('source', 'like', 'integration_%');
         $siteAccess->applyAlertScope($statsBase, $user, ['reports.viewAny']);
 
         $stats = [
-            'total' => (clone $statsBase)->count(),
-            'open' => (clone $statsBase)->where('status', 'open')->count(),
-            'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'total' => (clone $statsBase)->notSnoozed()->count(),
+            'open' => (clone $statsBase)->notSnoozed()->where('status', 'open')->count(),
+            'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'snoozed' => (clone $statsBase)->snoozed()->count(),
         ];
 
         $staff = $this->assignableStaff($user);
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
-            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),
             'stats' => $stats,
             'staff' => $staff,
             'basePath' => '/control-room/integration-alerts',

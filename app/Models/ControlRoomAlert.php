@@ -201,6 +201,11 @@ class ControlRoomAlert extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
+    public function snoozedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'snoozed_by_user_id');
+    }
+
     public function tasks()
     {
         return $this->hasMany(\App\Models\ControlRoom\AlertTask::class, 'alert_id');
@@ -243,6 +248,33 @@ class ControlRoomAlert extends Model
     public function scopeHighPriority($query)
     {
         return $query->whereIn('severity', ['high', 'critical']);
+    }
+
+    /**
+     * Scope for alerts currently snoozed (window still in the future).
+     */
+    public function scopeSnoozed($query)
+    {
+        return $query->whereNotNull('snoozed_until')->where('snoozed_until', '>', now());
+    }
+
+    /**
+     * Scope for alerts NOT currently snoozed — never snoozed, or the window has
+     * elapsed (an expired snooze auto-returns the alert to the worklist).
+     */
+    public function scopeNotSnoozed($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('snoozed_until')->orWhere('snoozed_until', '<=', now());
+        });
+    }
+
+    /**
+     * Whether the alert is snoozed right now.
+     */
+    public function isSnoozed(): bool
+    {
+        return $this->snoozed_until !== null && $this->snoozed_until->isFuture();
     }
 
     /**

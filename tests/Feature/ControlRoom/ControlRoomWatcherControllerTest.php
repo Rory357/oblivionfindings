@@ -141,4 +141,27 @@ class ControlRoomWatcherControllerTest extends TestCase
             ->delete("/control-room/alerts/{$this->alert->id}/watchers/99999")
             ->assertNotFound();
     }
+
+    public function test_destroy_redirects_back_for_inertia_requests(): void
+    {
+        AlertWatcher::create([
+            'alert_id' => $this->alert->id,
+            'user_id' => $this->other->id,
+            'added_by_user_id' => $this->admin->id,
+        ]);
+        $this->alert->update(['watchers_count' => 1]);
+
+        // The workspace removes watchers via an Inertia router.delete — the
+        // endpoint must redirect back, not return bare JSON (which would break
+        // the Inertia visit).
+        $this->actingAs($this->admin)
+            ->withHeader('X-Inertia', 'true')
+            ->delete("/control-room/alerts/{$this->alert->id}/watchers/{$this->other->id}")
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('control_room_alert_watchers', [
+            'alert_id' => $this->alert->id,
+            'user_id' => $this->other->id,
+        ]);
+    }
 }

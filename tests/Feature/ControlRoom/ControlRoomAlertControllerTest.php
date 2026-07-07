@@ -1017,6 +1017,137 @@ class ControlRoomAlertControllerTest extends TestCase
         );
     }
 
+    // ── Snooze ──────────────────────────────────────────────────────────
+
+    public function test_snooze_sets_window_and_records_snoozer(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['severity' => 'medium']);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/snooze", ['window' => '1h'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $alert->refresh();
+        $this->assertNotNull($alert->snoozed_until);
+        $this->assertTrue($alert->snoozed_until->isFuture());
+        $this->assertSame($this->admin->id, $alert->snoozed_by_user_id);
+        $this->assertTrue($alert->isSnoozed());
+    }
+
+    public function test_snooze_blocks_critical_alerts(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['severity' => 'critical']);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/snooze", ['window' => '15m'])
+            ->assertSessionHasErrors('alert');
+
+        $this->assertNull($alert->fresh()->snoozed_until);
+    }
+
+    public function test_snooze_blocks_resolved_alerts(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create(['severity' => 'medium']);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/snooze", ['window' => '15m'])
+            ->assertSessionHasErrors('alert');
+    }
+
+    public function test_custom_snooze_parses_the_worker_timezone(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['severity' => 'low']);
+
+        // Naive datetime-local typed in NZ wall time must store UTC — treating it
+        // as UTC would land the snooze 12 hours off.
+        $localDate = now()->timezone(config('app.worker_timezone'))->addDay()->format('Y-m-d');
+        $expectedUtc = \Illuminate\Support\Carbon::parse($localDate.'T22:00', config('app.worker_timezone'))
+            ->utc()->format('Y-m-d H:i:s');
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/snooze", [
+                'window' => 'custom',
+                'snoozed_until' => $localDate.'T22:00',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($expectedUtc, $alert->fresh()->snoozed_until->utc()->format('Y-m-d H:i:s'));
+    }
+
+    public function test_custom_snooze_requires_a_future_time(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['severity' => 'medium']);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/snooze", ['window' => 'custom'])
+            ->assertSessionHasErrors('snoozed_until');
+    }
+
+    public function test_unsnooze_returns_alert_to_the_worklist(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'severity' => 'medium',
+            'snoozed_until' => now()->addHour(),
+            'snoozed_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/unsnooze")
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertNull($alert->snoozed_until);
+        $this->assertNull($alert->snoozed_by_user_id);
+        $this->assertFalse($alert->isSnoozed());
+    }
+
+    public function test_index_hides_snoozed_by_default_and_the_snoozed_tab_shows_them(): void
+    {
+        $open = ControlRoomAlert::factory()->open()->create(['severity' => 'medium']);
+        $snoozed = ControlRoomAlert::factory()->open()->create([
+            'severity' => 'medium',
+            'snoozed_until' => now()->addHour(),
+            'snoozed_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('control-room/alerts/index')
+                ->where('stats.snoozed', 1)
+                ->has('alerts.data', 1)
+                ->where('alerts.data.0.id', $open->id)
+            );
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts?snoozed=1')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('alerts.data', 1)
+                ->where('alerts.data.0.id', $snoozed->id)
+            );
+    }
+
+    public function test_expired_snooze_returns_to_the_default_worklist(): void
+    {
+        $expired = ControlRoomAlert::factory()->open()->create([
+            'severity' => 'medium',
+            'snoozed_until' => now()->subMinute(),
+            'snoozed_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts')
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.snoozed', 0)
+                ->has('alerts.data', 1)
+                ->where('alerts.data.0.id', $expired->id)
+            );
+    }
+
     protected function scopeUserToSite(User $user, Site $site): void
     {
         HrEmployeeProfile::query()->updateOrCreate(
