@@ -225,3 +225,44 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
         ->post("/it/tickets/{$ticket->id}/resolve")
         ->assertForbidden();
 });
+
+test('provisioning assign, fulfil and cancel each write an activity event', function () {
+    $profile = itProfile();
+    $agent = User::factory()->create();
+
+    $request = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'account',
+        'item' => 'Email account',
+        'status' => 'pending',
+    ]);
+
+    // Assigning moves pending → in_progress and records an `assigned` event.
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$request->id}/assign", ['assigned_to_user_id' => $agent->id])
+        ->assertRedirect();
+    expect($request->refresh()->status)->toBe('in_progress');
+    expect($request->events()->where('type', 'assigned')->count())->toBe(1);
+
+    // Fulfilling records a `fulfilled` event (no onboarding task to complete here).
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$request->id}/fulfil", ['notes' => 'Provisioned'])
+        ->assertRedirect();
+    expect($request->events()->where('type', 'fulfilled')->count())->toBe(1);
+
+    // Cancelling a fresh request records a `cancelled` event with the reason.
+    $toCancel = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'access',
+        'item' => 'VPN access',
+        'status' => 'pending',
+    ]);
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$toCancel->id}/cancel", ['reason' => 'Duplicate'])
+        ->assertRedirect();
+    $cancelled = $toCancel->events()->where('type', 'cancelled')->first();
+    expect($cancelled)->not->toBeNull();
+    expect($cancelled->payload['reason'] ?? null)->toBe('Duplicate');
+});

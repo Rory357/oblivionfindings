@@ -192,6 +192,13 @@ const priorityVariant: Record<string, StatusVariant> = {
 const label = (raw: string) =>
     raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
+/** Today as `YYYY-MM-DD` for lexical overdue comparison against a due_date. */
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/** A `YYYY-MM-DD` due date as a compact en-NZ label ("8 Jul"). */
+const formatDue = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+
 const REQUEST_STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
 const REQUEST_TYPES = ['account', 'access', 'equipment', 'other'];
 const TICKET_STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
@@ -628,23 +635,29 @@ export default function ItIndex({
                         </div>
 
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[2fr_2fr_1.5fr_1fr_0.8fr_100px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <div className="grid grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                                 <span>Employee</span>
                                 <span>Item</span>
                                 <span>Assignee</span>
+                                <span>Priority</span>
                                 <span>Status</span>
-                                <span>Raised</span>
+                                <span>Due</span>
                                 <span />
                             </div>
                             {(requests?.data ?? []).map((r) => {
                                 const Icon = typeIcon[r.type] ?? Server;
                                 const actionable =
                                     can.manage && (r.status === 'pending' || r.status === 'in_progress');
+                                const overdue =
+                                    r.due_date != null &&
+                                    r.status !== 'done' &&
+                                    r.status !== 'cancelled' &&
+                                    r.due_date < todayISO();
                                 return (
                                     <div
                                         key={r.id}
                                         onContextMenu={actionable ? requestMenu(r) : undefined}
-                                        className="grid grid-cols-[2fr_2fr_1.5fr_1fr_0.8fr_100px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                        className={`grid grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
                                     >
                                         <div className="min-w-0">
                                             <div className="truncate text-[13.5px] font-semibold">
@@ -673,15 +686,38 @@ export default function ItIndex({
                                             {r.assignee?.name ?? 'Unassigned'}
                                         </span>
                                         <span>
+                                            <StatusBadge variant={priorityVariant[r.priority] ?? 'neutral'} size="sm">
+                                                {label(r.priority)}
+                                            </StatusBadge>
+                                        </span>
+                                        <span className="flex flex-col items-start gap-0.5">
                                             <StatusBadge
                                                 variant={requestStatusVariant[r.status] ?? 'neutral'}
                                                 size="sm"
                                             >
                                                 {label(r.status)}
                                             </StatusBadge>
+                                            <span className="text-[10.5px] text-muted-foreground">
+                                                {r.status === 'done'
+                                                    ? r.fulfilled
+                                                        ? `Done ${r.fulfilled}`
+                                                        : ''
+                                                    : r.created
+                                                      ? `Raised ${r.created}`
+                                                      : ''}
+                                            </span>
                                         </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            {r.status === 'done' ? (r.fulfilled ?? r.created ?? '—') : (r.created ?? '—')}
+                                        <span
+                                            className={
+                                                overdue
+                                                    ? 'text-[12px] font-semibold text-[color:var(--status-critical)]'
+                                                    : 'text-[12px] text-muted-foreground'
+                                            }
+                                        >
+                                            {r.due_date ? formatDue(r.due_date) : '—'}
+                                            {overdue ? (
+                                                <span className="block text-[10px] font-semibold">Overdue</span>
+                                            ) : null}
                                         </span>
                                         <span className="flex items-center justify-end gap-1.5">
                                             {actionable ? (

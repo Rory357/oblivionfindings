@@ -170,6 +170,10 @@ class ItProvisioningController extends Controller
             'status' => $provisioning->status === 'pending' ? 'in_progress' : $provisioning->status,
         ]);
 
+        ItTicketEvent::record($provisioning, 'assigned', $user->id, [
+            'to' => (int) $validated['assigned_to_user_id'],
+        ]);
+
         return redirect()->back()->with('success', 'Request assigned.');
     }
 
@@ -212,6 +216,10 @@ class ItProvisioningController extends Controller
                         'signed_off_by' => $task->sign_off_required ? $user->id : null,
                     ], fn ($v) => $v !== null));
                 }
+
+                ItTicketEvent::record($provisioning, 'fulfilled', $user->id, array_filter([
+                    'external_ref' => $validated['external_ref'] ?? null,
+                ]));
             });
         } catch (\LogicException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
@@ -237,6 +245,10 @@ class ItProvisioningController extends Controller
         }
 
         $provisioning->update(['status' => 'cancelled']);
+
+        ItTicketEvent::record($provisioning, 'cancelled', $user->id, array_filter([
+            'reason' => $reason,
+        ], fn ($v) => $v !== null));
 
         // Cross-loop: a cancelled request must not orphan its source onboarding
         // task — annotate the still-open task and tell the checklist creator so
