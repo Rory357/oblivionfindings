@@ -43,7 +43,21 @@ import { toast } from 'sonner';
 import { DOC_CATEGORY_ICON } from '@/components/hr/document-library-kit';
 import { DocumentsHero, type DocsHeroNeed } from '@/components/hr/documents-hero';
 import { useLeaveContextMenu, type LeaveCtxItem } from '@/components/hr/leave-context-menu';
+import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+
+/** Payload for the shared confirm dialog used across the Documents hub. */
+type ConfirmRequest = { title: string; body: string; confirmLabel: string; onConfirm: () => void };
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
@@ -613,6 +627,12 @@ function LibraryTab({
         });
     };
 
+    // Native window.confirm()/prompt() break the hub's design language — route
+    // destructive confirms through AlertDialog and the folder prompt through the
+    // kit TextPromptDialog. One confirm state serves the bulk bar and every row.
+    const [confirmState, setConfirmState] = useState<ConfirmRequest | null>(null);
+    const [moveOpen, setMoveOpen] = useState(false);
+
     return (
         <div className="motion-safe:animate-in motion-safe:fade-in-0">
             {/* Folder heading + breadcrumb */}
@@ -722,9 +742,9 @@ function LibraryTab({
                     <span className="text-[13px] font-bold text-primary">{selected.length} selected</span>
                     <span className="h-[18px] w-px bg-border" />
                     <BulkBtn icon={Download} label="Download" onClick={() => { window.location.href = `/hr/documents/bulk-download?` + selected.map((id) => `ids[]=${id}`).join('&'); }} />
-                    <BulkBtn icon={Folder} label="Move" onClick={() => { const f = window.prompt('Move to folder'); if (f) bulkPost('/hr/documents/move', { folder: f }, 'Documents moved'); }} />
+                    <BulkBtn icon={Folder} label="Move" onClick={() => setMoveOpen(true)} />
                     <BulkBtn icon={PenLine} label="Send" onClick={() => onSend(filteredDocs.find((d) => d.id === selected[0]) ?? filteredDocs[0])} />
-                    <BulkBtn icon={Trash2} label="Delete" tone="critical" onClick={() => { if (window.confirm(`Delete ${selected.length} document(s)?`)) bulkPost('/hr/documents/bulk-delete', {}, 'Deleted'); }} />
+                    <BulkBtn icon={Trash2} label="Delete" tone="critical" onClick={() => setConfirmState({ title: 'Delete documents?', body: `Permanently delete ${selected.length} document(s)? This can't be undone.`, confirmLabel: 'Delete', onConfirm: () => bulkPost('/hr/documents/bulk-delete', {}, 'Deleted') })} />
                     <div className="flex-1" />
                     <button type="button" onClick={() => setSelected([])} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
                 </div>
@@ -751,7 +771,7 @@ function LibraryTab({
                     filteredDocs.map((d, i) => {
                         const sel = selected.includes(d.id);
                         const Icon = DOC_CATEGORY_ICON[d.category] ?? FileText;
-                        const rowMenu = buildRowMenu(d, { onView, onSend, canManage });
+                        const rowMenu = buildRowMenu(d, { onView, onSend, canManage, requestConfirm: setConfirmState });
                         return (
                             <div
                                 key={d.id}
@@ -816,13 +836,38 @@ function LibraryTab({
                     })
                 )}
             </div>
+
+            <AlertDialog open={confirmState !== null} onOpenChange={(o) => !o && setConfirmState(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+                        <AlertDialogDescription>{confirmState?.body}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { confirmState?.onConfirm(); setConfirmState(null); }}>
+                            {confirmState?.confirmLabel ?? 'Confirm'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <TextPromptDialog
+                open={moveOpen}
+                onClose={() => setMoveOpen(false)}
+                onSubmit={(folder) => bulkPost('/hr/documents/move', { folder }, 'Documents moved')}
+                title="Move documents"
+                label="Destination folder"
+                placeholder="e.g. Contracts"
+                submitLabel="Move"
+            />
         </div>
     );
 }
 
 function buildRowMenu(
     d: DocRow,
-    { onView, onSend, canManage }: { onView: (d: DocRow) => void; onSend: (d: DocRow) => void; canManage: boolean },
+    { onView, onSend, canManage, requestConfirm }: { onView: (d: DocRow) => void; onSend: (d: DocRow) => void; canManage: boolean; requestConfirm: (req: ConfirmRequest) => void },
 ): LeaveCtxItem[] {
     const items: LeaveCtxItem[] = [
         { kind: 'item', label: 'Preview', icon: Eye, onSelect: () => onView(d) },
@@ -835,7 +880,7 @@ function buildRowMenu(
     items.push({ kind: 'item', label: 'Copy link', icon: Copy, onSelect: () => { navigator.clipboard?.writeText(`${window.location.origin}/hr/documents/${d.id}/download`); toast.success('Link copied'); } });
     if (canManage) {
         items.push({ kind: 'divider' });
-        items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => { if (window.confirm(`Delete "${d.title}"?`)) router.delete(`/hr/documents/${d.id}`, { preserveScroll: true }); } });
+        items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => requestConfirm({ title: 'Delete document?', body: `Delete "${d.title}"? This can't be undone.`, confirmLabel: 'Delete', onConfirm: () => router.delete(`/hr/documents/${d.id}`, { preserveScroll: true }) }) });
     }
     return items;
 }
@@ -861,6 +906,7 @@ function SignaturesTab({
 }) {
     const count = (k: typeof seg) => (k === 'all' ? requests.length : requests.filter((r) => r.status === k).length);
     const rows = requests.filter((r) => seg === 'all' || r.status === seg);
+    const [confirmState, setConfirmState] = useState<ConfirmRequest | null>(null);
 
     const segs: { k: typeof seg; label: string }[] = [
         { k: 'awaiting', label: 'Awaiting signature' },
@@ -902,15 +948,30 @@ function SignaturesTab({
             ) : (
                 <div className="flex flex-col gap-2.5">
                     {rows.map((r) => (
-                        <SigCard key={r.document_id} r={r} canManage={canManage} openCtx={openCtx} />
+                        <SigCard key={r.document_id} r={r} canManage={canManage} openCtx={openCtx} requestConfirm={setConfirmState} />
                     ))}
                 </div>
             )}
+
+            <AlertDialog open={confirmState !== null} onOpenChange={(o) => !o && setConfirmState(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+                        <AlertDialogDescription>{confirmState?.body}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep it</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { confirmState?.onConfirm(); setConfirmState(null); }}>
+                            {confirmState?.confirmLabel ?? 'Confirm'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
 
-function SigCard({ r, canManage, openCtx }: { r: SigRequest; canManage: boolean; openCtx: (items: LeaveCtxItem[]) => (e: React.MouseEvent) => void }) {
+function SigCard({ r, canManage, openCtx, requestConfirm }: { r: SigRequest; canManage: boolean; openCtx: (items: LeaveCtxItem[]) => (e: React.MouseEvent) => void; requestConfirm: (req: ConfirmRequest) => void }) {
     const TypeIcon = r.category === 'policy' ? Scroll : r.category === 'offer' ? Mail : FileText;
     const firstPending = r.signers.find((s) => s.status === 'pending');
 
@@ -930,7 +991,7 @@ function SigCard({ r, canManage, openCtx }: { r: SigRequest; canManage: boolean;
     if (r.has_signed_pdf) menu.push({ kind: 'item', label: 'Download signed PDF', icon: Download, onSelect: () => { window.location.href = `/hr/documents/${r.document_id}/signed`; } });
     if (canManage && r.status === 'awaiting') {
         menu.push({ kind: 'divider' });
-        menu.push({ kind: 'item', label: 'Cancel request', icon: X, tone: 'critical', onSelect: () => { if (window.confirm('Cancel outstanding requests?')) router.post(`/hr/signatures/document/${r.document_id}/cancel`, {}, { preserveScroll: true }); } });
+        menu.push({ kind: 'item', label: 'Cancel request', icon: X, tone: 'critical', onSelect: () => requestConfirm({ title: 'Cancel signature request?', body: `Withdraw the outstanding signature request for "${r.title}"? Signers will no longer be able to sign.`, confirmLabel: 'Cancel request', onConfirm: () => router.post(`/hr/signatures/document/${r.document_id}/cancel`, {}, { preserveScroll: true }) }) });
     }
 
     return (
