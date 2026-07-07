@@ -75,6 +75,11 @@ class VettingController extends Controller
             ],
             'can' => [
                 'manage' => $user->canDo('hr.vetting.manage'),
+                // The shared hub header offers cross-domain create actions;
+                // gate each on the real manage perm so it isn't advertised to
+                // someone who'll only hit a 403 on submit.
+                'compliance_manage' => $user->canDo('hr.compliance.manage'),
+                'driver_manage' => $user->canDo('hr.driver.manage'),
             ],
         ]);
     }

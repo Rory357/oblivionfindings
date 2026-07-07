@@ -54,7 +54,7 @@ interface Props {
     roles: string[];
     siteTypes: string[];
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
-    can: { manage: boolean };
+    can: { manage: boolean; vetting_manage: boolean; driver_manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -114,7 +114,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compliance matrix" />
             <div className="space-y-4 px-4 py-4 lg:px-6">
-                <ComplianceHubHeader hero={hero} active="matrix" counts={{ matrix: requirements.length || undefined }} can={{ manage: can.manage, vetting: true, driver: true }} onWizard={(type) => setWz({ type })} />
+                <ComplianceHubHeader hero={hero} active="matrix" counts={{ matrix: requirements.length || undefined }} can={{ manage: can.manage, vetting: can.vetting_manage, driver: can.driver_manage }} onWizard={(type) => setWz({ type })} />
 
                 {/* Requirements library */}
                 <div className="flex flex-wrap items-end justify-between gap-3">

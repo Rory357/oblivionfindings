@@ -158,8 +158,14 @@ class ComplianceController extends Controller
             ],
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),
+                // .view gates the "View vetting/drivers" nav links in the row menu.
                 'vetting' => $user->canDo('hr.vetting.view'),
                 'driver' => $user->canDo('hr.driver.view'),
+                // .manage gates the header's "Add vetting check"/"Add driver"
+                // create actions — advertising them to a view-only user just
+                // yields a 403 on submit.
+                'vetting_manage' => $user->canDo('hr.vetting.manage'),
+                'driver_manage' => $user->canDo('hr.driver.manage'),
             ],
         ]);
     }

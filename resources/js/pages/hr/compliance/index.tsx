@@ -92,7 +92,7 @@ interface Props {
     hero: HeroPayload;
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     filters: { q: string; status: string | null; requirement_id: string | null };
-    can: { manage: boolean; vetting: boolean; driver: boolean };
+    can: { manage: boolean; vetting: boolean; driver: boolean; vetting_manage: boolean; driver_manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -176,7 +176,7 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                     hero={hero}
                     active="overview"
                     counts={{ matrix: wizard.requirements.length || undefined }}
-                    can={can}
+                    can={{ manage: can.manage, vetting: can.vetting_manage, driver: can.driver_manage }}
                     onWizard={(type) => setWz({ type })}
                 />
 

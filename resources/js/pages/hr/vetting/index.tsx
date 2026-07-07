@@ -62,7 +62,7 @@ interface Props {
     summary: { total: number; clear: number; pending: number; flagged: number; expired: number; expiring: number };
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     filters: { status: string | null; q: string };
-    can: { manage: boolean };
+    can: { manage: boolean; compliance_manage: boolean; driver_manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -122,7 +122,7 @@ export default function VettingIndex({ hero, checks, summary, wizard, filters, c
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vetting register" />
             <div className="space-y-4 px-4 py-4 lg:px-6">
-                <ComplianceHubHeader hero={hero} active="vetting" can={{ manage: true, vetting: can.manage, driver: true }} onWizard={(type) => setWz({ type })} />
+                <ComplianceHubHeader hero={hero} active="vetting" can={{ manage: can.compliance_manage, vetting: can.manage, driver: can.driver_manage }} onWizard={(type) => setWz({ type })} />
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     <StatTile label="Total" value={summary.total} icon={UserCheck} tone="info" />

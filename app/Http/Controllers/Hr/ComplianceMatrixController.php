@@ -72,6 +72,9 @@ class ComplianceMatrixController extends Controller
             'wizard' => $this->complianceWizardData($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),
+                // Real perms for the shared hub header's cross-domain create actions.
+                'vetting_manage' => $user->canDo('hr.vetting.manage'),
+                'driver_manage' => $user->canDo('hr.driver.manage'),
             ],
         ]);
     }

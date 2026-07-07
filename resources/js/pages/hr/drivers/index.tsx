@@ -63,7 +63,7 @@ interface Props {
     summary: { total: number; eligible: number; expiring: number; suspended: number; pending: number };
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     filters: { status: string | null; q: string };
-    can: { manage: boolean };
+    can: { manage: boolean; compliance_manage: boolean; vetting_manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -124,7 +124,7 @@ export default function DriversIndex({ hero, records, summary, wizard, filters, 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Driver register" />
             <div className="space-y-4 px-4 py-4 lg:px-6">
-                <ComplianceHubHeader hero={hero} active="drivers" can={{ manage: true, vetting: true, driver: can.manage }} onWizard={(type) => setWz({ type })} />
+                <ComplianceHubHeader hero={hero} active="drivers" can={{ manage: can.compliance_manage, vetting: can.vetting_manage, driver: can.manage }} onWizard={(type) => setWz({ type })} />
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     <StatTile label="Total" value={summary.total} icon={Car} tone="info" />

@@ -42,7 +42,7 @@ interface Props {
     events: RenewalEvent[];
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     filters: { type: string };
-    can: { manage: boolean };
+    can: { manage: boolean; vetting_manage: boolean; driver_manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -131,7 +131,7 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Renewals" />
             <div className="space-y-4 px-4 py-4 lg:px-6">
-                <ComplianceHubHeader hero={hero} active="calendar" can={{ manage: can.manage, vetting: true, driver: true }} onWizard={(type) => setWz({ type })} />
+                <ComplianceHubHeader hero={hero} active="calendar" can={{ manage: can.manage, vetting: can.vetting_manage, driver: can.driver_manage }} onWizard={(type) => setWz({ type })} />
 
                 {/* Horizon + type filters */}
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-2.5">
