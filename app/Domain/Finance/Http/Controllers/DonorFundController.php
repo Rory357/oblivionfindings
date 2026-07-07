@@ -9,6 +9,7 @@ use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -26,11 +27,13 @@ class DonorFundController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $funds = FinDonorFund::forOrganization($orgId)
+        $query = FinDonorFund::forOrganization($orgId)
             ->with('glAccount:id,code,name', 'fundingStream:id,name')
-            ->orderBy('fund_name')
-            ->get()
-            ->map(fn (FinDonorFund $fund) => [
+            ->orderBy('fund_name');
+
+        $this->applyFundFilters($query, $request);
+
+        $funds = $query->paginate(20)->withQueryString()->through(fn (FinDonorFund $fund) => [
                 'id' => $fund->id,
                 'fund_code' => $fund->fund_code,
                 'fund_name' => $fund->fund_name,
@@ -57,6 +60,7 @@ class DonorFundController extends Controller
 
         return Inertia::render('finance/donor-funds/Index', [
             'funds' => $funds,
+            'filters' => $request->only(['search', 'status', 'restricted']),
             'summary' => $summary,
             'canManage' => $canManage,
             'glAccounts' => $canManage ? $this->fundGlAccounts($orgId) : [],
@@ -65,17 +69,18 @@ class DonorFundController extends Controller
     }
 
     /**
-     * Stream the donor-fund list as a sanitised CSV. The index has no filters,
-     * so this mirrors its ordering and exports every fund for the organisation.
+     * Stream the donor-fund list as a sanitised CSV. Honours the same
+     * search / status / restricted filters as the index so "Export" respects the
+     * current view.
      */
     public function export(Request $request)
     {
         $orgId = $request->user()->organization_id;
 
-        $rows = FinDonorFund::forOrganization($orgId)
-            ->orderBy('fund_name')
-            ->get()
-            ->map(fn (FinDonorFund $fund) => [
+        $query = FinDonorFund::forOrganization($orgId)->orderBy('fund_name');
+        $this->applyFundFilters($query, $request);
+
+        $rows = $query->get()->map(fn (FinDonorFund $fund) => [
                 $fund->fund_code,
                 $fund->fund_name,
                 $fund->donor_name,
@@ -90,6 +95,32 @@ class DonorFundController extends Controller
             ['Fund Code', 'Name', 'Donor', 'Total Received', 'Total Spent', 'Balance', 'Status'],
             $rows,
         );
+    }
+
+    /**
+     * Apply the shared donor-fund list filters (search / status / restricted) so the
+     * index list and the CSV export always show the same rows for a given query string.
+     *
+     * @param  Builder<FinDonorFund>  $query
+     */
+    private function applyFundFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('fund_name', 'like', "%{$search}%")
+                    ->orWhere('fund_code', 'like', "%{$search}%")
+                    ->orWhere('donor_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('restricted')) {
+            $query->where('is_restricted', $request->input('restricted') === 'restricted');
+        }
     }
 
     /** Active liability/equity GL accounts for the donor-fund modal. */

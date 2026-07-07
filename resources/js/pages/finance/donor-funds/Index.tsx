@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
@@ -14,8 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { Plus, Heart, AlertTriangle, HandHeart, Download } from 'lucide-react';
+import { Plus, Heart, AlertTriangle, HandHeart, Download, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
 
@@ -48,8 +50,27 @@ interface Summary {
     expiring_soon: number;
 }
 
+interface PaginatorLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+interface Paginated<T> {
+    data: T[];
+    links: PaginatorLink[];
+    last_page: number;
+}
+
+interface Filters {
+    search?: string;
+    status?: string;
+    restricted?: string;
+}
+
 interface Props extends PageProps {
-    funds: Fund[];
+    funds: Paginated<Fund>;
+    filters: Filters;
     summary: Summary;
     canManage: boolean;
     glAccounts: DonorFundGlAccount[];
@@ -80,8 +101,28 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Donor Funds', href: '/finance/donor-funds' },
 ];
 
-export default function DonorFundsIndex({ funds, summary, canManage = false, glAccounts = [], fundingStreams = [] }: Props) {
+export default function DonorFundsIndex({ funds, filters, summary, canManage = false, glAccounts = [], fundingStreams = [] }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [status, setStatus] = useState(filters.status ?? '');
+    const [restricted, setRestricted] = useState(filters.restricted ?? '');
+
+    const applyFilters = () => {
+        const params: Record<string, string> = {};
+        if (search) params.search = search;
+        if (status && status !== 'all') params.status = status;
+        if (restricted && restricted !== 'all') params.restricted = restricted;
+        router.get('/finance/donor-funds', params, { preserveState: true, preserveScroll: true });
+    };
+
+    const clearFilters = () => {
+        setSearch('');
+        setStatus('');
+        setRestricted('');
+        router.get('/finance/donor-funds', {}, { preserveState: true });
+    };
+
+    const hasFilters = Boolean(search || (status && status !== 'all') || (restricted && restricted !== 'all'));
     const pieData = [
         { name: 'Restricted', value: summary.restricted_balance },
         { name: 'Unrestricted', value: summary.unrestricted_balance },
@@ -106,7 +147,7 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href="/finance/donor-funds/export">
+                                    <a href={`/finance/donor-funds/export?${new URLSearchParams(Object.entries({ search, status: status !== 'all' ? status : '', restricted: restricted !== 'all' ? restricted : '' }).filter(([, v]) => v)).toString()}`}>
                                         <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
@@ -211,13 +252,67 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                     )}
                 </div>
 
+                {/* Filters */}
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search fund, code, donor..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Select value={status} onValueChange={setStatus}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All statuses</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="fully_spent">Fully spent</SelectItem>
+                                    <SelectItem value="expired">Expired</SelectItem>
+                                    <SelectItem value="returned">Returned</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Select value={restricted} onValueChange={setRestricted}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All funds" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All funds</SelectItem>
+                                    <SelectItem value="restricted">Restricted</SelectItem>
+                                    <SelectItem value="unrestricted">Unrestricted</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div className="flex gap-2">
+                                <Button onClick={applyFilters} variant="secondary" className="shrink-0">
+                                    Filter
+                                </Button>
+                                <Button onClick={clearFilters} variant="ghost" className="shrink-0">
+                                    Clear
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Funds Table */}
-                {funds.length === 0 ? (
+                {funds.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12">
                             <Heart className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">No donor funds yet.</p>
-                            <p className="text-sm text-muted-foreground">Create your first fund to start tracking donations and grants.</p>
+                            <p className="text-lg font-medium text-muted-foreground">
+                                {hasFilters ? 'No funds match your filters.' : 'No donor funds yet.'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {hasFilters
+                                    ? 'Try adjusting or clearing the filters.'
+                                    : 'Create your first fund to start tracking donations and grants.'}
+                            </p>
                         </CardContent>
                     </Card>
                 ) : (
@@ -239,7 +334,7 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {funds.map((fund) => {
+                                    {funds.data.map((fund) => {
                                         const badge = statusBadge[fund.status] ?? statusBadge.active;
                                         const utilisation = fund.budget_amount
                                             ? Math.round((fund.total_spent / fund.budget_amount) * 100)
@@ -299,6 +394,21 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                     })}
                                 </TableBody>
                             </Table>
+
+                            {funds.last_page > 1 && (
+                                <div className="flex items-center justify-center gap-1 border-t p-4">
+                                    {funds.links.map((link, i) => (
+                                        <Button
+                                            key={i}
+                                            variant={link.active ? 'default' : 'ghost'}
+                                            size="sm"
+                                            disabled={!link.url}
+                                            onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}

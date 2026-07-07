@@ -8,9 +8,11 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Download, Plus, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronRight, DollarSign, Download, Plus, Search, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -190,6 +192,36 @@ function AccountTypeSection({
     );
 }
 
+type ActiveFilter = 'all' | 'active' | 'inactive';
+
+/**
+ * Prune the account tree to rows matching the search text (code or name) and the
+ * active filter, keeping any ancestor of a match so the hierarchy stays intact.
+ * Runs client-side — the whole chart is already loaded, so a tree filter is the
+ * right idiom (you never paginate a chart of accounts).
+ */
+function filterAccounts(nodes: Account[], q: string, active: ActiveFilter): Account[] {
+    const needle = q.trim().toLowerCase();
+    const matches = (a: Account) => {
+        const activeOk =
+            active === 'all' || (active === 'active' ? a.is_active : !a.is_active);
+        const textOk =
+            needle === '' ||
+            a.code.toLowerCase().includes(needle) ||
+            a.name.toLowerCase().includes(needle);
+        return activeOk && textOk;
+    };
+    const walk = (list: Account[]): Account[] =>
+        list.reduce<Account[]>((acc, node) => {
+            const children = walk(node.children);
+            if (matches(node) || children.length > 0) {
+                acc.push({ ...node, children });
+            }
+            return acc;
+        }, []);
+    return walk(nodes);
+}
+
 export default function AccountsIndex({
     accountTree,
     accountTypes,
@@ -199,16 +231,31 @@ export default function AccountsIndex({
     fundingStreams = [],
 }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Chart of Accounts', href: '/finance/accounts' },
     ];
 
+    const TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+
     const countTree = (nodes: Account[]): number =>
         nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
-    const totalAccounts = (
-        ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
-    ).reduce((sum, type) => sum + countTree(accountTree[type] || []), 0);
+    const totalAccounts = TYPES.reduce(
+        (sum, type) => sum + countTree(accountTree[type] || []),
+        0,
+    );
+
+    const hasFilters = search.trim() !== '' || activeFilter !== 'all';
+    const filteredTree = TYPES.reduce((acc, type) => {
+        acc[type] = filterAccounts(accountTree[type] || [], search, activeFilter);
+        return acc;
+    }, {} as AccountTree);
+    const visibleCount = TYPES.reduce(
+        (sum, type) => sum + countTree(filteredTree[type]),
+        0,
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -246,28 +293,52 @@ export default function AccountsIndex({
                 }
             >
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="gap-4">
                         <div className="flex items-center gap-2">
                             <DollarSign className="h-5 w-5 text-muted-foreground" />
                             <CardTitle>Account Tree</CardTitle>
                         </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search code or name..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Select
+                                value={activeFilter}
+                                onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
+                            >
+                                <SelectTrigger className="sm:w-44">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All accounts</SelectItem>
+                                    <SelectItem value="active">Active only</SelectItem>
+                                    <SelectItem value="inactive">Inactive only</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {(
-                            [
-                                'asset',
-                                'liability',
-                                'equity',
-                                'revenue',
-                                'expense',
-                            ] as const
-                        ).map((type) => (
-                            <AccountTypeSection
-                                key={type}
-                                type={type}
-                                accounts={accountTree[type] || []}
-                            />
-                        ))}
+                        {visibleCount === 0 ? (
+                            <div className="py-12 text-center text-sm text-muted-foreground">
+                                No accounts match your search.
+                            </div>
+                        ) : (
+                            TYPES.filter(
+                                (type) => !hasFilters || filteredTree[type].length > 0,
+                            ).map((type) => (
+                                <AccountTypeSection
+                                    key={type}
+                                    type={type}
+                                    accounts={filteredTree[type]}
+                                />
+                            ))
+                        )}
                     </CardContent>
                 </Card>
 

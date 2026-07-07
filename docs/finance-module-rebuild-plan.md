@@ -641,8 +641,17 @@ vendor, receipt) — the mould for C2.
       Browser-verified on demo data: receivables (Invoices 6 · Quotes 1 · Recurring 1 · Price books 1; Billing/
       Allocations 0 → no badge; Aged-AR/Statements reports → no badge) + payables (Bills 4 · POs 2 · Vendors 4 ·
       Credit notes 2 · Payment runs 2), no console errors. Gates: types 0, eslint 0, vitest 3, suite 230 green.
-    - **[ ] C3d-list — pagination + search + URL filter chips + sort** on lists lacking them (accounts / donor-funds /
-      credit-notes / gst-returns paginate; replicate invoices/bills' URL-synced search+status+date+sort elsewhere).
+    - **[x] C3d-list — command layer on the laggard lists.** Replicated the invoices/bills golden template (hand-rolled
+      inline filter Card + inline paginator `.links`, no shared FilterBar/LaravelPagination so the pages stay visually
+      identical to invoices/bills; broad EmptyState/skeleton adoption stays C3e's module-wide job). **Donor-funds**:
+      now `->paginate(20)->withQueryString()->through(…)` + search / status / restricted filters (shared
+      `applyFundFilters` so index + CSV export show the same rows) + filter bar + paginator + filter-aware empty.
+      **Credit-notes**: added search (CN # / vendor / client) + credit-date range on top of its type/status
+      (shared `applyCreditNoteFilters`). **Accounts** (a *tree*): client-side search + active filter over the loaded
+      chart (you never paginate a chart of accounts) — prunes to matches keeping ancestors. **GST returns**: already
+      had status/year + pagination → left as-is. No clickable column sort (the golden template has none — adding it to
+      only these would break consistency; defer a uniform sort). Gates: types 0, eslint 0, suite 232, browser-verified
+      (donor-funds `?search=` round-trips + hydrates; accounts tree 8→1 on "bank"; credit-notes bar renders), no console errors.
     - **[ ] C3d-menus — right-click context menus** on every list row (reuse the canonical mould, don't fork).
   - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·

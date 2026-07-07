@@ -9,6 +9,7 @@ use App\Domain\Finance\Services\AccountsPayableService;
 use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -29,17 +30,7 @@ class CreditNoteController extends Controller
             ->with('vendor:id,name')
             ->orderBy('credit_date', 'desc');
 
-        if ($request->filled('type')) {
-            if ($request->input('type') === 'payable') {
-                $query->payable();
-            } elseif ($request->input('type') === 'receivable') {
-                $query->receivable();
-            }
-        }
-
-        if ($request->filled('status')) {
-            $query->withStatus($request->input('status'));
-        }
+        $this->applyCreditNoteFilters($query, $request);
 
         $creditNotes = $query->paginate(20)->withQueryString();
 
@@ -48,7 +39,7 @@ class CreditNoteController extends Controller
 
         return Inertia::render('finance/credit-notes/Index', [
             'creditNotes' => $creditNotes,
-            'filters' => $request->only(['type', 'status']),
+            'filters' => $request->only(['type', 'status', 'search', 'date_from', 'date_to']),
             'canManage' => $canManage,
             // Reference data for the create modal.
             'vendors' => $canManage ? $this->vendorOptions($orgId) : [],
@@ -59,8 +50,8 @@ class CreditNoteController extends Controller
 
     /**
      * Stream the (filtered) credit-note list as a sanitised CSV. Mirrors the
-     * index's type/status filters so "Export" respects the current view. Party
-     * resolves to the client (receivable) or the vendor (payable).
+     * index's search/type/status/date filters so "Export" respects the current
+     * view. Party resolves to the client (receivable) or the vendor (payable).
      */
     public function export(Request $request)
     {
@@ -72,16 +63,7 @@ class CreditNoteController extends Controller
             ->with(['vendor:id,name', 'client:id,first_name,last_name'])
             ->orderBy('credit_date', 'desc');
 
-        if ($request->filled('type')) {
-            if ($request->input('type') === 'payable') {
-                $query->payable();
-            } elseif ($request->input('type') === 'receivable') {
-                $query->receivable();
-            }
-        }
-        if ($request->filled('status')) {
-            $query->withStatus($request->input('status'));
-        }
+        $this->applyCreditNoteFilters($query, $request);
 
         $rows = $query->get()->map(fn (FinCreditNote $cn) => [
             $cn->credit_note_number,
@@ -101,6 +83,47 @@ class CreditNoteController extends Controller
             ['Credit Note #', 'Type', 'Party', 'Date', 'Subtotal', 'GST', 'Total', 'Status'],
             $rows,
         );
+    }
+
+    /**
+     * Apply the shared credit-note list filters (type / status / search / date range)
+     * so the index list and the CSV export always show the same rows for a given
+     * query string. Search matches the CN number or the party (vendor or client) name.
+     *
+     * @param  Builder<FinCreditNote>  $query
+     */
+    private function applyCreditNoteFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('type')) {
+            if ($request->input('type') === 'payable') {
+                $query->payable();
+            } elseif ($request->input('type') === 'receivable') {
+                $query->receivable();
+            }
+        }
+
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('credit_note_number', 'like', "%{$search}%")
+                    ->orWhereHas('vendor', fn ($v) => $v->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('client', fn ($c) => $c
+                        ->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('credit_date', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('credit_date', '<=', $request->input('date_to'));
+        }
     }
 
     /** Active vendors for the credit-note modal. */
