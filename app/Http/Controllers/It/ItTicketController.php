@@ -8,11 +8,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
+use App\Http\Requests\It\BulkTicketActionRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
+use App\Models\User;
+use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
@@ -350,5 +353,159 @@ class ItTicketController extends Controller
         }
 
         return redirect()->back()->with('success', "Stopped watching {$ticket->reference}.");
+    }
+
+    /* ================================================================== */
+    /*  Bulk actions (§F2) */
+    /* ================================================================== */
+
+    /**
+     * One action over many tickets: assign, set priority (restamps the SLA
+     * clock), set a working status (waiting transitions bank the pause), or
+     * close. Foreign-tenant ids silently drop out of the tenant-scoped
+     * fetch; settled tickets are skipped rather than mutated — the flash
+     * reports both as "unchanged". One event row per actual change, same
+     * payload shape as the single-ticket routes.
+     */
+    public function bulk(BulkTicketActionRequest $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $validated = $request->validated();
+        $action = (string) $validated['action'];
+
+        $assignee = null;
+        if ($action === 'assign' && ! empty($validated['assigned_to_user_id'])) {
+            $assignee = User::query()->find((int) $validated['assigned_to_user_id']);
+            // Same foreign-tenant guard as every other assignment here: reject a
+            // recipient whose HR profile sits in a different organisation.
+            $inOtherTenant = $assignee && HrEmployeeProfile::query()
+                ->where('user_id', $assignee->id)
+                ->whereNotNull('tenant_id')
+                ->where('tenant_id', '!=', $tenantId)
+                ->exists();
+            if ($inOtherTenant) {
+                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
+            }
+        }
+
+        $tickets = ItTicket::query()
+            ->forTenant($tenantId)
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $updated = 0;
+        $skipped = count($validated['ids']) - $tickets->count();
+
+        foreach ($tickets as $ticket) {
+            $changed = match ($action) {
+                'assign' => $this->bulkAssign($ticket, $assignee, $user),
+                'priority' => $this->bulkPriority($ticket, (string) $validated['priority'], $user),
+                'status' => $this->bulkStatus($ticket, (string) $validated['status'], $user),
+                'close' => $this->bulkClose($ticket, $user),
+                default => false,
+            };
+            $changed ? $updated++ : $skipped++;
+        }
+
+        $label = ['assign' => 'assigned', 'priority' => 'reprioritised', 'status' => 'updated', 'close' => 'closed'][$action];
+
+        return redirect()->back()->with(
+            'success',
+            "{$updated} ticket(s) {$label}".($skipped > 0 ? " · {$skipped} unchanged" : '').'.',
+        );
+    }
+
+    private function bulkAssign(ItTicket $ticket, ?User $assignee, User $actor): bool
+    {
+        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true)) {
+            return false; // settled tickets keep their history
+        }
+        $newId = $assignee?->id;
+        if ((int) $ticket->assigned_to_user_id === (int) $newId) {
+            return false;
+        }
+
+        $from = $ticket->assigned_to_user_id;
+        $ticket->assigned_to_user_id = $newId;
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'assigned', $actor->id, [
+            'from' => $from,
+            'to' => $newId,
+            'via' => 'bulk',
+        ]);
+        if ($assignee && $assignee->id !== $actor->id) {
+            $assignee->notify(new TicketAssignedNotification($ticket));
+        }
+
+        return true;
+    }
+
+    private function bulkPriority(ItTicket $ticket, string $priority, User $actor): bool
+    {
+        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true) || $ticket->priority === $priority) {
+            return false;
+        }
+
+        $from = $ticket->priority;
+        $ticket->priority = $priority;
+        // Re-target the SLA clock for the new priority (same creation anchor).
+        $ticket->stampSlaDueDates();
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'priority_changed', $actor->id, [
+            'from' => $from,
+            'to' => $priority,
+            'via' => 'bulk',
+        ]);
+
+        return true;
+    }
+
+    private function bulkStatus(ItTicket $ticket, string $status, User $actor): bool
+    {
+        // Working states only (the FormRequest enforces the target; this
+        // guards the source) — bulk never un-resolves or un-closes.
+        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true) || $ticket->status === $status) {
+            return false;
+        }
+
+        $from = $ticket->status;
+        if ($status === 'waiting') {
+            $ticket->startWaiting();
+        } elseif ($ticket->status === 'waiting') {
+            $ticket->stopWaiting($status);
+        } else {
+            $ticket->status = $status;
+        }
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'status_changed', $actor->id, [
+            'from' => $from,
+            'to' => $ticket->status,
+            'via' => 'bulk',
+        ]);
+
+        return true;
+    }
+
+    private function bulkClose(ItTicket $ticket, User $actor): bool
+    {
+        if ($ticket->status === 'closed') {
+            return false;
+        }
+
+        if ($ticket->status === 'waiting') {
+            $ticket->stopWaiting('closed');
+        } else {
+            $ticket->status = 'closed';
+        }
+        $ticket->closed_at = now();
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'closed', $actor->id, ['via' => 'bulk']);
+
+        return true;
     }
 }

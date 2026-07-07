@@ -56,7 +56,14 @@ class ItProvisioningController extends Controller
             'assignee' => is_numeric($request->query('assignee')) ? (int) $request->query('assignee') : null,
             'ticket_status' => $this->cleanFilter($request->query('ticket_status'), ItTicket::STATUSES),
             'ticket_priority' => $this->cleanFilter($request->query('ticket_priority'), ItTicket::PRIORITIES),
+            'ticket_category' => $this->cleanFilter($request->query('ticket_category'), ItTicket::CATEGORIES),
+            'sla' => $this->cleanFilter($request->query('sla'), ItTicket::SLA_STATES),
             'view' => $this->cleanFilter($request->query('view'), array_keys(self::TICKET_VIEWS)),
+            'q' => trim((string) $request->query('q', '')) !== '' ? trim((string) $request->query('q')) : null,
+            'from' => $this->cleanDate($request->query('from')),
+            'to' => $this->cleanDate($request->query('to')),
+            'sort' => $this->cleanFilter($request->query('sort'), ['reference', 'created', 'updated', 'priority', 'status']),
+            'dir' => $this->cleanFilter($request->query('dir'), ['asc', 'desc']),
         ];
 
         $canManage = (bool) ($user && $user->canDo('it.manage'));
@@ -487,6 +494,42 @@ class ItProvisioningController extends Controller
         };
     }
 
+    /** Escaped LIKE across reference, title and requester name (§F2 search). */
+    private function applyTicketSearch($query, string $term)
+    {
+        $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term).'%';
+
+        return $query->where(function ($w) use ($like) {
+            $w->where('reference', 'like', $like)
+                ->orWhere('title', 'like', $like)
+                ->orWhereHas('requester', fn ($r) => $r->where('name', 'like', $like));
+        });
+    }
+
+    /**
+     * Column sort when a header asks for one; otherwise the triage order
+     * the queue has always had (open first, urgent first, newest first).
+     * Semantic columns sort by severity/progression, not alphabetically.
+     */
+    private function applyTicketSort($query, ?string $sort, ?string $dir): void
+    {
+        $direction = $dir === 'asc' ? 'asc' : 'desc';
+
+        match ($sort) {
+            'reference' => $query->orderBy('reference', $direction),
+            'created' => $query->orderBy('created_at', $direction),
+            'updated' => $query->orderBy('updated_at', $direction),
+            'priority' => $query->orderByRaw("CASE priority WHEN 'low' THEN 0 WHEN 'normal' THEN 1 WHEN 'high' THEN 2 ELSE 3 END {$direction}"),
+            'status' => $query->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END {$direction}"),
+            default => $query
+                ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END")
+                ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
+                ->orderByDesc('created_at'),
+        };
+
+        $query->orderByDesc('id'); // stable tiebreak for pagination
+    }
+
     /** @param array<string, mixed> $filters */
     private function requestPage(int $tenantId, array $filters)
     {
@@ -539,16 +582,22 @@ class ItProvisioningController extends Controller
             return null;
         }
 
-        return ItTicket::query()
+        $query = ItTicket::query()
             ->forTenant($tenantId)
             ->with(['requester:id,name', 'assignee:id,name'])
             ->when($filters['view'], fn ($q, $view) => $this->applyTicketView($q, $view, $userId))
+            ->when($filters['q'], fn ($q, $term) => $this->applyTicketSearch($q, $term))
             ->when($filters['ticket_status'], fn ($q, $status) => $q->where('status', $status))
             ->when($filters['ticket_priority'], fn ($q, $priority) => $q->where('priority', $priority))
+            ->when($filters['ticket_category'], fn ($q, $category) => $q->where('category', $category))
+            ->when($filters['sla'], fn ($q, $sla) => $q->where('sla_state', $sla))
             ->when($filters['assignee'], fn ($q, $assignee) => $q->where('assigned_to_user_id', $assignee))
-            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END")
-            ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
-            ->orderByDesc('created_at')
+            ->when($filters['from'], fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
+            ->when($filters['to'], fn ($q, $to) => $q->whereDate('created_at', '<=', $to));
+
+        $this->applyTicketSort($query, $filters['sort'] ?? null, $filters['dir'] ?? null);
+
+        return $query
             ->paginate(15, ['*'], 'tickets_page')
             ->withQueryString()
             ->through(fn (ItTicket $t) => [
@@ -728,4 +777,13 @@ class ItProvisioningController extends Controller
         return in_array($value, $allowed, true) ? $value : null;
     }
 
+    /** A strict, real Y-m-d date or null — the queue's date-range filters. */
+    private function cleanDate(mixed $value): ?string
+    {
+        if (! is_string($value) || ! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+            return null;
+        }
+
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) ? $value : null;
+    }
 }
