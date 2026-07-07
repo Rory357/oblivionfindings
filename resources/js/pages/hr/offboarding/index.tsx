@@ -309,7 +309,7 @@ export default function OffboardingIndex({
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground capitalize">
                                                 {checklist.template_key.replace(
-                                                    /_/g,
+                                                    /[:_]/g,
                                                     ' ',
                                                 )}
                                             </td>

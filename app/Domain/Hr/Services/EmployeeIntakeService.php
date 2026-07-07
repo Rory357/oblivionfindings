@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
@@ -208,6 +209,19 @@ class EmployeeIntakeService
         $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
 
         $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart) {
+            // 0. Close out any leaver workflow still open from the previous
+            //    stint — rehiring supersedes it, and leaving it open would
+            //    strand a live checklist whose completion revokes the login
+            //    this rehire is about to restore.
+            HrOffboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->get()
+                ->each(fn ($checklist) => $checklist->update([
+                    'status' => 'cancelled',
+                    'completed_at' => null,
+                ]));
+
             // 1. Archive the outgoing stint (append-only history).
             $history = $profile->employment_history ?? [];
             $history[] = [

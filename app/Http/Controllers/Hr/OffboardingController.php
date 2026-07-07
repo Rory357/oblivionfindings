@@ -290,4 +290,43 @@ class OffboardingController extends Controller
 
         return redirect()->back()->with('success', "Task '{$task->title}' completed.");
     }
+
+    /**
+     * Reopen a mistakenly-completed task. Never restores revoked system
+     * access — rehire owns restoration.
+     */
+    public function uncompleteTask(Request $request, HrOffboardingTask $task)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $checklist = $task->checklist;
+        abort_unless($checklist, 404);
+        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+
+        $this->onboardingService->uncompleteOffboardingTask($task);
+
+        return redirect()->back()->with('success', 'Task reopened.');
+    }
+
+    /**
+     * Cancel or archive an offboarding without deleting it — e.g. a retracted
+     * resignation. Append-only history.
+     */
+    public function setStatus(Request $request, HrOffboardingChecklist $checklist)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:in_progress,cancelled,archived'],
+        ]);
+
+        $this->onboardingService->setOffboardingChecklistStatus($checklist, $validated['status']);
+
+        return redirect()->back()->with('success', 'Offboarding updated.');
+    }
 }

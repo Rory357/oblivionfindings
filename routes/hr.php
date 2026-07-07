@@ -598,6 +598,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/create', [OffboardingController::class, 'create'])->name('create');
             Route::post('/', [OffboardingController::class, 'store'])->name('store');
             Route::post('/tasks/{task}/complete', [OffboardingController::class, 'completeTask'])->name('tasks.complete');
+            Route::post('/tasks/{task}/uncomplete', [OffboardingController::class, 'uncompleteTask'])->name('tasks.uncomplete');
+            Route::post('/{checklist}/status', [OffboardingController::class, 'setStatus'])->name('status');
         });
 
         Route::get('/{checklist}', [OffboardingController::class, 'show'])->name('show');

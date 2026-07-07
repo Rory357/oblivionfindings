@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\OffboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingChecklistAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Models\Asset;
@@ -769,7 +770,7 @@ class OnboardingService
      */
     public function generateOffboardingChecklist(HrEmployeeProfile $profile, int $createdBy, array $options = []): HrOffboardingChecklist
     {
-        return DB::transaction(function () use ($profile, $createdBy, $options) {
+        $result = DB::transaction(function () use ($profile, $createdBy, $options) {
             $endDate = $options['end_date'] ?? $profile->end_date ?? now()->addWeeks(2);
             $offboardingTemplate = HrOnboardingTemplate::query()
                 ->forTenant($profile->tenant_id)
@@ -890,6 +891,74 @@ class OnboardingService
 
             return $checklist->load('tasks');
         });
+
+        // Notify assignees after commit (onboarding notifies too; without this,
+        // offboarding tasks sat silently until someone opened the hub —
+        // dangerous when the tasks gate access revocation + asset recovery).
+        foreach ($result->tasks as $task) {
+            if (! $task->assigned_to_user_id) {
+                continue;
+            }
+
+            $assignee = User::find($task->assigned_to_user_id);
+            if (! $assignee) {
+                continue;
+            }
+
+            try {
+                $assignee->notify(new OffboardingTaskAssignedNotification($task));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to notify offboarding task assignee', [
+                    'task_id' => $task->id,
+                    'assignee_id' => $assignee->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Reopen a mistakenly-completed offboarding task (mirror of the onboarding
+     * uncomplete). Reverts a completed checklist to in_progress but NEVER
+     * restores revoked system access — rehire owns restoration.
+     */
+    public function uncompleteOffboardingTask(HrOffboardingTask $task): HrOffboardingTask
+    {
+        if ($task->status !== 'completed') {
+            return $task;
+        }
+
+        $task->update([
+            'status' => 'pending',
+            'completed_at' => null,
+            'completed_by' => null,
+            'signed_off_by' => null,
+            'signed_off_at' => null,
+        ]);
+
+        $checklist = $task->checklist()->firstOrFail();
+        if ($checklist->status === 'completed') {
+            $checklist->update(['status' => 'in_progress', 'completed_at' => null]);
+        }
+
+        return $task->fresh();
+    }
+
+    /**
+     * Cancel or archive an offboarding checklist without deleting it — e.g. a
+     * retracted resignation (append-only history, mirrors the onboarding
+     * status setter).
+     */
+    public function setOffboardingChecklistStatus(HrOffboardingChecklist $checklist, string $status): HrOffboardingChecklist
+    {
+        $checklist->update([
+            'status' => $status,
+            'completed_at' => $status === 'completed' ? ($checklist->completed_at ?? now()) : $checklist->completed_at,
+        ]);
+
+        return $checklist->fresh();
     }
 
     /**

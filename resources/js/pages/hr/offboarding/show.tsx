@@ -1,4 +1,16 @@
 import { SelectInput } from '@/components/hr/wizard';
+import { PageHero } from '@/components/page';
+import PageShell from '@/components/page-shell';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,8 +28,8 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { MessageSquare, RotateCcw, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface Task {
@@ -300,6 +312,9 @@ export default function OffboardingShow({
     );
 
     const config = statusConfig[checklist.status] || statusConfig.pending;
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const isOpenChecklist =
+        checklist.status === 'pending' || checklist.status === 'in_progress';
 
     function completeTask(task: Task) {
         if (!can.manage || task.status === 'completed') return;
@@ -314,20 +329,35 @@ export default function OffboardingShow({
         });
     }
 
+    function reopenTask(task: Task) {
+        if (!can.manage || task.status !== 'completed') return;
+        router.post(
+            `/hr/offboarding/tasks/${task.id}/uncomplete`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    function setChecklistStatus(status: 'in_progress' | 'cancelled') {
+        router.post(
+            `/hr/offboarding/${checklist.id}/status`,
+            { status },
+            { preserveScroll: true },
+        );
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head
                 title={`Offboarding - ${checklist.employee_profile.user.name}`}
             />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href="/hr/offboarding">
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back
-                        </Link>
-                    </Button>
-                </div>
+            <PageShell>
+                <PageHero
+                    category="hr"
+                    variant="compact"
+                    title={`Offboarding: ${checklist.employee_profile.user.name}`}
+                    description={`Last working day ${checklist.due_date || 'not set'}`}
+                />
 
                 <Card>
                     <CardHeader>
@@ -337,15 +367,42 @@ export default function OffboardingShow({
                                     {checklist.employee_profile.user.name}
                                 </CardTitle>
                                 <p className="mt-1 text-sm text-muted-foreground capitalize">
-                                    {checklist.template_key.replace(/_/g, ' ')}
+                                    {checklist.template_key.replace(/[:_]/g, ' ')}
                                 </p>
                             </div>
-                            <Badge
-                                variant="outline"
-                                className={config.className}
-                            >
-                                {config.label}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                {can.manage && isOpenChecklist && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setCancelOpen(true)}
+                                    >
+                                        <XCircle className="mr-1.5 h-4 w-4" />
+                                        Cancel offboarding
+                                    </Button>
+                                )}
+                                {can.manage &&
+                                    checklist.status === 'cancelled' && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setChecklistStatus(
+                                                    'in_progress',
+                                                )
+                                            }
+                                        >
+                                            <RotateCcw className="mr-1.5 h-4 w-4" />
+                                            Resume offboarding
+                                        </Button>
+                                    )}
+                                <Badge
+                                    variant="outline"
+                                    className={config.className}
+                                >
+                                    {config.label}
+                                </Badge>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -484,25 +541,37 @@ export default function OffboardingShow({
                                                                     interview
                                                                 </Button>
                                                             )}
-                                                        <Button
-                                                            size="sm"
-                                                            variant={
-                                                                completed
-                                                                    ? 'secondary'
-                                                                    : 'default'
-                                                            }
-                                                            disabled={
-                                                                !can.manage ||
-                                                                completed
-                                                            }
-                                                            onClick={() =>
-                                                                completeTask(task)
-                                                            }
-                                                        >
-                                                            {completed
-                                                                ? 'Done'
-                                                                : 'Complete'}
-                                                        </Button>
+                                                        {completed ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                disabled={
+                                                                    !can.manage
+                                                                }
+                                                                onClick={() =>
+                                                                    reopenTask(
+                                                                        task,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                                                                Reopen
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                size="sm"
+                                                                disabled={
+                                                                    !can.manage
+                                                                }
+                                                                onClick={() =>
+                                                                    completeTask(
+                                                                        task,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Complete
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -512,7 +581,7 @@ export default function OffboardingShow({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageShell>
 
             {can.manage && (
                 <ExitInterviewDialog
@@ -523,6 +592,34 @@ export default function OffboardingShow({
                     departureReasons={departureReasons}
                 />
             )}
+
+            <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Cancel this offboarding?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Use this when the departure is not going ahead —
+                            e.g. a retracted resignation. The checklist and
+                            its history are kept, tasks stop counting as due,
+                            and it can be resumed later. System access is not
+                            changed.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep offboarding</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setCancelOpen(false);
+                                setChecklistStatus('cancelled');
+                            }}
+                        >
+                            Cancel offboarding
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }
