@@ -141,10 +141,10 @@ const CATEGORY_COLOURS: Record<
         icon: 'text-status-info',
     },
     'Flexible / Other': {
-        bg: 'bg-muted-foreground/80/10',
+        bg: 'bg-muted-foreground/10',
         text: 'text-muted-foreground',
         border: 'border-l-slate-500',
-        badge: 'bg-muted-foreground/80/20 text-muted-foreground',
+        badge: 'bg-muted-foreground/20 text-muted-foreground',
         icon: 'text-muted-foreground',
     },
 };
@@ -357,7 +357,7 @@ export default function ServiceContextsPage(props: Props) {
                                 ).map((cat) => (
                                     <span
                                         key={cat}
-                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${CATEGORY_COLOURS[cat]?.badge ?? 'bg-muted-foreground/80/20 text-muted-foreground'}`}
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${CATEGORY_COLOURS[cat]?.badge ?? 'bg-muted-foreground/20 text-muted-foreground'}`}
                                     >
                                         {cat}: {categoryStats[cat]}
                                     </span>
@@ -591,7 +591,7 @@ export default function ServiceContextsPage(props: Props) {
                                     {/* Type description hint */}
                                     {selectedCreateType && (
                                         <div
-                                            className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-muted-foreground/80/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-muted-foreground'}`}
+                                            className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-muted-foreground/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-muted-foreground'}`}
                                         >
                                             <span className="font-medium">
                                                 {selectedCreateType.label}:
@@ -951,7 +951,7 @@ function ContextCard({
                         ) : (
                             <Badge
                                 variant="secondary"
-                                className="bg-muted-foreground/80/20 border-0 text-[10px] text-muted-foreground"
+                                className="bg-muted-foreground/20 border-0 text-[10px] text-muted-foreground"
                             >
                                 Inactive
                             </Badge>

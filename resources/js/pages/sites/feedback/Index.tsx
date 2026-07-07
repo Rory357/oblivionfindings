@@ -98,7 +98,7 @@ const typeColors: Record<string, string> = {
     client: 'border-status-info/30 text-status-info bg-status-info',
     staff: 'border-status-success/30 text-status-success bg-status-success',
     external:
-        'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        'border-border/30 text-muted-foreground bg-muted-foreground/10',
     complaint:
         'border-status-critical/30 text-status-critical bg-status-critical',
     compliment:
@@ -119,7 +119,7 @@ const statusColors: Record<string, string> = {
         'border-status-warning/30 text-status-warning bg-status-warning',
     in_progress: 'border-primary/30 text-primary/70 bg-primary/10',
     resolved: 'border-status-success/30 text-status-success bg-status-success',
-    closed: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    closed: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
 };
 
 const categoryLabels: Record<string, string> = {
