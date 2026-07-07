@@ -294,7 +294,9 @@ class ControlRoomPlaybookController extends Controller
         DB::transaction(function () use ($data, $playbook, $user) {
             $playbook->update([
                 'name' => $data['name'],
-                'code' => $data['code'] ?? null,
+                // `code` is NOT NULL and the wizard doesn't surface it — keep the
+                // existing code, or derive one if this playbook somehow lacks it.
+                'code' => $data['code'] ?? $playbook->code ?? $this->generatePlaybookCode($data['name']),
                 'description' => $data['description'] ?? null,
                 'category' => $data['category'],
                 'auto_attach' => $data['auto_attach'] ?? false,

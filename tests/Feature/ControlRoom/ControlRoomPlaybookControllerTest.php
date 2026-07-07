@@ -127,6 +127,30 @@ class ControlRoomPlaybookControllerTest extends TestCase
         $this->assertSame('door_left_open_response', $playbook->code);
     }
 
+    public function test_update_keeps_code_when_omitted(): void
+    {
+        // The edit wizard doesn't send `code` — update() must not null the
+        // NOT NULL column; it keeps the existing code.
+        $playbook = Playbook::create([
+            'name' => 'Keep Code', 'code' => 'keep_code', 'category' => 'safety',
+            'version' => 1, 'is_active' => true,
+        ]);
+        $step = PlaybookStep::create(['playbook_id' => $playbook->id, 'order' => 1, 'title' => 'S1', 'type' => 'task']);
+
+        $this->actingAs($this->admin)
+            ->put("/control-room/playbooks/{$playbook->id}", [
+                'name' => 'Keep Code Renamed',
+                'category' => 'safety',
+                'steps' => [['id' => $step->id, 'title' => 'S1 edited', 'type' => 'task']],
+            ])
+            ->assertRedirect();
+
+        $playbook->refresh();
+        $this->assertSame('Keep Code Renamed', $playbook->name);
+        $this->assertSame('keep_code', $playbook->code, 'Existing code must survive an update that omits it.');
+        $this->assertSame(2, $playbook->version);
+    }
+
     public function test_store_generated_code_is_unique(): void
     {
         $payload = [
