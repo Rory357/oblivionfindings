@@ -238,6 +238,9 @@ class HandleInertiaRequests extends Middleware
                 'info' => session('info'),
                 'clock_out_blockers' => session('clock_out_blockers'),
                 'rostering_report_link' => session('rostering_report_link'),
+                // Raise-a-ticket success pane reads the new ticket's
+                // reference from here once props refresh.
+                'it_ticket' => session('it_ticket'),
                 // /my-day's "Today's timesheet" find-or-create flow uses this
                 // to tell the front-end which draft to open in the review
                 // popup once props refresh.

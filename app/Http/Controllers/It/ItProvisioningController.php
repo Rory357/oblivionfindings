@@ -11,9 +11,11 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Notifications\It\TicketCreatedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -243,7 +245,18 @@ class ItProvisioningController extends Controller
             'assigned_to_user_id' => $assigneeId,
         ]));
 
-        return redirect()->back()->with('success', "Ticket logged — {$ticket->reference}.");
+        // Receipt to the requester ("we've got it"), plus an urgent alert to
+        // the agents working the queue — never to the actor themselves.
+        $user->notify(new TicketCreatedNotification($ticket, 'receipt'));
+        if ($ticket->priority === 'urgent') {
+            $agents = $this->usersWithItManage($tenantId)
+                ->reject(fn (User $agent) => $agent->id === $user->id);
+            NotificationFacade::send($agents, new TicketCreatedNotification($ticket, 'urgent_alert'));
+        }
+
+        return redirect()->back()
+            ->with('success', "Ticket logged — {$ticket->reference}.")
+            ->with('it_ticket', ['id' => $ticket->id, 'reference' => $ticket->reference]);
     }
 
     public function updateTicket(Request $request, ItTicket $ticket)
@@ -590,5 +603,31 @@ class ItProvisioningController extends Controller
     private function cleanFilter(mixed $value, array $allowed): ?string
     {
         return in_array($value, $allowed, true) ? $value : null;
+    }
+
+    /**
+     * Tenant users holding it.manage (role grant or allow-override, minus
+     * deny-overrides) — the audience for queue alerts. Mirrors the proven
+     * HrNotificationService::getUsersWithPermission query shape.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function usersWithItManage(int $tenantId)
+    {
+        return User::query()
+            // Users are tenanted by organization_id; a NULL means the default
+            // tenant on this single-tenant install — don't silently drop them.
+            ->where(fn ($q) => $q->where('organization_id', $tenantId)->orWhereNull('organization_id'))
+            ->where(function ($query) {
+                $query->whereHas('roles.permissions', fn ($q) => $q->where('key', 'it.manage'))
+                    ->orWhereHas('permissionOverrides', fn ($q) => $q
+                        ->where('permissions.key', 'it.manage')
+                        ->where('permission_user.allowed', true));
+            })
+            ->whereDoesntHave('permissionOverrides', fn ($q) => $q
+                ->where('permissions.key', 'it.manage')
+                ->where('permission_user.allowed', false))
+            ->distinct()
+            ->get();
     }
 }

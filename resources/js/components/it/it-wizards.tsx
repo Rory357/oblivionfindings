@@ -27,6 +27,7 @@ import {
     InfoCard,
     ReviewCard,
     ReviewRow,
+    Segmented,
     SelectInput,
     StepHead,
     TilePicker,
@@ -84,6 +85,7 @@ export interface TicketRow {
 
 export type ItModal =
     | { type: 'ticket' }
+    | { type: 'raise' }
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow };
@@ -116,6 +118,8 @@ export function ItWizard({
     switch (modal.type) {
         case 'ticket':
             return <CreateTicketWizard assignees={assignees} onClose={onClose} />;
+        case 'raise':
+            return <RaiseTicketDialog onClose={onClose} />;
         case 'fulfil':
             return <FulfilRequestDialog request={modal.request} onClose={onClose} />;
         case 'assign-request':
@@ -354,6 +358,158 @@ function CreateTicketWizard({
                     </div>
                 </WizardStepPane>
             )}
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  Raise a ticket (self-service, single step — speed IS the spec)    */
+/* ================================================================== */
+
+const RAISE_STEPS: readonly WizardStep[] = [
+    { key: 'raise', label: 'Raise a ticket', blurb: 'Under 30 seconds', icon: Ticket },
+];
+
+/** Plain-language categories for people mid-shift — no IT jargon. */
+const RAISE_CATEGORY_OPTIONS = [
+    { key: 'hardware', label: 'Device or hardware', description: 'Phone, laptop, printer, charger…', icon: Laptop },
+    { key: 'account', label: 'Account or sign-in', description: 'Locked out, passwords, email', icon: User },
+    { key: 'network', label: 'Wi-Fi or network', description: 'No internet, VPN trouble', icon: Wifi },
+    { key: 'other', label: 'Something else', description: 'Anything IT should look at', icon: Server },
+] as const;
+
+/** Plain-language urgency → priority. The requester never sees "P1". */
+const URGENCY_OPTIONS: { value: string; label: string }[] = [
+    { value: 'urgent', label: 'Stops me supporting someone right now' },
+    { value: 'high', label: 'Blocking my work' },
+    { value: 'normal', label: 'Annoying but I can work' },
+    { value: 'low', label: 'Whenever' },
+];
+
+function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
+    const wizard = useWizard(RAISE_STEPS.length);
+    const [done, setDone] = useState(false);
+    const [moreDetails, setMoreDetails] = useState(false);
+    const [reference, setReference] = useState<string | null>(null);
+
+    const form = useForm({
+        title: '',
+        description: '',
+        category: 'hardware',
+        priority: 'normal',
+    });
+
+    const valid = form.data.title.trim().length > 0;
+
+    const submit = () => {
+        form.post('/it/tickets', {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const err = pageFlashError(page);
+                if (err) {
+                    toast.error(err);
+                    return;
+                }
+                const flash = page.props.flash as
+                    | { it_ticket?: { reference?: string | null } }
+                    | undefined;
+                setReference(flash?.it_ticket?.reference ?? null);
+                setDone(true);
+                toast.success('Ticket raised — IT can see it now.');
+            },
+        });
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Raise a ticket"
+            description="Tell IT what's broken — they see it instantly."
+            railIcon={Ticket}
+            railTitle="Raise a ticket"
+            railSub="IT helpdesk"
+            steps={RAISE_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title={reference ? `Raised — ${reference}` : 'Ticket raised'}
+                        blurb={
+                            <>
+                                IT can see it now. We’ll email you when it’s picked up or
+                                resolved — and you can track it any time in <strong>My tickets</strong>.
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={null}
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={form.processing || !valid}>
+                        {form.processing ? 'Raising…' : 'Raise ticket'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={Ticket}
+                    title="What’s the problem?"
+                    blurb="One line is enough — you can add detail if it helps."
+                />
+                <div className="grid gap-3.5">
+                    <Field label="What's broken?" required error={form.errors.title}>
+                        <Input
+                            value={form.data.title}
+                            onChange={(e) => form.setData('title', e.target.value)}
+                            placeholder="e.g. My work phone won’t charge"
+                            maxLength={255}
+                            autoFocus
+                        />
+                    </Field>
+                    <Field label="What kind of thing is it?" error={form.errors.category}>
+                        <TilePicker
+                            value={form.data.category}
+                            onChange={(v) => form.setData('category', v)}
+                            options={[...RAISE_CATEGORY_OPTIONS]}
+                        />
+                    </Field>
+                    <Field label="How urgent is it?" error={form.errors.priority}>
+                        <Segmented
+                            value={form.data.priority}
+                            onChange={(v) => form.setData('priority', v)}
+                            options={URGENCY_OPTIONS}
+                        />
+                    </Field>
+                    {moreDetails ? (
+                        <Field label="More details" hint="optional" error={form.errors.description}>
+                            <Textarea
+                                value={form.data.description}
+                                onChange={(e) => form.setData('description', e.target.value)}
+                                placeholder="Anything that helps IT find or fix it — where you are, what you tried…"
+                                rows={4}
+                            />
+                        </Field>
+                    ) : (
+                        // eslint-disable-next-line no-restricted-syntax -- text-link disclosure, not a button chrome
+                        <button
+                            type="button"
+                            onClick={() => setMoreDetails(true)}
+                            className="justify-self-start text-[12.5px] font-semibold text-primary hover:underline"
+                        >
+                            + Add more details
+                        </button>
+                    )}
+                </div>
+            </WizardStepPane>
         </WizardShell>
     );
 }

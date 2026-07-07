@@ -356,7 +356,9 @@ export default function ItIndex({
                         </div>
                         {can.manage || can.request ? (
                             <Button
-                                onClick={() => setModal({ type: 'ticket' })}
+                                onClick={() =>
+                                    setModal({ type: can.manage ? 'ticket' : 'raise' })
+                                }
                                 className="bg-white/15 text-primary-foreground hover:bg-white/25"
                             >
                                 <Plus className="h-4 w-4" />{' '}
@@ -638,9 +640,8 @@ export default function ItIndex({
                             </p>
                             <Button
                                 size="sm"
-                                variant="outline"
                                 className="ml-auto"
-                                onClick={() => setModal({ type: 'ticket' })}
+                                onClick={() => setModal({ type: 'raise' })}
                             >
                                 <Plus className="h-3.5 w-3.5" /> Raise a ticket
                             </Button>
@@ -685,13 +686,18 @@ export default function ItIndex({
                                             {label(t.priority)}
                                         </StatusBadge>
                                     </span>
-                                    <span>
+                                    <span className="flex flex-col items-start gap-1">
                                         <StatusBadge
-                                            variant={ticketStatusVariant[t.status] ?? 'neutral'}
+                                            variant={
+                                                t.status === 'waiting'
+                                                    ? 'warning'
+                                                    : (ticketStatusVariant[t.status] ?? 'neutral')
+                                            }
                                             size="sm"
                                         >
-                                            {label(t.status)}
+                                            {t.status === 'waiting' ? 'Waiting on you' : label(t.status)}
                                         </StatusBadge>
+                                        <StatusDots status={t.status} />
                                     </span>
                                     <span className="text-[12px] text-muted-foreground">
                                         {t.age ?? '—'}
@@ -770,6 +776,29 @@ function AssigneeFilter({
                 ))}
             </SelectContent>
         </Select>
+    );
+}
+
+/** Progress dots for a requester's ticket: raised → working → resolved →
+ *  closed. Decorative (aria-hidden) — the StatusBadge text beside it carries
+ *  the meaning; `waiting` sits at the working stage with its own flag. */
+const DOT_STAGES = ['open', 'in_progress', 'resolved', 'closed'];
+
+function StatusDots({ status }: { status: string }) {
+    const reached = status === 'waiting' ? 1 : DOT_STAGES.indexOf(status);
+    return (
+        <span aria-hidden className="flex items-center gap-1 pl-0.5">
+            {DOT_STAGES.map((stage, i) => (
+                <span
+                    key={stage}
+                    className={
+                        i <= reached
+                            ? 'h-1.5 w-1.5 rounded-full bg-primary'
+                            : 'h-1.5 w-1.5 rounded-full bg-border'
+                    }
+                />
+            ))}
+        </span>
     );
 }
 
