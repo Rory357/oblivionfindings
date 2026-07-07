@@ -3,14 +3,14 @@ import { type PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewVendorDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewVendorDialog, PayablesTabsFooter, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2, Download } from 'lucide-react';
+import { Plus, Search, Building2, Download, Eye } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
 interface Vendor {
@@ -96,6 +96,15 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
     );
 
     const activeCount = vendors.data.filter((v) => v.is_active).length;
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (vendor: Vendor): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/vendors/${vendor.id}`) },
+        ];
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -219,7 +228,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                 </TableHeader>
                                 <TableBody>
                                     {vendors.data.map((vendor) => (
-                                        <TableRow key={vendor.id}>
+                                        <TableRow key={vendor.id} onContextMenu={rowMenu.open(rowMenuItems(vendor))}>
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/vendors/${vendor.id}`}
@@ -290,6 +299,8 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                         </div>
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewBillDialog, PayablesTabsFooter, formatMoney, type AccountOption } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download } from 'lucide-react';
+import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -113,6 +113,18 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
     const isOverdue = (bill: Bill) => {
         if (bill.status === 'paid' || bill.status === 'cancelled') return false;
         return new Date(bill.due_date) < new Date();
+    };
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (bill: Bill): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/bills/${bill.id}`) },
+        ];
+        if (canManage && bill.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditBill(bill) });
+        }
+        return items;
     };
 
     return (
@@ -252,6 +264,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                             isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/bills/${bill.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(bill))}
                                     >
                                         <TableCell className="font-medium">
                                             <Link href={`/finance/bills/${bill.id}`} className="text-primary hover:underline">
@@ -312,6 +325,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         </div>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

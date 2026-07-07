@@ -44,3 +44,12 @@ export {
     statusTone,
     type StatusTone,
 } from '@/components/hr/status-badge';
+
+// Reuse HR's generic row context-menu hook (portal, cursor-positioned, token-
+// styled, keyboard-navigable) for right-click actions on finance list rows — the
+// same mould HR hubs use, so the interaction is identical across modules. Build a
+// per-row RowCtxItem[] mirroring the page's existing inline actions (Open first).
+export {
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/hr/row-context-menu';

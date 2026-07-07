@@ -6,9 +6,11 @@ import {
     CreditNoteDialog,
     formatMoney,
     PayablesTabsFooter,
+    useRowContextMenu,
     type CreditNoteAccountOption,
     type CreditNoteClientOption,
     type CreditNoteVendorOption,
+    type RowCtxItem,
 } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Plus, FileMinus, Download, Search } from 'lucide-react';
+import { FileText, Plus, FileMinus, Download, Search, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 interface CreditNote {
@@ -101,6 +103,13 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
 
     const payableCount = creditNotes.data.filter((cn) => cn.type === 'payable').length;
     const receivableCount = creditNotes.data.filter((cn) => cn.type === 'receivable').length;
+
+    // Right-click row menu — mirrors the row's only inline action: opening the
+    // credit note (row onClick + the CN-number link both go to the show route).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (creditNote: CreditNote): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/credit-notes/${creditNote.id}`) },
+    ];
 
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
@@ -234,6 +243,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                             key={creditNote.id}
                                             className="cursor-pointer hover:bg-muted/50"
                                             onClick={() => router.get(`/finance/credit-notes/${creditNote.id}`)}
+                                            onContextMenu={rowMenu.open(rowMenuItems(creditNote))}
                                         >
                                             <TableCell className="font-medium">
                                                 <Link href={`/finance/credit-notes/${creditNote.id}`} className="text-primary hover:underline">
@@ -274,6 +284,8 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                         </>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

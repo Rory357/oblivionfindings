@@ -652,7 +652,18 @@ vendor, receipt) — the mould for C2.
       had status/year + pagination → left as-is. No clickable column sort (the golden template has none — adding it to
       only these would break consistency; defer a uniform sort). Gates: types 0, eslint 0, suite 232, browser-verified
       (donor-funds `?search=` round-trips + hydrates; accounts tree 8→1 on "bank"; credit-notes bar renders), no console errors.
-    - **[ ] C3d-menus — right-click context menus** on every list row (reuse the canonical mould, don't fork).
+    - **[~] C3d-menus — right-click context menus** on list rows. Reused HR's generic `useRowContextMenu()`
+      (portal, cursor-positioned, token-styled, keyboard-nav; `RowCtxItem[]` API) — re-exported via the finance
+      barrel alongside the existing StatusBadge HR re-export (no fork, zero HR files touched). Each row's menu
+      MIRRORS that page's existing inline actions (Open first), same guards + same handlers — never an invented
+      route or a bypassed confirm (payment-run Approve/Process stay on the Show page behind ConfirmDialog, so the
+      Index menu is Open-only). **Batch 1 MERGED — the 7 AP/AR transactional lists**: invoices (Open/Edit-draft/
+      Record-receipt), bills (Open/Edit-draft), purchase-orders (Open), quotes (Open/Edit-draft), vendors (Open),
+      credit-notes (Open), payment-runs (Open). Gates: types 0, eslint 0, build clean, suite 232 (no PHP touched);
+      browser-verified the menu opens per-row with the right guarded items (invoices Paid→Open, Sent→Open+Record
+      receipt), no console errors. **Follow-up batch**: ledger/banking/tax list rows (journals, accounts-tree,
+      fixed-assets, cost-centres, fiscal-periods, currencies, fx-revaluations, bank-transactions, petty-cash,
+      gst-returns, ird-filings, audit-exports) get the same treatment next.
   - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +

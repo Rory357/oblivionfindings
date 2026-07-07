@@ -1,14 +1,14 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter, formatMoney } from '@/components/finance';
+import { PayablesTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, Plus, Send, Download } from 'lucide-react';
+import { Banknote, Plus, Send, Download, Eye } from 'lucide-react';
 
 type PaymentRun = {
     id: number;
@@ -52,6 +52,14 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
     const completedCount = paymentRuns.data.filter((r) => r.status === 'completed').length;
     const processingCount = paymentRuns.data.filter((r) => r.status === 'processing').length;
     const draftCount = paymentRuns.data.filter((r) => r.status === 'draft').length;
+
+    // Right-click row menu — mirrors the row's only inline action: opening the
+    // payment run (the row onClick navigates to the show route). Approve/Process
+    // live on the detail page behind confirm dialogs, not as inline row actions.
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (run: PaymentRun): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/payment-runs/${run.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -152,6 +160,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                                     key={run.id}
                                                     className="cursor-pointer hover:bg-muted/50"
                                                     onClick={() => router.visit(`/finance/payment-runs/${run.id}`)}
+                                                    onContextMenu={rowMenu.open(rowMenuItems(run))}
                                                 >
                                                     <TableCell className="font-mono font-medium">
                                                         {run.run_number}
@@ -200,6 +209,8 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

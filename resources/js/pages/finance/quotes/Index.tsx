@@ -16,9 +16,11 @@ import {
     formatMoney,
     QuoteDialog,
     ReceivablesTabsFooter,
+    useRowContextMenu,
     type EditableQuote,
     type QuoteClientOption,
     type QuotePriceBook,
+    type RowCtxItem,
 } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -96,6 +98,18 @@ export default function QuotesIndex({
             notes: quote.notes,
             lines: quote.lines,
         });
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (quote: Quote): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/quotes/${quote.id}`) },
+        ];
+        if (canManage && quote.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(quote) });
+        }
+        return items;
+    };
 
     return (
         <AppLayout>
@@ -178,7 +192,11 @@ export default function QuotesIndex({
                         </Card>
                     )}
                     {(quotes?.data ?? []).map((quote) => (
-                        <Card key={quote.id} className="transition-all hover:border-border hover:shadow-sm">
+                        <Card
+                            key={quote.id}
+                            className="transition-all hover:border-border hover:shadow-sm"
+                            onContextMenu={rowMenu.open(rowMenuItems(quote))}
+                        >
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
                                     <FileText className="h-5 w-5" />
@@ -245,6 +263,8 @@ export default function QuotesIndex({
                         ))}
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageShell>
 
             {canManage && (

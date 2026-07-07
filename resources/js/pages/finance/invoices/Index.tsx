@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney, NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
+import { formatMoney, NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, useRowContextMenu, type ClientOption, type RowCtxItem, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -115,6 +115,21 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
     const isOverdue = (invoice: Invoice) => {
         if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
         return new Date(invoice.due_date) < new Date();
+    };
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (invoice: Invoice): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/invoices/${invoice.id}`) },
+        ];
+        if (canManage && invoice.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditInvoice(invoice) });
+        }
+        if (canReceipt(invoice)) {
+            items.push({ kind: 'item', label: 'Record receipt', icon: Wallet, onSelect: () => setReceiptInvoice(invoice) });
+        }
+        return items;
     };
 
     return (
@@ -244,6 +259,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             isOverdue(invoice) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/invoices/${invoice.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(invoice))}
                                     >
                                         <TableCell className="font-medium">
                                             <Link href={`/finance/invoices/${invoice.id}`} className="text-primary hover:underline">
@@ -327,6 +343,8 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         </div>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {receiptInvoice && (

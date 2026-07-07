@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewPoDialog, PayablesTabsFooter, formatMoney, type AccountOption } from '@/components/finance';
+import { NewPoDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingCart, Download } from 'lucide-react';
+import { Plus, ShoppingCart, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 type Vendor = { id: number; name: string };
@@ -49,6 +49,12 @@ export default function PurchaseOrderIndex() {
     function apply(next: Record<string, string>) {
         router.get('/finance/purchase-orders', { ...current, ...next }, { preserveState: true, preserveScroll: true });
     }
+
+    // Right-click row menu — mirrors the row's existing inline action (the PO-number link to the show route).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (po: PurchaseOrder): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/purchase-orders/${po.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -161,7 +167,7 @@ export default function PurchaseOrderIndex() {
                                     </TableRow>
                                 ) : (
                                     rows.map((po) => (
-                                        <TableRow key={po.id}>
+                                        <TableRow key={po.id} onContextMenu={rowMenu.open(rowMenuItems(po))}>
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/purchase-orders/${po.id}`}
@@ -199,6 +205,8 @@ export default function PurchaseOrderIndex() {
                         ))}
                     </div>
                 ) : null}
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (
