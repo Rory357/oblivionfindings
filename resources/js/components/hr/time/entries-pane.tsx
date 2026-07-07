@@ -145,7 +145,7 @@ export function EntriesPane({
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="submitted">Submitted</SelectItem>
                         <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="voided">Voided</SelectItem>
                     </SelectContent>
                 </Select>
 

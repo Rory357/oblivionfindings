@@ -4,12 +4,15 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Models\HrTimeEntryAmendment;
+use App\Domain\Hr\Notifications\TimeEntryChangedNotification;
 use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TimeTrackingService
 {
@@ -310,13 +313,70 @@ class TimeTrackingService
     /*  Edit / Amend time entry */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Time entries feed pay — block mutations once the entry's date falls in
+     * a locked/exported payroll run or its timesheet is payroll-linked
+     * (mirrors TimesheetApprovalService::assertNotLockedByPayroll at the
+     * entry level; without this an entry could be amended AFTER payroll
+     * consumed it, silently desyncing pay from the record).
+     */
+    protected function assertEntryNotPayrollLocked(HrTimeEntry $entry, string $action): void
+    {
+        $timesheet = $entry->timesheet;
+        if ($timesheet && ($timesheet->is_payroll_segment_complete || $timesheet->payroll_reference)) {
+            throw new \LogicException("This entry's timesheet is payroll-linked and cannot be {$action}.");
+        }
+
+        if (! $entry->entry_date || ! $entry->tenant_id) {
+            return;
+        }
+
+        $locked = HrPayrollRun::query()
+            ->where('tenant_id', $entry->tenant_id)
+            ->whereIn('status', ['locked', 'exported'])
+            ->where('period_start', '<=', $entry->entry_date)
+            ->where('period_end', '>=', $entry->entry_date)
+            ->exists();
+
+        if ($locked) {
+            throw new \LogicException("This entry falls in a locked payroll period and cannot be {$action}.");
+        }
+    }
+
+    /**
+     * Tell the entry's owner someone else touched their time record
+     * (best-effort; skipped when they acted on their own entry).
+     */
+    protected function notifyEntryOwner(HrTimeEntry $entry, User $actor, string $action, ?string $reason = null): void
+    {
+        if ($entry->user_id === $actor->id) {
+            return;
+        }
+
+        $owner = User::find($entry->user_id);
+        if (! $owner) {
+            return;
+        }
+
+        try {
+            $owner->notify(new TimeEntryChangedNotification($entry, $actor, $action, $reason));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send time-entry changed notification', [
+                'entry_id' => $entry->id,
+                'action' => $action,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     public function editTimeEntry(HrTimeEntry $entry, User $editor, array $data, string $reason): HrTimeEntry
     {
         if (in_array($entry->status, ['approved'], true)) {
             throw new \LogicException('Cannot edit an approved time entry.');
         }
+        $this->assertEntryNotPayrollLocked($entry, 'edited');
 
-        return DB::transaction(function () use ($entry, $editor, $data, $reason) {
+        $result = DB::transaction(function () use ($entry, $editor, $data, $reason) {
             $editableFields = ['clock_in', 'clock_out', 'break_minutes', 'pay_type', 'notes', 'is_sleepover', 'is_on_call', 'is_public_holiday', 'mileage_km', 'cost_centre', 'project_code'];
             $originalValues = [];
             $tenantId = $entry->tenant_id;
@@ -402,6 +462,14 @@ class TimeTrackingService
 
             return $freshEntry;
         });
+
+        // Only notify when something actually changed — the no-op path returns
+        // the same instance; the changed path returns a fresh() one.
+        if ($result !== $entry) {
+            $this->notifyEntryOwner($result, $editor, 'amended', $reason);
+        }
+
+        return $result;
     }
 
     /* ------------------------------------------------------------------ */
@@ -436,7 +504,7 @@ class TimeTrackingService
 
         $reason = isset($data['reason']) ? trim((string) $data['reason']) : '';
 
-        return DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager, $reason) {
+        $result = DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager, $reason) {
             $entry = HrTimeEntry::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $targetUserId,
@@ -482,6 +550,10 @@ class TimeTrackingService
 
             return $entry->fresh();
         });
+
+        $this->notifyEntryOwner($result, $manager, 'created', $reason !== '' ? $reason : null);
+
+        return $result;
     }
 
     /* ------------------------------------------------------------------ */
@@ -497,6 +569,7 @@ class TimeTrackingService
         if ($entry->status === 'approved') {
             throw new \LogicException('Cannot void an approved time entry. Adjust it through a timesheet amendment instead.');
         }
+        $this->assertEntryNotPayrollLocked($entry, 'voided');
 
         DB::transaction(function () use ($entry, $actor, $reason) {
             HrTimeEntryAmendment::create([
@@ -518,6 +591,8 @@ class TimeTrackingService
 
             $entry->delete(); // soft-delete (deleted_at)
         });
+
+        $this->notifyEntryOwner($entry, $actor, 'voided', $reason);
     }
 
     /* ------------------------------------------------------------------ */
@@ -557,6 +632,7 @@ class TimeTrackingService
         if ($entry->clock_out) {
             throw new \LogicException('This entry is already clocked out.');
         }
+        $this->assertEntryNotPayrollLocked($entry, 'corrected');
 
         $clockOutLocal = $this->parseWorkerLocalDateTime($clockOut);
         $clockOutUtc = $clockOutLocal->copy()->utc();
@@ -584,7 +660,7 @@ class TimeTrackingService
         $workedHours = $totalMinutes / 60;
         $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
 
-        return DB::transaction(function () use ($entry, $actor, $clockOutUtc, $breakMinutes, $totalHours, $requiredBreak, $reason) {
+        $result = DB::transaction(function () use ($entry, $actor, $clockOutUtc, $breakMinutes, $totalHours, $requiredBreak, $reason) {
             HrTimeEntryAmendment::create([
                 'tenant_id' => $entry->tenant_id,
                 'hr_time_entry_id' => $entry->id,
@@ -613,6 +689,10 @@ class TimeTrackingService
 
             return $fresh;
         });
+
+        $this->notifyEntryOwner($result, $actor, 'corrected', $reason);
+
+        return $result;
     }
 
     private function parseWorkerLocalDateTime(mixed $value): Carbon

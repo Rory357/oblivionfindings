@@ -231,7 +231,11 @@ class TimeTrackingController extends Controller
         // 'all' scope → no filter (admin only)
 
         $entries = (clone $entriesBaseQuery)
-            ->when($status, fn ($q) => $q->where('status', $status))
+            // Voided entries are soft-deleted; without withTrashed() the
+            // "Voided" filter would silently match nothing.
+            ->when($status, fn ($q) => $status === 'voided'
+                ? $q->withTrashed()->where('status', 'voided')
+                : $q->where('status', $status))
             ->when($payType, fn ($q) => $q->where('pay_type', $payType))
             ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
             ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
