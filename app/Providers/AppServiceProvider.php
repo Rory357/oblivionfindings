@@ -175,6 +175,10 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'client' => Client::class,
             'staff' => User::class,
+            // IT activity trail subjects (it_ticket_events.subject_type) —
+            // stable short keys so DB rows survive class moves.
+            'it_ticket' => \App\Models\ItTicket::class,
+            'it_provisioning_request' => \App\Models\ItProvisioningRequest::class,
         ]);
 
         Shift::observe(ShiftObserver::class);

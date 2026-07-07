@@ -7,6 +7,8 @@ use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * An onboarding-driven IT work item (account / access / equipment / other)
@@ -21,6 +23,8 @@ class ItProvisioningRequest extends Model
 
     public const STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
 
+    public const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+
     protected $fillable = [
         'tenant_id',
         'employee_profile_id',
@@ -29,6 +33,8 @@ class ItProvisioningRequest extends Model
         'item',
         'assigned_to_user_id',
         'status',
+        'priority',
+        'due_date',
         'external_ref',
         'fulfilled_at',
         'fulfilled_by',
@@ -38,6 +44,7 @@ class ItProvisioningRequest extends Model
 
     protected $casts = [
         'fulfilled_at' => 'datetime',
+        'due_date' => 'date',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -67,6 +74,18 @@ class ItProvisioningRequest extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Shared IT activity trail (same table as ticket events). */
+    public function events(): MorphMany
+    {
+        return $this->morphMany(ItTicketEvent::class, 'subject');
+    }
+
+    /** Helpdesk tickets raised from this request (broken laptop etc.). */
+    public function linkedTickets(): HasMany
+    {
+        return $this->hasMany(ItTicket::class, 'provisioning_request_id');
     }
 
     /* ------------------------------------------------------------------ */
