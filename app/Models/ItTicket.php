@@ -177,6 +177,28 @@ class ItTicket extends Model
     }
 
     /* ------------------------------------------------------------------ */
+    /*  SLA stamping */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Stamp/restamp the SLA due dates from the tenant policy for the
+     * ticket's CURRENT priority, anchored at creation — a priority change
+     * re-targets the same clock, it doesn't restart it. Mutates without
+     * saving; callers persist.
+     */
+    public function stampSlaDueDates(): void
+    {
+        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor(
+            (int) $this->tenant_id,
+            (string) $this->priority,
+        );
+
+        $anchor = $this->created_at ?? now();
+        $this->first_response_due_at = $anchor->copy()->addMinutes($firstResponseMinutes);
+        $this->resolution_due_at = $anchor->copy()->addMinutes($resolutionMinutes);
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Waiting clock (SLA pause/resume) */
     /* ------------------------------------------------------------------ */
 

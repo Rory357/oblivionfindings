@@ -241,6 +241,11 @@ class ItProvisioningController extends Controller
             'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
 
+        // Every ticket gets SLA targets from the tenant policy (or the §G
+        // defaults) the moment it exists — the clock starts at creation.
+        $ticket->stampSlaDueDates();
+        $ticket->save();
+
         $this->storeItAttachments($ticket, $request->file('attachments'), $user);
 
         ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
@@ -314,6 +319,10 @@ class ItProvisioningController extends Controller
             ]);
         }
         if ($ticket->priority !== $original['priority']) {
+            // Re-target the SLA clock for the new priority (same anchor).
+            $ticket->stampSlaDueDates();
+            $ticket->save();
+
             ItTicketEvent::record($ticket, 'priority_changed', $user->id, [
                 'from' => $original['priority'],
                 'to' => $ticket->priority,
@@ -493,6 +502,9 @@ class ItProvisioningController extends Controller
                 'priority' => $t->priority,
                 'status' => $t->status,
                 'sla_state' => $t->sla_state,
+                'first_response_due_at' => $t->first_response_due_at?->toIso8601String(),
+                'resolution_due_at' => $t->resolution_due_at?->toIso8601String(),
+                'first_responded_at' => $t->first_responded_at?->toIso8601String(),
                 'requester' => $t->requester?->name ?? 'Unknown',
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
                 'age' => $t->created_at?->diffForHumans(short: true),

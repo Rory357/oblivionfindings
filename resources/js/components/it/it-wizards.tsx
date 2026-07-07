@@ -78,6 +78,9 @@ export interface TicketRow {
     priority: string;
     status: string;
     sla_state: string;
+    first_response_due_at: string | null;
+    resolution_due_at: string | null;
+    first_responded_at: string | null;
     requester: string;
     assignee: AssigneeOption | null;
     age: string | null;
