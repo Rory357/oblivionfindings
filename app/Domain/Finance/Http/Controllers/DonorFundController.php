@@ -51,34 +51,36 @@ class DonorFundController extends Controller
 
         $summary = $this->donorFundService->getFundsSummary($orgId);
 
+        // The store route is gated by finance.admin — mirror that so the create
+        // modal (and its reference data) only appears for users who can post.
+        $canManage = (bool) $request->user()->canDo('finance.admin');
+
         return Inertia::render('finance/donor-funds/Index', [
             'funds' => $funds,
             'summary' => $summary,
+            'canManage' => $canManage,
+            'glAccounts' => $canManage ? $this->fundGlAccounts($orgId) : [],
+            'fundingStreams' => $canManage ? $this->fundFundingStreams($orgId) : [],
         ]);
     }
 
-    /**
-     * Show the create fund form.
-     */
-    public function create(Request $request)
+    /** Active liability/equity GL accounts for the donor-fund modal. */
+    private function fundGlAccounts(?int $orgId)
     {
-        $orgId = $request->user()->organization_id;
-
-        $glAccounts = FinAccount::forOrganization($orgId)
+        return FinAccount::forOrganization($orgId)
             ->active()
             ->whereIn('type', ['liability', 'equity'])
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
+    }
 
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
+    /** Active funding streams for the donor-fund modal. */
+    private function fundFundingStreams(?int $orgId)
+    {
+        return FinFundingStream::forOrganization($orgId)
             ->active()
             ->orderBy('name')
             ->get(['id', 'name']);
-
-        return Inertia::render('finance/donor-funds/Create', [
-            'glAccounts' => $glAccounts,
-            'fundingStreams' => $fundingStreams,
-        ]);
     }
 
     /**
@@ -193,6 +195,8 @@ class DonorFundController extends Controller
                 'status' => $fund->status,
                 'is_restricted' => $fund->is_restricted,
                 'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
+                // Structured GL account so the transaction modal can render the trust-journal preview.
+                'gl_account' => $fund->glAccount ? ['code' => $fund->glAccount->code, 'name' => $fund->glAccount->name] : null,
                 'funding_stream_name' => $fund->fundingStream?->name,
                 'created_by' => $fund->createdBy?->name,
             ],
@@ -200,6 +204,8 @@ class DonorFundController extends Controller
             'reports' => $reports,
             'expenseAccounts' => $expenseAccounts,
             'bankAccounts' => $bankAccounts,
+            // Receipts/expenditure post under finance.admin — gate the modals to match.
+            'canManage' => (bool) $request->user()->canDo('finance.admin'),
         ]);
     }
 

@@ -8,11 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// TODO(C3): this page still imports the ui/tabs shim — migrate to the shared TabStrip in C3. The
+// receipt/expenditure Selects moved into DonorFundTransactionDialog, so ui/select is no longer needed here.
 import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+    DonorFundTransactionDialog,
+    type DonorFundTxnAccount,
+    type DonorFundTxnBankAccount,
+    type DonorFundGlSummary,
+} from '@/components/finance';
+import { ArrowDownCircle, ArrowUpCircle, Download } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -37,6 +44,7 @@ interface FundData {
     status: string;
     is_restricted: boolean;
     gl_account_name: string | null;
+    gl_account: DonorFundGlSummary;
     funding_stream_name: string | null;
     created_by: string | null;
 }
@@ -82,6 +90,7 @@ interface Props extends PageProps {
     reports: Report[];
     expenseAccounts: Account[];
     bankAccounts: BankAccount[];
+    canManage: boolean;
 }
 
 const formatCurrency = (amount: number) =>
@@ -115,9 +124,10 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
 };
 
-export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts }: Props) {
+export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts, canManage = false }: Props) {
     const config = statusConfig[fund.status] ?? statusConfig.active;
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
+    const [txnType, setTxnType] = useState<'receipt' | 'expenditure' | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -131,40 +141,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
         { name: 'Available', amount: fund.available_balance },
     ];
 
-    const receiptForm = useForm({
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: '',
-        amount: '',
-        reference: '',
-        bank_account_id: '',
-    });
-
-    const expenditureForm = useForm({
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: '',
-        amount: '',
-        reference: '',
-        expense_account_id: '',
-    });
-
     const reportForm = useForm({
         period_from: '',
         period_to: '',
     });
-
-    const handleReceipt = (e: FormEvent) => {
-        e.preventDefault();
-        receiptForm.post(`/finance/donor-funds/${fund.id}/receipt`, {
-            onSuccess: () => receiptForm.reset(),
-        });
-    };
-
-    const handleExpenditure = (e: FormEvent) => {
-        e.preventDefault();
-        expenditureForm.post(`/finance/donor-funds/${fund.id}/expenditure`, {
-            onSuccess: () => expenditureForm.reset(),
-        });
-    };
 
     const handleReport = (e: FormEvent) => {
         e.preventDefault();
@@ -332,16 +312,26 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                 <TabsRoot defaultValue="transactions" className="space-y-4">
                     <TabsList>
                         <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                        <TabsTrigger value="receipt">Record Receipt</TabsTrigger>
-                        <TabsTrigger value="expenditure">Record Expenditure</TabsTrigger>
                         <TabsTrigger value="reports">Reports</TabsTrigger>
                     </TabsList>
 
                     {/* Transactions Tab */}
                     <TabsContent value="transactions">
                         <Card>
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Transactions</CardTitle>
+                                {canManage && (
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => setTxnType('receipt')}>
+                                            <ArrowDownCircle className="mr-1.5 h-4 w-4 text-status-success" />
+                                            Record Receipt
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setTxnType('expenditure')}>
+                                            <ArrowUpCircle className="mr-1.5 h-4 w-4 text-status-critical" />
+                                            Record Expenditure
+                                        </Button>
+                                    </div>
+                                )}
                             </CardHeader>
                             <CardContent className="p-0">
                                 {transactions.length === 0 ? (
@@ -390,175 +380,6 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                         </TableBody>
                                     </Table>
                                 )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Receipt Tab */}
-                    <TabsContent value="receipt">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-status-success" />
-                                    Record Receipt
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleReceipt} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="receipt_date">Date</Label>
-                                        <Input
-                                            id="receipt_date"
-                                            type="date"
-                                            value={receiptForm.data.transaction_date}
-                                            onChange={(e) => receiptForm.setData('transaction_date', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_amount">Amount (NZD)</Label>
-                                        <Input
-                                            id="receipt_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
-                                            value={receiptForm.data.amount}
-                                            onChange={(e) => receiptForm.setData('amount', e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Label htmlFor="receipt_description">Description</Label>
-                                        <Input
-                                            id="receipt_description"
-                                            value={receiptForm.data.description}
-                                            onChange={(e) => receiptForm.setData('description', e.target.value)}
-                                            placeholder="e.g. Q1 2026 grant instalment"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_reference">Reference</Label>
-                                        <Input
-                                            id="receipt_reference"
-                                            value={receiptForm.data.reference}
-                                            onChange={(e) => receiptForm.setData('reference', e.target.value)}
-                                            placeholder="Optional reference"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_bank">Bank Account</Label>
-                                        <Select
-                                            value={receiptForm.data.bank_account_id}
-                                            onValueChange={(val) => receiptForm.setData('bank_account_id', val)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select bank account" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {bankAccounts.map((acc) => (
-                                                    <SelectItem key={acc.id} value={String(acc.id)}>
-                                                        {acc.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Button type="submit" disabled={receiptForm.processing}>
-                                            {receiptForm.processing ? 'Recording...' : 'Record Receipt'}
-                                        </Button>
-                                        {(receiptForm.errors as Record<string, string>).receipt && (
-                                            <p className="mt-2 text-sm text-destructive">{(receiptForm.errors as Record<string, string>).receipt}</p>
-                                        )}
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Expenditure Tab */}
-                    <TabsContent value="expenditure">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <TrendingDown className="h-5 w-5 text-destructive" />
-                                    Record Expenditure
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleExpenditure} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="exp_date">Date</Label>
-                                        <Input
-                                            id="exp_date"
-                                            type="date"
-                                            value={expenditureForm.data.transaction_date}
-                                            onChange={(e) => expenditureForm.setData('transaction_date', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_amount">Amount (NZD)</Label>
-                                        <Input
-                                            id="exp_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
-                                            value={expenditureForm.data.amount}
-                                            onChange={(e) => expenditureForm.setData('amount', e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                        {fund.is_restricted && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Available: {formatCurrency(fund.available_balance)}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Label htmlFor="exp_description">Description</Label>
-                                        <Input
-                                            id="exp_description"
-                                            value={expenditureForm.data.description}
-                                            onChange={(e) => expenditureForm.setData('description', e.target.value)}
-                                            placeholder="e.g. Staff training programme"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_reference">Reference</Label>
-                                        <Input
-                                            id="exp_reference"
-                                            value={expenditureForm.data.reference}
-                                            onChange={(e) => expenditureForm.setData('reference', e.target.value)}
-                                            placeholder="Optional reference"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_account">Expense Account</Label>
-                                        <Select
-                                            value={expenditureForm.data.expense_account_id}
-                                            onValueChange={(val) => expenditureForm.setData('expense_account_id', val)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select expense account" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {expenseAccounts.map((acc) => (
-                                                    <SelectItem key={acc.id} value={String(acc.id)}>
-                                                        {acc.code} - {acc.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Button type="submit" disabled={expenditureForm.processing}>
-                                            {expenditureForm.processing ? 'Recording...' : 'Record Expenditure'}
-                                        </Button>
-                                        {(expenditureForm.errors as Record<string, string>).expenditure && (
-                                            <p className="mt-2 text-sm text-destructive">
-                                                {(expenditureForm.errors as Record<string, string>).expenditure}
-                                            </p>
-                                        )}
-                                    </div>
-                                </form>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -659,6 +480,25 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                     </TabsContent>
                 </TabsRoot>
             </PageLayout>
+
+            {canManage && txnType && (
+                <DonorFundTransactionDialog
+                    key={txnType}
+                    open
+                    initialType={txnType}
+                    onClose={() => setTxnType(null)}
+                    fund={{
+                        id: fund.id,
+                        fund_name: fund.fund_name,
+                        fund_code: fund.fund_code,
+                        is_restricted: fund.is_restricted,
+                        available_balance: fund.available_balance,
+                        gl_account: fund.gl_account,
+                    }}
+                    expenseAccounts={expenseAccounts as DonorFundTxnAccount[]}
+                    bankAccounts={bankAccounts as DonorFundTxnBankAccount[]}
+                />
+            )}
         </AppLayout>
     );
 }

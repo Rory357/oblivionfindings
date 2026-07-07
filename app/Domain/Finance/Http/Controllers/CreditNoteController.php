@@ -43,24 +43,33 @@ class CreditNoteController extends Controller
 
         $creditNotes = $query->paginate(20)->withQueryString();
 
+        $user = $request->user();
+        $canManage = (bool) $user->can('create', FinCreditNote::class);
+
         return Inertia::render('finance/credit-notes/Index', [
             'creditNotes' => $creditNotes,
             'filters' => $request->only(['type', 'status']),
+            'canManage' => $canManage,
+            // Reference data for the create modal.
+            'vendors' => $canManage ? $this->vendorOptions($orgId) : [],
+            'clients' => $canManage ? $this->clientOptions($orgId) : [],
+            'accounts' => $canManage ? $this->accountOptions($orgId) : [],
         ]);
     }
 
-    public function create(Request $request)
+    /** Active vendors for the credit-note modal. */
+    private function vendorOptions(?int $orgId)
     {
-        $this->authorize('create', FinCreditNote::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $vendors = FinVendor::forOrganization($orgId)
+        return FinVendor::forOrganization($orgId)
             ->active()
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
 
-        $clients = Client::query()
+    /** Clients for the credit-note modal (receivable type). */
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
             ->when(
                 $orgId && Schema::hasColumn('clients', 'organization_id'),
                 fn ($query) => $query->where('organization_id', $orgId),
@@ -73,17 +82,15 @@ class CreditNoteController extends Controller
                 'name' => trim($client->first_name . ' ' . $client->last_name),
             ])
             ->values();
+    }
 
-        $accounts = FinAccount::forOrganization($orgId)
+    /** Active GL accounts (with type) for the credit-note modal's per-line account picker. */
+    private function accountOptions(?int $orgId)
+    {
+        return FinAccount::forOrganization($orgId)
             ->active()
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type']);
-
-        return Inertia::render('finance/credit-notes/Create', [
-            'vendors' => $vendors,
-            'clients' => $clients,
-            'accounts' => $accounts,
-        ]);
     }
 
     public function store(StoreCreditNoteRequest $request)

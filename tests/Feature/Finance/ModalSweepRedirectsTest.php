@@ -5,18 +5,23 @@ use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
- * C2 modal sweep — six simple full-page Create/Edit flows became WizardShell
- * modals on their index pages (recurring charges · price books · petty cash ·
- * bank accounts · audit exports · cash-flow forecasts). The retired GET
- * create/edit URLs now redirect to each flow's index; the POST/PUT endpoints
- * are unchanged.
+ * C2 modal sweep — simple full-page Create/Edit flows became WizardShell modals
+ * on their index (and, where relevant, show) pages: recurring charges · price
+ * books · petty cash · bank accounts · audit exports · cash-flow forecasts ·
+ * quotes · credit notes · fixed assets · donor funds. The retired GET create/
+ * edit URLs now redirect to each flow's index; the POST/PUT endpoints are
+ * unchanged. (Funding streams already used inline dialogs — no GET create/edit
+ * URLs existed to retire, so they're not in the redirect set.)
  */
 function modalSweepUser(): User
 {
     $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
 
     // The view permission each index route's middleware requires.
-    foreach (['finance.ar.view', 'finance.petty_cash.view', 'finance.bank.view', 'finance.reports.view'] as $key) {
+    foreach ([
+        'finance.ar.view', 'finance.ap.view', 'finance.petty_cash.view',
+        'finance.bank.view', 'finance.reports.view', 'finance.assets.view',
+    ] as $key) {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
@@ -38,6 +43,12 @@ it('redirects every retired create/edit url to its flow index', function (string
     'bank account edit' => ['/finance/bank-accounts/123/edit', '/finance/bank-accounts'],
     'audit export create' => ['/finance/audit-exports/create', '/finance/audit-exports'],
     'cash flow forecast create' => ['/finance/cash-flow-forecast/create', '/finance/cash-flow-forecast'],
+    'quote create' => ['/finance/quotes/create', '/finance/quotes'],
+    'quote edit' => ['/finance/quotes/123/edit', '/finance/quotes'],
+    'credit note create' => ['/finance/credit-notes/create', '/finance/credit-notes'],
+    'fixed asset create' => ['/finance/fixed-assets/create', '/finance/fixed-assets'],
+    'fixed asset edit' => ['/finance/fixed-assets/123/edit', '/finance/fixed-assets'],
+    'donor fund create' => ['/finance/donor-funds/create', '/finance/donor-funds'],
 ]);
 
 it('still serves each flow index (now hosting the modal) to a permitted user', function (string $url, string $component) {
@@ -54,6 +65,10 @@ it('still serves each flow index (now hosting the modal) to a permitted user', f
     'bank accounts' => ['/finance/bank-accounts', 'finance/bank-accounts/Index'],
     'audit exports' => ['/finance/audit-exports', 'finance/audit-exports/Index'],
     'cash flow forecasts' => ['/finance/cash-flow-forecast', 'finance/CashFlowForecast/Index'],
+    'quotes' => ['/finance/quotes', 'finance/quotes/Index'],
+    'credit notes' => ['/finance/credit-notes', 'finance/credit-notes/Index'],
+    'fixed assets' => ['/finance/fixed-assets', 'finance/fixed-assets/Index'],
+    'donor funds' => ['/finance/donor-funds', 'finance/donor-funds/Index'],
 ]);
 
 it('persists a recurring charge from the modal payload (starts_at regression)', function () {

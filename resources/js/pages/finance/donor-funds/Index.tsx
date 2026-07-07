@@ -3,12 +3,18 @@ import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    DonorFundDialog,
+    type DonorFundFundingStream,
+    type DonorFundGlAccount,
+} from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Heart, AlertTriangle, HandHeart } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState } from 'react';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
@@ -44,6 +50,9 @@ interface Summary {
 interface Props extends PageProps {
     funds: Fund[];
     summary: Summary;
+    canManage: boolean;
+    glAccounts: DonorFundGlAccount[];
+    fundingStreams: DonorFundFundingStream[];
 }
 
 const formatCurrency = (amount: number) =>
@@ -73,7 +82,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Donor Funds', href: '/finance/donor-funds' },
 ];
 
-export default function DonorFundsIndex({ funds, summary }: Props) {
+export default function DonorFundsIndex({ funds, summary, canManage = false, glAccounts = [], fundingStreams = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
     const pieData = [
         { name: 'Restricted', value: summary.restricted_balance },
         { name: 'Unrestricted', value: summary.unrestricted_balance },
@@ -96,12 +106,12 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                             { label: 'Expiring soon', value: summary.expiring_soon },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/donor-funds/create">
+                            canManage ? (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Fund
-                                </Link>
-                            </Button>
+                                </Button>
+                            ) : undefined
                         }
                     />
                 }
@@ -289,6 +299,15 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <DonorFundDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    glAccounts={glAccounts}
+                    fundingStreams={fundingStreams}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -260,12 +260,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.ap.manage');
 
     // ── Credit Notes ────────────────────────────────────────────────────
+    // Create is a WizardShell modal on the index page; the retired full-page URL
+    // redirects to the list. (Must stay registered BEFORE /credit-notes/{creditNote}.)
     Route::get('/credit-notes', [CreditNoteController::class, 'index'])
         ->name('credit-notes.index')
         ->middleware('permission:finance.ap.view');
-    Route::get('/credit-notes/create', [CreditNoteController::class, 'create'])
-        ->name('credit-notes.create')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/credit-notes/create', '/finance/credit-notes')->name('credit-notes.create');
     Route::post('/credit-notes', [CreditNoteController::class, 'store'])
         ->name('credit-notes.store')
         ->middleware('permission:finance.ap.manage');
@@ -345,16 +345,19 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     });
 
     // ── Quotes ─────────────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index page; the retired full-page
+    // URLs redirect to the list. (The create redirect must stay registered BEFORE
+    // /quotes/{quote} so it isn't captured as a param. Edit is draft-only.)
+    Route::redirect('/quotes/create', '/finance/quotes')->name('quotes.create');
     Route::middleware('permission:finance.ar.manage')->group(function () {
-        Route::get('/quotes/create', [QuoteController::class, 'create'])->name('quotes.create');
         Route::post('/quotes', [QuoteController::class, 'store'])->name('quotes.store');
     });
     Route::middleware('permission:finance.ar.view')->group(function () {
         Route::get('/quotes', [QuoteController::class, 'index'])->name('quotes.index');
         Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('quotes.show');
     });
+    Route::redirect('/quotes/{quote}/edit', '/finance/quotes')->name('quotes.edit');
     Route::middleware('permission:finance.ar.manage')->group(function () {
-        Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('quotes.edit');
         Route::put('/quotes/{quote}', [QuoteController::class, 'update'])->name('quotes.update');
         Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
         Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
@@ -502,12 +505,13 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.tax.manage');
 
     // ── Fixed Assets ────────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /fixed-assets/{fixedAsset} so it isn't captured.)
     Route::get('/fixed-assets', [FixedAssetController::class, 'index'])
         ->name('fixed-assets.index')
         ->middleware('permission:finance.assets.view');
-    Route::get('/fixed-assets/create', [FixedAssetController::class, 'create'])
-        ->name('fixed-assets.create')
-        ->middleware('permission:finance.assets.manage');
+    Route::redirect('/fixed-assets/create', '/finance/fixed-assets')->name('fixed-assets.create');
     Route::post('/fixed-assets', [FixedAssetController::class, 'store'])
         ->name('fixed-assets.store')
         ->middleware('permission:finance.assets.manage');
@@ -517,9 +521,7 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/fixed-assets/{fixedAsset}', [FixedAssetController::class, 'show'])
         ->name('fixed-assets.show')
         ->middleware('permission:finance.assets.view');
-    Route::get('/fixed-assets/{fixedAsset}/edit', [FixedAssetController::class, 'edit'])
-        ->name('fixed-assets.edit')
-        ->middleware('permission:finance.assets.manage');
+    Route::redirect('/fixed-assets/{fixedAsset}/edit', '/finance/fixed-assets')->name('fixed-assets.edit');
     Route::put('/fixed-assets/{fixedAsset}', [FixedAssetController::class, 'update'])
         ->name('fixed-assets.update')
         ->middleware('permission:finance.assets.manage');
@@ -684,12 +686,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     });
 
     // ── Donor Funds ───────────────────────────────────────────────────────
+    // Create is a WizardShell modal on the index page; the retired full-page URL
+    // redirects to the list. (Must stay registered BEFORE /donor-funds/{fund}.)
     Route::get('/donor-funds', [DonorFundController::class, 'index'])
         ->name('donor-funds.index')
         ->middleware('permission:finance.reports.view');
-    Route::get('/donor-funds/create', [DonorFundController::class, 'create'])
-        ->name('donor-funds.create')
-        ->middleware('permission:finance.admin');
+    Route::redirect('/donor-funds/create', '/finance/donor-funds')->name('donor-funds.create');
     Route::post('/donor-funds', [DonorFundController::class, 'store'])
         ->name('donor-funds.store')
         ->middleware('permission:finance.admin');

@@ -85,7 +85,7 @@ export default function QuoteShow({ quote }: Props) {
                         {quote.status === 'draft' && (
                             <>
                                 <Button asChild size="sm" variant="outline">
-                                    <Link href={`/finance/quotes/${quote.id}/edit`}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Link>
+                                    <Link href="/finance/quotes"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Link>
                                 </Button>
                                 <Button size="sm" onClick={() => handleAction('send')}>
                                     <Send className="mr-1.5 h-3.5 w-3.5" /> Send

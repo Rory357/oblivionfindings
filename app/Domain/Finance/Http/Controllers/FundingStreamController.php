@@ -43,6 +43,9 @@ class FundingStreamController extends Controller
         return Inertia::render('finance/funding-streams/Index', [
             'fundingStreams' => $fundingStreams,
             'revenueAccounts' => $revenueAccounts,
+            // The whole funding-streams group is gated by finance.admin, so a user
+            // who reached the index can manage; pass it explicitly for the modal wiring.
+            'canManage' => (bool) $request->user()->canDo('finance.admin'),
         ]);
     }
 

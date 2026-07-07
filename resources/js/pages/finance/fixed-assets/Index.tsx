@@ -1,7 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import {
+    FixedAssetDialog,
+    LedgerTabsFooter,
+    type EditableFixedAsset,
+    type FixedAssetGlAccount,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +37,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash } from 'lucide-react';
+import { Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
 interface FixedAsset {
@@ -47,6 +52,11 @@ interface FixedAsset {
     useful_life_months: number;
     depreciation_method: string;
     status: string;
+    gl_asset_account_id: number | null;
+    gl_depreciation_account_id: number | null;
+    gl_expense_account_id: number | null;
+    notes: string | null;
+    has_depreciations: boolean;
 }
 
 interface PaginatedAssets {
@@ -76,6 +86,9 @@ interface Props {
     assets: PaginatedAssets;
     summary: Summary;
     filters: Filters;
+    canManage: boolean;
+    assetAccounts: FixedAssetGlAccount[];
+    expenseAccounts: FixedAssetGlAccount[];
 }
 
 const formatNZD = (amount: number | string) =>
@@ -116,9 +129,29 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Fixed Assets', href: '/finance/fixed-assets' },
 ];
 
-export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
+export default function FixedAssetsIndex({ assets, summary, filters, canManage = false, assetAccounts = [], expenseAccounts = [] }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [depModalOpen, setDepModalOpen] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editAsset, setEditAsset] = useState<EditableFixedAsset | null>(null);
+
+    const openEdit = (asset: FixedAsset) =>
+        setEditAsset({
+            id: asset.id,
+            asset_name: asset.asset_name,
+            asset_tag: asset.asset_tag,
+            category: asset.category,
+            purchase_date: asset.purchase_date,
+            purchase_cost: asset.purchase_cost,
+            residual_value: asset.residual_value,
+            useful_life_months: asset.useful_life_months,
+            depreciation_method: asset.depreciation_method,
+            gl_asset_account_id: asset.gl_asset_account_id,
+            gl_depreciation_account_id: asset.gl_depreciation_account_id,
+            gl_expense_account_id: asset.gl_expense_account_id,
+            notes: asset.notes,
+            has_depreciations: asset.has_depreciations,
+        });
 
     const depForm = useForm({
         depreciation_date: new Date().toISOString().split('T')[0],
@@ -215,12 +248,12 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                         </form>
                                     </DialogContent>
                                 </Dialog>
-                                <Link href={'/finance/fixed-assets/create'}>
-                                    <Button size="sm">
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Add Asset
                                     </Button>
-                                </Link>
+                                )}
                             </div>
                         }
                     />
@@ -356,12 +389,12 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 <p className="text-muted-foreground mb-4">
                                     Get started by adding your first fixed asset.
                                 </p>
-                                <Link href={'/finance/fixed-assets/create'}>
-                                    <Button>
+                                {canManage && (
+                                    <Button onClick={() => setCreateOpen(true)}>
                                         <Plus className="mr-2 h-4 w-4" />
                                         Add Asset
                                     </Button>
-                                </Link>
+                                )}
                             </div>
                         ) : (
                             <Table>
@@ -375,6 +408,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                         <TableHead className="text-right">Accum. Depr.</TableHead>
                                         <TableHead className="text-right">Book Value</TableHead>
                                         <TableHead>Status</TableHead>
+                                        {canManage && <TableHead className="w-12 text-right" />}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -421,6 +455,21 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                                         {statusLabels[asset.status] || asset.status}
                                                     </Badge>
                                                 </TableCell>
+                                                {canManage && (
+                                                    <TableCell className="text-right">
+                                                        {asset.status !== 'disposed' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0"
+                                                                aria-label={`Edit ${asset.asset_name}`}
+                                                                onClick={() => openEdit(asset)}
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         );
                                     })}
@@ -453,6 +502,26 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <FixedAssetDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    assetAccounts={assetAccounts}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
+
+            {canManage && editAsset && (
+                <FixedAssetDialog
+                    key={editAsset.id}
+                    open
+                    asset={editAsset}
+                    onClose={() => setEditAsset(null)}
+                    assetAccounts={assetAccounts}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
         </AppLayout>
     );
 }

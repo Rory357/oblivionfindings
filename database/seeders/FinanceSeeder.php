@@ -196,6 +196,7 @@ class FinanceSeeder extends Seeder
             $this->account('8200', 'Bad Debts', 'expense', 'expense'),
             $this->account('8300', 'Unrealised FX Gain/Loss', 'expense', 'expense'),
             $this->account('8310', 'Realised FX Gain/Loss', 'expense', 'expense'),
+            $this->account('8400', 'Gain/Loss on Asset Disposal', 'expense', 'expense'),
         ];
     }
 

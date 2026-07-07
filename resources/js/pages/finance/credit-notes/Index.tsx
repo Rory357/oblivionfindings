@@ -2,7 +2,13 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import {
+    CreditNoteDialog,
+    PayablesTabsFooter,
+    type CreditNoteAccountOption,
+    type CreditNoteClientOption,
+    type CreditNoteVendorOption,
+} from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -36,6 +42,10 @@ interface Filters {
 interface Props extends PageProps {
     creditNotes: PaginatedCreditNotes;
     filters: Filters;
+    canManage: boolean;
+    vendors: CreditNoteVendorOption[];
+    clients: CreditNoteClientOption[];
+    accounts: CreditNoteAccountOption[];
 }
 
 const formatCurrency = (amount: string | number) =>
@@ -61,9 +71,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Credit Notes', href: '/finance/credit-notes' },
 ];
 
-export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) {
+export default function CreditNotesIndex({ auth, creditNotes, filters, canManage = false, vendors = [], clients = [], accounts = [] }: Props) {
     const [type, setType] = useState(filters.type ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
+    const [createOpen, setCreateOpen] = useState(false);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -98,12 +109,12 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                             { label: 'AR', value: receivableCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/credit-notes/create">
+                            canManage ? (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Credit Note
-                                </Link>
-                            </Button>
+                                </Button>
+                            ) : undefined
                         }
                         footer={<PayablesTabsFooter active="credit-notes" />}
                     />
@@ -152,12 +163,12 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                             <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
                                 Credit notes are used to adjust invoices or bills. Create one to get started.
                             </p>
-                            <Button asChild>
-                                <Link href="/finance/credit-notes/create">
+                            {canManage && (
+                                <Button onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     New Credit Note
-                                </Link>
-                            </Button>
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <>
@@ -221,6 +232,16 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                     )}
                 </Card>
             </PageLayout>
+
+            {canManage && (
+                <CreditNoteDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    vendors={vendors}
+                    clients={clients}
+                    accounts={accounts}
+                />
+            )}
         </AppLayout>
     );
 }
