@@ -35,6 +35,7 @@ export function WizardShell({
     steps,
     stepIndex,
     onStepClick,
+    headerLabel,
     pct,
     pctLabel = 'Completeness',
     railExtra,
@@ -56,6 +57,10 @@ export function WizardShell({
     steps: readonly WizardStep[];
     stepIndex: number;
     onStepClick: (index: number) => void;
+    /** Replaces the "Step x of y · label" header line. Detail dialogs use this —
+     *  their rail entries are SECTIONS, not sequential steps, so "Step 1 of 7"
+     *  reads wrong; a pane title or section name goes here instead. */
+    headerLabel?: string;
     pct?: number | null;
     pctLabel?: string;
     /** Extra rail content pinned below the steps (e.g. a live clinical card). */
@@ -187,7 +192,9 @@ export function WizardShell({
                         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                             <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
                                 <div className="text-[13px] font-semibold text-muted-foreground">
-                                    {steps.length > 1 ? (
+                                    {headerLabel ? (
+                                        <span className="text-foreground">{headerLabel}</span>
+                                    ) : steps.length > 1 ? (
                                         <>
                                             Step {stepIndex + 1} of {steps.length} ·{' '}
                                             <span className="text-foreground">

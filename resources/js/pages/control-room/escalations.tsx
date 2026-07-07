@@ -648,11 +648,17 @@ function QueueColumn({
                 </div>
             </div>
 
-            {/* Alert cards */}
+            {/* Alert cards — the column shows the top of the queue; the badge
+                carries the full count */}
             <div
                 className="flex-1 space-y-2 overflow-y-auto p-3"
                 style={{ maxHeight: 'calc(100vh - 360px)' }}
             >
+                {queue.alert_count > queue.alerts.length ? (
+                    <p className="rounded-md bg-muted/60 px-2 py-1 text-center text-[11px] text-muted-foreground">
+                        Showing the top {queue.alerts.length} of {queue.alert_count} — work from the top down.
+                    </p>
+                ) : null}
                 {queue.alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                         <CheckCircle2 className="mb-2 h-8 w-8 text-status-success" />
@@ -712,11 +718,13 @@ export default function EscalationQueue({
         null,
     );
 
-    // Client-side countdown ticker (1 second)
+    // Client-side countdown ticker. 30s granularity — SLA timers on cards read
+    // in minutes/hours, and a 1s tick re-rendered every card on the board each
+    // second, which made large boards visibly janky.
     useEffect(() => {
         countdownTimerRef.current = setInterval(() => {
-            setNowMs((prev) => prev + 1000);
-        }, 1000);
+            setNowMs((prev) => prev + 30000);
+        }, 30000);
 
         return () => {
             if (countdownTimerRef.current)

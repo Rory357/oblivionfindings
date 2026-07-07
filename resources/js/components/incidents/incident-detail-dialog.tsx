@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -235,6 +235,7 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             steps={SECTIONS}
             stepIndex={stepIndex}
             onStepClick={(i) => setSection(SECTIONS[i].key)}
+            headerLabel={editing ? 'Edit incident' : action ? ACTION_META[action].title : (SECTIONS[stepIndex]?.label ?? 'Overview')}
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
@@ -270,6 +271,10 @@ const ACTION_META: Record<LifecycleAction, { title: string; blurb: string; icon:
 function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: LifecycleAction; onDone: () => void }) {
     const incidentId = d.id;
     const meta = ACTION_META[action];
+    // Guardrail rejections come back as a 302 + flash.error (the pane stays
+    // open) — show WHY it was blocked, or the user sees nothing happen.
+    const [attempted, setAttempted] = useState(false);
+    const flashError = (usePage().props as { flash?: { error?: string } }).flash?.error;
     const form = useForm<{ review_notes: string; closed_outcome: string; closed_notes: string; reopened_reason: string }>({
         review_notes: '',
         closed_outcome: '',
@@ -279,6 +284,7 @@ function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: Lifecycl
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        setAttempted(true);
         const url = `/incidents/${incidentId}/${action}`;
         form.post(url, {
             preserveScroll: true,
@@ -293,6 +299,12 @@ function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: Lifecycl
     return (
         <form onSubmit={submit} className="flex flex-col gap-4">
             <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
+
+            {attempted && flashError ? (
+                <InfoCard icon={AlertTriangle} tone="crit">
+                    <span className="font-semibold">Couldn't {action === 'submit' ? 'submit' : action} this incident.</span> {flashError}
+                </InfoCard>
+            ) : null}
 
             {action === 'submit' ? (
                 <>

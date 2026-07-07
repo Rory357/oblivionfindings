@@ -841,14 +841,17 @@ export default function AlertsIndex({
                 <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
             ) : null}
 
-            {/* Manual alert creation — guided wizard */}
-            <NewAlertWizard
-                open={newOpen}
-                onClose={() => setNewOpen(false)}
-                clients={clients}
-                sites={sites}
-                onOpenAlert={openWorkspace}
-            />
+            {/* Manual alert creation — guided wizard. Mounted only while open so
+                every run starts fresh and a closed wizard can never linger. */}
+            {newOpen ? (
+                <NewAlertWizard
+                    open
+                    onClose={() => setNewOpen(false)}
+                    clients={clients}
+                    sites={sites}
+                    onOpenAlert={openWorkspace}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -566,28 +566,34 @@ export default function ControlRoomIndex({
                     </div>
                 )}
 
-                {/* Attention Flags (PR12) */}
-                {attention_flags && attention_flags.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                        {attention_flags.map((flag, i) => (
-                            <div
-                                key={i}
-                                className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 text-sm ${
-                                    flag.level === 'critical'
-                                        ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
-                                        : 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning'
-                                }`}
-                            >
-                                {flag.level === 'critical' ? (
-                                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                                ) : (
-                                    <AlertCircle className="h-4 w-4 shrink-0" />
-                                )}
-                                <span>{flag.message}</span>
+                {/* What needs attention — ONE compact card instead of a stack of
+                    full-width warning banners (the big critical banner above
+                    already carries the #1 item, so it's filtered out here). */}
+                {(() => {
+                    const flags = (attention_flags ?? []).filter(
+                        (f) => !(stats.critical > 0 && f.message.toLowerCase().includes('critical alert')),
+                    );
+                    if (!flags.length) return null;
+                    return (
+                        <Card className="mt-4 gap-0 py-0">
+                            <div className="border-b border-border px-4 py-2.5 text-sm font-semibold text-foreground">
+                                What needs attention
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <div className="divide-y divide-border/60">
+                                {flags.slice(0, 4).map((flag, i) => (
+                                    <div key={i} className="flex items-center gap-2.5 px-4 py-2 text-sm">
+                                        {flag.level === 'critical' ? (
+                                            <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
+                                        ) : (
+                                            <AlertCircle className="h-4 w-4 shrink-0 text-status-warning" />
+                                        )}
+                                        <span className="text-foreground">{flag.message}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    );
+                })()}
 
                 {/* Row 3: Trend Charts (unified 3-column) */}
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">

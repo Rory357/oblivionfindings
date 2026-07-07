@@ -274,10 +274,11 @@ export default function ControlRoomBroadcast({
                 </Card>
             </PageShell>
 
-            {/* Guided composer — message → audience → channels → review & send */}
-            {can.manage ? (
+            {/* Guided composer — message → audience → channels → review & send.
+                Mounted only while open so every run starts fresh. */}
+            {can.manage && composerOpen ? (
                 <BroadcastWizard
-                    open={composerOpen}
+                    open
                     onClose={() => setComposerOpen(false)}
                     roles={roles}
                     roleCounts={roleCounts}

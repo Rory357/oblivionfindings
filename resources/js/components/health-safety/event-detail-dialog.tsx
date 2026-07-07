@@ -23,7 +23,7 @@ import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/prim
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -445,6 +445,7 @@ export function EventDetailDialog({
             steps={SECTIONS as readonly WizardStep[]}
             stepIndex={stepIndex}
             onStepClick={(i) => setSection(SECTIONS[i].key)}
+            headerLabel={SECTIONS[stepIndex]?.label ?? 'Overview'}
             pct={null}
             footerStart={footerStart}
             footerEnd={footerEnd}
@@ -491,9 +492,14 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
     const gate = d.close_gate;
     const blocked = (gate?.blockers.length ?? 0) > 0;
     const form = useForm<{ closure_summary: string; override_reason: string }>({ closure_summary: '', override_reason: '' });
+    // A rejected close comes back as a 302 + flash.error (pane stays open) —
+    // show WHY, or the click looks like it did nothing.
+    const [attempted, setAttempted] = useState(false);
+    const flashError = (usePage().props as { flash?: { error?: string } }).flash?.error;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        setAttempted(true);
         // A blocked closure comes back on a 302 as flash.error (not 422) — keep the
         // pane open so the user can record an override reason.
         form.post(`/health-safety/events/${d.id}/close`, {
@@ -511,6 +517,12 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 title="Close event"
                 blurb="A required investigation must be complete and every corrective action verified — or close with a logged override. A closure summary is always required."
             />
+
+            {attempted && flashError ? (
+                <InfoCard icon={AlertTriangle} tone="crit">
+                    <span className="font-semibold">Couldn't close this event.</span> {flashError}
+                </InfoCard>
+            ) : null}
 
             {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">

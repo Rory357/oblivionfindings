@@ -380,6 +380,22 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
     ];
     const stepIndex = SECTIONS.findIndex((s) => s.key === section);
 
+    // Header line: the rail entries are sections (not sequential steps), so
+    // never say "Step x of 7" — show the open pane's title, or the section.
+    const ACTION_TITLES: Record<ActionKey, string> = {
+        acknowledge: 'Acknowledge alert',
+        triage: 'Start triage',
+        resolve: 'Resolve alert',
+        close: 'Close alert',
+        escalate: 'Escalate alert',
+        assign: a.assigned_to ? 'Reassign alert' : 'Assign alert',
+        confirm_sensor: 'Confirm sensor detection',
+        dismiss_sensor: 'Dismiss as false positive',
+        edit_meta: 'Edit alert details',
+        start_playbook: 'Start a playbook',
+    };
+    const headerLabel = action ? ACTION_TITLES[action] : (SECTIONS[stepIndex]?.label ?? 'Overview');
+
     const closePane = () => setAction(null);
 
     // While an action pane is open it owns the body + its own buttons.
@@ -458,6 +474,7 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
             steps={SECTIONS}
             stepIndex={stepIndex}
             onStepClick={(i) => setSection(SECTIONS[i].key)}
+            headerLabel={headerLabel}
             footerStart={footerStart}
             footerEnd={footerEnd}
             railExtra={railExtra}

@@ -276,6 +276,18 @@ class HandleInertiaRequests extends Middleware
                 // ({label, url, employee_name}) so the case page can offer an
                 // explicit "Start offboarding" CTA (never auto-created).
                 'offboarding_cta' => session('offboarding_cta'),
+                // The incident report wizard reads this so its success pane can
+                // open the newly-created incident over the register.
+                'created_incident_id' => session('created_incident_id'),
+                // The New-alert wizard reads this so its success pane can open
+                // the freshly-raised alert's workspace.
+                'created_alert_id' => session('created_alert_id'),
+                // Sensor triage confirm flashes the incident it created.
+                'confirmed_incident_id' => session('confirmed_incident_id'),
+                // The quick-flag dialog reads these so its success pane can show
+                // the CR-/INC- chips and open either record.
+                'flagged_incident_id' => session('flagged_incident_id'),
+                'flagged_alert_id' => session('flagged_alert_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

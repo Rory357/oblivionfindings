@@ -754,13 +754,16 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                 </DialogContent>
             </Dialog>
 
-            {/* Quick-flag: raise an alert + create the incident together (Gap A) */}
-            <FlagIncidentDialog
-                open={flagOpen}
-                onClose={() => setFlagOpen(false)}
-                clients={clients}
-                onFlagged={(incidentId) => router.visit(`/incidents?incident=${incidentId}`)}
-            />
+            {/* Quick-flag: raise an alert + create the incident together (Gap A).
+                Mounted only while open so every run starts fresh. */}
+            {flagOpen ? (
+                <FlagIncidentDialog
+                    open
+                    onClose={() => setFlagOpen(false)}
+                    clients={clients}
+                    onFlagged={(incidentId) => router.visit(`/incidents?incident=${incidentId}`)}
+                />
+            ) : null}
 
             {/* Workspace-over-list for linked alerts */}
             {detail ? (

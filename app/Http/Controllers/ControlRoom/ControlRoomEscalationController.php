@@ -27,12 +27,19 @@ class ControlRoomEscalationController extends Controller
             ->orderBy('name')
             ->get()
             ->map(function (TriageQueue $queue) {
-                // Load unresolved alerts currently in this queue
+                // Board columns show the top of the queue only — rendering every
+                // alert (dev data has 1,000+) makes the page unusable. The full
+                // count still drives the column badge and capacity bar.
+                $totalCount = ControlRoomAlert::unresolved()
+                    ->where('queue_id', $queue->id)
+                    ->count();
+
                 $alerts = ControlRoomAlert::unresolved()
                     ->where('queue_id', $queue->id)
                     ->with(['assignedTo:id,name', 'sla', 'client:id,first_name,last_name'])
                     ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
                     ->orderBy('triggered_at')
+                    ->limit(25)
                     ->get();
 
                 $alertData = $alerts->map(function (ControlRoomAlert $alert) use ($queue) {
@@ -96,7 +103,7 @@ class ControlRoomEscalationController extends Controller
                     'description' => $queue->description ?? null,
                     'auto_escalate_after_minutes' => $queue->auto_escalate_after_minutes,
                     'escalate_to_queue_id' => $queue->escalate_to_queue_id,
-                    'alert_count' => count($alertData),
+                    'alert_count' => $totalCount,
                     'alerts' => $alertData,
                 ];
             })
