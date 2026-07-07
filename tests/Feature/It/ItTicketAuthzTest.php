@@ -94,7 +94,7 @@ test('a requester sees only their own tickets in the payload', function () {
         ->get('/it')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('tickets', 2)
+            ->has('tickets.data', 2)
             ->has('myTickets', 1));
 });
 

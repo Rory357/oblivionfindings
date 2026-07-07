@@ -30,6 +30,9 @@ class ItTicket extends Model
 
     public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
+    /** Statuses that count as "open" for queues, badges and saved views. */
+    public const OPEN_STATUSES = ['open', 'in_progress', 'waiting'];
+
     protected $fillable = [
         'tenant_id',
         'reference',
@@ -70,6 +73,60 @@ class ItTicket extends Model
         'reopened_count' => 'integer',
         'csat_score' => 'integer',
     ];
+
+    /* ------------------------------------------------------------------ */
+    /*  Reference generation */
+    /* ------------------------------------------------------------------ */
+
+    protected static function booted(): void
+    {
+        // Every ticket gets a human-facing reference (IT-000123) — filled
+        // here so factories and secondary write paths never miss it. The
+        // tenant-unique index is the backstop; createWithReference() adds
+        // the retry for genuinely concurrent creates.
+        static::creating(function (self $ticket) {
+            if (! $ticket->reference && $ticket->tenant_id) {
+                $ticket->reference = static::nextReference((int) $ticket->tenant_id);
+            }
+        });
+    }
+
+    /** Next per-tenant sequence value, based on the highest stamped so far. */
+    public static function nextReference(int $tenantId): string
+    {
+        $max = (int) static::query()
+            ->forTenant($tenantId)
+            ->whereNotNull('reference')
+            ->selectRaw("MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq")
+            ->value('seq');
+
+        return sprintf('IT-%06d', $max + 1);
+    }
+
+    /**
+     * Create with a race-safe reference: two requests computing the same
+     * next sequence collide on the unique index — the loser recomputes and
+     * retries instead of surfacing a 500.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function createWithReference(array $attributes): self
+    {
+        unset($attributes['reference']); // always generated, never client-supplied
+
+        $attempts = 0;
+        do {
+            try {
+                return static::create($attributes);
+            } catch (\Illuminate\Database\QueryException $exception) {
+                $attempts++;
+                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
+                if (! $collidedOnReference || $attempts >= 5) {
+                    throw $exception;
+                }
+            }
+        } while (true);
+    }
 
     /* ------------------------------------------------------------------ */
     /*  Relationships */

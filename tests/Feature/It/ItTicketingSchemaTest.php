@@ -43,8 +43,10 @@ test('tickets carry the full ticketing schema and tolerate null references', fun
     expect($ticket->csat_score)->toBeNull();
 
     // The tenant-unique reference index must tolerate many NULLs (rows
-    // created before the generator stamps them).
-    ItTicket::factory()->count(2)->create(['reference' => null]);
+    // written outside Eloquent bypass the generating hook). Blank them via
+    // raw SQL to prove the index property.
+    $ids = ItTicket::factory()->count(2)->create()->pluck('id');
+    \Illuminate\Support\Facades\DB::table('it_tickets')->whereIn('id', $ids)->update(['reference' => null]);
     expect(ItTicket::query()->whereNull('reference')->count())->toBe(2);
 
     // waiting is now a legal status (per §P.10 — display "Waiting on requester").

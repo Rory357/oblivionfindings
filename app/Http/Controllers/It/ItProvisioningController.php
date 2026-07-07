@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
+use App\Models\ItTicketEvent;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,14 +51,14 @@ class ItProvisioningController extends Controller
             'assignee' => is_numeric($request->query('assignee')) ? (int) $request->query('assignee') : null,
             'ticket_status' => $this->cleanFilter($request->query('ticket_status'), ItTicket::STATUSES),
             'ticket_priority' => $this->cleanFilter($request->query('ticket_priority'), ItTicket::PRIORITIES),
+            'view' => $this->cleanFilter($request->query('view'), array_keys(self::TICKET_VIEWS)),
         ];
 
-        // Requesters get ONLY their own tickets — the agent queues, stats and
-        // staff directory never reach a self-service payload.
+        // Requesters get ONLY their own tickets — the agent queues, summary
+        // and staff directory never reach a self-service payload.
         $agentProps = $isAgent ? [
-            'requests' => $this->requestRows($tenantId, $filters),
-            'tickets' => $this->ticketRows($tenantId, $filters),
-            'stats' => $this->stats($tenantId),
+            'requests' => $this->requestPage($tenantId, $filters),
+            'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
             'assignees' => $this->tenantUserOptions($tenantId),
             'filters' => $filters,
         ] : [];
@@ -65,6 +66,7 @@ class ItProvisioningController extends Controller
         return Inertia::render('it/index', [
             ...$agentProps,
             'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user->id) : [],
+            'summary' => $this->summary($tenantId, $user->id, $isAgent),
             'can' => [
                 'view' => $isAgent,
                 'manage' => (bool) ($user && $user->canDo('it.manage')),
@@ -224,7 +226,7 @@ class ItProvisioningController extends Controller
         // an assignee, whatever the request body says.
         $assigneeId = $isAgent ? ($validated['assigned_to_user_id'] ?? null) : null;
 
-        ItTicket::create([
+        $ticket = ItTicket::createWithReference([
             'tenant_id' => $tenantId,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -232,10 +234,16 @@ class ItProvisioningController extends Controller
             'assigned_to_user_id' => $assigneeId,
             'category' => $validated['category'],
             'priority' => $validated['priority'],
+            'source' => $isAgent ? 'agent' : 'portal',
             'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
 
-        return redirect()->back()->with('success', 'Ticket logged.');
+        ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
+            'source' => $ticket->source,
+            'assigned_to_user_id' => $assigneeId,
+        ]));
+
+        return redirect()->back()->with('success', "Ticket logged — {$ticket->reference}.");
     }
 
     public function updateTicket(Request $request, ItTicket $ticket)
@@ -292,13 +300,48 @@ class ItProvisioningController extends Controller
     /*  Payload builders */
     /* ================================================================== */
 
+    /**
+     * Saved views for the tickets queue — server-side where clauses keyed by
+     * the `view` query param. "awaiting_reply" is a v1 proxy (no agent
+     * response yet); it sharpens once the thread lands.
+     *
+     * @var array<string, string>
+     */
+    private const TICKET_VIEWS = [
+        'all_open' => 'All open',
+        'unassigned' => 'Unassigned',
+        'mine' => 'Mine',
+        'breaching' => 'Breaching soon',
+        'breached' => 'Breached',
+        'awaiting_reply' => 'Awaiting reply',
+        'waiting' => 'Waiting on requester',
+        'recently_resolved' => 'Recently resolved',
+    ];
+
+    /** Apply one saved view's constraints to a tickets query. */
+    private function applyTicketView($query, string $view, int $userId)
+    {
+        return match ($view) {
+            'all_open' => $query->whereIn('status', ItTicket::OPEN_STATUSES),
+            'unassigned' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->whereNull('assigned_to_user_id'),
+            'mine' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('assigned_to_user_id', $userId),
+            'breaching' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('sla_state', 'at_risk'),
+            'breached' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('sla_state', 'breached'),
+            'awaiting_reply' => $query->whereIn('status', ['open', 'in_progress'])->whereNull('first_responded_at'),
+            'waiting' => $query->where('status', 'waiting'),
+            'recently_resolved' => $query->whereIn('status', ['resolved', 'closed'])
+                ->where('resolved_at', '>=', now()->subDays(7)),
+            default => $query,
+        };
+    }
+
     /** @param array<string, mixed> $filters */
-    private function requestRows(int $tenantId, array $filters): array
+    private function requestPage(int $tenantId, array $filters)
     {
         // House rule: guard new-table reads so a request racing the deploy's
         // migration step renders an empty queue instead of a 500.
         if (! Schema::hasTable('it_provisioning_requests')) {
-            return [];
+            return null;
         }
 
         return ItProvisioningRequest::query()
@@ -314,8 +357,9 @@ class ItProvisioningController extends Controller
             ->when($filters['assignee'], fn ($q, $assignee) => $q->where('assigned_to_user_id', $assignee))
             ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'done' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (ItProvisioningRequest $r) => [
+            ->paginate(15, ['*'], 'requests_page')
+            ->withQueryString()
+            ->through(fn (ItProvisioningRequest $r) => [
                 'id' => $r->id,
                 'employee' => [
                     'name' => $r->employeeProfile?->user?->name ?? 'Unknown',
@@ -324,6 +368,8 @@ class ItProvisioningController extends Controller
                 'item' => $r->item,
                 'type' => $r->type,
                 'status' => $r->status,
+                'priority' => $r->priority,
+                'due_date' => $r->due_date?->toDateString(),
                 'assignee' => $r->assignee ? ['id' => $r->assignee->id, 'name' => $r->assignee->name] : null,
                 'external_ref' => $r->external_ref,
                 'notes' => $r->notes,
@@ -331,42 +377,43 @@ class ItProvisioningController extends Controller
                 'sign_off_required' => (bool) ($r->onboardingTask?->sign_off_required ?? false),
                 'created' => $r->created_at?->diffForHumans(short: true),
                 'fulfilled' => $r->fulfilled_at?->diffForHumans(short: true),
-            ])
-            ->values()
-            ->all();
+            ]);
     }
 
     /** @param array<string, mixed> $filters */
-    private function ticketRows(int $tenantId, array $filters): array
+    private function ticketPage(int $tenantId, array $filters, int $userId)
     {
         if (! Schema::hasTable('it_tickets')) {
-            return [];
+            return null;
         }
 
         return ItTicket::query()
             ->forTenant($tenantId)
             ->with(['requester:id,name', 'assignee:id,name'])
+            ->when($filters['view'], fn ($q, $view) => $this->applyTicketView($q, $view, $userId))
             ->when($filters['ticket_status'], fn ($q, $status) => $q->where('status', $status))
             ->when($filters['ticket_priority'], fn ($q, $priority) => $q->where('priority', $priority))
             ->when($filters['assignee'], fn ($q, $assignee) => $q->where('assigned_to_user_id', $assignee))
-            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END")
+            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'waiting' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END")
             ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (ItTicket $t) => [
+            ->paginate(15, ['*'], 'tickets_page')
+            ->withQueryString()
+            ->through(fn (ItTicket $t) => [
                 'id' => $t->id,
+                'reference' => $t->reference,
                 'title' => $t->title,
                 'description' => $t->description,
                 'category' => $t->category,
                 'priority' => $t->priority,
                 'status' => $t->status,
+                'sla_state' => $t->sla_state,
                 'requester' => $t->requester?->name ?? 'Unknown',
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
                 'age' => $t->created_at?->diffForHumans(short: true),
+                'updated' => $t->updated_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
-            ])
-            ->values()
-            ->all();
+            ]);
     }
 
     /**
@@ -390,6 +437,7 @@ class ItProvisioningController extends Controller
             ->get()
             ->map(fn (ItTicket $t) => [
                 'id' => $t->id,
+                'reference' => $t->reference,
                 'title' => $t->title,
                 'description' => $t->description,
                 'category' => $t->category,
@@ -403,30 +451,120 @@ class ItProvisioningController extends Controller
             ->all();
     }
 
-    /** @return array<string, int> */
-    private function stats(int $tenantId): array
+    /**
+     * The server summary that feeds the hero, tab badges and saved-view
+     * chips. Computed over ALL rows (never the current page); requesters get
+     * only their own `my` section — an agent-shaped summary must never reach
+     * a self-service payload.
+     *
+     * @return array<string, mixed>
+     */
+    private function summary(int $tenantId, int $userId, bool $isAgent): array
     {
-        $requests = Schema::hasTable('it_provisioning_requests')
-            ? ItProvisioningRequest::query()
-                ->forTenant($tenantId)
-                ->selectRaw("SUM(status = 'pending') AS pending, SUM(status = 'in_progress') AS in_progress, SUM(status = 'done' AND fulfilled_at >= ?) AS done_30d", [now()->subDays(30)])
-                ->first()
-            : null;
+        $ticketsReady = Schema::hasTable('it_tickets');
+        $requestsReady = Schema::hasTable('it_provisioning_requests');
 
-        $tickets = Schema::hasTable('it_tickets')
+        $my = $ticketsReady
             ? ItTicket::query()
                 ->forTenant($tenantId)
-                ->selectRaw("SUM(status IN ('open', 'in_progress')) AS open_count, SUM(status IN ('open', 'in_progress') AND priority = 'urgent') AS urgent")
+                ->where('requester_user_id', $userId)
+                ->selectRaw(
+                    "SUM(status IN ('open', 'in_progress', 'waiting')) AS open_count,
+                     SUM(status = 'waiting') AS waiting,
+                     SUM(status IN ('resolved', 'closed') AND resolved_at >= ?) AS resolved_30d",
+                    [now()->subDays(30)],
+                )
                 ->first()
             : null;
 
-        return [
-            'requests_pending' => (int) ($requests->pending ?? 0),
-            'requests_in_progress' => (int) ($requests->in_progress ?? 0),
-            'requests_done_30d' => (int) ($requests->done_30d ?? 0),
-            'tickets_open' => (int) ($tickets->open_count ?? 0),
-            'tickets_urgent' => (int) ($tickets->urgent ?? 0),
+        $summary = [
+            'my' => [
+                'open' => (int) ($my->open_count ?? 0),
+                'waiting' => (int) ($my->waiting ?? 0),
+                'resolved_30d' => (int) ($my->resolved_30d ?? 0),
+            ],
         ];
+
+        if (! $isAgent) {
+            return $summary;
+        }
+
+        $tickets = $ticketsReady
+            ? ItTicket::query()
+                ->forTenant($tenantId)
+                ->selectRaw(
+                    "SUM(status IN ('open', 'in_progress', 'waiting')) AS open_count,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND assigned_to_user_id IS NULL) AS unassigned,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND assigned_to_user_id IS NULL AND priority = 'urgent') AS urgent_unassigned,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND priority = 'urgent') AS urgent_open,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND sla_state = 'at_risk') AS at_risk,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND sla_state = 'breached') AS breached,
+                     SUM(status IN ('open', 'in_progress') AND first_responded_at IS NULL) AS awaiting_reply,
+                     SUM(status = 'waiting') AS waiting,
+                     SUM(status IN ('open', 'in_progress', 'waiting') AND assigned_to_user_id = ?) AS mine,
+                     SUM(status IN ('resolved', 'closed') AND resolved_at >= ?) AS resolved_30d,
+                     SUM(status IN ('resolved', 'closed') AND resolved_at >= ?) AS recently_resolved,
+                     SUM(status = 'open') AS status_open,
+                     SUM(status = 'in_progress') AS status_in_progress,
+                     SUM(status = 'resolved') AS status_resolved,
+                     SUM(status = 'closed') AS status_closed",
+                    [$userId, now()->subDays(30), now()->subDays(7)],
+                )
+                ->first()
+            : null;
+
+        $requests = $requestsReady
+            ? ItProvisioningRequest::query()
+                ->forTenant($tenantId)
+                ->selectRaw(
+                    "SUM(status = 'pending') AS pending,
+                     SUM(status = 'in_progress') AS in_progress,
+                     SUM(status = 'done' AND fulfilled_at >= ?) AS done_30d,
+                     SUM(status IN ('pending', 'in_progress') AND due_date IS NOT NULL AND due_date < ?) AS overdue,
+                     SUM(status = 'pending' AND created_at < ?) AS pending_over_7d",
+                    [now()->subDays(30), now()->toDateString(), now()->subDays(7)],
+                )
+                ->first()
+            : null;
+
+        $summary['tickets'] = [
+            'open' => (int) ($tickets->open_count ?? 0),
+            'unassigned' => (int) ($tickets->unassigned ?? 0),
+            'urgent_unassigned' => (int) ($tickets->urgent_unassigned ?? 0),
+            'urgent_open' => (int) ($tickets->urgent_open ?? 0),
+            'at_risk' => (int) ($tickets->at_risk ?? 0),
+            'breached' => (int) ($tickets->breached ?? 0),
+            'awaiting_reply' => (int) ($tickets->awaiting_reply ?? 0),
+            'waiting' => (int) ($tickets->waiting ?? 0),
+            'resolved_30d' => (int) ($tickets->resolved_30d ?? 0),
+            'by_status' => [
+                'open' => (int) ($tickets->status_open ?? 0),
+                'in_progress' => (int) ($tickets->status_in_progress ?? 0),
+                'waiting' => (int) ($tickets->waiting ?? 0),
+                'resolved' => (int) ($tickets->status_resolved ?? 0),
+                'closed' => (int) ($tickets->status_closed ?? 0),
+            ],
+            'views' => [
+                'all_open' => (int) ($tickets->open_count ?? 0),
+                'unassigned' => (int) ($tickets->unassigned ?? 0),
+                'mine' => (int) ($tickets->mine ?? 0),
+                'breaching' => (int) ($tickets->at_risk ?? 0),
+                'breached' => (int) ($tickets->breached ?? 0),
+                'awaiting_reply' => (int) ($tickets->awaiting_reply ?? 0),
+                'waiting' => (int) ($tickets->waiting ?? 0),
+                'recently_resolved' => (int) ($tickets->recently_resolved ?? 0),
+            ],
+        ];
+
+        $summary['provisioning'] = [
+            'pending' => (int) ($requests->pending ?? 0),
+            'in_progress' => (int) ($requests->in_progress ?? 0),
+            'done_30d' => (int) ($requests->done_30d ?? 0),
+            'overdue' => (int) ($requests->overdue ?? 0),
+            'pending_over_7d' => (int) ($requests->pending_over_7d ?? 0),
+        ];
+
+        return $summary;
     }
 
     /** Active tenant staff usable as request/ticket assignees (IT owners). */

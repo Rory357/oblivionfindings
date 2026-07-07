@@ -55,6 +55,8 @@ export interface RequestRow {
     item: string;
     type: string;
     status: string;
+    priority: string;
+    due_date: string | null;
     assignee: AssigneeOption | null;
     external_ref: string | null;
     notes: string | null;
@@ -66,14 +68,17 @@ export interface RequestRow {
 
 export interface TicketRow {
     id: number;
+    reference: string | null;
     title: string;
     description: string | null;
     category: string;
     priority: string;
     status: string;
+    sla_state: string;
     requester: string;
     assignee: AssigneeOption | null;
     age: string | null;
+    updated: string | null;
     resolved: string | null;
 }
 

@@ -12,6 +12,7 @@ import {
     type TicketRow,
 } from '@/components/it/it-wizards';
 import { Button } from '@/components/ui/button';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -45,12 +46,44 @@ import { toast } from 'sonner';
 /*  Props & constants                                                  */
 /* ------------------------------------------------------------------ */
 
-interface Stats {
-    requests_pending: number;
-    requests_in_progress: number;
-    requests_done_30d: number;
-    tickets_open: number;
-    tickets_urgent: number;
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+/** Laravel LengthAwarePaginator as serialised into Inertia props. */
+interface Paginated<T> {
+    data: T[];
+    links: PaginationLink[];
+    current_page: number;
+    last_page: number;
+    total: number;
+}
+
+/** Server summary — all-time counts feeding hero chips and tab badges. */
+interface Summary {
+    my: { open: number; waiting: number; resolved_30d: number };
+    tickets?: {
+        open: number;
+        unassigned: number;
+        urgent_unassigned: number;
+        urgent_open: number;
+        at_risk: number;
+        breached: number;
+        awaiting_reply: number;
+        waiting: number;
+        resolved_30d: number;
+        by_status: Record<string, number>;
+        views: Record<string, number>;
+    };
+    provisioning?: {
+        pending: number;
+        in_progress: number;
+        done_30d: number;
+        overdue: number;
+        pending_over_7d: number;
+    };
 }
 
 interface Filters {
@@ -59,10 +92,12 @@ interface Filters {
     assignee: number | null;
     ticket_status: string | null;
     ticket_priority: string | null;
+    view: string | null;
 }
 
 interface MyTicketRow {
     id: number;
+    reference: string | null;
     title: string;
     description: string | null;
     category: string;
@@ -75,13 +110,13 @@ interface MyTicketRow {
 
 interface Props {
     /** Agent-only props — absent from self-service (requester) payloads. */
-    requests?: RequestRow[];
-    tickets?: TicketRow[];
-    stats?: Stats;
+    requests?: Paginated<RequestRow> | null;
+    tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
     filters?: Filters;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
+    summary: Summary;
     can: { view: boolean; manage: boolean; request: boolean };
 }
 
@@ -130,21 +165,17 @@ const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 /* ------------------------------------------------------------------ */
 
 export default function ItIndex({
-    requests = [],
-    tickets = [],
-    stats,
+    requests,
+    tickets,
     assignees = [],
     filters,
     myTickets,
+    summary,
     can,
 }: Props) {
     const [tab, setTab] = useHrTab(can.view ? 'provisioning' : 'my-tickets');
     const [modal, setModal] = useState<ItModal | null>(null);
     const ctx = useLeaveContextMenu();
-
-    const myOpen = myTickets.filter(
-        (t) => t.status === 'open' || t.status === 'in_progress',
-    ).length;
 
     const tabItems: HrTabItem[] = [
         ...(can.view
@@ -154,14 +185,16 @@ export default function ItIndex({
                       label: 'Provisioning',
                       icon: Server,
                       tone: 'primary',
-                      badge: (stats?.requests_pending ?? 0) + (stats?.requests_in_progress ?? 0),
+                      badge:
+                          (summary.provisioning?.pending ?? 0) +
+                          (summary.provisioning?.in_progress ?? 0),
                   },
                   {
                       id: 'tickets',
                       label: 'Tickets',
                       icon: Ticket,
                       tone: 'info',
-                      badge: stats?.tickets_open ?? 0,
+                      badge: summary.tickets?.open ?? 0,
                   },
               ] as HrTabItem[])
             : []),
@@ -172,7 +205,7 @@ export default function ItIndex({
                       label: 'My tickets',
                       icon: Inbox,
                       tone: 'success',
-                      badge: myOpen,
+                      badge: summary.my.waiting,
                   },
               ] as HrTabItem[])
             : []),
@@ -332,22 +365,19 @@ export default function ItIndex({
                         ) : null}
                     </div>
                     <div className="mt-6 flex flex-wrap gap-2.5">
-                        {(can.view && stats
+                        {(can.view && summary.tickets && summary.provisioning
                             ? [
-                                  { label: 'Pending requests', value: stats.requests_pending },
-                                  { label: 'In progress', value: stats.requests_in_progress },
-                                  { label: 'Fulfilled · 30d', value: stats.requests_done_30d },
-                                  { label: 'Open tickets', value: stats.tickets_open },
-                                  { label: 'Urgent', value: stats.tickets_urgent },
+                                  { label: 'Pending requests', value: summary.provisioning.pending },
+                                  { label: 'In progress', value: summary.provisioning.in_progress },
+                                  { label: 'Fulfilled · 30d', value: summary.provisioning.done_30d },
+                                  { label: 'Open tickets', value: summary.tickets.open },
+                                  { label: 'Unassigned', value: summary.tickets.unassigned },
+                                  { label: 'Urgent open', value: summary.tickets.urgent_open },
                               ]
                             : [
-                                  { label: 'My open tickets', value: myOpen },
-                                  {
-                                      label: 'Resolved',
-                                      value: myTickets.filter(
-                                          (t) => t.status === 'resolved' || t.status === 'closed',
-                                      ).length,
-                                  },
+                                  { label: 'My open tickets', value: summary.my.open },
+                                  { label: 'Waiting on me', value: summary.my.waiting },
+                                  { label: 'Resolved · 30d', value: summary.my.resolved_30d },
                               ]
                         ).map((s) => (
                             <div
@@ -399,7 +429,7 @@ export default function ItIndex({
                                 <span>Raised</span>
                                 <span />
                             </div>
-                            {requests.map((r) => {
+                            {(requests?.data ?? []).map((r) => {
                                 const Icon = typeIcon[r.type] ?? Server;
                                 const actionable =
                                     can.manage && (r.status === 'pending' || r.status === 'in_progress');
@@ -470,7 +500,7 @@ export default function ItIndex({
                                     </div>
                                 );
                             })}
-                            {requests.length === 0 ? (
+                            {(requests?.data ?? []).length === 0 ? (
                                 <EmptyState
                                     icon={Inbox}
                                     title="No provisioning requests"
@@ -478,6 +508,9 @@ export default function ItIndex({
                                 />
                             ) : null}
                         </div>
+                        {requests ? (
+                            <LaravelPagination links={requests.links} lastPage={requests.last_page} />
+                        ) : null}
                     </>
                 )}
 
@@ -526,7 +559,7 @@ export default function ItIndex({
                                 <span>Age</span>
                                 <span />
                             </div>
-                            {tickets.map((t) => (
+                            {(tickets?.data ?? []).map((t) => (
                                 <div
                                     key={t.id}
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
@@ -541,6 +574,7 @@ export default function ItIndex({
                                                 {t.title}
                                             </span>
                                             <span className="block truncate text-[11px] text-muted-foreground">
+                                                {t.reference ? `${t.reference} · ` : ''}
                                                 {label(t.category)}
                                                 {t.description ? ` · ${t.description}` : ''}
                                             </span>
@@ -577,7 +611,7 @@ export default function ItIndex({
                                     </span>
                                 </div>
                             ))}
-                            {tickets.length === 0 ? (
+                            {(tickets?.data ?? []).length === 0 ? (
                                 <EmptyState
                                     icon={Ticket}
                                     title="No tickets"
@@ -589,6 +623,9 @@ export default function ItIndex({
                                 />
                             ) : null}
                         </div>
+                        {tickets ? (
+                            <LaravelPagination links={tickets.links} lastPage={tickets.last_page} />
+                        ) : null}
                     </>
                 )}
 
@@ -631,6 +668,7 @@ export default function ItIndex({
                                                 {t.title}
                                             </span>
                                             <span className="block truncate text-[11px] text-muted-foreground">
+                                                {t.reference ? `${t.reference} · ` : ''}
                                                 {label(t.category)}
                                                 {t.description ? ` · ${t.description}` : ''}
                                             </span>

@@ -68,9 +68,11 @@ test('the /it hub is gated on it permissions', function () {
         ->assertInertia(fn ($page) => $page
             ->component('it/index')
             ->has('myTickets')
+            ->has('summary.my')
             ->missing('requests')
             ->missing('tickets')
-            ->missing('stats')
+            ->missing('summary.tickets')
+            ->missing('summary.provisioning')
             ->missing('assignees')
             ->where('can.view', false)
             ->where('can.manage', false)
@@ -83,7 +85,8 @@ test('the /it hub is gated on it permissions', function () {
             ->component('it/index')
             ->has('requests')
             ->has('tickets')
-            ->has('stats')
+            ->has('summary.tickets')
+            ->has('summary.provisioning')
             ->has('myTickets')
             ->where('can.view', true)
             ->has('can.manage'));
