@@ -1,4 +1,5 @@
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
+import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,15 +64,6 @@ interface PlaybookSummary {
     runs_count: number;
     last_run_at: string | null;
     created_at: string | null;
-}
-
-interface StepForm {
-    title: string;
-    type: string;
-    instructions: string;
-    is_required: boolean;
-    is_blocking: boolean;
-    time_limit_minutes: string;
 }
 
 interface Props {
@@ -139,17 +131,6 @@ function formatRelativeTime(isoString: string | null): string {
     return `${diffDays}d ago`;
 }
 
-function emptyStep(): StepForm {
-    return {
-        title: '',
-        type: 'task',
-        instructions: '',
-        is_required: true,
-        is_blocking: false,
-        time_limit_minutes: '',
-    };
-}
-
 // --- Component ---
 
 export default function PlaybooksIndex({
@@ -162,29 +143,11 @@ export default function PlaybooksIndex({
     const [activeCategory, setActiveCategory] = useState<string>(
         filters.category || 'all',
     );
-    const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-    // Create form state
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [category, setCategory] = useState('emergency');
-    const [autoAttach, setAutoAttach] = useState(false);
-    const [requiresApproval, setRequiresApproval] = useState(false);
-    const [slaAck, setSlaAck] = useState('');
-    const [slaResponse, setSlaResponse] = useState('');
-    const [slaResolution, setSlaResolution] = useState('');
-    const [requiredEvidence, setRequiredEvidence] = useState<string[]>([]);
-    const [steps, setSteps] = useState<StepForm[]>([emptyStep()]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const evidenceOptions = [
-        'photo',
-        'video',
-        'document',
-        'signature',
-        'witness_statement',
-        'incident_report',
-    ];
+    // ?new=1 deep-links straight into the playbook wizard (house pattern).
+    const [wizardOpen, setWizardOpen] = useState<boolean>(
+        () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1',
+    );
 
     const applyFilter = (key: string, value: string) => {
         const newFilters = {
@@ -216,99 +179,6 @@ export default function PlaybooksIndex({
         );
     };
 
-    const addStep = () => {
-        setSteps([...steps, emptyStep()]);
-    };
-
-    const removeStep = (index: number) => {
-        if (steps.length > 1) {
-            setSteps(steps.filter((_, i) => i !== index));
-        }
-    };
-
-    const updateStep = (
-        index: number,
-        field: keyof StepForm,
-        value: string | boolean,
-    ) => {
-        const updated = [...steps];
-        (updated[index] as any)[field] = value;
-        setSteps(updated);
-    };
-
-    const moveStep = (index: number, direction: 'up' | 'down') => {
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= steps.length) return;
-        const updated = [...steps];
-        [updated[index], updated[newIndex]] = [
-            updated[newIndex],
-            updated[index],
-        ];
-        setSteps(updated);
-    };
-
-    const toggleEvidence = (type: string) => {
-        setRequiredEvidence((prev) =>
-            prev.includes(type)
-                ? prev.filter((t) => t !== type)
-                : [...prev, type],
-        );
-    };
-
-    const resetForm = () => {
-        setName('');
-        setDescription('');
-        setCategory('emergency');
-        setAutoAttach(false);
-        setRequiresApproval(false);
-        setSlaAck('');
-        setSlaResponse('');
-        setSlaResolution('');
-        setRequiredEvidence([]);
-        setSteps([emptyStep()]);
-    };
-
-    const handleCreate = (e: FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        router.post(
-            '/control-room/playbooks',
-            {
-                name,
-                description: description || null,
-                category,
-                auto_attach: autoAttach,
-                requires_approval: requiresApproval,
-                sla_acknowledge_minutes: slaAck ? parseInt(slaAck) : null,
-                sla_response_minutes: slaResponse
-                    ? parseInt(slaResponse)
-                    : null,
-                sla_resolution_minutes: slaResolution
-                    ? parseInt(slaResolution)
-                    : null,
-                required_evidence: requiredEvidence,
-                steps: steps.map((s) => ({
-                    title: s.title,
-                    type: s.type,
-                    instructions: s.instructions || null,
-                    is_required: s.is_required,
-                    is_blocking: s.is_blocking,
-                    time_limit_minutes: s.time_limit_minutes
-                        ? parseInt(s.time_limit_minutes)
-                        : null,
-                })),
-            },
-            {
-                onSuccess: () => {
-                    setShowCreateDialog(false);
-                    resetForm();
-                },
-                onFinish: () => setIsSubmitting(false),
-            },
-        );
-    };
-
     const categoryTabs = [
         { key: 'all', label: 'All' },
         ...Object.entries(categories).map(([key, label]) => ({ key, label })),
@@ -336,513 +206,10 @@ export default function PlaybooksIndex({
                         ]}
                         actions={
                             can.manage ? (
-                                <Dialog
-                                    open={showCreateDialog}
-                                    onOpenChange={setShowCreateDialog}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button>
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Create Playbook
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-                                        <form onSubmit={handleCreate}>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Create Playbook
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Define a response procedure
-                                                    with ordered steps.
-                                                </DialogDescription>
-                                            </DialogHeader>
-
-                                            <div className="mt-4 space-y-6">
-                                                {/* Basic Info */}
-                                                <div className="grid gap-4 sm:grid-cols-2">
-                                                    <div className="space-y-2 sm:col-span-2">
-                                                        <Label htmlFor="pb-name">
-                                                            Name *
-                                                        </Label>
-                                                        <Input
-                                                            id="pb-name"
-                                                            value={name}
-                                                            onChange={(e) =>
-                                                                setName(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="e.g. Emergency Response Protocol"
-                                                            required
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2 sm:col-span-2">
-                                                        <Label htmlFor="pb-desc">
-                                                            Description
-                                                        </Label>
-                                                        <Textarea
-                                                            id="pb-desc"
-                                                            value={description}
-                                                            onChange={(e) =>
-                                                                setDescription(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Describe the purpose and scope of this playbook..."
-                                                            rows={2}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>
-                                                            Category *
-                                                        </Label>
-                                                        <Select
-                                                            value={category}
-                                                            onValueChange={
-                                                                setCategory
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {Object.entries(
-                                                                    categories,
-                                                                ).map(
-                                                                    ([
-                                                                        key,
-                                                                        label,
-                                                                    ]) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                key
-                                                                            }
-                                                                            value={
-                                                                                key
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                label
-                                                                            }
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="flex items-end gap-6">
-                                                        <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                id="pb-auto"
-                                                                checked={
-                                                                    autoAttach
-                                                                }
-                                                                onCheckedChange={
-                                                                    setAutoAttach
-                                                                }
-                                                            />
-                                                            <Label htmlFor="pb-auto">
-                                                                Auto-attach
-                                                            </Label>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                id="pb-approval"
-                                                                checked={
-                                                                    requiresApproval
-                                                                }
-                                                                onCheckedChange={
-                                                                    setRequiresApproval
-                                                                }
-                                                            />
-                                                            <Label htmlFor="pb-approval">
-                                                                Requires
-                                                                Approval
-                                                            </Label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* SLA Targets */}
-                                                <div>
-                                                    <h4 className="mb-2 text-sm font-medium">
-                                                        SLA Targets (minutes)
-                                                    </h4>
-                                                    <div className="grid gap-3 sm:grid-cols-3">
-                                                        <div className="space-y-1">
-                                                            <Label
-                                                                htmlFor="sla-ack"
-                                                                className="text-xs text-muted-foreground"
-                                                            >
-                                                                Acknowledge
-                                                            </Label>
-                                                            <Input
-                                                                id="sla-ack"
-                                                                type="number"
-                                                                min={1}
-                                                                value={slaAck}
-                                                                onChange={(e) =>
-                                                                    setSlaAck(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="e.g. 5"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <Label
-                                                                htmlFor="sla-resp"
-                                                                className="text-xs text-muted-foreground"
-                                                            >
-                                                                Response
-                                                            </Label>
-                                                            <Input
-                                                                id="sla-resp"
-                                                                type="number"
-                                                                min={1}
-                                                                value={
-                                                                    slaResponse
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setSlaResponse(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="e.g. 15"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <Label
-                                                                htmlFor="sla-res"
-                                                                className="text-xs text-muted-foreground"
-                                                            >
-                                                                Resolution
-                                                            </Label>
-                                                            <Input
-                                                                id="sla-res"
-                                                                type="number"
-                                                                min={1}
-                                                                value={
-                                                                    slaResolution
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setSlaResolution(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="e.g. 60"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Required Evidence */}
-                                                <div>
-                                                    <h4 className="mb-2 text-sm font-medium">
-                                                        Required Evidence
-                                                    </h4>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {evidenceOptions.map(
-                                                            (type) => (
-                                                                <Button
-                                                                    key={type}
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    onClick={() =>
-                                                                        toggleEvidence(
-                                                                            type,
-                                                                        )
-                                                                    }
-                                                                    className={`h-auto rounded-full px-3 py-1 text-xs ${
-                                                                        requiredEvidence.includes(
-                                                                            type,
-                                                                        )
-                                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                                            : 'border-border text-muted-foreground hover:bg-muted'
-                                                                    }`}
-                                                                >
-                                                                    {type.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}
-                                                                </Button>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Steps Editor */}
-                                                <div>
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <h4 className="text-sm font-medium">
-                                                            Steps *
-                                                        </h4>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={addStep}
-                                                        >
-                                                            <Plus className="mr-1 h-3 w-3" />
-                                                            Add Step
-                                                        </Button>
-                                                    </div>
-                                                    <div className="space-y-3">
-                                                        {steps.map(
-                                                            (step, index) => (
-                                                                <Card
-                                                                    key={index}
-                                                                    className="border-dashed"
-                                                                >
-                                                                    <CardContent className="pt-4">
-                                                                        <div className="flex items-start gap-2">
-                                                                            <div className="flex flex-col items-center gap-1 pt-1">
-                                                                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                                                                    {index +
-                                                                                        1}
-                                                                                </span>
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    onClick={() =>
-                                                                                        moveStep(
-                                                                                            index,
-                                                                                            'up',
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        index ===
-                                                                                        0
-                                                                                    }
-                                                                                    className="h-5 w-5 text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                                                                >
-                                                                                    <ChevronUp className="h-3 w-3" />
-                                                                                </Button>
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    onClick={() =>
-                                                                                        moveStep(
-                                                                                            index,
-                                                                                            'down',
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        index ===
-                                                                                        steps.length -
-                                                                                            1
-                                                                                    }
-                                                                                    className="h-5 w-5 text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                                                                >
-                                                                                    <ChevronDown className="h-3 w-3" />
-                                                                                </Button>
-                                                                            </div>
-                                                                            <div className="flex-1 space-y-3">
-                                                                                <div className="grid gap-3 sm:grid-cols-2">
-                                                                                    <Input
-                                                                                        value={
-                                                                                            step.title
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            updateStep(
-                                                                                                index,
-                                                                                                'title',
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                            )
-                                                                                        }
-                                                                                        placeholder="Step title *"
-                                                                                        required
-                                                                                    />
-                                                                                    <Select
-                                                                                        value={
-                                                                                            step.type
-                                                                                        }
-                                                                                        onValueChange={(
-                                                                                            v,
-                                                                                        ) =>
-                                                                                            updateStep(
-                                                                                                index,
-                                                                                                'type',
-                                                                                                v,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <SelectTrigger>
-                                                                                            <SelectValue />
-                                                                                        </SelectTrigger>
-                                                                                        <SelectContent>
-                                                                                            {Object.entries(
-                                                                                                stepTypes,
-                                                                                            ).map(
-                                                                                                ([
-                                                                                                    key,
-                                                                                                    label,
-                                                                                                ]) => (
-                                                                                                    <SelectItem
-                                                                                                        key={
-                                                                                                            key
-                                                                                                        }
-                                                                                                        value={
-                                                                                                            key
-                                                                                                        }
-                                                                                                    >
-                                                                                                        {
-                                                                                                            label
-                                                                                                        }
-                                                                                                    </SelectItem>
-                                                                                                ),
-                                                                                            )}
-                                                                                        </SelectContent>
-                                                                                    </Select>
-                                                                                </div>
-                                                                                <Textarea
-                                                                                    value={
-                                                                                        step.instructions
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e,
-                                                                                    ) =>
-                                                                                        updateStep(
-                                                                                            index,
-                                                                                            'instructions',
-                                                                                            e
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                    placeholder="Instructions for this step..."
-                                                                                    rows={
-                                                                                        2
-                                                                                    }
-                                                                                />
-                                                                                <div className="flex flex-wrap items-center gap-4">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Switch
-                                                                                            checked={
-                                                                                                step.is_required
-                                                                                            }
-                                                                                            onCheckedChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateStep(
-                                                                                                    index,
-                                                                                                    'is_required',
-                                                                                                    v,
-                                                                                                )
-                                                                                            }
-                                                                                        />
-                                                                                        <span className="text-xs">
-                                                                                            Required
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Switch
-                                                                                            checked={
-                                                                                                step.is_blocking
-                                                                                            }
-                                                                                            onCheckedChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateStep(
-                                                                                                    index,
-                                                                                                    'is_blocking',
-                                                                                                    v,
-                                                                                                )
-                                                                                            }
-                                                                                        />
-                                                                                        <span className="text-xs">
-                                                                                            Blocking
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Input
-                                                                                            type="number"
-                                                                                            min={
-                                                                                                1
-                                                                                            }
-                                                                                            value={
-                                                                                                step.time_limit_minutes
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                updateStep(
-                                                                                                    index,
-                                                                                                    'time_limit_minutes',
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder="Time limit (min)"
-                                                                                            className="w-36"
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() =>
-                                                                                    removeStep(
-                                                                                        index,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    steps.length ===
-                                                                                    1
-                                                                                }
-                                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30"
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    </CardContent>
-                                                                </Card>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <DialogFooter className="mt-6">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setShowCreateDialog(
-                                                            false,
-                                                        );
-                                                        resetForm();
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={isSubmitting}
-                                                >
-                                                    {isSubmitting
-                                                        ? 'Creating...'
-                                                        : 'Create Playbook'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
+                                <Button onClick={() => setWizardOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create Playbook
+                                </Button>
                             ) : undefined
                         }
                     />
@@ -904,7 +271,7 @@ export default function PlaybooksIndex({
                                             size="sm"
                                             className="mt-3"
                                             onClick={() =>
-                                                setShowCreateDialog(true)
+                                                setWizardOpen(true)
                                             }
                                         >
                                             <Plus className="mr-1 h-3 w-3" />
@@ -1035,6 +402,16 @@ export default function PlaybooksIndex({
                     )}
                 </PageShell>
             </div>
+
+            {/* Guided playbook builder — mounted only while open so every run starts fresh. */}
+            {wizardOpen ? (
+                <PlaybookWizard
+                    open
+                    onClose={() => setWizardOpen(false)}
+                    categories={categories}
+                    stepTypes={stepTypes}
+                />
+            ) : null}
         </AppLayout>
     );
 }

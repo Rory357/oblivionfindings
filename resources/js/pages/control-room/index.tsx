@@ -18,6 +18,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
+    ChevronRight,
     AlertTriangle,
     Bell,
     Clock,
@@ -574,22 +575,43 @@ export default function ControlRoomIndex({
                         (f) => !(stats.critical > 0 && f.message.toLowerCase().includes('critical alert')),
                     );
                     if (!flags.length) return null;
+                    // Each flag deep-links to the view where you fix it.
+                    const FLAG_HREFS: Record<string, string> = {
+                        critical_alerts: '/control-room/alerts?severity=critical',
+                        unassigned: '/control-room/alerts?assigned_to=unassigned',
+                        high_escalation: '/control-room/escalations',
+                        stale_open: '/control-room/alerts?status=open&sort=triggered_at&dir=asc',
+                        sla_compliance: '/control-room/sla/breaches',
+                    };
                     return (
                         <Card className="mt-4 gap-0 py-0">
                             <div className="border-b border-border px-4 py-2.5 text-sm font-semibold text-foreground">
                                 What needs attention
                             </div>
                             <div className="divide-y divide-border/60">
-                                {flags.slice(0, 4).map((flag, i) => (
-                                    <div key={i} className="flex items-center gap-2.5 px-4 py-2 text-sm">
-                                        {flag.level === 'critical' ? (
-                                            <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
-                                        ) : (
-                                            <AlertCircle className="h-4 w-4 shrink-0 text-status-warning" />
-                                        )}
-                                        <span className="text-foreground">{flag.message}</span>
-                                    </div>
-                                ))}
+                                {flags.slice(0, 4).map((flag, i) => {
+                                    const href = FLAG_HREFS[flag.metric];
+                                    const inner = (
+                                        <>
+                                            {flag.level === 'critical' ? (
+                                                <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 shrink-0 text-status-warning" />
+                                            )}
+                                            <span className="flex-1 text-foreground">{flag.message}</span>
+                                            {href ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
+                                        </>
+                                    );
+                                    return href ? (
+                                        <Link key={i} href={href} className="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors hover:bg-muted/50">
+                                            {inner}
+                                        </Link>
+                                    ) : (
+                                        <div key={i} className="flex items-center gap-2.5 px-4 py-2 text-sm">
+                                            {inner}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </Card>
                     );

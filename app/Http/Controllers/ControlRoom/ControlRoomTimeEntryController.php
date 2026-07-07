@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\TimeEntry;
 use App\Models\ControlRoomAlert;
@@ -10,6 +11,8 @@ use Illuminate\Http\Request;
 
 class ControlRoomTimeEntryController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     /**
      * List time entries for an alert, including any running entry for the current user.
      */
@@ -66,6 +69,10 @@ class ControlRoomTimeEntryController extends Controller
             ->exists();
 
         if ($running) {
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors(['alert' => 'You already have a running timer on this alert.']);
+            }
+
             return response()->json(['message' => 'You already have a running timer on this alert.'], 422);
         }
 
@@ -74,6 +81,10 @@ class ControlRoomTimeEntryController extends Controller
             'user_id' => $user->id,
             'started_at' => now(),
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Timer started.');
+        }
 
         return response()->json([
             'entry' => [
@@ -92,6 +103,10 @@ class ControlRoomTimeEntryController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
         if (! $entry->isRunning()) {
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors(['alert' => 'This time entry is not running.']);
+            }
+
             return response()->json(['message' => 'This time entry is not running.'], 422);
         }
 
@@ -116,6 +131,10 @@ class ControlRoomTimeEntryController extends Controller
             'entry_id' => $entry->id,
             'duration_minutes' => $entry->duration_minutes,
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, "Timer stopped — {$entry->duration_minutes} min logged.");
+        }
 
         return response()->json([
             'entry' => [
@@ -167,6 +186,10 @@ class ControlRoomTimeEntryController extends Controller
             'duration_minutes' => $data['duration_minutes'],
         ]);
 
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Time logged.');
+        }
+
         return response()->json(['entry' => $entry], 201);
     }
 
@@ -191,6 +214,10 @@ class ControlRoomTimeEntryController extends Controller
             'alert_id' => $alertId,
             'entry_id' => $entryId,
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Time entry deleted.');
+        }
 
         return response()->json(['message' => 'Time entry deleted.']);
     }

@@ -4,7 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -878,7 +878,7 @@ function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => vo
     const form = useForm<{ priority: string; category: string; due_at: string; resolution_code: string }>({
         priority: a.priority ?? '',
         category: a.category ?? '',
-        due_at: a.due_at ? a.due_at.slice(0, 10) : '',
+        due_at: a.due_at ? a.due_at.slice(0, 16) : '',
         resolution_code: a.resolution_code ?? '',
     });
     const submit = () => {
@@ -914,7 +914,7 @@ function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => vo
                     <SelectInput value={form.data.category} onChange={(v) => form.setData('category', v)} placeholder="No category" options={d.config_options.categories ?? []} />
                 </Field>
                 <Field label="Due" hint="Internal target" error={form.errors.due_at}>
-                    <Input type="date" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
+                    <Input type="datetime-local" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
                 </Field>
                 <Field label="Resolution code" error={form.errors.resolution_code}>
                     <SelectInput value={form.data.resolution_code} onChange={(v) => form.setData('resolution_code', v)} placeholder="Not set" options={d.config_options.resolution_codes ?? []} />
@@ -1530,24 +1530,7 @@ function TasksSection({ d }: { d: AlertWorkspaceDetail }) {
             {d.tasks.length ? (
                 <div className="flex flex-col gap-2">
                     {d.tasks.map((t) => (
-                        <div key={t.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                            <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${TASK_STATUS_TONE[t.status] ?? 'text-muted-foreground'}`} />
-                            <div className="min-w-0 flex-1">
-                                <p className={`text-sm text-foreground ${t.status === 'completed' ? 'line-through opacity-70' : ''}`}>{t.title}</p>
-                                {t.description ? <p className="text-xs whitespace-pre-wrap text-muted-foreground">{t.description}</p> : null}
-                                <p className="text-xs text-muted-foreground">
-                                    {titleCase(t.status)} · {titleCase(t.priority)}
-                                    {t.assigned_to ? ` · ${t.assigned_to.name}` : ' · unassigned'}
-                                    {t.due_at ? ` · due ${formatDateTime(t.due_at)}` : ''}
-                                </p>
-                            </div>
-                            {d.can.manage && t.status !== 'completed' && t.status !== 'cancelled' ? (
-                                <div className="flex shrink-0 items-center gap-1.5">
-                                    <ConfirmChip label="Done" icon={Check} onConfirm={() => router.post(`/control-room/tasks/${t.id}/status`, { status: 'completed' }, { preserveScroll: true })} />
-                                    <ConfirmChip label="Remove" icon={Trash2} destructive onConfirm={() => router.delete(`/control-room/tasks/${t.id}`, { preserveScroll: true })} />
-                                </div>
-                            ) : null}
-                        </div>
+                        <TaskRow key={t.id} d={d} t={t} />
                     ))}
                 </div>
             ) : (
@@ -1557,6 +1540,147 @@ function TasksSection({ d }: { d: AlertWorkspaceDetail }) {
                 </div>
             )}
         </div>
+    );
+}
+
+function TaskRow({ d, t }: { d: AlertWorkspaceDetail; t: AlertWorkspaceDetail['tasks'][number] }) {
+    const [editing, setEditing] = useState(false);
+    const [addingSub, setAddingSub] = useState(false);
+    const live = t.status !== 'completed' && t.status !== 'cancelled';
+
+    return (
+        <div className="rounded-lg border border-border p-3">
+            <div className="flex items-start gap-3">
+                <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${TASK_STATUS_TONE[t.status] ?? 'text-muted-foreground'}`} />
+                <div className="min-w-0 flex-1">
+                    <p className={`text-sm text-foreground ${t.status === 'completed' ? 'line-through opacity-70' : ''}`}>{t.title}</p>
+                    {t.description ? <p className="text-xs whitespace-pre-wrap text-muted-foreground">{t.description}</p> : null}
+                    <p className="text-xs text-muted-foreground">
+                        {titleCase(t.status)} · {titleCase(t.priority)}
+                        {t.assigned_to ? ` · ${t.assigned_to.name}` : ' · unassigned'}
+                        {t.due_at ? ` · due ${formatDateTime(t.due_at)}` : ''}
+                    </p>
+                </div>
+                {d.can.manage && live ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                        <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)} title="Edit task">
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <ConfirmChip label="Done" icon={Check} onConfirm={() => router.post(`/control-room/tasks/${t.id}/status`, { status: 'completed' }, { preserveScroll: true })} />
+                        <ConfirmChip label="Remove" icon={Trash2} destructive onConfirm={() => router.delete(`/control-room/tasks/${t.id}`, { preserveScroll: true })} />
+                    </div>
+                ) : null}
+            </div>
+
+            {editing ? <EditTaskForm d={d} t={t} onDone={() => setEditing(false)} /> : null}
+
+            {/* Subtasks */}
+            {t.subtasks.length || (d.can.manage && live) ? (
+                <div className="mt-2 flex flex-col gap-1.5 border-l-2 border-border/60 pl-3">
+                    {t.subtasks.map((st) => (
+                        <div key={st.id} className="flex items-center gap-2 text-xs">
+                            <Check className={`h-3 w-3 shrink-0 ${st.status === 'completed' ? 'text-status-success' : 'text-muted-foreground/40'}`} />
+                            <span className={`min-w-0 flex-1 truncate ${st.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                {st.title}
+                                {st.assigned_to ? ` · ${st.assigned_to.name}` : ''}
+                            </span>
+                            {d.can.manage && st.status !== 'completed' && st.status !== 'cancelled' ? (
+                                <ConfirmChip label="Done" icon={Check} onConfirm={() => router.post(`/control-room/tasks/${st.id}/status`, { status: 'completed' }, { preserveScroll: true })} />
+                            ) : null}
+                        </div>
+                    ))}
+                    {d.can.manage && live ? (
+                        addingSub ? (
+                            <AddSubtaskForm alertId={d.alert.id} parentId={t.id} onDone={() => setAddingSub(false)} />
+                        ) : (
+                            <button type="button" onClick={() => setAddingSub(true)} className="self-start text-xs font-medium text-primary hover:underline">
+                                + Add subtask
+                            </button>
+                        )
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function EditTaskForm({ d, t, onDone }: { d: AlertWorkspaceDetail; t: AlertWorkspaceDetail['tasks'][number]; onDone: () => void }) {
+    const form = useForm<{ title: string; description: string; priority: string; assigned_to_user_id: string; due_at: string }>({
+        title: t.title,
+        description: t.description ?? '',
+        priority: t.priority,
+        assigned_to_user_id: t.assigned_to ? String(t.assigned_to.id) : '',
+        due_at: t.due_at ? t.due_at.slice(0, 10) : '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.transform((data) => ({
+            title: data.title,
+            description: data.description || null,
+            priority: data.priority,
+            assigned_to_user_id: data.assigned_to_user_id ? Number(data.assigned_to_user_id) : null,
+            due_at: data.due_at || null,
+        }));
+        form.put(`/control-room/tasks/${t.id}`, { preserveScroll: true, onSuccess: onDone });
+    };
+    return (
+        <form onSubmit={submit} className="mt-2 flex flex-col gap-2.5 rounded-xl border border-border bg-muted/30 p-3">
+            <Field label="Task" required>
+                <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+            </Field>
+            <Field label="Detail" hint="Optional">
+                <Textarea rows={2} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+            </Field>
+            <div className="grid gap-2.5 sm:grid-cols-3">
+                <Field label="Priority">
+                    <SelectInput
+                        value={form.data.priority}
+                        onChange={(v) => form.setData('priority', v)}
+                        placeholder="Priority"
+                        options={[
+                            { value: 'low', label: 'Low' },
+                            { value: 'medium', label: 'Medium' },
+                            { value: 'high', label: 'High' },
+                            { value: 'critical', label: 'Critical' },
+                        ]}
+                    />
+                </Field>
+                <Field label="Assign to">
+                    <SelectInput value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} placeholder="Unassigned" options={d.staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                </Field>
+                <Field label="Due">
+                    <Input type="date" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
+                </Field>
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={onDone}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={form.processing || !form.data.title.trim()}>Save task</Button>
+            </div>
+        </form>
+    );
+}
+
+function AddSubtaskForm({ alertId, parentId, onDone }: { alertId: number; parentId: number; onDone: () => void }) {
+    const form = useForm<{ title: string; priority: string; parent_task_id: number }>({ title: '', priority: 'medium', parent_task_id: parentId });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.title.trim()) return;
+        form.post(`/control-room/alerts/${alertId}/tasks`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                onDone();
+            },
+        });
+    };
+    return (
+        <form onSubmit={submit} className="flex items-center gap-2">
+            <Input className="h-8 flex-1 text-xs" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Subtask…" />
+            <Button type="submit" size="sm" disabled={form.processing || !form.data.title.trim()}>Add</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={onDone} aria-label="Cancel subtask">
+                <X className="h-3.5 w-3.5" />
+            </Button>
+        </form>
     );
 }
 
@@ -1694,16 +1818,115 @@ function ActivitySection({ d }: { d: AlertWorkspaceDetail }) {
                 )}
             </div>
 
-            {d.time_entries.length || d.time_spent_minutes ? (
-                <div>
-                    <p className="mb-2 text-sm font-semibold text-foreground">Time on this alert</p>
-                    <p className="text-xs text-muted-foreground">
-                        {d.time_spent_minutes} minute{d.time_spent_minutes === 1 ? '' : 's'} logged
-                        {d.time_entries.some((t) => t.is_running) ? ' · timer running' : ''}
-                    </p>
-                </div>
-            ) : null}
+            <TimeTracking d={d} />
         </div>
+    );
+}
+
+/* --- Time tracking ---------------------------------------------------- */
+
+function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
+    const authUserId = (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id;
+    const [logging, setLogging] = useState(false);
+    const myRunning = d.time_entries.find((t) => t.is_running && t.user_id === authUserId);
+    const alertId = d.alert.id;
+
+    if (!d.can.manage) {
+        return d.time_spent_minutes ? (
+            <p className="text-xs text-muted-foreground">{d.time_spent_minutes} min logged on this alert.</p>
+        ) : null;
+    }
+
+    return (
+        <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                    Time on this alert
+                    <span className="ml-2 font-normal text-muted-foreground">{d.time_spent_minutes} min logged</span>
+                </p>
+                <div className="flex items-center gap-1.5">
+                    {myRunning ? (
+                        <ConfirmChip
+                            label="Stop timer"
+                            icon={Timer}
+                            onConfirm={() => router.post(`/control-room/time-entries/${myRunning.id}/stop`, {}, { preserveScroll: true })}
+                            title={`Running since ${myRunning.started_at ? formatDateTime(myRunning.started_at) : '—'}`}
+                        />
+                    ) : (
+                        <ConfirmChip
+                            label="Start timer"
+                            icon={Timer}
+                            onConfirm={() => router.post(`/control-room/alerts/${alertId}/time-entries/start`, {}, { preserveScroll: true })}
+                            title="Starts a live timer for you on this alert"
+                        />
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setLogging((v) => !v)}>
+                        <Plus className="mr-1.5 h-3.5 w-3.5" /> Log time
+                    </Button>
+                </div>
+            </div>
+
+            {myRunning ? (
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <Timer className="h-3.5 w-3.5" /> Your timer is running (started {myRunning.started_at ? formatDateTime(myRunning.started_at) : '—'}).
+                </p>
+            ) : null}
+
+            {logging ? <LogTimeForm alertId={alertId} onDone={() => setLogging(false)} /> : null}
+
+            {d.time_entries.length ? (
+                <div className="mt-2 flex flex-col gap-1.5">
+                    {d.time_entries.map((t) => (
+                        <div key={t.id} className="flex items-center gap-2.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs">
+                            <Timer className={`h-3.5 w-3.5 shrink-0 ${t.is_running ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="min-w-0 flex-1 truncate text-foreground">
+                                {t.is_running ? 'Running' : `${t.duration_minutes ?? 0} min`} · {t.user_name}
+                                {t.description ? ` — ${t.description}` : ''}
+                            </span>
+                            <span className="shrink-0 text-muted-foreground">{formatDateTime(t.created_at)}</span>
+                            {!t.is_running ? (
+                                <ConfirmChip label="Remove" icon={Trash2} destructive onConfirm={() => router.delete(`/control-room/time-entries/${t.id}`, { preserveScroll: true })} />
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-xs text-muted-foreground">No time logged yet — start the timer while you work, or log minutes afterwards.</p>
+            )}
+        </div>
+    );
+}
+
+function LogTimeForm({ alertId, onDone }: { alertId: number; onDone: () => void }) {
+    const form = useForm<{ duration_minutes: string; description: string }>({ duration_minutes: '', description: '' });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.transform((data) => ({ duration_minutes: Number(data.duration_minutes), description: data.description || null }));
+        form.post(`/control-room/alerts/${alertId}/time-entries`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                onDone();
+            },
+        });
+    };
+    return (
+        <form onSubmit={submit} className="mb-2 flex flex-col gap-2.5 rounded-xl border border-border bg-muted/30 p-3">
+            <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field label="Minutes" required error={(form.errors as Record<string, string | undefined>).duration_minutes}>
+                    <Input type="number" min={1} value={form.data.duration_minutes} onChange={(e) => form.setData('duration_minutes', e.target.value)} placeholder="e.g. 15" />
+                </Field>
+                <Field label="What was it spent on?" hint="Optional">
+                    <Input value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} placeholder="e.g. Phone call with the family" />
+                </Field>
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={onDone}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={form.processing || !form.data.duration_minutes || Number(form.data.duration_minutes) < 1}>
+                    Log time
+                </Button>
+            </div>
+        </form>
     );
 }
 
@@ -1751,20 +1974,11 @@ function DiscussionThread({ d, thread }: { d: AlertWorkspaceDetail; thread: Aler
     const [replying, setReplying] = useState(false);
     return (
         <div className="rounded-lg border border-border p-2.5">
-            <p className="text-sm whitespace-pre-wrap text-foreground">{thread.content}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-                {thread.user.name} · {formatDateTime(thread.created_at)}
-                {thread.edited_at ? ' · edited' : ''}
-            </p>
+            <DiscussionEntry entry={thread} canManage={d.can.manage} />
             {thread.replies.length ? (
                 <div className="mt-2 flex flex-col gap-1.5 border-l-2 border-border pl-3">
                     {thread.replies.map((r) => (
-                        <div key={r.id}>
-                            <p className="text-sm whitespace-pre-wrap text-foreground">{r.content}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {r.user.name} · {formatDateTime(r.created_at)}
-                            </p>
-                        </div>
+                        <DiscussionEntry key={r.id} entry={r} canManage={d.can.manage} />
                     ))}
                 </div>
             ) : null}
@@ -1779,6 +1993,56 @@ function DiscussionThread({ d, thread }: { d: AlertWorkspaceDetail; thread: Aler
                     </button>
                 )
             ) : null}
+        </div>
+    );
+}
+
+/** One comment or reply — the author can edit it in place; author or a manager can delete. */
+function DiscussionEntry({ entry, canManage }: { entry: { id: number; content: string; user: UserRef; edited_at: string | null; created_at: string }; canManage: boolean }) {
+    const authUserId = (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id;
+    const isOwner = entry.user.id === authUserId;
+    const deleted = entry.content === '[deleted]';
+    const [editing, setEditing] = useState(false);
+    const form = useForm<{ content: string }>({ content: entry.content });
+
+    const save = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.content.trim()) return;
+        form.put(`/control-room/discussions/${entry.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setEditing(false),
+        });
+    };
+
+    if (editing) {
+        return (
+            <form onSubmit={save} className="flex items-start gap-2">
+                <Textarea rows={2} className="flex-1" value={form.data.content} onChange={(e) => form.setData('content', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <Button type="submit" size="sm" disabled={form.processing || !form.data.content.trim()}>Save</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { form.setData('content', entry.content); setEditing(false); }}>Cancel</Button>
+                </div>
+            </form>
+        );
+    }
+
+    return (
+        <div>
+            <p className={`text-sm whitespace-pre-wrap ${deleted ? 'text-muted-foreground italic' : 'text-foreground'}`}>{entry.content}</p>
+            <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                    {entry.user.name} · {formatDateTime(entry.created_at)}
+                    {entry.edited_at ? ' · edited' : ''}
+                </span>
+                {!deleted && isOwner ? (
+                    <button type="button" onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">
+                        Edit
+                    </button>
+                ) : null}
+                {!deleted && (isOwner || canManage) ? (
+                    <ConfirmChip label="Delete" icon={Trash2} destructive onConfirm={() => router.delete(`/control-room/discussions/${entry.id}`, { preserveScroll: true })} />
+                ) : null}
+            </p>
         </div>
     );
 }

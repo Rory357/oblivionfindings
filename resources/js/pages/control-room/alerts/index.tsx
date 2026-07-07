@@ -463,7 +463,11 @@ export default function AlertsIndex({
                             <SelectItem value="personal_tracker">
                                 Tracker
                             </SelectItem>
+                            <SelectItem value="sensor">Sensor</SelectItem>
                             <SelectItem value="manual">Manual</SelectItem>
+                            <SelectItem value="control_room">
+                                Control Room
+                            </SelectItem>
                             <SelectItem value="external">External</SelectItem>
                             <SelectItem value="compliance">
                                 Compliance

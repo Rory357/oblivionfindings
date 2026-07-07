@@ -1,4 +1,5 @@
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
+import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -214,51 +215,7 @@ export default function PlaybookShow({
     stepTypes,
     can,
 }: Props) {
-    const [editing, setEditing] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Edit form state
-    const [editName, setEditName] = useState(playbook.name);
-    const [editDescription, setEditDescription] = useState(
-        playbook.description ?? '',
-    );
-    const [editCategory, setEditCategory] = useState(playbook.category);
-    const [editAutoAttach, setEditAutoAttach] = useState(playbook.auto_attach);
-    const [editRequiresApproval, setEditRequiresApproval] = useState(
-        playbook.requires_approval,
-    );
-    const [editSlaAck, setEditSlaAck] = useState(
-        playbook.sla_acknowledge_minutes?.toString() ?? '',
-    );
-    const [editSlaResponse, setEditSlaResponse] = useState(
-        playbook.sla_response_minutes?.toString() ?? '',
-    );
-    const [editSlaResolution, setEditSlaResolution] = useState(
-        playbook.sla_resolution_minutes?.toString() ?? '',
-    );
-    const [editRequiredEvidence, setEditRequiredEvidence] = useState<string[]>(
-        playbook.required_evidence ?? [],
-    );
-    const [editSteps, setEditSteps] = useState<StepEditForm[]>(
-        playbook.steps.map((s) => ({
-            id: s.id,
-            title: s.title,
-            type: s.type,
-            instructions: s.instructions ?? '',
-            is_required: s.is_required,
-            is_blocking: s.is_blocking,
-            time_limit_minutes: s.time_limit_minutes?.toString() ?? '',
-        })),
-    );
-
-    const evidenceOptions = [
-        'photo',
-        'video',
-        'document',
-        'signature',
-        'witness_statement',
-        'incident_report',
-    ];
+    const [wizardOpen, setWizardOpen] = useState(false);
 
     const catConfig =
         categoryConfig[playbook.category] ?? categoryConfig.maintenance;
@@ -269,125 +226,6 @@ export default function PlaybookShow({
             `/control-room/playbooks/${playbook.id}/toggle-active`,
             {},
             { preserveScroll: true },
-        );
-    };
-
-    const startEditing = () => {
-        setEditName(playbook.name);
-        setEditDescription(playbook.description ?? '');
-        setEditCategory(playbook.category);
-        setEditAutoAttach(playbook.auto_attach);
-        setEditRequiresApproval(playbook.requires_approval);
-        setEditSlaAck(playbook.sla_acknowledge_minutes?.toString() ?? '');
-        setEditSlaResponse(playbook.sla_response_minutes?.toString() ?? '');
-        setEditSlaResolution(playbook.sla_resolution_minutes?.toString() ?? '');
-        setEditRequiredEvidence(playbook.required_evidence ?? []);
-        setEditSteps(
-            playbook.steps.map((s) => ({
-                id: s.id,
-                title: s.title,
-                type: s.type,
-                instructions: s.instructions ?? '',
-                is_required: s.is_required,
-                is_blocking: s.is_blocking,
-                time_limit_minutes: s.time_limit_minutes?.toString() ?? '',
-            })),
-        );
-        setEditing(true);
-    };
-
-    const cancelEditing = () => {
-        setEditing(false);
-    };
-
-    const addEditStep = () => {
-        setEditSteps([
-            ...editSteps,
-            {
-                id: null,
-                title: '',
-                type: 'task',
-                instructions: '',
-                is_required: true,
-                is_blocking: false,
-                time_limit_minutes: '',
-            },
-        ]);
-    };
-
-    const removeEditStep = (index: number) => {
-        if (editSteps.length > 1) {
-            setEditSteps(editSteps.filter((_, i) => i !== index));
-        }
-    };
-
-    const updateEditStep = (
-        index: number,
-        field: keyof StepEditForm,
-        value: string | boolean | number | null,
-    ) => {
-        const updated = [...editSteps];
-        (updated[index] as any)[field] = value;
-        setEditSteps(updated);
-    };
-
-    const moveEditStep = (index: number, direction: 'up' | 'down') => {
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= editSteps.length) return;
-        const updated = [...editSteps];
-        [updated[index], updated[newIndex]] = [
-            updated[newIndex],
-            updated[index],
-        ];
-        setEditSteps(updated);
-    };
-
-    const toggleEditEvidence = (type: string) => {
-        setEditRequiredEvidence((prev) =>
-            prev.includes(type)
-                ? prev.filter((t) => t !== type)
-                : [...prev, type],
-        );
-    };
-
-    const handleSave = (e: FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        router.put(
-            `/control-room/playbooks/${playbook.id}`,
-            {
-                name: editName,
-                description: editDescription || null,
-                category: editCategory,
-                auto_attach: editAutoAttach,
-                requires_approval: editRequiresApproval,
-                sla_acknowledge_minutes: editSlaAck
-                    ? parseInt(editSlaAck)
-                    : null,
-                sla_response_minutes: editSlaResponse
-                    ? parseInt(editSlaResponse)
-                    : null,
-                sla_resolution_minutes: editSlaResolution
-                    ? parseInt(editSlaResolution)
-                    : null,
-                required_evidence: editRequiredEvidence,
-                steps: editSteps.map((s) => ({
-                    id: s.id,
-                    title: s.title,
-                    type: s.type,
-                    instructions: s.instructions || null,
-                    is_required: s.is_required,
-                    is_blocking: s.is_blocking,
-                    time_limit_minutes: s.time_limit_minutes
-                        ? parseInt(s.time_limit_minutes)
-                        : null,
-                })),
-            },
-            {
-                onSuccess: () => setEditing(false),
-                onFinish: () => setIsSubmitting(false),
-            },
         );
     };
 
@@ -445,444 +283,20 @@ export default function PlaybookShow({
                                         onConfirm={toggleActive}
                                         title={playbook.is_active ? 'Stop this playbook auto-attaching to new alerts' : 'Make this playbook available'}
                                     />
-                                    {!editing ? (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={startEditing}
-                                        >
-                                            <Pencil className="mr-1 h-3 w-3" />
-                                            Edit
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={cancelEditing}
-                                        >
-                                            <X className="mr-1 h-3 w-3" />
-                                            Cancel
-                                        </Button>
-                                    )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setWizardOpen(true)}
+                                    >
+                                        <Pencil className="mr-1 h-3 w-3" />
+                                        Edit
+                                    </Button>
                                 </div>
                             ) : undefined
                         }
                     />
 
-                    {editing ? (
-                        /* ==================== EDIT MODE ==================== */
-                        <form onSubmit={handleSave} className="space-y-6">
-                            {/* Basic Info */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Playbook Details
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="space-y-2 sm:col-span-2">
-                                            <Label>Name *</Label>
-                                            <Input
-                                                value={editName}
-                                                onChange={(e) =>
-                                                    setEditName(e.target.value)
-                                                }
-                                                required
-                                            />
-                                        </div>
-                                        <div className="space-y-2 sm:col-span-2">
-                                            <Label>Description</Label>
-                                            <Textarea
-                                                value={editDescription}
-                                                onChange={(e) =>
-                                                    setEditDescription(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                rows={2}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Category *</Label>
-                                            <Select
-                                                value={editCategory}
-                                                onValueChange={setEditCategory}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {Object.entries(
-                                                        categories,
-                                                    ).map(([k, v]) => (
-                                                        <SelectItem
-                                                            key={k}
-                                                            value={k}
-                                                        >
-                                                            {v}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="flex items-end gap-6">
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    checked={editAutoAttach}
-                                                    onCheckedChange={
-                                                        setEditAutoAttach
-                                                    }
-                                                />
-                                                <Label>Auto-attach</Label>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    checked={
-                                                        editRequiresApproval
-                                                    }
-                                                    onCheckedChange={
-                                                        setEditRequiresApproval
-                                                    }
-                                                />
-                                                <Label>Requires Approval</Label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* SLA Targets */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        SLA Targets (minutes)
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid gap-3 sm:grid-cols-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-muted-foreground">
-                                                Acknowledge
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                value={editSlaAck}
-                                                onChange={(e) =>
-                                                    setEditSlaAck(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-muted-foreground">
-                                                Response
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                value={editSlaResponse}
-                                                onChange={(e) =>
-                                                    setEditSlaResponse(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-muted-foreground">
-                                                Resolution
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                value={editSlaResolution}
-                                                onChange={(e) =>
-                                                    setEditSlaResolution(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Required Evidence */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Required Evidence
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex flex-wrap gap-2">
-                                        {evidenceOptions.map((type) => (
-                                            <Button
-                                                key={type}
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    toggleEditEvidence(type)
-                                                }
-                                                className={`rounded-full px-3 text-xs ${
-                                                    editRequiredEvidence.includes(
-                                                        type,
-                                                    )
-                                                        ? 'border-primary bg-primary/10 text-primary'
-                                                        : 'border-border text-muted-foreground hover:bg-muted'
-                                                }`}
-                                            >
-                                                {type.replace(/_/g, ' ')}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Steps Editor */}
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            Steps
-                                        </CardTitle>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={addEditStep}
-                                        >
-                                            <Plus className="mr-1 h-3 w-3" />
-                                            Add Step
-                                        </Button>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {editSteps.map((step, index) => (
-                                        <Card
-                                            key={index}
-                                            className="border-dashed"
-                                        >
-                                            <CardContent className="pt-4">
-                                                <div className="flex items-start gap-2">
-                                                    <div className="flex flex-col items-center gap-1 pt-1">
-                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                                            {index + 1}
-                                                        </span>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                moveEditStep(
-                                                                    index,
-                                                                    'up',
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                index === 0
-                                                            }
-                                                            className="h-5 w-5 text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                                        >
-                                                            <ChevronUp className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                moveEditStep(
-                                                                    index,
-                                                                    'down',
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                index ===
-                                                                editSteps.length -
-                                                                    1
-                                                            }
-                                                            className="h-5 w-5 text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                                        >
-                                                            <ChevronDown className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                    <div className="flex-1 space-y-3">
-                                                        <div className="grid gap-3 sm:grid-cols-2">
-                                                            <Input
-                                                                value={
-                                                                    step.title
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateEditStep(
-                                                                        index,
-                                                                        'title',
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="Step title *"
-                                                                required
-                                                            />
-                                                            <Select
-                                                                value={
-                                                                    step.type
-                                                                }
-                                                                onValueChange={(
-                                                                    v,
-                                                                ) =>
-                                                                    updateEditStep(
-                                                                        index,
-                                                                        'type',
-                                                                        v,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <SelectTrigger>
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {Object.entries(
-                                                                        stepTypes,
-                                                                    ).map(
-                                                                        ([
-                                                                            k,
-                                                                            v,
-                                                                        ]) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    k
-                                                                                }
-                                                                                value={
-                                                                                    k
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    v
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <Textarea
-                                                            value={
-                                                                step.instructions
-                                                            }
-                                                            onChange={(e) =>
-                                                                updateEditStep(
-                                                                    index,
-                                                                    'instructions',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Instructions..."
-                                                            rows={2}
-                                                        />
-                                                        <div className="flex flex-wrap items-center gap-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <Switch
-                                                                    checked={
-                                                                        step.is_required
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        v,
-                                                                    ) =>
-                                                                        updateEditStep(
-                                                                            index,
-                                                                            'is_required',
-                                                                            v,
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <span className="text-xs">
-                                                                    Required
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Switch
-                                                                    checked={
-                                                                        step.is_blocking
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        v,
-                                                                    ) =>
-                                                                        updateEditStep(
-                                                                            index,
-                                                                            'is_blocking',
-                                                                            v,
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <span className="text-xs">
-                                                                    Blocking
-                                                                </span>
-                                                            </div>
-                                                            <Input
-                                                                type="number"
-                                                                min={1}
-                                                                value={
-                                                                    step.time_limit_minutes
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateEditStep(
-                                                                        index,
-                                                                        'time_limit_minutes',
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="Time limit (min)"
-                                                                className="w-36"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            removeEditStep(
-                                                                index,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            editSteps.length ===
-                                                            1
-                                                        }
-                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive disabled:opacity-30"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </CardContent>
-                            </Card>
-
-                            <div className="flex justify-end gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={cancelEditing}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting}>
-                                    <Save className="mr-1 h-4 w-4" />
-                                    {isSubmitting
-                                        ? 'Saving...'
-                                        : 'Save Changes'}
-                                </Button>
-                            </div>
-                        </form>
-                    ) : (
+                    {(
                         /* ==================== VIEW MODE ==================== */
                         <div className="space-y-6">
                             {/* Info Cards Row */}
@@ -1287,6 +701,38 @@ export default function PlaybookShow({
                     )}
                 </PageShell>
             </div>
+
+            {/* Guided playbook editor — basics → steps → automation → review.
+                Mounted only while open so every run starts fresh. */}
+            {wizardOpen ? (
+                <PlaybookWizard
+                    open
+                    onClose={() => setWizardOpen(false)}
+                    categories={categories}
+                    stepTypes={stepTypes}
+                    playbook={{
+                        id: playbook.id,
+                        name: playbook.name,
+                        description: playbook.description ?? '',
+                        category: playbook.category,
+                        auto_attach: playbook.auto_attach,
+                        requires_approval: playbook.requires_approval,
+                        sla_acknowledge_minutes: playbook.sla_acknowledge_minutes?.toString() ?? '',
+                        sla_response_minutes: playbook.sla_response_minutes?.toString() ?? '',
+                        sla_resolution_minutes: playbook.sla_resolution_minutes?.toString() ?? '',
+                        required_evidence: playbook.required_evidence ?? [],
+                        steps: playbook.steps.map((s) => ({
+                            id: s.id,
+                            title: s.title,
+                            type: s.type,
+                            instructions: s.instructions ?? '',
+                            is_required: s.is_required,
+                            is_blocking: s.is_blocking,
+                            time_limit_minutes: s.time_limit_minutes?.toString() ?? '',
+                        })),
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

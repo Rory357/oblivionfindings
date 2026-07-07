@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertDiscussion;
 use App\Models\ControlRoomAlert;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 
 class ControlRoomDiscussionController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     /**
      * Return threaded discussions for an alert.
      */
@@ -103,6 +106,10 @@ class ControlRoomDiscussionController extends Controller
             'type' => $discussion->type,
         ]);
 
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Comment posted.');
+        }
+
         return response()->json(['discussion' => $discussion], 201);
     }
 
@@ -128,6 +135,10 @@ class ControlRoomDiscussionController extends Controller
             'discussion_id' => $discussion->id,
         ]);
 
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Comment updated.');
+        }
+
         return response()->json(['discussion' => $discussion->fresh()]);
     }
 
@@ -150,6 +161,10 @@ class ControlRoomDiscussionController extends Controller
             'alert_id' => $discussion->alert_id,
             'discussion_id' => $discussion->id,
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Comment deleted.');
+        }
 
         return response()->json(['message' => 'Discussion deleted.']);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertWatcher;
 use App\Models\ControlRoomAlert;
@@ -10,6 +11,8 @@ use Illuminate\Http\Request;
 
 class ControlRoomWatcherController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     /**
      * List watchers for an alert.
      */
@@ -52,6 +55,10 @@ class ControlRoomWatcherController extends Controller
             ->exists();
 
         if ($exists) {
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors(['alert' => 'User is already watching this alert.']);
+            }
+
             return response()->json(['message' => 'User is already watching this alert.'], 422);
         }
 
@@ -67,6 +74,10 @@ class ControlRoomWatcherController extends Controller
             'alert_id' => $alert->id,
             'watcher_user_id' => $data['user_id'],
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return $this->inertiaOrJson($request, 'Watcher added.');
+        }
 
         return response()->json(['watcher' => $watcher], 201);
     }
@@ -87,7 +98,7 @@ class ControlRoomWatcherController extends Controller
             $existing->delete();
             $alert->decrement('watchers_count');
 
-            return response()->json(['watching' => false]);
+            return $this->inertiaOrJson($request, 'Stopped watching this alert.', ['watching' => false]);
         }
 
         AlertWatcher::create([
@@ -98,7 +109,7 @@ class ControlRoomWatcherController extends Controller
 
         $alert->increment('watchers_count');
 
-        return response()->json(['watching' => true]);
+        return $this->inertiaOrJson($request, 'Watching this alert.', ['watching' => true]);
     }
 
     /**
