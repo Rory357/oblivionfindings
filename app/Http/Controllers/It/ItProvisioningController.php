@@ -793,6 +793,7 @@ class ItProvisioningController extends Controller
             'awaiting_lane' => [],
             'aging_lane' => [],
             'unassigned_by_priority' => ['urgent' => 0, 'high' => 0, 'normal' => 0, 'low' => 0],
+            'recent_activity' => [],
         ];
 
         if (! Schema::hasTable('it_tickets')) {
@@ -880,7 +881,43 @@ class ItProvisioningController extends Controller
                 'normal' => (int) ($byPriority->normal ?? 0),
                 'low' => (int) ($byPriority->low ?? 0),
             ],
+            'recent_activity' => $this->recentActivity($tenantId),
         ];
+    }
+
+    /**
+     * §F1 recent-activity feed — the latest ticket events across the tenant,
+     * humanised on the client. Ticket subjects only (each row deep-links to a
+     * ticket); provisioning events stay on their own request rows. `subject`
+     * is loaded via the morph so a deleted ticket drops out rather than 500s.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function recentActivity(int $tenantId): array
+    {
+        if (! Schema::hasTable('it_ticket_events')) {
+            return [];
+        }
+
+        return ItTicketEvent::query()
+            ->where('tenant_id', $tenantId)
+            ->where('subject_type', 'it_ticket')
+            ->with(['actor:id,name', 'subject'])
+            ->latest('created_at')
+            ->limit(8)
+            ->get()
+            ->filter(fn (ItTicketEvent $e) => $e->subject !== null)
+            ->map(fn (ItTicketEvent $e) => [
+                'id' => $e->id,
+                'type' => $e->type,
+                'payload' => $e->payload,
+                'actor' => $e->actor?->name,
+                'ticket_id' => $e->subject_id,
+                'reference' => $e->subject?->reference,
+                'at' => $e->created_at?->diffForHumans(short: true),
+            ])
+            ->values()
+            ->all();
     }
 
     /** @param array<int, string> $allowed */

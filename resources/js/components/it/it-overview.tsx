@@ -5,11 +5,20 @@
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { router } from '@inertiajs/react';
 import {
+    Activity,
     AlarmClock,
+    CheckCircle2,
     Clock,
+    Eye,
+    Flag,
     Inbox,
+    Play,
+    Plus,
+    RotateCcw,
     Timer,
     TriangleAlert,
+    UserCog,
+    XCircle,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -43,12 +52,23 @@ interface AgingLaneRow {
     age: string | null;
 }
 
+interface ActivityRow {
+    id: number;
+    type: string;
+    payload: Record<string, unknown> | null;
+    actor: string | null;
+    ticket_id: number;
+    reference: string | null;
+    at: string | null;
+}
+
 export interface OverviewPayload {
     avg_first_response_mins: number | null;
     sla_lane: SlaLaneRow[];
     awaiting_lane: AwaitingLaneRow[];
     aging_lane: AgingLaneRow[];
     unassigned_by_priority: Record<string, number>;
+    recent_activity: ActivityRow[];
 }
 
 interface OverviewKpis {
@@ -203,6 +223,110 @@ export function ItOverview({
                     </div>
                 </div>
             </div>
+
+            <ActivityFeed rows={overview.recent_activity} onOpenTicket={onOpenTicket} />
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Recent activity                                                   */
+/* ------------------------------------------------------------------ */
+
+const ACTIVITY_ICON: Record<string, LucideIcon> = {
+    created: Plus,
+    assigned: UserCog,
+    status_changed: Play,
+    priority_changed: Flag,
+    sla_at_risk: TriangleAlert,
+    sla_breached: TriangleAlert,
+    sla_escalated: TriangleAlert,
+    resolved: CheckCircle2,
+    closed: XCircle,
+    reopened: RotateCcw,
+    watcher_added: Eye,
+    watcher_removed: Eye,
+};
+
+/** Compact past-tense phrase for the feed line (payload-aware where it helps). */
+function activityVerb(type: string, payload: Record<string, unknown> | null): string {
+    const to = payload && typeof payload.to === 'string' ? label(payload.to) : null;
+    switch (type) {
+        case 'created':
+            return 'raised this ticket';
+        case 'assigned':
+            return 'reassigned this ticket';
+        case 'status_changed':
+            return to ? `moved it to ${to}` : 'changed the status';
+        case 'priority_changed':
+            return to ? `set priority ${to}` : 'changed the priority';
+        case 'sla_at_risk':
+            return 'flagged SLA at risk';
+        case 'sla_breached':
+            return 'SLA breached';
+        case 'sla_escalated':
+            return 'escalated to admins';
+        case 'resolved':
+            return 'resolved this ticket';
+        case 'closed':
+            return 'closed this ticket';
+        case 'reopened':
+            return 'reopened this ticket';
+        case 'watcher_added':
+            return 'started watching';
+        case 'watcher_removed':
+            return 'stopped watching';
+        default:
+            return label(type).toLowerCase();
+    }
+}
+
+function ActivityFeed({
+    rows,
+    onOpenTicket,
+}: {
+    rows: ActivityRow[];
+    onOpenTicket: (id: number) => void;
+}) {
+    return (
+        <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="mb-2 flex items-center gap-2">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                    <Activity className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-[13px] font-bold">Recent activity</span>
+            </div>
+            {rows.length === 0 ? (
+                <p className="px-1 py-4 text-center text-[12px] text-muted-foreground">
+                    No ticket activity yet — it lands here as agents work the queue.
+                </p>
+            ) : (
+                <div className="flex flex-col">
+                    {rows.map((row) => {
+                        const Icon = ACTIVITY_ICON[row.type] ?? Timer;
+                        return (
+                            <button
+                                key={row.id}
+                                type="button"
+                                onClick={() => onOpenTicket(row.ticket_id)}
+                                className="flex items-center gap-2.5 border-b border-border/55 py-2 text-left last:border-0 hover:bg-muted/40"
+                            >
+                                <span className="grid h-6 w-6 flex-none place-items-center rounded-md bg-muted text-muted-foreground">
+                                    <Icon className="h-3 w-3" />
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-[12.5px]">
+                                    <span className="font-semibold">{row.actor ?? 'System'}</span>{' '}
+                                    <span className="text-muted-foreground">{activityVerb(row.type, row.payload)}</span>
+                                    {row.reference ? (
+                                        <span className="text-muted-foreground"> · {row.reference}</span>
+                                    ) : null}
+                                </span>
+                                <span className="flex-none text-[11px] text-muted-foreground">{row.at ?? ''}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

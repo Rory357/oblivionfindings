@@ -197,3 +197,23 @@ test('the overview board serves agents needs-attention lanes and hides from requ
         ->assertOk()
         ->assertInertia(fn ($page) => $page->missing('overview'));
 });
+
+test('the overview activity feed surfaces recent ticket events for agents', function () {
+    // Raise a ticket through the real write path → a `created` event lands.
+    $this->actingAs($this->hr)
+        ->post('/it/tickets', [
+            'title' => 'Feed fixture',
+            'category' => 'other',
+            'priority' => 'normal',
+        ])
+        ->assertRedirect();
+
+    $this->actingAs($this->hr)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('overview.recent_activity', 1)
+            ->where('overview.recent_activity.0.type', 'created')
+            ->where('overview.recent_activity.0.actor', $this->hr->name)
+            ->where('overview.recent_activity.0.reference', 'IT-000001'));
+});
