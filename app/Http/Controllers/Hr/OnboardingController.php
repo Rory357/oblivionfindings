@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\OnboardingOwnerReassignedNotification;
 use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OnboardingService;
@@ -23,6 +24,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class OnboardingController extends Controller
@@ -566,7 +568,25 @@ class OnboardingController extends Controller
             'owner_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
+        $previousOwnerId = $checklist->created_by;
         $checklist->update(['created_by' => $validated['owner_id']]);
+
+        // The new owner inherits responsibility for driving the checklist —
+        // tell them, unless they reassigned it to themselves.
+        if ($validated['owner_id'] !== $user->id && $validated['owner_id'] !== $previousOwnerId) {
+            $newOwner = User::find($validated['owner_id']);
+            if ($newOwner) {
+                try {
+                    $newOwner->notify(new OnboardingOwnerReassignedNotification($checklist->fresh()->loadMissing('employeeProfile.user')));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send onboarding owner-reassigned notification', [
+                        'checklist_id' => $checklist->id,
+                        'owner_id' => $validated['owner_id'],
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
 
         return redirect()->back()->with('success', 'Checklist owner reassigned.');
     }

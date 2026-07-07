@@ -17,6 +17,7 @@ use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\ItProvisioningRequest;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -387,6 +388,13 @@ class OnboardingService
                 HrOnboardingTask::where('id', $id)->update(['sort_order' => $order++]);
             }
         });
+
+        // The sort_order writes above are mass query updates (no Eloquent
+        // events → AuditableChanges never fires), so record the reorder as a
+        // single summary entry rather than one noisy row per task.
+        AuditLogger::log('onboardingchecklist.tasks_reordered', $checklist, [
+            'ordered_task_ids' => array_values(array_map('intval', $orderedIds)),
+        ]);
     }
 
     /**
