@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class HrCalendarEventAttachment extends Model
 {
+    use AuditableChanges;
+
     protected $table = 'hr_calendar_event_attachments';
 
     protected $fillable = [

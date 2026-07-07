@@ -11,9 +11,13 @@ use App\Domain\Hr\Models\HrCalendarEventCategory;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Notifications\CalendarEventInviteNotification;
+use App\Domain\Hr\Notifications\CalendarEventRsvpNotification;
 use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -260,8 +264,9 @@ class CalendarController extends Controller
             ...$data,
         ]);
 
-        $this->syncAttendees($event, $audienceType, $audienceUserIds);
+        $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
         $this->syncReminders($event, $reminders);
+        $this->notifyNewInvitees($event, $newInvitees);
 
         // Flash the new id so the wizard can upload any staged attachments to it.
         return redirect()->back()
@@ -409,7 +414,8 @@ class CalendarController extends Controller
         $event->update($data);
 
         if ($audienceProvided) {
-            $this->syncAttendees($event, $audienceType, $audienceUserIds);
+            $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
+            $this->notifyNewInvitees($event, $newInvitees);
         }
         if ($remindersProvided) {
             $this->syncReminders($event, $reminders);
@@ -451,10 +457,14 @@ class CalendarController extends Controller
      *
      * @param  list<int>  $userIds
      */
-    private function syncAttendees(HrCalendarEvent $event, ?string $audienceType, array $userIds): void
+    /**
+     * @return array<int, int> User ids newly added to the invite list (so the
+     *                         caller can notify them — re-syncs don't re-invite).
+     */
+    private function syncAttendees(HrCalendarEvent $event, ?string $audienceType, array $userIds): array
     {
         if ($audienceType === null) {
-            return;
+            return [];
         }
 
         if ($audienceType !== 'people') {
@@ -470,7 +480,7 @@ class CalendarController extends Controller
                 'rsvp_status' => 'none',
             ]);
 
-            return;
+            return [];
         }
 
         $userIds = array_values(array_unique(array_map('intval', $userIds)));
@@ -483,12 +493,42 @@ class CalendarController extends Controller
             ->delete();
 
         $existing = $event->attendees()->where('audience_type', 'person')->pluck('user_id')->all();
+        $added = [];
         foreach (array_diff($userIds, $existing) as $userId) {
             $event->attendees()->create([
                 'user_id' => $userId,
                 'audience_type' => 'person',
                 'rsvp_status' => 'none',
             ]);
+            $added[] = $userId;
+        }
+
+        return $added;
+    }
+
+    /**
+     * Tell newly-invited people about the event — without this the RSVP
+     * feature is unreachable (you can't respond to an invite you never saw).
+     */
+    private function notifyNewInvitees(HrCalendarEvent $event, array $userIds): void
+    {
+        foreach ($userIds as $userId) {
+            if ($userId === $event->created_by) {
+                continue;
+            }
+            $invitee = User::find($userId);
+            if (! $invitee) {
+                continue;
+            }
+            try {
+                $invitee->notify(new CalendarEventInviteNotification($event));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send calendar invite notification', [
+                    'event_id' => $event->id,
+                    'user_id' => $userId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -516,6 +556,21 @@ class CalendarController extends Controller
             'rsvp_status' => $data['status'],
             'responded_at' => now(),
         ]);
+
+        // The organiser is waiting on responses — a quiet in-app note, no mail.
+        if ($event->created_by && $event->created_by !== $user->id) {
+            $organiser = User::find($event->created_by);
+            if ($organiser) {
+                try {
+                    $organiser->notify(new CalendarEventRsvpNotification($event, $user, $data['status']));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send RSVP notification', [
+                        'event_id' => $event->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
 
         return redirect()->back()->with('success', 'Your response was saved.');
     }
@@ -587,6 +642,14 @@ class CalendarController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+
+        // The FK cascade removes attachment ROWS but not their files — clean
+        // the storage first or every deleted event leaks its uploads on disk.
+        foreach ($event->attachments()->get() as $attachment) {
+            if ($attachment->path) {
+                Storage::disk($attachment->disk ?: 'private')->delete($attachment->path);
+            }
+        }
 
         $event->delete();
 
