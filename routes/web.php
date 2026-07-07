@@ -167,6 +167,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
         Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
         Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
+        // SLA target grid — admin-only on top of it.manage (FormRequest authorize).
+        Route::put('/it/sla-policies', [ItProvisioningController::class, 'updateSlaPolicies'])->name('it.sla.update');
     });
 });
 

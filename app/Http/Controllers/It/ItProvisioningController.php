@@ -7,7 +7,9 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\It\UpdateSlaPoliciesRequest;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
@@ -57,6 +59,9 @@ class ItProvisioningController extends Controller
             'view' => $this->cleanFilter($request->query('view'), array_keys(self::TICKET_VIEWS)),
         ];
 
+        $canManage = (bool) ($user && $user->canDo('it.manage'));
+        $canEditSla = $canManage && $user->hasRole('admin');
+
         // Requesters get ONLY their own tickets — the agent queues, summary
         // and staff directory never reach a self-service payload.
         $agentProps = $isAgent ? [
@@ -64,6 +69,7 @@ class ItProvisioningController extends Controller
             'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
             'assignees' => $this->tenantUserOptions($tenantId),
             'filters' => $filters,
+            'slaPolicies' => $canEditSla ? $this->slaPolicyGrid($tenantId) : null,
         ] : [];
 
         return Inertia::render('it/index', [
@@ -72,10 +78,61 @@ class ItProvisioningController extends Controller
             'summary' => $this->summary($tenantId, $user->id, $isAgent),
             'can' => [
                 'view' => $isAgent,
-                'manage' => (bool) ($user && $user->canDo('it.manage')),
+                'manage' => $canManage,
                 'request' => $canRequest,
+                'edit_sla' => $canEditSla,
             ],
         ]);
+    }
+
+    /**
+     * §N7: rewrite the tenant's SLA grid — one row per priority, values
+     * become the stamping source for every ticket created (or re-triaged)
+     * from here on. Existing tickets keep the targets they were promised.
+     */
+    public function updateSlaPolicies(UpdateSlaPoliciesRequest $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        foreach (ItTicket::PRIORITIES as $priority) {
+            ItSlaPolicy::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'priority' => $priority],
+                [
+                    'first_response_minutes' => (int) $request->validated("{$priority}.first_response_minutes"),
+                    'resolution_minutes' => (int) $request->validated("{$priority}.resolution_minutes"),
+                ],
+            );
+        }
+
+        return redirect()->back()->with('success', 'SLA targets updated — new tickets pick them up immediately.');
+    }
+
+    /**
+     * The effective SLA grid for the policy editor: tenant row when set,
+     * §G default otherwise, flagged so the UI can say which is which.
+     *
+     * @return array<string, array{first_response_minutes: int, resolution_minutes: int, is_custom: bool}>
+     */
+    private function slaPolicyGrid(int $tenantId): array
+    {
+        $rows = ItSlaPolicy::query()
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('priority');
+
+        $grid = [];
+        foreach (ItTicket::PRIORITIES as $priority) {
+            $row = $rows->get($priority);
+            [$response, $resolution] = ItSlaPolicy::DEFAULTS[$priority];
+            $grid[$priority] = [
+                'first_response_minutes' => $row ? (int) $row->first_response_minutes : $response,
+                'resolution_minutes' => $row ? (int) $row->resolution_minutes : $resolution,
+                'is_custom' => (bool) $row,
+            ];
+        }
+
+        return $grid;
     }
 
     /* ================================================================== */

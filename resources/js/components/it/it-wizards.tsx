@@ -12,9 +12,11 @@ import {
     KeyRound,
     Laptop,
     Mail,
+    RotateCcw,
     Search,
     Server,
     Ticket,
+    Timer,
     User,
     UserCheck,
     Wifi,
@@ -41,6 +43,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 
 /* ------------------------------------------------------------------ */
@@ -88,13 +91,23 @@ export interface TicketRow {
     resolved: string | null;
 }
 
+/** One priority's effective SLA targets, as served by the policy editor payload. */
+export interface SlaPolicyRow {
+    first_response_minutes: number;
+    resolution_minutes: number;
+    is_custom: boolean;
+}
+
+export type SlaPolicyGrid = Record<string, SlaPolicyRow>;
+
 export type ItModal =
     | { type: 'ticket' }
     | { type: 'raise' }
     | { type: 'resolve'; ticket: { id: number; reference: string | null; title: string } }
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
-    | { type: 'assign-ticket'; ticket: TicketRow };
+    | { type: 'assign-ticket'; ticket: TicketRow }
+    | { type: 'sla' };
 
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
  *  from the page passed to onSuccess — `back()->with('error')` fires onSuccess,
@@ -114,10 +127,12 @@ const UNASSIGNED = 'unassigned';
 export function ItWizard({
     modal,
     assignees,
+    slaPolicies,
     onClose,
 }: {
     modal: ItModal | null;
     assignees: AssigneeOption[];
+    slaPolicies?: SlaPolicyGrid | null;
     onClose: () => void;
 }) {
     if (!modal) return null;
@@ -126,6 +141,8 @@ export function ItWizard({
             return <CreateTicketWizard assignees={assignees} onClose={onClose} />;
         case 'raise':
             return <RaiseTicketDialog onClose={onClose} />;
+        case 'sla':
+            return slaPolicies ? <SlaPolicyDialog policies={slaPolicies} onClose={onClose} /> : null;
         case 'resolve':
             return <ResolveTicketDialog ticket={modal.ticket} onClose={onClose} />;
         case 'fulfil':
@@ -664,6 +681,214 @@ export function ResolveTicketDialog({
                         />
                         Email the requester that it’s fixed
                     </label>
+                </div>
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  SLA targets (single step, admin-only — §N7)                       */
+/* ================================================================== */
+
+const SLA_STEPS: readonly WizardStep[] = [
+    { key: 'targets', label: 'SLA targets', blurb: 'Minutes per priority', icon: Timer },
+];
+
+/** §G defaults — what "Reset to defaults" restores. */
+const SLA_DEFAULTS: Record<string, { first_response_minutes: string; resolution_minutes: string }> = {
+    urgent: { first_response_minutes: '60', resolution_minutes: '240' },
+    high: { first_response_minutes: '240', resolution_minutes: '1440' },
+    normal: { first_response_minutes: '1440', resolution_minutes: '4320' },
+    low: { first_response_minutes: '4320', resolution_minutes: '10080' },
+};
+
+const SLA_PRIORITY_HINTS: Record<string, string> = {
+    urgent: 'Stops someone supporting a person right now',
+    high: 'Blocking their work',
+    normal: 'Annoying, but they can work',
+    low: 'Whenever there’s a moment',
+};
+
+/** "90 min" / "4 h" / "3 d" — so minutes never need mental arithmetic. */
+function minutesHuman(raw: string): string {
+    const m = Number(raw);
+    if (!Number.isFinite(m) || m <= 0) return '—';
+    if (m < 60) return `${m} min`;
+    if (m < 24 * 60) {
+        const h = m / 60;
+        return `${Number.isInteger(h) ? h : h.toFixed(1)} h`;
+    }
+    const d = m / (24 * 60);
+    return `${Number.isInteger(d) ? d : d.toFixed(1)} d`;
+}
+
+type SlaFormData = Record<string, { first_response_minutes: string; resolution_minutes: string }>;
+
+export function SlaPolicyDialog({
+    policies,
+    onClose,
+}: {
+    policies: SlaPolicyGrid;
+    onClose: () => void;
+}) {
+    const wizard = useWizard(SLA_STEPS.length);
+    const [done, setDone] = useState(false);
+
+    const form = useForm<SlaFormData>(
+        Object.fromEntries(
+            Object.keys(SLA_DEFAULTS).map((priority) => [
+                priority,
+                {
+                    first_response_minutes: String(
+                        policies[priority]?.first_response_minutes ??
+                            SLA_DEFAULTS[priority].first_response_minutes,
+                    ),
+                    resolution_minutes: String(
+                        policies[priority]?.resolution_minutes ??
+                            SLA_DEFAULTS[priority].resolution_minutes,
+                    ),
+                },
+            ]),
+        ),
+    );
+
+    // Nested error keys ("urgent.resolution_minutes") aren't in the typed map.
+    const errors = form.errors as Record<string, string | undefined>;
+
+    const set = (priority: string, field: 'first_response_minutes' | 'resolution_minutes', value: string) =>
+        form.setData(priority, { ...form.data[priority], [field]: value });
+
+    const submit = () => {
+        form.put('/it/sla-policies', {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const err = pageFlashError(page);
+                if (err) {
+                    toast.error(err);
+                    return;
+                }
+                setDone(true);
+                toast.success('SLA targets updated.');
+            },
+        });
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="SLA targets"
+            description="The clock every ticket is stamped with, per priority."
+            railIcon={Timer}
+            railTitle="SLA targets"
+            railSub="IT helpdesk"
+            steps={SLA_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title="Targets saved"
+                        blurb="New tickets and re-triaged priorities use these immediately. Existing tickets keep the targets they were promised."
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={
+                <Button
+                    variant="ghost"
+                    onClick={() => form.setData(structuredClone(SLA_DEFAULTS))}
+                    disabled={form.processing}
+                >
+                    <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
+                </Button>
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={form.processing}>
+                        {form.processing ? 'Saving…' : 'Save targets'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={Timer}
+                    title="Response & resolution targets"
+                    blurb="Minutes from creation. First response stops at the first public agent reply; resolution pauses while a ticket waits on its requester."
+                />
+                <div className="grid gap-3">
+                    {Object.keys(SLA_DEFAULTS).map((priority) => (
+                        <div key={priority} className="rounded-xl border border-border bg-muted/30 p-3.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div className="text-[13px] font-bold capitalize">{priority}</div>
+                                    <div className="text-[11.5px] text-muted-foreground">
+                                        {SLA_PRIORITY_HINTS[priority]}
+                                    </div>
+                                </div>
+                                {policies[priority]?.is_custom ? (
+                                    <StatusBadge variant="info" size="sm">
+                                        Custom
+                                    </StatusBadge>
+                                ) : (
+                                    <StatusBadge variant="neutral" size="sm">
+                                        Default
+                                    </StatusBadge>
+                                )}
+                            </div>
+                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
+                                <Field
+                                    label="First response (minutes)"
+                                    error={errors[`${priority}.first_response_minutes`]}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="number"
+                                            min={5}
+                                            value={form.data[priority].first_response_minutes}
+                                            onChange={(e) =>
+                                                set(priority, 'first_response_minutes', e.target.value)
+                                            }
+                                            aria-label={`${priority} first response minutes`}
+                                        />
+                                        <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
+                                            = {minutesHuman(form.data[priority].first_response_minutes)}
+                                        </span>
+                                    </div>
+                                </Field>
+                                <Field
+                                    label="Resolution (minutes)"
+                                    error={errors[`${priority}.resolution_minutes`]}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="number"
+                                            min={5}
+                                            value={form.data[priority].resolution_minutes}
+                                            onChange={(e) =>
+                                                set(priority, 'resolution_minutes', e.target.value)
+                                            }
+                                            aria-label={`${priority} resolution minutes`}
+                                        />
+                                        <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
+                                            = {minutesHuman(form.data[priority].resolution_minutes)}
+                                        </span>
+                                    </div>
+                                </Field>
+                            </div>
+                        </div>
+                    ))}
+                    <InfoCard icon={Timer}>
+                        Clocks run 24/7 for now — business-hours calendars are a recorded
+                        follow-up decision. Changing targets never rewrites tickets already
+                        on the queue.
+                    </InfoCard>
                 </div>
             </WizardStepPane>
         </WizardShell>

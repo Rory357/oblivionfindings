@@ -17,3 +17,19 @@ into the family portal.
 pins the exclusion. If you DO want portal users raising IT tickets, delete the
 two names from the exclusion lists in those files and drop the
 "external portal personas hold no it.request grant" test.
+
+## 2. SLA clocks run 24/7 — no business-hours calendar (v1, per §G)
+
+The SLA engine (stamping, `it:check-sla`, the admin target editor) counts
+every minute of every day. A "normal · 1440 min" ticket raised Friday 17:00
+is due Saturday 17:00 — weekends and NZ public holidays count against the
+target. §G explicitly scopes v1 this way and marks business-hours calendars
+as a stretch decision.
+
+**Recommendation if/when wanted:** add `business_hours` (start/end,
+days-of-week, holiday list) to `it_sla_policies` — schema change, so it needs
+a §P-style sign-off — and teach `stampSlaDueDates()` + `it:check-sla` +
+`resolveTicket()`'s met-check to count only working minutes. Until then the
+mitigation is generous targets (the editor at Tickets → SLA targets, admin
+only, makes them per-tenant editable). The editor's copy states the 24/7
+behaviour so nobody assumes otherwise.

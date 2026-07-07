@@ -5,6 +5,7 @@
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
 import { ResolveTicketDialog } from '@/components/it/it-wizards';
+import { SlaChip } from '@/components/it/sla-chip';
 import {
     TicketThread,
     type ThreadAttachment,
@@ -35,7 +36,6 @@ import {
     RotateCcw,
     Server,
     Ticket as TicketIcon,
-    Timer,
     UserPlus,
     XCircle,
 } from 'lucide-react';
@@ -160,12 +160,6 @@ export default function ItTicketShow({
 
     const isWorking = WORKING_STATUSES.includes(ticket.status);
 
-    // SLA chip — hidden until due dates are stamped (SLA engine, item 8) or
-    // once the target is met. Always text + icon, never colour alone.
-    const slaDue = ticket.first_responded_at ? ticket.resolution_due_at : ticket.first_response_due_at;
-    const slaLabel = ticket.first_responded_at ? 'resolution due' : 'response due';
-    const showSla = isWorking && slaDue !== null && ticket.sla_state !== 'met';
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference ?? 'Ticket'} — ${ticket.title}`} />
@@ -209,21 +203,9 @@ export default function ItTicketShow({
                                 <StatusBadge variant={priorityVariant[ticket.priority] ?? 'neutral'} size="sm">
                                     {label(ticket.priority)}
                                 </StatusBadge>
-                                {showSla ? (
-                                    <StatusBadge
-                                        variant={
-                                            ticket.sla_state === 'breached'
-                                                ? 'critical'
-                                                : ticket.sla_state === 'at_risk'
-                                                  ? 'warning'
-                                                  : 'info'
-                                        }
-                                        size="sm"
-                                    >
-                                        <Timer className="mr-1 h-3 w-3" />
-                                        {slaLabel} {absolute(slaDue)}
-                                    </StatusBadge>
-                                ) : null}
+                                {/* Live SLA countdown — ticks once a minute, tone from the
+                                    server verdict, hidden once met/settled. */}
+                                <SlaChip ticket={ticket} />
                             </div>
                             <h1 className="mt-1 truncate text-[22px] leading-tight font-bold tracking-tight">
                                 {ticket.title}

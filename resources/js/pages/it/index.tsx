@@ -9,8 +9,10 @@ import {
     type AssigneeOption,
     type ItModal,
     type RequestRow,
+    type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -24,7 +26,7 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     CheckCircle2,
     Inbox,
@@ -37,6 +39,7 @@ import {
     RotateCcw,
     Server,
     Ticket,
+    Timer,
     UserCog,
     XCircle,
 } from 'lucide-react';
@@ -115,10 +118,12 @@ interface Props {
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
     filters?: Filters;
+    /** Effective SLA grid — present only for admins (the policy editor). */
+    slaPolicies?: SlaPolicyGrid | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
     summary: Summary;
-    can: { view: boolean; manage: boolean; request: boolean };
+    can: { view: boolean; manage: boolean; request: boolean; edit_sla?: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it' }];
@@ -170,6 +175,7 @@ export default function ItIndex({
     tickets,
     assignees = [],
     filters,
+    slaPolicies,
     myTickets,
     summary,
     can,
@@ -364,7 +370,12 @@ export default function ItIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="IT & Provisioning" />
             {ctx.element}
-            <ItWizard modal={modal} assignees={assignees} onClose={() => setModal(null)} />
+            <ItWizard
+                modal={modal}
+                assignees={assignees}
+                slaPolicies={slaPolicies}
+                onClose={() => setModal(null)}
+            />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
@@ -405,23 +416,48 @@ export default function ItIndex({
                                   { label: 'Open tickets', value: summary.tickets.open },
                                   { label: 'Unassigned', value: summary.tickets.unassigned },
                                   { label: 'Urgent open', value: summary.tickets.urgent_open },
+                                  {
+                                      label: 'Breaching soon',
+                                      value: summary.tickets.at_risk,
+                                      href: '/it?tab=tickets&view=breaching',
+                                  },
+                                  {
+                                      label: 'Breached',
+                                      value: summary.tickets.breached,
+                                      href: '/it?tab=tickets&view=breached',
+                                  },
                               ]
                             : [
                                   { label: 'My open tickets', value: summary.my.open },
                                   { label: 'Waiting on me', value: summary.my.waiting },
                                   { label: 'Resolved · 30d', value: summary.my.resolved_30d },
                               ]
-                        ).map((s) => (
-                            <div
-                                key={s.label}
-                                className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2"
-                            >
-                                <div className="text-[20px] leading-none font-bold">{s.value}</div>
-                                <div className="mt-1 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
-                                    {s.label}
+                        ).map((s: { label: string; value: number; href?: string }) => {
+                            const inner = (
+                                <>
+                                    <div className="text-[20px] leading-none font-bold">{s.value}</div>
+                                    <div className="mt-1 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
+                                        {s.label}
+                                    </div>
+                                </>
+                            );
+                            return s.href ? (
+                                <Link
+                                    key={s.label}
+                                    href={s.href}
+                                    className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-left transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none"
+                                >
+                                    {inner}
+                                </Link>
+                            ) : (
+                                <div
+                                    key={s.label}
+                                    className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2"
+                                >
+                                    {inner}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -579,15 +615,26 @@ export default function ItIndex({
                                     <Plus className="h-3.5 w-3.5" /> Log ticket
                                 </Button>
                             ) : null}
+                            {can.edit_sla && slaPolicies ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className={can.manage ? undefined : 'ml-auto'}
+                                    onClick={() => setModal({ type: 'sla' })}
+                                >
+                                    <Timer className="h-3.5 w-3.5" /> SLA targets
+                                </Button>
+                            ) : null}
                         </div>
 
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <div className="grid grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                                 <span>Ticket</span>
                                 <span>Requester</span>
                                 <span>Assignee</span>
                                 <span>Priority</span>
                                 <span>Status</span>
+                                <span>SLA</span>
                                 <span>Age</span>
                                 <span />
                             </div>
@@ -597,7 +644,7 @@ export default function ItIndex({
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
                                     onClick={(e) => openTicket(t.id, e)}
                                     onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
-                                    className="grid cursor-pointer grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                                    className="grid cursor-pointer grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
@@ -629,6 +676,9 @@ export default function ItIndex({
                                         <StatusBadge variant={ticketStatusVariant[t.status] ?? 'neutral'} size="sm">
                                             {label(t.status)}
                                         </StatusBadge>
+                                    </span>
+                                    <span className="min-w-0">
+                                        <SlaChip ticket={t} />
                                     </span>
                                     <span className="text-[12px] text-muted-foreground">{t.age ?? '—'}</span>
                                     <span className="flex justify-end">

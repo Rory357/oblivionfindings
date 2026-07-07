@@ -107,3 +107,68 @@ test('the seeder materialises editable default rows and factories stay unstamped
     $fixture = ItTicket::factory()->create();
     expect($fixture->first_response_due_at)->toBeNull();
 });
+
+/* ------------------------------------------------------------------ */
+/*  §N7 — the admin SLA target editor (PUT it.sla.update)             */
+/* ------------------------------------------------------------------ */
+
+/** A full valid editor payload (the §G defaults), with per-priority overrides. */
+function itSlaGrid(array $overrides = []): array
+{
+    $grid = [];
+    foreach (ItSlaPolicy::DEFAULTS as $priority => [$response, $resolution]) {
+        $grid[$priority] = [
+            'first_response_minutes' => $response,
+            'resolution_minutes' => $resolution,
+        ];
+    }
+
+    return array_replace_recursive($grid, $overrides);
+}
+
+test('an admin can retune the grid and new tickets stamp from it', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)
+        ->put('/it/sla-policies', itSlaGrid([
+            'urgent' => ['first_response_minutes' => 30, 'resolution_minutes' => 120],
+        ]))
+        ->assertRedirect();
+
+    // The whole grid materialises as tenant rows (editable from here on).
+    expect(ItSlaPolicy::query()->where('tenant_id', 1)->count())->toBe(4);
+    expect(ItSlaPolicy::minutesFor(1, 'urgent'))->toBe([30, 120]);
+
+    $this->actingAs($this->worker)
+        ->post('/it/tickets', [
+            'title' => 'Stamped by the retuned grid',
+            'category' => 'network',
+            'priority' => 'urgent',
+        ])
+        ->assertRedirect();
+
+    $ticket = ItTicket::query()->firstWhere('title', 'Stamped by the retuned grid');
+    expect($ticket->first_response_due_at->equalTo($ticket->created_at->copy()->addMinutes(30)))->toBeTrue();
+    expect($ticket->resolution_due_at->equalTo($ticket->created_at->copy()->addMinutes(120)))->toBeTrue();
+});
+
+test('the SLA editor is admin-only — it.manage alone is not enough', function () {
+    // hr holds it.manage but not the admin role; a worker holds neither.
+    $this->actingAs($this->hr)->put('/it/sla-policies', itSlaGrid())->assertForbidden();
+    $this->actingAs($this->worker)->put('/it/sla-policies', itSlaGrid())->assertForbidden();
+    expect(ItSlaPolicy::query()->count())->toBe(0);
+});
+
+test('the grid refuses a resolution target tighter than first response', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)
+        ->from('/it?tab=tickets')
+        ->put('/it/sla-policies', itSlaGrid([
+            'urgent' => ['first_response_minutes' => 60, 'resolution_minutes' => 30],
+        ]))
+        ->assertRedirect('/it?tab=tickets')
+        ->assertSessionHasErrors('urgent.resolution_minutes');
+
+    expect(ItSlaPolicy::query()->count())->toBe(0);
+});
