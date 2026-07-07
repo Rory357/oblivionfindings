@@ -13,6 +13,7 @@ use App\Domain\Finance\Http\Controllers\BillingController;
 use App\Domain\Finance\Http\Controllers\BudgetActualsController;
 use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
 use App\Domain\Finance\Http\Controllers\CashFlowForecastController;
+use App\Domain\Finance\Http\Controllers\CashPositionController;
 use App\Domain\Finance\Http\Controllers\ChartOfAccountsController;
 use App\Domain\Finance\Http\Controllers\ClientFinancialsController;
 use App\Domain\Finance\Http\Controllers\ConsolidationController;
@@ -59,14 +60,24 @@ use Illuminate\Support\Facades\Route;
  */
 Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function () {
 
-    // Dashboard
-    Route::get('/dashboard', [FinanceDashboardController::class, 'index'])
+    // Overview hub — the module home. Summary lives at /finance itself; the
+    // other Overview tabs (executive, by-site, cash position) are sibling
+    // routes sharing the OverviewTabsFooter. The old /finance/dashboard URL
+    // redirects (route NAME `finance.dashboard` is kept on the hub so every
+    // existing route('finance.dashboard') caller now lands on /finance).
+    Route::get('/', [FinanceDashboardController::class, 'index'])
         ->name('dashboard')
         ->middleware('permission:finance.dashboard');
+    Route::redirect('/dashboard', '/finance');
 
-    // Executive Financial Dashboard
+    // Executive Financial Dashboard (Overview hub tab)
     Route::get('/executive-dashboard', [ExecutiveFinancialDashboardController::class, 'index'])
         ->name('executive-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Cash position (Overview hub tab) — live balances + 30-day obligations.
+    Route::get('/cash-position', [CashPositionController::class, 'index'])
+        ->name('cash-position')
         ->middleware('permission:finance.dashboard');
 
     // Finance obligation calendar — page shell + JSON event feed (invoice/bill

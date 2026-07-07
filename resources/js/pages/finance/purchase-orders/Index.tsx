@@ -44,7 +44,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Purchase Orders', href: '/finance/purchase-orders' },
 ];
 

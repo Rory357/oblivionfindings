@@ -129,7 +129,7 @@ export default function JournalsIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
             ]}
         >

@@ -10,7 +10,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
     { title: 'New Forecast', href: '/finance/cash-flow-forecast/create' },
 ];

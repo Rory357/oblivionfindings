@@ -47,7 +47,7 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Payment Runs', href: '/finance/payment-runs' },
 ];
 

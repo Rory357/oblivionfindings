@@ -94,7 +94,7 @@ const filingDataLabels: Record<string, string> = {
 
 export default function IrdFilingShow({ filing }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'IRD E-Filing', href: '/finance/ird-filings' },
         {
             title: `${filingTypeLabels[filing.filing_type]} - ${formatDate(filing.period_to)}`,

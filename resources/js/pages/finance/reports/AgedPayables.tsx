@@ -54,7 +54,7 @@ const agingColumns = [
 const PIE_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#991b1b'];
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Reports', href: '/finance/reports/aged-payables' },
     { title: 'Aged Payables', href: '/finance/reports/aged-payables' },
 ];

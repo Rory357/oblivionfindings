@@ -69,7 +69,7 @@ type Props = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Bank Transactions', href: '/finance/bank-transactions' },
 ];
 

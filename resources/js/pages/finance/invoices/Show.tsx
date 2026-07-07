@@ -77,7 +77,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
     const canMarkPaid = invoice.status !== 'cancelled' && invoice.status !== 'paid';
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Invoices', href: '/finance/invoices' },
         { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
     ];

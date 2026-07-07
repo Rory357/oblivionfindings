@@ -238,7 +238,7 @@ export default function BillCreate({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Bills', href: '/finance/bills' },
                 { title: 'New Bill', href: '/finance/bills/create' },
             ]}

@@ -203,7 +203,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
     const [postingId, setPostingId] = useState<number | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
         { title: 'Intercompany', href: `/finance/intercompany/${group.id}` },

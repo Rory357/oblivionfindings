@@ -116,7 +116,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Credit Notes', href: '/finance/credit-notes' },
                 { title: 'New Credit Note', href: '/finance/credit-notes/create' },
             ]}

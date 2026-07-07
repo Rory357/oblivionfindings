@@ -43,7 +43,7 @@ const formatCurrency = (amount: number) =>
 const formatPct = (pct: number) => pct.toFixed(1) + '%';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Reports', href: '/finance/reports/funding-stream-summary' },
     { title: 'Funding Stream Summary', href: '/finance/reports/funding-stream-summary' },
 ];

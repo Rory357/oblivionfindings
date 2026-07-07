@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PageHero, PageLayout } from '@/components/page';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Audit Exports', href: '/finance/audit-exports' },
     { title: 'New Export', href: '/finance/audit-exports/create' },
 ];

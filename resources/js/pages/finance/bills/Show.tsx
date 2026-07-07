@@ -93,7 +93,7 @@ export default function BillShow({ auth, bill }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Bills', href: '/finance/bills' },
                 { title: bill.bill_number, href: `/finance/bills/${bill.id}` },
             ]}

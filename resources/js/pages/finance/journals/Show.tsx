@@ -154,7 +154,7 @@ export default function JournalsShow({ auth, journal }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
                 { title: journal.journal_number, href: `/finance/journals/${journal.id}` },
             ]}

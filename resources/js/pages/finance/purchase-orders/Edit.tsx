@@ -136,7 +136,7 @@ export default function PurchaseOrderEdit() {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: `/finance/purchase-orders/${po.id}` }, { title: 'Edit', href: '#' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: `/finance/purchase-orders/${po.id}` }, { title: 'Edit', href: '#' }]}>
             <Head title={`Edit ${po.po_number}`} />
             <PageLayout
                 hero={

@@ -280,7 +280,7 @@ function formatDate(dateStr: string): string {
 
 export default function ConsolidationShow({ group, entities, recentRuns, mappings }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
     ];

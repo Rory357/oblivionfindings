@@ -44,7 +44,7 @@ test('legacy admin column without role_user entry cannot access finance dashboar
     ]);
     // Deliberately NOT attaching via $user->roles()->attach(...)
 
-    $response = $this->actingAs($user)->get('/finance/dashboard');
+    $response = $this->actingAs($user)->get('/finance');
 
     $response->assertForbidden();
 });

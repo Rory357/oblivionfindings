@@ -112,7 +112,7 @@ const statusColors: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Fixed Assets', href: '/finance/fixed-assets' },
 ];
 

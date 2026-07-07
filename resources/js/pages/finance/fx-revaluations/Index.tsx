@@ -31,7 +31,7 @@ type PageProps = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
 ];
 

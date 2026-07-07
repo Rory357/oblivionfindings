@@ -128,7 +128,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
                 { title: 'Create', href: '/finance/journals/create' },
             ]}

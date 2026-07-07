@@ -94,7 +94,7 @@ function SummaryCard({ title, value, icon: Icon, currency, colorClass }: { title
 
 export default function RunResults({ group, run }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
         { title: `Run #${run.id}`, href: `/finance/consolidation/${group.id}/runs/${run.id}` },

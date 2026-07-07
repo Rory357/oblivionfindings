@@ -102,7 +102,7 @@ export default function PurchaseOrderCreate() {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: 'Create', href: '#' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: 'Create', href: '#' }]}>
             <Head title="Create Purchase Order" />
             <PageLayout
                 hero={

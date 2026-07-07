@@ -88,7 +88,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Invoices', href: '/finance/invoices' },
 ];
 

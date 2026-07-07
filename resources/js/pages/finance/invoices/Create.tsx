@@ -84,7 +84,7 @@ const emptyLine = (): LineItem => ({
 });
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Invoices', href: '/finance/invoices' },
     { title: 'New Invoice', href: '/finance/invoices/create' },
 ];

@@ -137,7 +137,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Vendors', href: '/finance/vendors' },
                 { title: vendor.name, href: `/finance/vendors/${vendor.id}` },
                 { title: 'Edit', href: `/finance/vendors/${vendor.id}/edit` },
