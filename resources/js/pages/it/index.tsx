@@ -12,6 +12,7 @@ import {
     type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { ItHero } from '@/components/it/it-hero';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
 import {
@@ -37,7 +38,7 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     CheckCircle2,
     ChevronDown,
@@ -566,87 +567,12 @@ export default function ItIndex({
             </AlertDialog>
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
-                {/* Hero */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-9 py-8 text-primary-foreground">
-                    <div className="flex flex-wrap items-center justify-between gap-5">
-                        <div className="flex items-center gap-4">
-                            <span className="grid h-[54px] w-[54px] flex-none place-items-center rounded-2xl border border-white/20 bg-white/15">
-                                <Server className="h-6 w-6" />
-                            </span>
-                            <div>
-                                <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
-                                    IT &amp; Provisioning
-                                </h1>
-                                <p className="mt-1 text-[13px] font-medium text-white/75">
-                                    Account, access &amp; equipment requests — and the IT helpdesk queue.
-                                </p>
-                            </div>
-                        </div>
-                        {can.manage || can.request ? (
-                            <Button
-                                onClick={() =>
-                                    setModal({ type: can.manage ? 'ticket' : 'raise' })
-                                }
-                                className="bg-white/15 text-primary-foreground hover:bg-white/25"
-                            >
-                                <Plus className="h-4 w-4" />{' '}
-                                {can.manage ? 'Log ticket' : 'Raise a ticket'}
-                            </Button>
-                        ) : null}
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-2.5">
-                        {(can.view && summary.tickets && summary.provisioning
-                            ? [
-                                  { label: 'Pending requests', value: summary.provisioning.pending },
-                                  { label: 'In progress', value: summary.provisioning.in_progress },
-                                  { label: 'Fulfilled · 30d', value: summary.provisioning.done_30d },
-                                  { label: 'Open tickets', value: summary.tickets.open },
-                                  { label: 'Unassigned', value: summary.tickets.unassigned },
-                                  { label: 'Urgent open', value: summary.tickets.urgent_open },
-                                  {
-                                      label: 'Breaching soon',
-                                      value: summary.tickets.at_risk,
-                                      href: '/it?tab=tickets&view=breaching',
-                                  },
-                                  {
-                                      label: 'Breached',
-                                      value: summary.tickets.breached,
-                                      href: '/it?tab=tickets&view=breached',
-                                  },
-                              ]
-                            : [
-                                  { label: 'My open tickets', value: summary.my.open },
-                                  { label: 'Waiting on me', value: summary.my.waiting },
-                                  { label: 'Resolved · 30d', value: summary.my.resolved_30d },
-                              ]
-                        ).map((s: { label: string; value: number; href?: string }) => {
-                            const inner = (
-                                <>
-                                    <div className="text-[20px] leading-none font-bold">{s.value}</div>
-                                    <div className="mt-1 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
-                                        {s.label}
-                                    </div>
-                                </>
-                            );
-                            return s.href ? (
-                                <Link
-                                    key={s.label}
-                                    href={s.href}
-                                    className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-left transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none"
-                                >
-                                    {inner}
-                                </Link>
-                            ) : (
-                                <div
-                                    key={s.label}
-                                    className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2"
-                                >
-                                    {inner}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                <ItHero
+                    summary={summary}
+                    can={can}
+                    onRaise={() => setModal({ type: 'raise' })}
+                    onLog={() => setModal({ type: 'ticket' })}
+                />
 
                 <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
 
