@@ -325,8 +325,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     });
 
     // ── Price Books ────────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /price-books/{priceBook} so it isn't captured as a param.)
+    Route::redirect('/price-books/create', '/finance/price-books')->name('price_books.create');
+    Route::redirect('/price-books/{priceBook}/edit', '/finance/price-books')->name('price_books.edit');
     Route::middleware('permission:finance.ar.manage')->group(function () {
-        Route::get('/price-books/create', [PriceBookController::class, 'create'])->name('price_books.create');
         Route::post('/price-books', [PriceBookController::class, 'store'])->name('price_books.store');
     });
     Route::middleware('permission:finance.ar.view')->group(function () {
@@ -334,7 +338,6 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::get('/price-books/{priceBook}', [PriceBookController::class, 'show'])->name('price_books.show');
     });
     Route::middleware('permission:finance.ar.manage')->group(function () {
-        Route::get('/price-books/{priceBook}/edit', [PriceBookController::class, 'edit'])->name('price_books.edit');
         Route::put('/price-books/{priceBook}', [PriceBookController::class, 'update'])->name('price_books.update');
         Route::post('/price-books/{priceBook}/items', [PriceBookController::class, 'storeItem'])->name('price_books.items.store');
         Route::put('/price-books/{priceBook}/items/{item}', [PriceBookController::class, 'updateItem'])->name('price_books.items.update');
@@ -363,10 +366,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/recurring-charges', [RecurringChargeController::class, 'index'])
         ->name('recurring_charges.index')
         ->middleware('permission:finance.ar.view');
+    // Create/edit are WizardShell modals on the index page; the retired
+    // full-page URLs redirect to the list.
+    Route::redirect('/recurring-charges/create', '/finance/recurring-charges')->name('recurring_charges.create');
+    Route::redirect('/recurring-charges/{charge}/edit', '/finance/recurring-charges')->name('recurring_charges.edit');
     Route::middleware('permission:finance.ar.manage')->group(function () {
-        Route::get('/recurring-charges/create', [RecurringChargeController::class, 'create'])->name('recurring_charges.create');
         Route::post('/recurring-charges', [RecurringChargeController::class, 'store'])->name('recurring_charges.store');
-        Route::get('/recurring-charges/{charge}/edit', [RecurringChargeController::class, 'edit'])->name('recurring_charges.edit');
         Route::put('/recurring-charges/{charge}', [RecurringChargeController::class, 'update'])->name('recurring_charges.update');
         Route::delete('/recurring-charges/{charge}', [RecurringChargeController::class, 'destroy'])->name('recurring_charges.destroy');
     });
@@ -381,18 +386,17 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/bank-accounts', [BankAccountController::class, 'index'])
         ->name('bank-accounts.index')
         ->middleware('permission:finance.bank.view');
-    Route::get('/bank-accounts/create', [BankAccountController::class, 'create'])
-        ->name('bank-accounts.create')
-        ->middleware('permission:finance.bank.manage');
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /bank-accounts/{bankAccount} so it isn't captured.)
+    Route::redirect('/bank-accounts/create', '/finance/bank-accounts')->name('bank-accounts.create');
     Route::post('/bank-accounts', [BankAccountController::class, 'store'])
         ->name('bank-accounts.store')
         ->middleware('permission:finance.bank.manage');
     Route::get('/bank-accounts/{bankAccount}', [BankAccountController::class, 'show'])
         ->name('bank-accounts.show')
         ->middleware('permission:finance.bank.view');
-    Route::get('/bank-accounts/{bankAccount}/edit', [BankAccountController::class, 'edit'])
-        ->name('bank-accounts.edit')
-        ->middleware('permission:finance.bank.manage');
+    Route::redirect('/bank-accounts/{bankAccount}/edit', '/finance/bank-accounts')->name('bank-accounts.edit');
     Route::put('/bank-accounts/{bankAccount}', [BankAccountController::class, 'update'])
         ->name('bank-accounts.update')
         ->middleware('permission:finance.bank.manage');
@@ -527,9 +531,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/petty-cash', [PettyCashController::class, 'index'])
         ->name('petty-cash.index')
         ->middleware('permission:finance.petty_cash.view');
-    Route::get('/petty-cash/create', [PettyCashController::class, 'create'])
-        ->name('petty-cash.create')
-        ->middleware('permission:finance.petty_cash.manage');
+    // Create is a WizardShell modal on the index page; the retired full-page
+    // URL redirects to the list. (Must stay registered BEFORE /petty-cash/{fund}.)
+    Route::redirect('/petty-cash/create', '/finance/petty-cash')->name('petty-cash.create');
     Route::post('/petty-cash', [PettyCashController::class, 'store'])
         ->name('petty-cash.store')
         ->middleware('permission:finance.petty_cash.manage');
@@ -579,9 +583,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     });
 
     // ── Cash Flow Forecast ───────────────────────────────────────────────
+    // Create is a WizardShell modal on the index page; the retired full-page
+    // URL redirects to the list. (Must stay registered BEFORE the {forecast} show.)
+    Route::redirect('/cash-flow-forecast/create', '/finance/cash-flow-forecast')->name('cash-flow-forecast.create');
     Route::middleware('permission:finance.reports.view')->group(function () {
         Route::get('/cash-flow-forecast', [CashFlowForecastController::class, 'index'])->name('cash-flow-forecast.index');
-        Route::get('/cash-flow-forecast/create', [CashFlowForecastController::class, 'create'])->name('cash-flow-forecast.create');
         Route::post('/cash-flow-forecast', [CashFlowForecastController::class, 'store'])->name('cash-flow-forecast.store');
         Route::get('/cash-flow-forecast/{forecast}', [CashFlowForecastController::class, 'show'])->name('cash-flow-forecast.show');
         Route::delete('/cash-flow-forecast/{forecast}', [CashFlowForecastController::class, 'destroy'])->name('cash-flow-forecast.destroy');
@@ -651,9 +657,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/audit-exports', [AuditExportController::class, 'index'])
         ->name('audit-exports.index')
         ->middleware('permission:finance.reports.view');
-    Route::get('/audit-exports/create', [AuditExportController::class, 'create'])
-        ->name('audit-exports.create')
-        ->middleware('permission:finance.admin');
+    // Create is a WizardShell modal on the index page; the retired full-page
+    // URL redirects to the list.
+    Route::redirect('/audit-exports/create', '/finance/audit-exports')->name('audit-exports.create');
     Route::post('/audit-exports', [AuditExportController::class, 'store'])
         ->name('audit-exports.store')
         ->middleware('permission:finance.admin');

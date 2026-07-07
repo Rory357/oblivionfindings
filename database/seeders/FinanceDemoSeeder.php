@@ -39,14 +39,17 @@ class FinanceDemoSeeder extends Seeder
         }
 
         // ── Ledger: a small chart of accounts + a couple of posted journals ──
+        // `sub_type` matters: the bank-account modal only lists `bank` sub-type GL
+        // accounts, and petty-cash likewise expects an asset GL — without a `bank`
+        // account the Add-Bank-Account modal has an empty (unsubmittable) GL picker.
         $accounts = [
-            ['code' => '1000', 'name' => 'Bank', 'type' => 'asset'],
-            ['code' => '1100', 'name' => 'Accounts Receivable', 'type' => 'asset'],
-            ['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability'],
-            ['code' => '2100', 'name' => 'GST Payable', 'type' => 'liability'],
-            ['code' => '4000', 'name' => 'Funding Revenue', 'type' => 'revenue'],
-            ['code' => '5000', 'name' => 'Wages', 'type' => 'expense'],
-            ['code' => '6000', 'name' => 'Supplies', 'type' => 'expense'],
+            ['code' => '1000', 'name' => 'Bank', 'type' => 'asset', 'sub_type' => 'bank'],
+            ['code' => '1100', 'name' => 'Accounts Receivable', 'type' => 'asset', 'sub_type' => 'accounts_receivable'],
+            ['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability', 'sub_type' => 'accounts_payable'],
+            ['code' => '2100', 'name' => 'GST Payable', 'type' => 'liability', 'sub_type' => 'current_liability'],
+            ['code' => '4000', 'name' => 'Funding Revenue', 'type' => 'revenue', 'sub_type' => 'revenue'],
+            ['code' => '5000', 'name' => 'Wages', 'type' => 'expense', 'sub_type' => 'expense'],
+            ['code' => '6000', 'name' => 'Supplies', 'type' => 'expense', 'sub_type' => 'expense'],
         ];
         foreach ($accounts as $account) {
             FinAccount::factory()->create([
@@ -54,6 +57,7 @@ class FinanceDemoSeeder extends Seeder
                 'code' => $account['code'],
                 'name' => $account['name'],
                 'type' => $account['type'],
+                'sub_type' => $account['sub_type'],
             ]);
         }
 

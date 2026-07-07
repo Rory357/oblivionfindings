@@ -3,11 +3,13 @@ import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, PettyCashFundDialog, type UserOption } from '@/components/finance';
+import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Wallet, Coins } from 'lucide-react';
+import { useState } from 'react';
 
 interface Fund {
     id: number;
@@ -21,6 +23,9 @@ interface Fund {
 
 interface Props extends PageProps {
     funds: Fund[];
+    canManage: boolean;
+    accounts: AccountOption[];
+    users: UserOption[];
 }
 
 const formatCurrency = (amount: number) =>
@@ -31,7 +36,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Petty Cash', href: '/finance/petty-cash' },
 ];
 
-export default function PettyCashIndex({ funds }: Props) {
+export default function PettyCashIndex({ funds, canManage = false, accounts = [], users = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
     const activeCount = funds.filter((f) => f.is_active).length;
     const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
     const totalBalance = funds.reduce((s, f) => s + f.current_balance, 0);
@@ -53,12 +59,12 @@ export default function PettyCashIndex({ funds }: Props) {
                             { label: 'Total balance', value: formatCurrency(totalBalance) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href={'/finance/petty-cash/create'}>
+                            canManage && (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Fund
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<BankingTabsFooter active="petty-cash" />}
                     />
@@ -70,6 +76,12 @@ export default function PettyCashIndex({ funds }: Props) {
                             <Wallet className="mb-4 h-12 w-12 text-muted-foreground" />
                             <p className="text-lg font-medium text-muted-foreground">No petty cash funds yet.</p>
                             <p className="text-sm text-muted-foreground">Create your first fund to get started.</p>
+                            {canManage && (
+                                <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Fund
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 ) : (
@@ -135,6 +147,15 @@ export default function PettyCashIndex({ funds }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <PettyCashFundDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    accounts={accounts}
+                    users={users}
+                />
+            )}
         </AppLayout>
     );
 }

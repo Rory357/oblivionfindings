@@ -31,15 +31,10 @@ class CashFlowForecastController extends Controller
 
         return Inertia::render('finance/CashFlowForecast/Index', [
             'forecasts' => $forecasts,
+            // Store shares the route group's finance.reports.view permission —
+            // passed for consistency with the other index-modal flows.
+            'canManage' => (bool) $request->user()->canDo('finance.reports.view'),
         ]);
-    }
-
-    /**
-     * Show the form to create a new forecast.
-     */
-    public function create(Request $request)
-    {
-        return Inertia::render('finance/CashFlowForecast/Create');
     }
 
     /**

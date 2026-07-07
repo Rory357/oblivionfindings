@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { BankAccountDialog, type AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +21,9 @@ interface BankAccount {
     id: number;
     name: string;
     bank_name: string;
+    account_number: string | null;
     account_type: string;
+    gl_account_id: number | null;
     opening_balance: number;
     current_balance: number;
     is_primary: boolean;
@@ -57,6 +60,8 @@ interface Props {
     transactions: Transaction[];
     reconciliations: Reconciliation[];
     balanceHistory: BalanceHistoryEntry[];
+    canManage: boolean;
+    glAccounts: AccountOption[];
 }
 
 const statusBadge = (status: string) => {
@@ -79,8 +84,9 @@ const reconStatusBadge = (status: string) => {
     }
 };
 
-export default function BankAccountShow({ bankAccount, transactions, reconciliations, balanceHistory }: Props) {
+export default function BankAccountShow({ bankAccount, transactions, reconciliations, balanceHistory, canManage = false, glAccounts = [] }: Props) {
     const [importOpen, setImportOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
 
     const importForm = useForm({
         bank_account_id: bankAccount.id,
@@ -121,11 +127,11 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         title={bankAccount.name}
                         description={bankAccount.bank_name}
                         actions={
-                            <Button variant="outline" asChild>
-                                <Link href={`/finance/bank-accounts/${bankAccount.id}/edit`}>
+                            canManage && (
+                                <Button variant="outline" onClick={() => setEditOpen(true)}>
                                     Edit
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                     />
                 }
@@ -326,6 +332,25 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            {/* Mounted only while open so each edit starts from fresh props. */}
+            {canManage && editOpen && (
+                <BankAccountDialog
+                    open
+                    onClose={() => setEditOpen(false)}
+                    glAccounts={glAccounts}
+                    bankAccount={{
+                        id: bankAccount.id,
+                        name: bankAccount.name,
+                        bank_name: bankAccount.bank_name,
+                        account_number: bankAccount.account_number,
+                        account_type: bankAccount.account_type,
+                        gl_account_id: bankAccount.gl_account_id ?? bankAccount.gl_account?.id ?? null,
+                        is_primary: bankAccount.is_primary,
+                        is_active: bankAccount.is_active,
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }
