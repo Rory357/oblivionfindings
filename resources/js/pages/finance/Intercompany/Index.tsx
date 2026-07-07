@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,12 +64,6 @@ type PageProps = {
     group: Group;
     transactions: Transaction[];
     entities: Entity[];
-};
-
-const statusColors: Record<string, string> = {
-    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    posted: 'bg-status-success-bg text-status-success border-status-success/30',
-    eliminated: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 function CreateTransactionDialog({ groupId, entities }: { groupId: number; entities: Entity[] }) {
@@ -302,9 +296,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                                 {formatMoney(Number(txn.amount))}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={statusColors[txn.status]}>
-                                                    {txn.status.charAt(0).toUpperCase() + txn.status.slice(1)}
-                                                </Badge>
+                                                <StatusBadge status={txn.status} />
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {txn.status === 'pending' && (

@@ -3,7 +3,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
@@ -45,20 +45,6 @@ type PurchaseOrder = {
     funding_stream?: FundingStream | null;
     bills: Bill[];
 };
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
-    sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
-    partially_received: { label: 'Partially Received', className: 'bg-status-warning-bg text-status-warning' },
-    received: { label: 'Received', className: 'bg-status-success-bg text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
-
-function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, className: 'bg-muted text-foreground' };
-    return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
-}
 
 export default function PurchaseOrderShow() {
     const { purchaseOrder } = usePage().props as unknown as { purchaseOrder: PurchaseOrder };

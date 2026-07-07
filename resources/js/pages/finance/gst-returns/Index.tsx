@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
 import { TaxTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
@@ -54,12 +54,6 @@ const basisLabels: Record<string, string> = {
     invoice: 'Invoice',
     payments: 'Payments',
     hybrid: 'Hybrid',
-};
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -244,7 +238,6 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                         gstReturns.data.map((gstReturn) => {
                                             const payable = Number(gstReturn.gst_payable);
                                             const isRefund = payable < 0;
-                                            const status = statusConfig[gstReturn.status] ?? statusConfig.draft;
 
                                             return (
                                                 <tr
@@ -291,9 +284,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         {isRefund ? ')' : ''}
                                                     </td>
                                                     <td className="py-3">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={gstReturn.status} />
                                                     </td>
                                                 </tr>
                                             );

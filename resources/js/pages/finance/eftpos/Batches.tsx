@@ -6,11 +6,11 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, Clock, CreditCard, DollarSign, Hash, Layers } from 'lucide-react';
+import { CreditCard, Layers } from 'lucide-react';
 import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
@@ -70,13 +70,6 @@ interface Props extends PageProps {
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
-    open: { label: 'Open', icon: Clock, className: 'border-status-info/30 text-status-info' },
-    closed: { label: 'Closed', icon: Clock, className: 'border-status-warning/30 text-status-warning' },
-    reconciled: { label: 'Reconciled', icon: CheckCircle2, className: 'border-status-success/30 text-status-success' },
-    discrepancy: { label: 'Discrepancy', icon: AlertTriangle, className: 'border-status-critical/30 text-status-critical' },
-};
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -221,8 +214,6 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                 </TableHeader>
                                 <TableBody>
                                     {batches.data.map((batch) => {
-                                        const config = statusConfig[batch.status] ?? statusConfig.open;
-                                        const StatusIcon = config.icon;
                                         return (
                                             <TableRow key={batch.id}>
                                                 <TableCell>
@@ -242,10 +233,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">{formatMoney(batch.settlement_amount)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={config.className}>
-                                                        <StatusIcon className="mr-1 h-3 w-3" />
-                                                        {config.label}
-                                                    </Badge>
+                                                    <StatusBadge status={batch.status} />
                                                     {batch.discrepancy_amount !== 0 && (
                                                         <span className="ml-1 text-xs text-destructive">
                                                             ({formatMoney(batch.discrepancy_amount)})

@@ -3,6 +3,7 @@ import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
@@ -63,15 +64,6 @@ const formatDate = (date: string | null) =>
 const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
-
 export default function BillShow({ auth, bill }: Props) {
     const isOverdue = bill.status !== 'paid' && bill.status !== 'cancelled' && new Date(bill.due_date) < new Date();
     const isDraft = bill.status === 'draft';
@@ -112,9 +104,7 @@ export default function BillShow({ auth, bill }: Props) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {bill.bill_number}
-                                <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
-                                    {statusConfig[bill.status]?.label ?? bill.status}
-                                </Badge>
+                                <StatusBadge status={bill.status} />
                                 {isOverdue && (
                                     <Badge className="bg-status-critical-bg text-status-critical">
                                         <AlertTriangle className="w-3 h-3 mr-1" />

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Plus, Heart, AlertTriangle, HandHeart } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
@@ -67,11 +68,11 @@ const fundTypeLabels: Record<string, string> = {
     sponsorship: 'Sponsorship',
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    active: { label: 'Active', className: 'border-status-success/30 text-status-success' },
-    fully_spent: { label: 'Fully Spent', className: 'border-status-warning/30 text-status-warning' },
-    expired: { label: 'Expired', className: 'border-status-critical/30 text-status-critical' },
-    returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
+const statusBadge: Record<string, { label: string; variant: StatusVariant }> = {
+    active: { label: 'Active', variant: 'success' },
+    fully_spent: { label: 'Fully Spent', variant: 'warning' },
+    expired: { label: 'Expired', variant: 'critical' },
+    returned: { label: 'Returned', variant: 'neutral' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -231,7 +232,7 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                 </TableHeader>
                                 <TableBody>
                                     {funds.map((fund) => {
-                                        const config = statusConfig[fund.status] ?? statusConfig.active;
+                                        const badge = statusBadge[fund.status] ?? statusBadge.active;
                                         const utilisation = fund.budget_amount
                                             ? Math.round((fund.total_spent / fund.budget_amount) * 100)
                                             : null;
@@ -280,9 +281,7 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={config.className}>
-                                                        {config.label}
-                                                    </Badge>
+                                                    <StatusBadge variant={badge.variant} label={badge.label} />
                                                     {fund.next_report_due && new Date(fund.next_report_due) <= new Date() && (
                                                         <AlertTriangle className="ml-1 inline h-4 w-4 text-status-warning" />
                                                     )}

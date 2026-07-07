@@ -5,6 +5,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -100,12 +101,6 @@ const statusIcons: Record<string, React.ReactNode> = {
     success: <CheckCircle2 className="h-4 w-4 text-status-success" />,
     failed: <XCircle className="h-4 w-4 text-status-critical" />,
     pending: <Clock className="h-4 w-4 text-status-warning" />,
-};
-
-const statusColors: Record<string, string> = {
-    success: 'bg-status-success-bg text-status-success border-status-success/30',
-    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function CreateIntegrationDialog() {
@@ -237,14 +232,12 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Badge variant={integration.is_active ? 'default' : 'secondary'}>
-                            {integration.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <StatusBadge variant={integration.is_active ? 'success' : 'neutral'} label={integration.is_active ? 'Active' : 'Inactive'} />
                         {integration.last_sync_status && (
-                            <Badge variant="outline" className={statusColors[integration.last_sync_status]}>
+                            <StatusBadge status={integration.last_sync_status}>
                                 {statusIcons[integration.last_sync_status]}
-                                <span className="ml-1 capitalize">{integration.last_sync_status}</span>
-                            </Badge>
+                                <span className="capitalize">{integration.last_sync_status}</span>
+                            </StatusBadge>
                         )}
                     </div>
                 </div>

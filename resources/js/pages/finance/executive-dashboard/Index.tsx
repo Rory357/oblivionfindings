@@ -3,6 +3,7 @@ import { OverviewTabsFooter } from '@/components/finance/overview-hub';
 import { PageHero, PageLayout } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -126,9 +127,12 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
                                 <div key={i} className={`flex items-start gap-3 rounded-lg border p-3 ${severityColor[insight.severity] || severityColor.info}`}>
                                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                     <span className="text-sm">{insight.message}</span>
-                                    <Badge variant={insight.severity === 'critical' ? 'destructive' : 'secondary'} className="ml-auto shrink-0 text-[10px]">
-                                        {insight.severity}
-                                    </Badge>
+                                    <StatusBadge
+                                        size="sm"
+                                        variant={insight.severity === 'critical' ? 'critical' : insight.severity === 'warning' ? 'warning' : 'info'}
+                                        label={insight.severity}
+                                        className="ml-auto shrink-0"
+                                    />
                                 </div>
                             ))}
                         </div>

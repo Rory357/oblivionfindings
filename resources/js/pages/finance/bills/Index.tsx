@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { NewBillDialog, PayablesTabsFooter, formatMoney, type AccountOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -75,15 +75,6 @@ interface Props extends PageProps {
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-};
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -273,9 +264,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                         <TableCell className="text-right font-medium">{formatMoney(bill.total_amount)}</TableCell>
                                         <TableCell className="text-right">{formatMoney(bill.amount_paid)}</TableCell>
                                         <TableCell>
-                                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
-                                                {statusConfig[bill.status]?.label ?? bill.status}
-                                            </Badge>
+                                            <StatusBadge status={bill.status} />
                                         </TableCell>
                                         {canManage && (
                                             <TableCell className="text-right">

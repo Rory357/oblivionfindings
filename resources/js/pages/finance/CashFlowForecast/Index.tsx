@@ -3,7 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
 import { CashFlowForecastDialog, ConfirmDialog, ReportsTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -50,11 +50,6 @@ const periodTypeLabels: Record<string, string> = {
     weekly: 'Weekly',
     fortnightly: 'Fortnightly',
     monthly: 'Monthly',
-};
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    final: { label: 'Final', className: 'bg-status-success-bg text-status-success border-status-success/30' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -150,7 +145,6 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                     </TableHeader>
                                     <TableBody>
                                         {forecasts.data.map((forecast) => {
-                                            const status = statusConfig[forecast.status] ?? statusConfig.draft;
                                             return (
                                                 <TableRow
                                                     key={forecast.id}
@@ -170,9 +164,10 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                                     </TableCell>
                                                     <TableCell>{forecast.scenarios_count}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge
+                                                            variant={forecast.status === 'final' ? 'success' : 'neutral'}
+                                                            label={forecast.status === 'final' ? 'Final' : 'Draft'}
+                                                        />
                                                     </TableCell>
                                                     <TableCell className="whitespace-nowrap">
                                                         <div>{formatDate(forecast.forecast_date)}</div>

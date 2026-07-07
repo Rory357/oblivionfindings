@@ -1,5 +1,5 @@
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
@@ -38,15 +38,6 @@ type Props = {
     };
 };
 
-const STATUS_COLORS: Record<string, string> = {
-    draft: 'outline',
-    sent: 'default',
-    accepted: 'default',
-    declined: 'destructive',
-    expired: 'outline',
-    converted: 'default',
-};
-
 const STATUS_STEPS = ['draft', 'sent', 'accepted', 'converted'];
 
 function formatDate(d: string | null): string {
@@ -72,7 +63,7 @@ export default function QuoteShow({ quote }: Props) {
             <PageShell>
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={STATUS_COLORS[quote.status] as any ?? 'outline'} className="capitalize">{quote.status}</Badge>
+                    <StatusBadge status={quote.status} />
                     {quote.valid_until && (
                         <span className={`flex items-center gap-1 text-xs ${new Date(quote.valid_until) < new Date() ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}>
                             <CalendarDays className="h-3 w-3" /> Valid until: {formatDate(quote.valid_until)}

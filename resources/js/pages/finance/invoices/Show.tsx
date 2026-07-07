@@ -3,6 +3,7 @@ import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
@@ -60,15 +61,6 @@ const formatDate = (date: string | null) =>
 const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    sent: { label: 'Sent', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    overdue: { label: 'Overdue', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-    cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
-};
-
 export default function InvoiceShow({ auth, invoice }: Props) {
     const isOverdue = invoice.status !== 'paid' && invoice.status !== 'cancelled' && new Date(invoice.due_date) < new Date();
     const isDraft = invoice.status === 'draft';
@@ -114,9 +106,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {invoice.invoice_number}
-                                <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
-                                    {statusConfig[invoice.status]?.label ?? invoice.status}
-                                </Badge>
+                                <StatusBadge status={invoice.status} />
                                 {isOverdue && (
                                     <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
                                         <AlertTriangle className="w-3 h-3 mr-1" />

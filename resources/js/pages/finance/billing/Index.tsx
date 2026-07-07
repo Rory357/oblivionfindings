@@ -1,6 +1,7 @@
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -56,13 +57,6 @@ const STATUS_COLORS: Record<string, string> = {
     approved: OPS_COLORS.primary,
     billed: OPS_COLORS.accent,
     paid: OPS_COLORS.success,
-};
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    pending: 'outline',
-    approved: 'secondary',
-    billed: 'default',
-    paid: 'default',
 };
 
 function formatDate(d: string): string {
@@ -165,7 +159,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-medium">{entry.client ? `${entry.client.first_name} ${entry.client.last_name}` : 'Unknown'}</span>
-                                                <Badge variant={STATUS_VARIANTS[entry.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{entry.status}</Badge>
+                                                <StatusBadge status={entry.status} size="sm" />
                                                 <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">{entry.rate_type}</Badge>
                                             </div>
                                             <div className="mt-0.5 flex items-center gap-3 text-[10px] text-muted-foreground">

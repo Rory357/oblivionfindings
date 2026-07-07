@@ -12,6 +12,7 @@ import {
 } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -51,13 +52,6 @@ interface Props extends PageProps {
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    applied: { label: 'Applied', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-};
 
 const typeConfig: Record<string, { label: string; className: string }> = {
     payable: { label: 'AP', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
@@ -202,9 +196,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                             <TableCell>{formatDate(creditNote.credit_date)}</TableCell>
                                             <TableCell className="text-right font-medium">{formatMoney(creditNote.total_amount)}</TableCell>
                                             <TableCell>
-                                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
-                                                    {statusConfig[creditNote.status]?.label ?? creditNote.status}
-                                                </Badge>
+                                                <StatusBadge status={creditNote.status} />
                                             </TableCell>
                                         </TableRow>
                                     ))}

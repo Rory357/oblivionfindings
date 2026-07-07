@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
@@ -62,15 +62,6 @@ const filingTypeLabels: Record<string, string> = {
     ir7: 'IR7',
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
-    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-};
-
 const filingDataLabels: Record<string, string> = {
     return_type: 'Return Type',
     period_from: 'Period From',
@@ -101,7 +92,6 @@ export default function IrdFilingShow({ filing }: PageProps) {
         },
     ];
 
-    const status = statusConfig[filing.status] ?? statusConfig.draft;
     const canValidate = filing.status === 'draft';
     const canSubmit = filing.status === 'validated' || filing.status === 'error';
     const amount = Number(filing.total_amount);
@@ -134,9 +124,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge status={filing.status} />
                             </span>
                         }
                         description={

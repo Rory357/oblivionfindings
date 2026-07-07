@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { formatMoney } from '@/components/finance/money';
 
 interface CreditNoteLine {
@@ -48,13 +49,6 @@ const formatDate = (date: string | null) =>
 const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-success-bg text-status-success' },
-    applied: { label: 'Applied', className: 'bg-status-info-bg text-status-info' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
-
 const typeConfig: Record<string, { label: string; className: string }> = {
     payable: { label: 'Accounts Payable', className: 'bg-primary/10 text-primary' },
     receivable: { label: 'Accounts Receivable', className: 'bg-status-info-bg text-status-info' },
@@ -86,9 +80,7 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {creditNote.credit_note_number}
-                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
-                                    {statusConfig[creditNote.status]?.label ?? creditNote.status}
-                                </Badge>
+                                <StatusBadge status={creditNote.status} />
                                 <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
                                     {typeConfig[creditNote.type]?.label ?? creditNote.type}
                                 </Badge>

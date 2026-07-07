@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,13 +85,6 @@ type PageProps = {
     entities: Entity[];
     recentRuns: Run[];
     mappings?: Mapping[];
-};
-
-const statusColors: Record<string, string> = {
-    draft: 'bg-muted-foreground/10 text-muted-foreground border-border/30',
-    processing: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed: 'bg-status-success-bg text-status-success border-status-success/30',
-    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const methodLabels: Record<string, string> = {
@@ -472,9 +466,7 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                 {run.period_from} to {run.period_to}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={statusColors[run.status]}>
-                                                    {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                                                </Badge>
+                                                <StatusBadge status={run.status} />
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
                                                 {formatMoney(run.total_revenue)}

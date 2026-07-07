@@ -5,9 +5,10 @@ import { PageHero, PageLayout } from '@/components/page';
 import { AuditExportDialog, ConfirmDialog, TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Download, Trash2, Loader2, CheckCircle, XCircle, Clock, FileText, History } from 'lucide-react';
+import { Plus, Download, Trash2, FileText, History } from 'lucide-react';
 import { useState } from 'react';
 
 interface AuditExport {
@@ -62,13 +63,6 @@ const formatFileSize = (bytes: number | null) => {
         i++;
     }
     return `${size.toFixed(1)} ${units[i]}`;
-};
-
-const statusConfig: Record<string, { label: string; className: string; icon: typeof Clock }> = {
-    pending: { label: 'Pending', className: 'bg-muted text-muted-foreground border-border', icon: Clock },
-    generating: { label: 'Generating', className: 'bg-status-info-bg text-status-info border-status-info/30', icon: Loader2 },
-    completed: { label: 'Completed', className: 'bg-status-success-bg text-status-success border-status-success/30', icon: CheckCircle },
-    failed: { label: 'Failed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30', icon: XCircle },
 };
 
 const getSections = (exp: AuditExport): string[] => {
@@ -158,9 +152,6 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                     </TableRow>
                                 ) : (
                                     exportData.data.map((exp) => {
-                                        const statusCfg = statusConfig[exp.status] ?? statusConfig.pending;
-                                        const StatusIcon = statusCfg.icon;
-
                                         return (
                                             <TableRow key={exp.id}>
                                                 <TableCell className="font-medium">{exp.export_name}</TableCell>
@@ -179,10 +170,7 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={statusCfg.className}>
-                                                        <StatusIcon className={`w-3 h-3 mr-1 ${exp.status === 'generating' ? 'animate-spin' : ''}`} />
-                                                        {statusCfg.label}
-                                                    </Badge>
+                                                    <StatusBadge status={exp.status} />
                                                 </TableCell>
                                                 <TableCell className="text-sm">{formatFileSize(exp.file_size_bytes)}</TableCell>
                                                 <TableCell>

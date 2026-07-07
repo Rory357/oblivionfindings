@@ -4,7 +4,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
 import { TaxTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -86,15 +86,6 @@ const filingTypeLabels: Record<string, string> = {
     ir3: 'IR3',
     ir4: 'IR4',
     ir7: 'IR7',
-};
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
-    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 export default function IrdFilingsIndex({ filings, availableGstReturns, availablePayrollRuns, filters }: PageProps) {
@@ -388,7 +379,6 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                         </tr>
                                     ) : (
                                         filings.data.map((filing) => {
-                                            const status = statusConfig[filing.status] ?? statusConfig.draft;
                                             const amount = Number(filing.total_amount);
 
                                             return (
@@ -409,9 +399,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                         {amount < 0 ? ' (Refund)' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={filing.status} />
                                                     </td>
                                                     <td className="py-3 pr-4 font-mono text-xs">
                                                         {filing.ird_reference ?? '-'}

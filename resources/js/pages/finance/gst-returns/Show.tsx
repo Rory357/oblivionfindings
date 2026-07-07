@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
@@ -130,12 +130,6 @@ const formatDateTime = (dateStr: string) =>
         minute: '2-digit',
     });
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-};
-
 const frequencyLabels: Record<string, string> = {
     monthly: 'Monthly',
     two_monthly: 'Two-Monthly',
@@ -194,7 +188,6 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
         { title: `Period ending ${formatDate(gstReturn.period_end)}`, href: `/finance/gst-returns/${gstReturn.id}` },
     ];
 
-    const status = statusConfig[gstReturn.status] ?? statusConfig.draft;
     const isDraft = gstReturn.status === 'draft';
     const [fileOpen, setFileOpen] = useState(false);
     const [filing, setFiling] = useState(false);
@@ -223,9 +216,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 GST Return
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge status={gstReturn.status} />
                             </span>
                         }
                         description={

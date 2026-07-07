@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ConfirmDialog, LedgerTabsFooter, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeftRight, Plus, TrendingUp, TrendingDown, Globe } from 'lucide-react';
 import { useState } from 'react';
@@ -38,12 +38,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    posted: { label: 'Posted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    reversed: { label: 'Reversed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-};
 
 export default function FxRevaluationsIndex({ revaluations }: PageProps) {
     const [postTarget, setPostTarget] = useState<Revaluation | null>(null);
@@ -150,7 +144,6 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                             const gainLoss = Number(reval.total_gain_loss);
                                             const rowIsGain = gainLoss > 0;
                                             const rowIsLoss = gainLoss < 0;
-                                            const status = statusConfig[reval.status] ?? statusConfig.draft;
 
                                             return (
                                                 <tr key={reval.id} className="border-b last:border-0 hover:bg-muted/50">
@@ -171,9 +164,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                         {rowIsLoss ? ')' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={reval.status} />
                                                     </td>
                                                     <td className="py-3 pr-4 font-mono text-sm text-muted-foreground">
                                                         {reval.journal_number ?? '-'}

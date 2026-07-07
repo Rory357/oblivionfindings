@@ -2,7 +2,7 @@ import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { PayablesTabsFooter, formatMoney } from '@/components/finance';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,14 +33,6 @@ type PaginatedData<T> = {
 type PageProps = {
     paymentRuns: PaginatedData<PaymentRun>;
     filters: { status: string };
-};
-
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-    draft: { label: 'Draft', variant: 'secondary' },
-    approved: { label: 'Approved', variant: 'outline' },
-    processing: { label: 'Processing', variant: 'default' },
-    completed: { label: 'Completed', variant: 'default' },
-    failed: { label: 'Failed', variant: 'destructive' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -147,7 +139,6 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                     </TableHeader>
                                     <TableBody>
                                         {paymentRuns.data.map((run) => {
-                                            const config = statusConfig[run.status] || { label: run.status, variant: 'secondary' as const };
                                             return (
                                                 <TableRow
                                                     key={run.id}
@@ -168,7 +159,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                                         {formatMoney(run.total_amount)}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={config.variant}>{config.label}</Badge>
+                                                        <StatusBadge status={run.status} />
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
                                                         {run.processed_at || '-'}

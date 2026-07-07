@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Head } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -64,13 +65,6 @@ type Group = {
 type PageProps = {
     group: Group;
     run: Run;
-};
-
-const statusColors: Record<string, string> = {
-    draft: 'bg-muted-foreground/10 text-muted-foreground border-border/30',
-    processing: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed: 'bg-status-success-bg text-status-success border-status-success/30',
-    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 function formatCurrencyStr(value: string | number, currency: string = 'NZD'): string {
@@ -153,9 +147,7 @@ export default function RunResults({ group, run }: PageProps) {
                         title={`Consolidation Run #${run.id}`}
                         description={`${run.period_from} to ${run.period_to}${run.created_by ? ` | Run by ${run.created_by}` : ''}`}
                         actions={
-                            <Badge variant="outline" className={statusColors[run.status]}>
-                                {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                            </Badge>
+                            <StatusBadge status={run.status} />
                         }
                     />
                 }

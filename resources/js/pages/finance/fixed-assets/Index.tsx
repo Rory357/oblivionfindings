@@ -11,6 +11,7 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,18 +109,6 @@ const categoryColors: Record<string, string> = {
     furniture: 'bg-status-info-bg text-status-info',
     it_equipment: 'bg-primary/10 text-primary',
     land: 'bg-status-success-bg text-status-success',
-};
-
-const statusLabels: Record<string, string> = {
-    active: 'Active',
-    fully_depreciated: 'Fully Depreciated',
-    disposed: 'Disposed',
-};
-
-const statusColors: Record<string, string> = {
-    active: 'bg-status-success-bg text-status-success',
-    fully_depreciated: 'bg-status-warning-bg text-status-warning',
-    disposed: 'bg-muted text-muted-foreground',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -446,12 +435,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                                     {formatMoney(bookValue)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className={statusColors[asset.status] || ''}
-                                                    >
-                                                        {statusLabels[asset.status] || asset.status}
-                                                    </Badge>
+                                                    <StatusBadge status={asset.status} />
                                                 </TableCell>
                                                 {canManage && (
                                                     <TableCell className="text-right">

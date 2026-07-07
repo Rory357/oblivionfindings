@@ -3,7 +3,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,12 +39,6 @@ type FiscalPeriod = {
 
 type PageProps = {
     periods: FiscalPeriod[];
-};
-
-const statusColors: Record<string, string> = {
-    open: 'bg-status-success-bg text-status-success border-status-success/30',
-    closed: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    locked: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 function CreatePeriodDialog() {
@@ -270,9 +264,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                             <TableCell>{period.start_date}</TableCell>
                                             <TableCell>{period.end_date}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={statusColors[period.status]}>
-                                                    {period.status.charAt(0).toUpperCase() + period.status.slice(1)}
-                                                </Badge>
+                                                <StatusBadge status={period.status} />
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {period.closed_by || '-'}

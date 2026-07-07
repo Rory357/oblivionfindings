@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -90,11 +90,6 @@ type PageProps = {
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    final: { label: 'Final', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-};
-
 const periodTypeLabels: Record<string, string> = {
     weekly: 'Weekly',
     fortnightly: 'Fortnightly',
@@ -112,7 +107,6 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
         { title: forecast.name, href: `/finance/cash-flow-forecast/${forecast.id}` },
     ];
 
-    const status = statusConfig[forecast.status] ?? statusConfig.draft;
     const isDraft = forecast.status === 'draft';
 
     const activeForecastData =
@@ -174,9 +168,10 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {forecast.name}
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge
+                                    variant={forecast.status === 'final' ? 'success' : 'neutral'}
+                                    label={forecast.status === 'final' ? 'Final' : 'Draft'}
+                                />
                             </span>
                         }
                         description={

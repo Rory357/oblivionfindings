@@ -3,6 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -128,18 +129,6 @@ const categoryColors: Record<string, string> = {
     land: 'bg-status-success-bg text-status-success',
 };
 
-const statusLabels: Record<string, string> = {
-    active: 'Active',
-    fully_depreciated: 'Fully Depreciated',
-    disposed: 'Disposed',
-};
-
-const statusColors: Record<string, string> = {
-    active: 'bg-status-success-bg text-status-success',
-    fully_depreciated: 'bg-status-warning-bg text-status-warning',
-    disposed: 'bg-muted text-muted-foreground',
-};
-
 const methodLabels: Record<string, string> = {
     straight_line: 'Straight Line',
     diminishing_value: 'Diminishing Value',
@@ -190,9 +179,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                                 <Badge variant="secondary" className={categoryColors[asset.category] || ''}>
                                     {categoryLabels[asset.category] || asset.category}
                                 </Badge>
-                                <Badge variant="secondary" className={statusColors[asset.status] || ''}>
-                                    {statusLabels[asset.status] || asset.status}
-                                </Badge>
+                                <StatusBadge status={asset.status} />
                             </span>
                         }
                         description={asset.asset_tag ? `Tag: ${asset.asset_tag}` : undefined}

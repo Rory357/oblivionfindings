@@ -1,6 +1,6 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -65,14 +65,6 @@ type Props = {
     canManage: boolean;
     clients: QuoteClientOption[];
     priceBooks: QuotePriceBook[];
-};
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    draft: 'outline',
-    sent: 'secondary',
-    accepted: 'default',
-    declined: 'destructive',
-    converted: 'default',
 };
 
 function formatDate(d: string | null): string {
@@ -188,9 +180,7 @@ export default function QuotesIndex({
                                         <Link href={`/finance/quotes/${quote.id}`} className="text-sm font-semibold hover:underline">
                                             {quote.reference}
                                         </Link>
-                                        <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
-                                            {quote.status}
-                                        </Badge>
+                                        <StatusBadge status={quote.status} size="sm" />
                                         <span className="text-sm font-semibold text-status-success dark:text-status-success">
                                             {formatMoney(quote.total_amount)}
                                         </span>

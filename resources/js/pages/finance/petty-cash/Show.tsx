@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Receipt } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
@@ -98,11 +99,9 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                             <span className="flex flex-wrap items-center gap-3">
                                 {fund.name}
                                 {fund.is_active ? (
-                                    <Badge variant="outline" className="border-status-success/30 text-status-success">
-                                        Active
-                                    </Badge>
+                                    <StatusBadge variant="success" label="Active" />
                                 ) : (
-                                    <Badge variant="secondary">Inactive</Badge>
+                                    <StatusBadge variant="neutral" label="Inactive" />
                                 )}
                             </span>
                         }

@@ -1,6 +1,6 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -42,16 +42,6 @@ type PageProps = {
     paymentRun: PaymentRun;
 };
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-    draft: { label: 'Draft', variant: 'secondary' },
-    approved: { label: 'Approved', variant: 'outline' },
-    processing: { label: 'Processing', variant: 'default' },
-    completed: { label: 'Completed', variant: 'default' },
-    failed: { label: 'Failed', variant: 'destructive' },
-    pending: { label: 'Pending', variant: 'secondary' },
-    paid: { label: 'Paid', variant: 'default' },
-};
-
 export default function PaymentRunShow({ paymentRun }: PageProps) {
     const [approving, setApproving] = useState(false);
     const [processingRun, setProcessingRun] = useState(false);
@@ -80,8 +70,6 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
             onSuccess: () => setConfirmAction(null),
         });
     };
-
-    const config = statusConfig[paymentRun.status] || { label: paymentRun.status, variant: 'secondary' as const };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -149,7 +137,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Status</p>
-                                <Badge variant={config.variant}>{config.label}</Badge>
+                                <StatusBadge status={paymentRun.status} />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Amount</p>
@@ -234,7 +222,6 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {paymentRun.items.map((item) => {
-                                        const itemConfig = statusConfig[item.status] || { label: item.status, variant: 'secondary' as const };
                                         return (
                                             <TableRow key={item.id}>
                                                 <TableCell className="font-medium">
@@ -259,7 +246,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                                     {item.bank_account_number || '-'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant={itemConfig.variant}>{itemConfig.label}</Badge>
+                                                    <StatusBadge status={item.status} />
                                                 </TableCell>
                                             </TableRow>
                                         );

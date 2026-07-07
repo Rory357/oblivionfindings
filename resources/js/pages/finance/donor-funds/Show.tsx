@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     DonorFundTransactionDialog,
     FinanceTabs,
@@ -112,15 +113,15 @@ const txnTypeConfig: Record<string, { label: string; className: string; isInflow
     adjustment: { label: 'Adjustment', className: 'bg-muted text-foreground', isInflow: false },
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    active: { label: 'Active', className: 'border-status-success/30 text-status-success' },
-    fully_spent: { label: 'Fully Spent', className: 'border-status-warning/30 text-status-warning' },
-    expired: { label: 'Expired', className: 'border-status-critical/30 text-status-critical' },
-    returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
+const statusBadge: Record<string, { label: string; variant: StatusVariant }> = {
+    active: { label: 'Active', variant: 'success' },
+    fully_spent: { label: 'Fully Spent', variant: 'warning' },
+    expired: { label: 'Expired', variant: 'critical' },
+    returned: { label: 'Returned', variant: 'neutral' },
 };
 
 export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts, canManage = false }: Props) {
-    const config = statusConfig[fund.status] ?? statusConfig.active;
+    const badge = statusBadge[fund.status] ?? statusBadge.active;
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
     const [txnType, setTxnType] = useState<'receipt' | 'expenditure' | null>(null);
     const [tab, setTab] = useState<'transactions' | 'reports'>('transactions');
@@ -167,9 +168,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         }
                         actions={
                             <>
-                                <Badge variant="outline" className={config.className}>
-                                    {config.label}
-                                </Badge>
+                                <StatusBadge variant={badge.variant} label={badge.label} />
                                 {fund.is_restricted && (
                                     <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                         Restricted
@@ -456,7 +455,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                             {formatMoney(report.closing_balance)}
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Badge variant="outline">{report.status}</Badge>
+                                                            <StatusBadge status={report.status} />
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             {report.download_url ? (
