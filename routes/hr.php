@@ -90,6 +90,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
         Route::post('/expenses', [MyHrController::class, 'submitExpense'])->name('expenses.store');
         Route::post('/expenses/{expenseClaim}/submit', [MyHrController::class, 'submitExpenseClaim'])->name('expenses.submit');
+        Route::post('/expenses/{expenseClaim}/withdraw', [MyHrController::class, 'withdrawExpenseClaim'])->name('expenses.withdraw');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
         Route::get('/benefits', [MyHrController::class, 'benefits'])->name('benefits');
         // Owner-gated: a new hire completes their own onboarding task from the

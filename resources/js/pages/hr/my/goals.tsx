@@ -605,8 +605,17 @@ export default function MyGoals({ myHr, goals, objectives = [] }: Props) {
 
             {goals.data.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-muted-foreground">
-                            No development goals found.
+                        <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+                            <Target className="h-8 w-8 text-muted-foreground/40" />
+                            <div className="text-sm font-semibold">
+                                No development goals yet
+                            </div>
+                            <p className="max-w-sm text-[13px] text-muted-foreground">
+                                Development goals are set with your manager —
+                                usually during a review or 1:1. Once one is
+                                created for you, you can track and update it
+                                here.
+                            </p>
                         </CardContent>
                     </Card>
                 ) : (

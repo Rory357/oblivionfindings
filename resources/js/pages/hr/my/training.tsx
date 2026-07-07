@@ -76,7 +76,7 @@ interface Props {
 const STATUS_CONFIG = {
     compliant: {
         label: 'Compliant',
-        color: '#10b981',
+        color: 'var(--status-success)',
         bg: 'bg-status-success',
         text: 'text-status-success dark:text-status-success',
         border: 'border-status-success/30',
@@ -84,7 +84,7 @@ const STATUS_CONFIG = {
     },
     expiring_soon: {
         label: 'Expiring Soon',
-        color: '#f59e0b',
+        color: 'var(--status-warning)',
         bg: 'bg-status-warning',
         text: 'text-status-warning dark:text-status-warning',
         border: 'border-status-warning/30',
@@ -92,7 +92,7 @@ const STATUS_CONFIG = {
     },
     expired: {
         label: 'Expired',
-        color: '#ef4444',
+        color: 'var(--status-critical)',
         bg: 'bg-status-critical',
         text: 'text-status-critical dark:text-status-critical',
         border: 'border-status-critical/30',
@@ -100,8 +100,8 @@ const STATUS_CONFIG = {
     },
     not_started: {
         label: 'Not Started',
-        color: '#94a3b8',
-        bg: 'bg-muted-foreground/80/10',
+        color: 'var(--muted-foreground)',
+        bg: 'bg-muted-foreground/10',
         text: 'text-muted-foreground',
         border: 'border-border/30',
         icon: Clock,
@@ -207,8 +207,8 @@ export default function MyTraining({
                                     className="h-0.5"
                                     style={{
                                         backgroundColor: a.overdue
-                                            ? '#ef4444'
-                                            : '#0ea5e9',
+                                            ? 'var(--status-critical)'
+                                            : 'var(--status-info)',
                                     }}
                                 />
                                 <CardContent className="p-4">
@@ -276,7 +276,7 @@ export default function MyTraining({
                             >
                                 <div
                                     className="h-0.5"
-                                    style={{ backgroundColor: '#8b5cf6' }}
+                                    style={{ backgroundColor: 'var(--primary)' }}
                                 />
                                 <CardContent className="p-4">
                                     <div className="flex items-start justify-between gap-3">
@@ -366,22 +366,22 @@ export default function MyTraining({
                                             {
                                                 label: 'Compliant',
                                                 value: summary.compliant,
-                                                color: '#10b981',
+                                                color: 'var(--status-success)',
                                             },
                                             {
                                                 label: 'Expiring',
                                                 value: summary.expiring_soon,
-                                                color: '#f59e0b',
+                                                color: 'var(--status-warning)',
                                             },
                                             {
                                                 label: 'Expired',
                                                 value: summary.expired,
-                                                color: '#ef4444',
+                                                color: 'var(--status-critical)',
                                             },
                                             {
                                                 label: 'Not Started',
                                                 value: summary.not_started,
-                                                color: '#94a3b8',
+                                                color: 'var(--muted-foreground)',
                                             },
                                         ]}
                                         size={160}
@@ -543,10 +543,10 @@ export default function MyTraining({
                                                             width: `${pct}%`,
                                                             backgroundColor:
                                                                 pct === 100
-                                                                    ? '#10b981'
+                                                                    ? 'var(--status-success)'
                                                                     : pct >= 50
-                                                                      ? '#f59e0b'
-                                                                      : '#ef4444',
+                                                                      ? 'var(--status-warning)'
+                                                                      : 'var(--status-critical)',
                                                         }}
                                                     />
                                                 </div>

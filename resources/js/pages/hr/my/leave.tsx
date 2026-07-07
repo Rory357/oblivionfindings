@@ -27,6 +27,16 @@ import {
     ShiftContextMenu,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
@@ -184,6 +194,7 @@ export default function MyLeave({
         label: titleCase(t),
     }));
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null);
 
     function openNew() {
         setWizardInitial(undefined);
@@ -200,7 +211,13 @@ export default function MyLeave({
     }
 
     function cancel(r: LeaveRequest) {
-        if (!confirm('Cancel this leave request?')) return;
+        setCancelTarget(r);
+    }
+
+    function confirmCancel() {
+        const r = cancelTarget;
+        if (!r) return;
+        setCancelTarget(null);
         router.delete(`/hr/my/leave/${r.id}`, {
             preserveScroll: true,
             onSuccess: () =>
@@ -392,6 +409,33 @@ export default function MyLeave({
                 onSubmitted={() => setWizardOpen(false)}
             />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+
+            <AlertDialog
+                open={cancelTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setCancelTarget(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel this leave request?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {cancelTarget
+                                ? `${titleCase(cancelTarget.leave_type)} · ${fmtRange(cancelTarget.start_date, cancelTarget.end_date)} · ${cancelTarget.hours}h. `
+                                : ''}
+                            {cancelTarget?.status === 'approved'
+                                ? 'This leave is already approved — cancelling removes it from the roster and returns the hours to your balance.'
+                                : 'Your manager will no longer see this request.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep request</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmCancel}>
+                            Cancel request
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </MyHrShell>
     );
 }

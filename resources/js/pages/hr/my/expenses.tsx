@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { router } from '@inertiajs/react';
-import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, Receipt, Send, Trash2, Undo2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type ExpenseClaim = {
@@ -49,7 +49,7 @@ type Props = {
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
         className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+            'border-border/30 text-muted-foreground bg-muted-foreground/10',
         label: 'Draft',
     },
     submitted: {
@@ -404,17 +404,55 @@ export default function MyExpenses({ myHr, claims, categories }: Props) {
                                                             : 'Submit'}
                                                     </Button>
                                                 )}
+                                                {claim.status ===
+                                                    'submitted' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            router.post(
+                                                                `/hr/my/expenses/${claim.id}/withdraw`,
+                                                                {},
+                                                                {
+                                                                    preserveScroll:
+                                                                        true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        <Undo2 className="mr-1 h-3.5 w-3.5" />
+                                                        Withdraw
+                                                    </Button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
                                 })}
                                 {claims.data.length === 0 && (
                                     <tr>
-                                        <td
-                                            colSpan={6}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            No expense claims found.
+                                        <td colSpan={6} className="px-6 py-12">
+                                            <div className="flex flex-col items-center gap-2 text-center">
+                                                <Receipt className="h-8 w-8 text-muted-foreground/40" />
+                                                <div className="text-sm font-semibold">
+                                                    No expense claims yet
+                                                </div>
+                                                <p className="max-w-sm text-[13px] text-muted-foreground">
+                                                    Claim work costs like
+                                                    mileage, meals or supplies —
+                                                    approved claims are paid
+                                                    with your pay.
+                                                </p>
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-1"
+                                                    onClick={() =>
+                                                        setFormOpen(true)
+                                                    }
+                                                >
+                                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                                    New expense claim
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 )}

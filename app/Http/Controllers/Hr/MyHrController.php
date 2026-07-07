@@ -31,6 +31,7 @@ use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\FeedService;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\Hr\Services\TimeTrackingService;
@@ -649,6 +650,26 @@ class MyHrController extends Controller
         return redirect()->back()->with('success', 'Expense claim submitted for approval.');
     }
 
+    /**
+     * Pull my own submitted claim back to draft before it's actioned —
+     * it becomes editable again and can be resubmitted. Owner-gated.
+     */
+    public function withdrawExpenseClaim(Request $request, HrExpenseClaim $expenseClaim)
+    {
+        $user = $request->user();
+        abort_unless($expenseClaim->user_id === $user->id, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $expenseClaim->tenant_id);
+
+        try {
+            $this->expenseService->withdrawClaim($expenseClaim);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Expense claim withdrawn — it is back in draft and can be edited or resubmitted.');
+    }
+
     public function cancelLeave(Request $request, HrLeaveRequest $leaveRequest)
     {
         $user = $request->user();
@@ -1057,12 +1078,21 @@ class MyHrController extends Controller
 
         $data = ['employee_comments' => $validated['employee_comments'] ?? $review->employee_comments];
 
-        if (! empty($validated['employee_signed_off']) && ! $review->employee_signed_off) {
+        $signingOff = ! empty($validated['employee_signed_off']) && ! $review->employee_signed_off;
+
+        if ($signingOff) {
+            // Mirrors the UI's canSignOff gate: you can only acknowledge a
+            // review that has actually been completed and discussed.
+            abort_unless($review->status === 'completed', 422, 'Only a completed review can be signed off.');
             $data['employee_signed_off'] = true;
             $data['employee_signed_off_at'] = now();
         }
 
         $review->update($data);
+
+        if ($signingOff) {
+            app(HrNotificationService::class)->notifyReviewSignedOff($review->fresh());
+        }
 
         return redirect()->back()->with('success', 'Review updated.');
     }

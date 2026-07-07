@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +21,7 @@ import {
 import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { router } from '@inertiajs/react';
 import { Eye, FileText, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 
 interface PolicyVersion {
     id: number;
@@ -41,18 +52,21 @@ interface Props {
 }
 
 export default function MyPolicies({ myHr, policies }: Props) {
-    function handleAttest(policyId: number) {
-        if (
-            confirm(
-                'By clicking confirm, you attest that you have read and understood this policy.',
-            )
-        ) {
-            router.post(
-                `/hr/my/policies/${policyId}/attest`,
-                {},
-                { preserveScroll: true },
-            );
-        }
+    const [attestTarget, setAttestTarget] = useState<Policy | null>(null);
+
+    function handleAttest(policy: Policy) {
+        setAttestTarget(policy);
+    }
+
+    function confirmAttest() {
+        const policy = attestTarget;
+        if (!policy) return;
+        setAttestTarget(null);
+        router.post(
+            `/hr/my/policies/${policy.id}/attest`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -213,7 +227,7 @@ export default function MyPolicies({ myHr, policies }: Props) {
                                                                             variant="default"
                                                                             onClick={() =>
                                                                                 handleAttest(
-                                                                                    policy.id,
+                                                                                    policy,
                                                                                 )
                                                                             }
                                                                         >
@@ -252,6 +266,33 @@ export default function MyPolicies({ myHr, policies }: Props) {
                         </table>
                     </CardContent>
                 </Card>
+
+            <AlertDialog
+                open={attestTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setAttestTarget(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Attest to this policy?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {attestTarget
+                                ? `By confirming, you attest that you have read and understood “${attestTarget.title}”. Your attestation is recorded with the date and time.`
+                                : ''}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Not yet</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmAttest}>
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            Confirm attestation
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </MyHrShell>
     );
 }

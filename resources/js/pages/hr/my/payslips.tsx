@@ -316,7 +316,7 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                                 data={netTrend}
                                                 width={64}
                                                 height={28}
-                                                color="#8b5cf6"
+                                                color="var(--primary)"
                                             />
                                         )}
                                     </div>
@@ -363,12 +363,12 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                         >
                                             <stop
                                                 offset="0%"
-                                                stopColor="#10b981"
+                                                stopColor="var(--status-success)"
                                                 stopOpacity={0.3}
                                             />
                                             <stop
                                                 offset="100%"
-                                                stopColor="#10b981"
+                                                stopColor="var(--status-success)"
                                                 stopOpacity={0.02}
                                             />
                                         </linearGradient>
@@ -379,7 +379,7 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                         tickLine={false}
                                         tick={{
                                             fontSize: 11,
-                                            fill: 'hsl(var(--muted-foreground))',
+                                            fill: 'var(--muted-foreground)',
                                         }}
                                     />
                                     <YAxis
@@ -387,7 +387,7 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                         tickLine={false}
                                         tick={{
                                             fontSize: 10,
-                                            fill: 'hsl(var(--muted-foreground))',
+                                            fill: 'var(--muted-foreground)',
                                         }}
                                         tickFormatter={(v: number) =>
                                             `$${(v / 1000).toFixed(1)}k`
@@ -401,8 +401,8 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                         ]}
                                         labelStyle={{ fontWeight: 600 }}
                                         contentStyle={{
-                                            backgroundColor: 'hsl(var(--card))',
-                                            border: '1px solid hsl(var(--border))',
+                                            backgroundColor: 'var(--card)',
+                                            border: '1px solid var(--border)',
                                             borderRadius: '8px',
                                             fontSize: '12px',
                                         }}
@@ -410,7 +410,7 @@ export default function MyPayslips({ myHr, payslips }: Props) {
                                     <Area
                                         type="monotone"
                                         dataKey="net"
-                                        stroke="#10b981"
+                                        stroke="var(--status-success)"
                                         strokeWidth={2}
                                         fill="url(#netGradient)"
                                         name="Net Pay"

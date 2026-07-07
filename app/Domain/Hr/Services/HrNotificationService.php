@@ -15,10 +15,12 @@ use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
 use App\Domain\Hr\Notifications\GoalCompletedNotification;
 use App\Domain\Hr\Notifications\HrAssetAlertNotification;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
+use App\Domain\Hr\Notifications\LeaveCancelledNotification;
 use App\Domain\Hr\Notifications\LeaveDeclinedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\PerformanceReviewDueNotification;
+use App\Domain\Hr\Notifications\ReviewSignedOffNotification;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +62,42 @@ class HrNotificationService
             } catch (\Throwable $e) {
                 Log::warning('Failed to send leave approved notification', [
                     'leave_request_id' => $request->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Notify the right party that a leave request was cancelled. Employee
+     * self-cancel → the approvers hear about it (an approved booking coming off
+     * the roster changes their plans); manager/admin cancel → the employee hears.
+     */
+    public function notifyLeaveCancelled(HrLeaveRequest $request, bool $wasApproved, int $cancelledBy): void
+    {
+        $request->loadMissing('user');
+
+        if ($cancelledBy === $request->user_id) {
+            // Self-cancel → tell whoever was going to (or did) action it: the
+            // assigned approver when one exists, otherwise the approver pool.
+            $assigned = $request->escalated_to && $request->escalated_to !== $request->user_id
+                ? User::find($request->escalated_to)
+                : null;
+            $recipients = $assigned
+                ? collect([$assigned])
+                : $this->getLeaveApprovers($request);
+        } else {
+            // Manager/admin cancel → tell the employee.
+            $recipients = collect([$request->user ?? User::find($request->user_id)])->filter();
+        }
+
+        foreach ($recipients as $recipient) {
+            try {
+                $recipient->notify(new LeaveCancelledNotification($request, $wasApproved));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send leave cancelled notification', [
+                    'leave_request_id' => $request->id,
+                    'recipient_id' => $recipient->id,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -265,6 +303,31 @@ class HrNotificationService
                 Log::warning('Failed to send goal completed notification', [
                     'goal_id' => $goal->id,
                     'manager_id' => $manager->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Notify the reviewer when the employee signs off on their performance
+     * review — the reviewer is waiting on that acknowledgement to close it out.
+     */
+    public function notifyReviewSignedOff(HrPerformanceReview $review): void
+    {
+        $review->loadMissing('employee');
+
+        $reviewer = $review->reviewer_user_id && $review->reviewer_user_id !== $review->employee_user_id
+            ? User::find($review->reviewer_user_id)
+            : null;
+
+        if ($reviewer) {
+            try {
+                $reviewer->notify(new ReviewSignedOffNotification($review));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send review signed-off notification', [
+                    'review_id' => $review->id,
+                    'reviewer_id' => $reviewer->id,
                     'error' => $e->getMessage(),
                 ]);
             }

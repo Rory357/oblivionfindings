@@ -118,6 +118,28 @@ class ExpenseService
     }
 
     /**
+     * Withdraw a submitted claim back to draft — the claimant changed their
+     * mind (or spotted a mistake) before anyone actioned it. Reversible: the
+     * claim becomes editable again and can be resubmitted.
+     *
+     *
+     * @throws \LogicException If claim is not submitted
+     */
+    public function withdrawClaim(HrExpenseClaim $claim): HrExpenseClaim
+    {
+        if ($claim->status !== 'submitted') {
+            throw new \LogicException("Cannot withdraw a '{$claim->status}' claim.");
+        }
+
+        $claim->update([
+            'status' => 'draft',
+            'submitted_at' => null,
+        ]);
+
+        return $claim->fresh();
+    }
+
+    /**
      * Approve a submitted claim.
      *
      *

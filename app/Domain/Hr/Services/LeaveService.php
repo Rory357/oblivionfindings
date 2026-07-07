@@ -518,7 +518,9 @@ class LeaveService
             throw new \LogicException("Cannot cancel a '{$request->status}' leave request.");
         }
 
-        return DB::transaction(function () use ($request, $cancelledBy) {
+        $wasApproved = $request->status === 'approved';
+
+        $result = DB::transaction(function () use ($request, $cancelledBy) {
             $year = Carbon::parse($request->starts_at)->year;
             $hours = (float) $request->hours_requested;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
@@ -561,6 +563,12 @@ class LeaveService
 
             return $request->fresh();
         });
+
+        // Tell whoever was waiting on the request (best-effort, after commit —
+        // mirrors the submit path's approver notification).
+        app(HrNotificationService::class)->notifyLeaveCancelled($result, $wasApproved, $cancelledBy);
+
+        return $result;
     }
 
     /**

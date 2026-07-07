@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,7 +56,7 @@ interface Props {
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
         className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+            'border-border/30 text-muted-foreground bg-muted-foreground/10',
         label: 'Draft',
     },
     in_progress: {
@@ -73,7 +83,7 @@ function RatingStars({ rating }: { rating: number | null }) {
             {Array.from({ length: 5 }, (_, i) => (
                 <Star
                     key={i}
-                    className={`h-4 w-4 ${i < rating ? 'fill-amberx text-status-warning' : 'text-muted-foreground'}`}
+                    className={`h-4 w-4 ${i < rating ? 'fill-status-warning text-status-warning' : 'text-muted-foreground'}`}
                 />
             ))}
         </div>
@@ -82,6 +92,7 @@ function RatingStars({ rating }: { rating: number | null }) {
 
 function ReviewCard({ review }: { review: Review }) {
     const [editing, setEditing] = useState(false);
+    const [showSignOff, setShowSignOff] = useState(false);
     const form = useForm({
         employee_comments: review.employee_comments ?? '',
         employee_signed_off: false,
@@ -101,12 +112,7 @@ function ReviewCard({ review }: { review: Review }) {
     };
 
     const handleSignOff = () => {
-        if (
-            !confirm(
-                'Are you sure you want to sign off on this review? This action cannot be undone.',
-            )
-        )
-            return;
+        setShowSignOff(false);
         form.transform((data) => ({ ...data, employee_signed_off: true }));
         form.put(`/hr/my/reviews/${review.id}`, { preserveScroll: true });
     };
@@ -258,7 +264,7 @@ function ReviewCard({ review }: { review: Review }) {
                         {canSignOff && (
                             <div className="border-t pt-4">
                                 <Button
-                                    onClick={handleSignOff}
+                                    onClick={() => setShowSignOff(true)}
                                     disabled={form.processing}
                                 >
                                     Sign Off on Review
@@ -267,6 +273,34 @@ function ReviewCard({ review }: { review: Review }) {
                                     By signing off, you acknowledge that you
                                     have read and discussed this review.
                                 </p>
+                                <AlertDialog
+                                    open={showSignOff}
+                                    onOpenChange={setShowSignOff}
+                                >
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>
+                                                Sign off on this review?
+                                            </AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Signing off confirms you have
+                                                read and discussed this review
+                                                with your reviewer. This cannot
+                                                be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>
+                                                Not yet
+                                            </AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={handleSignOff}
+                                            >
+                                                Sign off
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
                         )}
 
@@ -275,7 +309,7 @@ function ReviewCard({ review }: { review: Review }) {
                                 Signed off on{' '}
                                 {new Date(
                                     review.employee_signed_off_at,
-                                ).toLocaleDateString()}
+                                ).toLocaleDateString('en-NZ')}
                             </p>
                         )}
 
