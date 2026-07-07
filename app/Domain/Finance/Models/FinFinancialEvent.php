@@ -107,7 +107,7 @@ class FinFinancialEvent extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->where('organization_id', $orgId);
+        return $query->where($query->qualifyColumn('organization_id'), $orgId);
     }
 
     public function scopePending($query)
