@@ -3570,7 +3570,7 @@ export default function ClientShow({
 
                                 {/* Overall Budget Bar */}
                                 {totalBudget > 0 && (
-                                    <Card className="bg-primary/10/30 border-primary">
+                                    <Card className="bg-primary/10 border-primary">
                                         <CardContent className="p-4">
                                             <div className="mb-2 flex items-center justify-between">
                                                 <span className="text-sm font-semibold">
@@ -4132,7 +4132,7 @@ export default function ClientShow({
                                                                     </p>
                                                                 )}
                                                                 {note.assigned_shift && (
-                                                                    <div className="bg-primary/10/50 mt-1 rounded-md border border-primary px-2 py-1 text-xs text-primary">
+                                                                    <div className="bg-primary/10 mt-1 rounded-md border border-primary px-2 py-1 text-xs text-primary">
                                                                         <p className="font-medium">
                                                                             📋
                                                                             Assigned
@@ -5111,7 +5111,7 @@ export default function ClientShow({
                                             </div>
                                         </CardContent>
                                     </Card>
-                                    <Card className="bg-primary/10/50 border dark:bg-primary/20">
+                                    <Card className="bg-primary/10 border dark:bg-primary/20">
                                         <CardContent className="p-4">
                                             <div className="text-2xl font-bold text-primary dark:text-primary">
                                                 {ts.outings_30d}

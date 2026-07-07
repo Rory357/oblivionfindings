@@ -831,7 +831,7 @@ export default function TransportCreate({
                                                 className={cn(
                                                     'rounded-lg border p-4 transition-all',
                                                     isSelected
-                                                        ? 'border-primary bg-primary/10/50 dark:border-primary dark:bg-primary/20'
+                                                        ? 'border-primary bg-primary/10 dark:border-primary dark:bg-primary/20'
                                                         : 'border-border hover:border-muted-foreground/30',
                                                 )}
                                             >

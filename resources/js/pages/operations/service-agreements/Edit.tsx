@@ -651,8 +651,8 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                             <div
                                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
                                     dragOver
-                                        ? 'border-primary bg-primary/10/50'
-                                        : 'border-primary bg-primary/10/50 hover:bg-primary/10'
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-primary bg-primary/5 hover:bg-primary/10'
                                 }`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                                 onDragLeave={() => setDragOver(false)}

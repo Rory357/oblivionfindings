@@ -138,7 +138,7 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                     key={risk.id}
                     className={cn(
                       "flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors",
-                      !risk.within_appetite && "border-primary bg-primary/10/50"
+                      !risk.within_appetite && "border-primary bg-primary/10"
                     )}
                   >
                     <div className="flex items-center gap-4">

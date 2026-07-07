@@ -196,7 +196,7 @@ export default function EmailSettings() {
                                     variant="outline"
                                     className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'smtp'
-                                            ? 'bg-primary/10/60 border-primary'
+                                            ? 'bg-primary/10 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
@@ -234,7 +234,7 @@ export default function EmailSettings() {
                                     variant="outline"
                                     className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'microsoft'
-                                            ? 'bg-primary/10/60 border-primary'
+                                            ? 'bg-primary/10 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
@@ -281,7 +281,7 @@ export default function EmailSettings() {
                                     variant="outline"
                                     className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'google'
-                                            ? 'bg-primary/10/60 border-primary'
+                                            ? 'bg-primary/10 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >

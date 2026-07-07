@@ -112,7 +112,7 @@ export default function PriceBookShow({ price_book, canManage = false }: Props) 
 
                     {/* Add Item Form */}
                     {showItemForm && (
-                        <Card className="mb-4 border-dashed border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/20">
+                        <Card className="mb-4 border-dashed border-primary bg-primary/10 dark:border-primary/30 dark:bg-primary/20">
                             <CardContent className="p-4">
                                 <form onSubmit={handleAddItem} className="space-y-3">
                                     <div className="grid gap-3 sm:grid-cols-3">
