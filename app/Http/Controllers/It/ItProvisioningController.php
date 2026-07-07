@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\It;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
@@ -11,6 +10,7 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +28,7 @@ use Inertia\Inertia;
  */
 class ItProvisioningController extends Controller
 {
-    use ResolvesHrTenant;
+    use Concerns\BuildsItOptions, ResolvesHrTenant;
 
     public function __construct(
         private readonly OnboardingService $onboardingService,
@@ -270,21 +270,59 @@ class ItProvisioningController extends Controller
         $validated = $request->validate([
             'status' => ['sometimes', Rule::in(ItTicket::STATUSES)],
             'priority' => ['sometimes', Rule::in(ItTicket::PRIORITIES)],
+            'subcategory' => ['sometimes', 'nullable', 'string', 'max:255'],
             'assigned_to_user_id' => [
                 'sometimes', 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
         ]);
 
+        $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
         $update = $validated;
 
         if (array_key_exists('status', $validated)) {
             $update['resolved_at'] = $validated['status'] === 'resolved'
                 ? ($ticket->resolved_at ?? now())
                 : null;
+
+            // The waiting clock: entering pauses the SLA, leaving banks the
+            // paused minutes (ItTicket::startWaiting/stopWaiting mutate the
+            // model; drop status from the mass-update so they own it).
+            if ($validated['status'] === 'waiting' && $original['status'] !== 'waiting') {
+                $ticket->startWaiting();
+                unset($update['status']);
+            } elseif ($original['status'] === 'waiting' && $validated['status'] !== 'waiting') {
+                $ticket->stopWaiting($validated['status']);
+                unset($update['status']);
+            }
         }
 
-        $ticket->update($update);
+        $ticket->fill($update);
+        $ticket->save();
+        $ticket->refresh();
+
+        // Activity trail + assignee notification, once per actual change.
+        if ($ticket->status !== $original['status']) {
+            ItTicketEvent::record($ticket, 'status_changed', $user->id, [
+                'from' => $original['status'],
+                'to' => $ticket->status,
+            ]);
+        }
+        if ($ticket->priority !== $original['priority']) {
+            ItTicketEvent::record($ticket, 'priority_changed', $user->id, [
+                'from' => $original['priority'],
+                'to' => $ticket->priority,
+            ]);
+        }
+        if ((int) $ticket->assigned_to_user_id !== (int) $original['assigned_to_user_id']) {
+            ItTicketEvent::record($ticket, 'assigned', $user->id, [
+                'from' => $original['assigned_to_user_id'],
+                'to' => $ticket->assigned_to_user_id,
+            ]);
+            if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
+                $ticket->assignee->notify(new TicketAssignedNotification($ticket));
+            }
+        }
 
         return redirect()->back()->with('success', 'Ticket updated.');
     }
@@ -578,25 +616,6 @@ class ItProvisioningController extends Controller
         ];
 
         return $summary;
-    }
-
-    /** Active tenant staff usable as request/ticket assignees (IT owners). */
-    private function tenantUserOptions(int $tenantId): array
-    {
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->with('user:id,name')
-            ->get()
-            ->map(fn (HrEmployeeProfile $p) => [
-                'id' => $p->user_id,
-                'name' => $p->user?->name,
-            ])
-            ->filter(fn ($u) => $u['id'] && $u['name'])
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            ->all();
     }
 
     /** @param array<int, string> $allowed */

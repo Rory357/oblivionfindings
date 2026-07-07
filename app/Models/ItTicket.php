@@ -171,6 +171,35 @@ class ItTicket extends Model
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Waiting clock (SLA pause/resume) */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Enter "waiting on requester": the resolution clock pauses from now.
+     * Mutates without saving — callers batch it into their own update().
+     */
+    public function startWaiting(): void
+    {
+        $this->status = 'waiting';
+        $this->waiting_since = $this->waiting_since ?? now();
+    }
+
+    /**
+     * Leave "waiting on requester" (requester replied, or an agent moved it
+     * on): bank the paused minutes so SLA maths exclude them, clear the
+     * marker. Mutates without saving.
+     */
+    public function stopWaiting(string $nextStatus = 'in_progress'): void
+    {
+        if ($this->waiting_since) {
+            $this->sla_paused_minutes = (int) $this->sla_paused_minutes
+                + (int) $this->waiting_since->diffInMinutes(now());
+            $this->waiting_since = null;
+        }
+        $this->status = $nextStatus;
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
 

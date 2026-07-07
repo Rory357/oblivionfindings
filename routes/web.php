@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItProvisioningController;
+use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\TodayDashboardController;
@@ -148,6 +149,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // Self-service: raising a ticket needs it.request (or it.manage for
     // agents logging on behalf of others) — enforced via ItTicketPolicy.
     Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
+    // The workspace: agents see every ticket, requesters their own
+    // (ItTicketPolicy; internal notes stripped server-side).
+    Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
+    Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
@@ -155,6 +160,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
+        Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
+        Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
     });
 });
 
