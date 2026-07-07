@@ -228,6 +228,9 @@ export default function LeaveIndex({
     const [declineNotes, setDeclineNotes] = useState('');
     const [processing, setProcessing] = useState(false);
     const [bulkApproveDialogOpen, setBulkApproveDialogOpen] = useState(false);
+    const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(
+        null,
+    );
     const selectedPendingIds = useMemo(
         () =>
             selectedRequestIds.filter((id) =>
@@ -276,6 +279,17 @@ export default function LeaveIndex({
         setDeclineTarget({ type: 'single', id: requestId });
         setDeclineNotes('');
         setDeclineDialogOpen(true);
+    }
+    function confirmCancelRequest() {
+        const target = cancelTarget;
+        if (!target) return;
+        setCancelTarget(null);
+        setProcessing(true);
+        router.post(
+            `/hr/leave/${target.id}/cancel`,
+            {},
+            { preserveScroll: true, onFinish: () => setProcessing(false) },
+        );
     }
     function toggleRequestSelection(requestId: number, checked: boolean) {
         setSelectedRequestIds((current) =>
@@ -412,6 +426,18 @@ export default function LeaveIndex({
                 label: 'Escalate now',
                 icon: ArrowUpCircle,
                 onSelect: escalateNow,
+            });
+        }
+        if (
+            !!can.manage &&
+            (r.status === 'pending' || r.status === 'approved')
+        ) {
+            items.push({
+                kind: 'item',
+                label: 'Cancel request…',
+                icon: XCircle,
+                tone: 'critical',
+                onSelect: () => setCancelTarget(r),
             });
         }
         items.push({ kind: 'divider' });
@@ -823,6 +849,36 @@ export default function LeaveIndex({
                         <AlertDialogAction onClick={confirmBulkApprove}>
                             Approve {selectedPendingIds.length} Request
                             {selectedPendingIds.length === 1 ? '' : 's'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Manager cancel confirmation */}
+            <AlertDialog
+                open={cancelTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setCancelTarget(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Cancel this leave request?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {cancelTarget
+                                ? `${cancelTarget.staff_name} · ${cancelTarget.hours}h. `
+                                : ''}
+                            {cancelTarget?.status === 'approved'
+                                ? 'This leave is approved — cancelling removes it from the roster, returns the hours to their balance, and notifies the employee.'
+                                : 'This pending request will be closed and the employee notified.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep request</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmCancelRequest}>
+                            Cancel request
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
@@ -106,6 +107,21 @@ class PublicHolidayController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         if ($holiday->tenant_id !== null) {
             $this->assertHrTenantAccess($tenantId, (int) $holiday->tenant_id);
+        }
+
+        // Leave hours are engine-calculated AROUND holidays — deleting one
+        // that overlaps existing requests silently invalidates those hour
+        // counts. Block with an explanation rather than corrupt history.
+        $overlapping = HrLeaveRequest::query()
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereDate('starts_at', '<=', $holiday->date)
+            ->whereDate('ends_at', '>=', $holiday->date)
+            ->count();
+
+        if ($overlapping > 0) {
+            return redirect()
+                ->route('hr.leave.holidays.index', ['year' => (int) $holiday->year])
+                ->with('error', "Cannot delete \u{201C}{$holiday->name}\u{201D} — {$overlapping} live leave request(s) span this date and their hours were calculated with it. Decline or cancel those requests first, or edit the holiday instead.");
         }
 
         $year = (int) $holiday->year;

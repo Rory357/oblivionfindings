@@ -426,8 +426,16 @@ export default function LeaveBalances({
                                         </div>
                                         <div className="text-[11px] text-muted-foreground">
                                             {e.created_at
-                                                ?.slice(0, 16)
-                                                .replace('T', ' ')}
+                                                ? new Date(
+                                                      e.created_at,
+                                                  ).toLocaleString('en-NZ', {
+                                                      day: 'numeric',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                      hour: 'numeric',
+                                                      minute: '2-digit',
+                                                  })
+                                                : ''}
                                             {e.created_by
                                                 ? ` · ${e.created_by}`
                                                 : ''}

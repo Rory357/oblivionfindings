@@ -389,6 +389,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/leave/{leaveRequest}', [LeaveController::class, 'show'])->name('leave.show');
             Route::post('/leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
             Route::post('/leave/{leaveRequest}/decline', [LeaveController::class, 'decline'])->name('leave.decline');
+            Route::post('/leave/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->name('leave.cancel');
             Route::post('/leave/bulk-approve', [LeaveController::class, 'bulkApprove'])->name('leave.bulk-approve');
             Route::post('/leave/bulk-decline', [LeaveController::class, 'bulkDecline'])->name('leave.bulk-decline');
             Route::post('/leave/escalate-now', [LeaveController::class, 'escalateNow'])->name('leave.escalate-now');

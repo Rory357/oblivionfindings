@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrLeaveBalanceLedger;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
+use App\Domain\Hr\Notifications\LeaveBalanceAdjustedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Models\Shift;
 use App\Models\Site;
@@ -452,7 +453,7 @@ class LeaveService
             throw new \InvalidArgumentException('Adjustment hours cannot be negative.');
         }
 
-        return DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor, $tenantId) {
+        $result = DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor, $tenantId) {
             $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true, $tenantId);
             $before = $this->snapshotBalance($balance);
 
@@ -485,8 +486,29 @@ class LeaveService
                 notes: $reason,
             );
 
-            return $balance->fresh();
+            return ['balance' => $balance->fresh(), 'delta' => $delta];
         });
+
+        // It's their statutory entitlement — tell them it moved (best-effort,
+        // after commit; skip self-adjustments).
+        if ($actor->id !== $target->id) {
+            try {
+                $target->notify(new LeaveBalanceAdjustedNotification(
+                    $leaveType,
+                    $year,
+                    (float) $result['delta'],
+                    (float) $result['balance']->balance_hours,
+                    $reason,
+                ));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send balance-adjusted notification', [
+                    'user_id' => $target->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $result['balance'];
     }
 
     /**
@@ -605,14 +627,21 @@ class LeaveService
             return;
         }
 
-        StaffTimeOff::whereKey($request->time_off_id)->update([
+        // Load-modify-save (not a mass update) so AuditableChanges logs the
+        // projection's own state change alongside the HrLeaveRequest edit.
+        $timeOff = StaffTimeOff::find($request->time_off_id);
+        if (! $timeOff) {
+            return;
+        }
+
+        $timeOff->fill([
             'tenant_id' => $request->tenant_id,
             'type' => $request->leave_type,
             'starts_at' => $request->starts_at,
             'ends_at' => $request->ends_at,
             'period' => $request->period ?: 'full_day',
             'label' => ucfirst(str_replace('_', ' ', (string) $request->leave_type)),
-        ]);
+        ])->save();
     }
 
     /**

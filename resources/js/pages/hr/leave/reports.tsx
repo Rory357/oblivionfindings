@@ -113,12 +113,12 @@ function AbsenceArea({
                     <linearGradient id="absFill" x1="0" y1="0" x2="0" y2="1">
                         <stop
                             offset="0%"
-                            stopColor="#b42318"
+                            stopColor="var(--status-critical)"
                             stopOpacity={0.3}
                         />
                         <stop
                             offset="100%"
-                            stopColor="#b42318"
+                            stopColor="var(--status-critical)"
                             stopOpacity={0.02}
                         />
                     </linearGradient>
@@ -127,7 +127,7 @@ function AbsenceArea({
                 <polyline
                     points={line}
                     fill="none"
-                    stroke="#b42318"
+                    stroke="var(--status-critical)"
                     strokeWidth={1.5}
                     vectorEffect="non-scaling-stroke"
                 />
@@ -364,7 +364,8 @@ export default function LeaveReports({
                             </span>
                             <p className="mb-2.5 text-[11.5px] text-muted-foreground">
                                 Frequency² × days — flags disruptive short
-                                absences
+                                absences. Top 8 shown; export for the full
+                                list.
                             </p>
                             {bradfordFactor.employees.length === 0 ? (
                                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -417,7 +418,8 @@ export default function LeaveReports({
                                 Annual leave utilisation
                             </span>
                             <p className="mb-2.5 text-[11.5px] text-muted-foreground">
-                                Taken vs entitlement, by staff member
+                                Taken vs entitlement, by staff member. Top 8
+                                shown; export for the full list.
                             </p>
                             {utilization.employees.length === 0 ? (
                                 <p className="py-6 text-center text-sm text-muted-foreground">

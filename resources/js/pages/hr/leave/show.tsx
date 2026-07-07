@@ -230,7 +230,7 @@ export default function ShowLeave({ request, can }: Props) {
                                         {request.submitted_at
                                             ? new Date(
                                                   request.submitted_at,
-                                              ).toLocaleString()
+                                              ).toLocaleString('en-NZ')
                                             : 'N/A'}
                                     </p>
                                 </div>
@@ -252,7 +252,7 @@ export default function ShowLeave({ request, can }: Props) {
                                                 {request.reviewed_at
                                                     ? new Date(
                                                           request.reviewed_at,
-                                                      ).toLocaleString()
+                                                      ).toLocaleString('en-NZ')
                                                     : 'N/A'}
                                             </p>
                                         </div>

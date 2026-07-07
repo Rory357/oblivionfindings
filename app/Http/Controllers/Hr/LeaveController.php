@@ -686,6 +686,36 @@ class LeaveController extends Controller
         return redirect()->back()->with('success', 'Leave request declined.');
     }
 
+    /**
+     * Manager/HR cancel of a pending or approved request — e.g. the staff
+     * member is hospitalised or the roster changed and they can't self-cancel.
+     * The service reverses the balance + ledger, removes the roster
+     * projection, and (because the actor isn't the owner) notifies the
+     * employee.
+     */
+    public function cancel(Request $request, HrLeaveRequest $leaveRequest)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $leaveRequest->tenant_id);
+
+        try {
+            $cancelled = $this->leaveService->cancelRequest($leaveRequest, $user->id);
+
+            $this->webhookService->publish($cancelled->tenant_id, 'leave.request.cancelled', [
+                'leave_request_id' => $cancelled->id,
+                'user_id' => $cancelled->user_id,
+                'cancelled_by' => $user->id,
+                'leave_type' => $cancelled->leave_type,
+            ]);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Leave request cancelled — the employee has been notified.');
+    }
+
     public function bulkApprove(Request $request)
     {
         $user = $request->user();
