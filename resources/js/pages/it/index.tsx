@@ -14,7 +14,18 @@ import {
 } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
@@ -142,6 +153,8 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it'
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
 const ALL = 'all';
+/** Bulk-assign sentinel for "remove the assignee" (empty value is illegal). */
+const UNASSIGN = 'unassign';
 
 const typeIcon: Record<string, typeof Mail> = {
     account: Mail,
@@ -337,6 +350,65 @@ export default function ItIndex({
         router.get('/it', { tab: 'tickets' }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
+    /* ---------------- bulk selection (§F2) ---------------- */
+
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [confirmBulkClose, setConfirmBulkClose] = useState(false);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const pageTicketIds = (tickets?.data ?? []).map((t) => t.id);
+
+    // The selection is per-view — drop it whenever the visible page changes
+    // (filter, sort, page or a bulk action that reshuffles rows).
+    const pageIdsKey = pageTicketIds.join(',');
+    useEffect(() => {
+        setSelected(new Set());
+    }, [pageIdsKey]);
+
+    const toggleRow = (id: number, on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (on) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+
+    const toggleAllOnPage = (on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            pageTicketIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            return next;
+        });
+
+    /** POST the selection through `it.tickets.bulk`; flash → toast, then clear. */
+    const runBulk = (payload: Record<string, unknown>) => {
+        if (selected.size === 0) return;
+        setBulkBusy(true);
+        router.post(
+            '/it/tickets/bulk',
+            { ids: [...selected], ...payload },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flash = page.props.flash as { error?: string; success?: string } | undefined;
+                    if (flash?.error) toast.error(flash.error);
+                    else if (flash?.success) toast.success(flash.success);
+                    setSelected(new Set());
+                },
+                onFinish: () => setBulkBusy(false),
+            },
+        );
+    };
+
+    // Bulk select is agent-only (it.manage) — the checkbox column and action
+    // bar only exist for people who can mutate. The grid gains a leading
+    // 36px checkbox track when it does.
+    const ticketGridCols = can.manage
+        ? 'grid-cols-[36px_3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]'
+        : 'grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]';
+    const allOnPageSelected = pageTicketIds.length > 0 && pageTicketIds.every((id) => selected.has(id));
+    const someOnPageSelected = pageTicketIds.some((id) => selected.has(id));
+
     /** Direct row action — surfaces the redirect flash as a toast. */
     const act = (method: 'post' | 'patch', url: string, data: Record<string, string> = {}) => {
         router[method](url, data, {
@@ -473,6 +545,25 @@ export default function ItIndex({
                 onClose={() => setModal(null)}
             />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
+
+            <AlertDialog open={confirmBulkClose} onOpenChange={setConfirmBulkClose}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Close {selected.size} ticket{selected.size === 1 ? '' : 's'}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Closed tickets leave the working queue. Requesters can still reopen within seven days.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep open</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => runBulk({ action: 'close' })}>
+                            Close tickets
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
                 {/* Hero */}
@@ -788,8 +879,94 @@ export default function ItIndex({
                             </div>
                         </div>
 
+                        {/* Bulk action bar — appears when rows are selected */}
+                        {can.manage && selected.size > 0 ? (
+                            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
+                                <span className="text-[12.5px] font-semibold text-foreground">
+                                    {selected.size} selected
+                                </span>
+                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                                <Select
+                                    value=""
+                                    onValueChange={(v) =>
+                                        runBulk({
+                                            action: 'assign',
+                                            assigned_to_user_id: v === UNASSIGN ? null : Number(v),
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-[150px]" aria-label="Assign selected tickets to">
+                                        <SelectValue placeholder="Assign to…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={UNASSIGN}>Unassign</SelectItem>
+                                        {assignees.map((a) => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value="" onValueChange={(v) => runBulk({ action: 'priority', priority: v })}>
+                                    <SelectTrigger className="h-8 w-[140px]" aria-label="Set priority for selected">
+                                        <SelectValue placeholder="Set priority…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {TICKET_PRIORITIES.map((p) => (
+                                            <SelectItem key={p} value={p}>
+                                                {label(p)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value="" onValueChange={(v) => runBulk({ action: 'status', status: v })}>
+                                    <SelectTrigger className="h-8 w-[150px]" aria-label="Set status for selected">
+                                        <SelectValue placeholder="Set status…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {['open', 'in_progress', 'waiting'].map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                                {label(s)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={bulkBusy}
+                                    onClick={() => setConfirmBulkClose(true)}
+                                >
+                                    <XCircle className="h-3.5 w-3.5" /> Close
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="ml-auto"
+                                    onClick={() => setSelected(new Set())}
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                        ) : null}
+
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <div className={`grid ${ticketGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}>
+                                {can.manage ? (
+                                    <span className="flex items-center">
+                                        <Checkbox
+                                            checked={
+                                                allOnPageSelected
+                                                    ? true
+                                                    : someOnPageSelected
+                                                      ? 'indeterminate'
+                                                      : false
+                                            }
+                                            onCheckedChange={(v) => toggleAllOnPage(v === true)}
+                                            aria-label="Select all tickets on this page"
+                                        />
+                                    </span>
+                                ) : null}
                                 <SortHeader label="Ticket" col="reference" filters={filters} onSort={applySort} />
                                 <span>Requester</span>
                                 <span>Assignee</span>
@@ -805,8 +982,18 @@ export default function ItIndex({
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
                                     onClick={(e) => openTicket(t.id, e)}
                                     onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
-                                    className="grid cursor-pointer grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                                    className={`grid cursor-pointer ${ticketGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40 ${selected.has(t.id) ? 'bg-primary/5' : ''}`}
                                 >
+                                    {can.manage ? (
+                                        <span className="flex items-center">
+                                            <Checkbox
+                                                checked={selected.has(t.id)}
+                                                onCheckedChange={(v) => toggleRow(t.id, v === true)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                aria-label={`Select ${t.reference ?? t.title}`}
+                                            />
+                                        </span>
+                                    ) : null}
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
                                             <Ticket className="h-3.5 w-3.5" />
