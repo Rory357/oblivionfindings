@@ -292,7 +292,7 @@ class SendMedicationAlerts extends Command
                 continue;
             }
 
-            $clientName = $medication->client?->name ?? 'Unknown client';
+            $clientName = $medication->client?->full_name ?? 'Unknown client';
             $medicationName = $medication->name ?? 'Unknown medication';
 
             foreach ($teamLeaders as $leader) {

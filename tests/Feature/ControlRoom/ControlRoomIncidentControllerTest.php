@@ -57,6 +57,37 @@ class ControlRoomIncidentControllerTest extends TestCase
             );
     }
 
+    public function test_feed_resolves_the_client_full_name(): void
+    {
+        // Regression: the feed read Client->name (which doesn't exist — the
+        // model appends full_name), so every client incident showed "Unknown".
+        $site = Site::factory()->create(['type' => 'house']);
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'first_name' => 'Aroha',
+            'last_name' => 'Kingi',
+        ]);
+
+        ClientIncident::create([
+            'client_id' => $client->id,
+            'reported_by' => $this->admin->id,
+            'title' => 'Feed name check',
+            'type' => 'behaviour',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'occurred_at' => now()->subHour(),
+            'description' => 'Feed name check',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('control-room/incidents')
+                ->where('incidents.data.0.client_name', 'Aroha Kingi')
+            );
+    }
+
     public function test_create_alert_from_incident_requires_create_permission(): void
     {
         $site = Site::factory()->create(['type' => 'house']);

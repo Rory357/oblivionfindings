@@ -172,7 +172,7 @@ class ComprehensiveAlertBridgeService
     public function bridgeBreakGlassAccess(ClientBreakGlassAccess $access): ?ControlRoomAlert
     {
         $userName = $access->relationLoaded('user') ? $access->user?->name : null;
-        $clientName = $access->relationLoaded('client') ? $access->client?->name : null;
+        $clientName = $access->relationLoaded('client') ? $access->client?->full_name : null;
 
         return $this->createBridgedAlert([
             'source' => 'compliance',

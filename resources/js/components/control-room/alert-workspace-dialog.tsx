@@ -911,13 +911,25 @@ function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => vo
                     />
                 </Field>
                 <Field label="Category" error={form.errors.category}>
-                    <SelectInput value={form.data.category} onChange={(v) => form.setData('category', v)} placeholder="No category" options={d.config_options.categories ?? []} />
+                    {(d.config_options.categories ?? []).length ? (
+                        <SelectInput value={form.data.category} onChange={(v) => form.setData('category', v)} placeholder="No category" options={d.config_options.categories ?? []} />
+                    ) : (
+                        <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                            No categories configured yet — add them under Control Room settings → Ticket options.
+                        </p>
+                    )}
                 </Field>
                 <Field label="Due" hint="Internal target" error={form.errors.due_at}>
                     <Input type="datetime-local" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
                 </Field>
                 <Field label="Resolution code" error={form.errors.resolution_code}>
-                    <SelectInput value={form.data.resolution_code} onChange={(v) => form.setData('resolution_code', v)} placeholder="Not set" options={d.config_options.resolution_codes ?? []} />
+                    {(d.config_options.resolution_codes ?? []).length ? (
+                        <SelectInput value={form.data.resolution_code} onChange={(v) => form.setData('resolution_code', v)} placeholder="Not set" options={d.config_options.resolution_codes ?? []} />
+                    ) : (
+                        <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                            No resolution codes configured yet — add them under Control Room settings → Ticket options.
+                        </p>
+                    )}
                 </Field>
             </div>
             <PaneNav onCancel={onDone} onSubmit={submit} submitLabel="Save details" processing={form.processing} />
