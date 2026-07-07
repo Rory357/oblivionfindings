@@ -36,6 +36,19 @@ class HsCorrectiveActionsRegisterTest extends TestCase
         return $user;
     }
 
+    public function test_register_grants_manage_to_roles_holding_hazards_manage(): void
+    {
+        // Regression: can.manage was computed with Gate ->can('hazards.manage')
+        // (no such Gate ability exists) so it was false for EVERYONE and the
+        // whole corrective-action lifecycle (Start/Complete/Verify/Close) was
+        // invisible in the register menu and the event dialog. It must come
+        // from the RBAC helper canDo().
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/corrective-actions')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('can.manage', true));
+    }
+
     public function test_corrective_actions_register_renders_sibling_governance_payload(): void
     {
         $site = Site::factory()->create(['name' => 'Rata House']);

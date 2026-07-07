@@ -821,6 +821,16 @@ class ControlRoomAlertController extends Controller
             }
         }
 
+        // The due time arrives as a naive datetime-local string in the worker's
+        // wall clock; interpret it in the worker timezone and store UTC, or a
+        // 9:00 am target displays as 9:00 pm.
+        if (! empty($fieldsToUpdate['due_at'])) {
+            $fieldsToUpdate['due_at'] = \Illuminate\Support\Carbon::parse(
+                $fieldsToUpdate['due_at'],
+                config('app.worker_timezone'),
+            )->utc();
+        }
+
         if (! empty($fieldsToUpdate)) {
             $alert->update($fieldsToUpdate);
         }

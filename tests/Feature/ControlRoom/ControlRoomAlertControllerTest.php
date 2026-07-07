@@ -104,6 +104,30 @@ class ControlRoomAlertControllerTest extends TestCase
     }
 
     // ──────────────────────────────────────
+    // Alert meta (working details)
+    // ──────────────────────────────────────
+
+    public function test_update_meta_interprets_due_at_in_the_worker_timezone(): void
+    {
+        // Regression: the datetime-local value ("2026-07-08T09:00", no zone)
+        // was stored verbatim, so Eloquent treated 9:00 am NZ as 9:00 am UTC
+        // and the workspace displayed it as 9:00 pm — twelve hours off.
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/meta", [
+                'due_at' => '2026-07-08T09:00',
+            ])
+            ->assertRedirect();
+
+        // 9:00 am 8 Jul NZST (UTC+12, NZ winter) === 9:00 pm 7 Jul UTC.
+        $this->assertSame(
+            '2026-07-07 21:00:00',
+            $alert->fresh()->due_at->utc()->format('Y-m-d H:i:s'),
+        );
+    }
+
+    // ──────────────────────────────────────
     // Acknowledge Alert
     // ──────────────────────────────────────
 

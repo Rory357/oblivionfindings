@@ -184,7 +184,7 @@ class HsEventController extends Controller
             ],
             'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
             'detail' => $detail,
-            'can' => ['manage' => (bool) ($request->user()?->can('hazards.manage') ?? false)],
+            'can' => ['manage' => (bool) ($request->user()?->canDo('hazards.manage') ?? false)],
         ]);
     }
 
@@ -432,7 +432,7 @@ class HsEventController extends Controller
                 'approved_by_name' => $inv->approvedBy?->name,
             ]);
 
-        $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
+        $canManage = (bool) (auth()->user()?->canDo('hazards.manage') ?? false);
         $currentUserId = auth()->id();
 
         $correctiveActions = $hsEvent->correctiveActions()
@@ -543,7 +543,7 @@ class HsEventController extends Controller
     {
         $tab = (string) $request->input('tab', $this->legacyActionTab($request));
 
-        $canManage = (bool) ($request->user()?->can('hazards.manage') ?? false);
+        $canManage = (bool) ($request->user()?->canDo('hazards.manage') ?? false);
         $currentUserId = $request->user()?->id;
 
         $query = HsCorrectiveAction::query()
@@ -682,7 +682,7 @@ class HsEventController extends Controller
                 'manage' => $canManage,
                 // Traceability report is a governance artefact, gated on governance.view
                 // (NOT hazards.manage) per the corrective-actions handover.
-                'viewReports' => (bool) ($request->user()?->can('governance.view') ?? false),
+                'viewReports' => (bool) ($request->user()?->canDo('governance.view') ?? false),
             ],
         ]);
     }

@@ -102,7 +102,7 @@ export type AlertWorkspaceDetail = {
         title: string;
         status: string;
         item_count: number;
-        items: Array<{ id: number; type: string; title: string; file_path: string | null; created_at: string | null }>;
+        items: Array<{ id: number; type: string; title: string; description: string | null; file_path: string | null; created_at: string | null }>;
     }>;
     communications: Array<{
         id: number;
@@ -873,12 +873,20 @@ function SensorDismissPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () 
     );
 }
 
+/** UTC ISO → the local wall-time string a datetime-local input expects. */
+function toDateTimeLocalInput(iso: string): string {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+}
+
 function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void }) {
     const a = d.alert;
     const form = useForm<{ priority: string; category: string; due_at: string; resolution_code: string }>({
         priority: a.priority ?? '',
         category: a.category ?? '',
-        due_at: a.due_at ? a.due_at.slice(0, 16) : '',
+        due_at: a.due_at ? toDateTimeLocalInput(a.due_at) : '',
         resolution_code: a.resolution_code ?? '',
     });
     const submit = () => {
@@ -1408,6 +1416,7 @@ function EvidencePackCard({ pack, canManage }: { pack: AlertWorkspaceDetail['evi
                                 )}
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm text-foreground">{item.title}</p>
+                                    {item.description ? <p className="text-xs whitespace-pre-wrap text-muted-foreground">{item.description}</p> : null}
                                     <p className="text-xs text-muted-foreground">
                                         {titleCase(item.type)}
                                         {item.created_at ? ` · ${formatDateTime(item.created_at)}` : ''}

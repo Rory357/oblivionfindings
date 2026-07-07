@@ -101,6 +101,33 @@ class ControlRoomEvidenceControllerTest extends TestCase
         $this->assertSame(1, $pack->fresh()->item_count);
     }
 
+    public function test_workspace_payload_carries_the_note_text(): void
+    {
+        // Regression: note items serialized only type/title ("Note"), so the
+        // text was unreadable in the workspace right after adding it.
+        $pack = EvidencePack::create([
+            'alert_id' => $this->alert->id,
+            'title' => 'Pack',
+            'status' => 'collecting',
+            'item_count' => 0,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/evidence/{$pack->id}/items", [
+                'item_type' => 'note',
+                'content' => 'Call log: reached on the landline, all well.',
+            ])
+            ->assertRedirect();
+
+        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+            ->build($this->admin, $this->alert->id);
+
+        $item = $detail['evidence_packs'][0]['items'][0];
+        $this->assertSame('note', $item['type']);
+        $this->assertSame('Call log: reached on the landline, all well.', $item['description']);
+    }
+
     public function test_store_item_blocked_on_completed_pack(): void
     {
         $pack = EvidencePack::create([

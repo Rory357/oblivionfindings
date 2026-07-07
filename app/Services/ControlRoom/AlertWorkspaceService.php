@@ -206,6 +206,9 @@ class AlertWorkspaceService
                     'id' => $i->id,
                     'type' => $i->type,
                     'title' => $i->title,
+                    // Note items keep their text here — without it the row reads
+                    // just "Note" and the content is unreadable after adding.
+                    'description' => $i->description,
                     'file_path' => $i->file_path,
                     'created_at' => optional($i->created_at)->toISOString(),
                 ])->values(),
