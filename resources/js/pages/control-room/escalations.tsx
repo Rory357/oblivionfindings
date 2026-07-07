@@ -503,6 +503,10 @@ function MoveQueueDialog({
     const [busy, setBusy] = useState(false);
     const target = queues.find((q) => String(q.id) === targetId);
 
+    // Queue names are often already tier-labelled ("Tier 1"), so only prepend the
+    // tier prefix when the name doesn't already carry it — avoids "Tier 1: Tier 1".
+    const queueLabel = (q: QueueOption) => (q.name.trim().toLowerCase().startsWith('tier') ? q.name : `Tier ${q.tier}: ${q.name}`);
+
     const submit = () => {
         if (!target || busy) return;
         setBusy(true);
@@ -535,7 +539,7 @@ function MoveQueueDialog({
                                     value={targetId}
                                     onChange={setTargetId}
                                     placeholder="Select a queue"
-                                    options={queues.map((q) => ({ value: String(q.id), label: `Tier ${q.tier}: ${q.name}` }))}
+                                    options={queues.map((q) => ({ value: String(q.id), label: queueLabel(q) }))}
                                 />
                             </Field>
                             <PaneNav onCancel={onClose} onNext={() => setStep(1)} nextDisabled={!target} step={0} stepCount={2} />
@@ -544,7 +548,7 @@ function MoveQueueDialog({
                         <>
                             <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-sm">
                                 <span className="font-medium text-foreground">CR-{alert.id} · {alert.alert_type}</span>
-                                <span className="text-muted-foreground"> → Tier {target?.tier}: {target?.name}</span>
+                                <span className="text-muted-foreground"> → {target ? queueLabel(target) : ''}</span>
                             </div>
                             <PaneNav onCancel={onClose} onBack={() => setStep(0)} onSubmit={submit} submitLabel="Move alert" processing={busy} step={1} stepCount={2} />
                         </>

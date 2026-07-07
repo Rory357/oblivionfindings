@@ -123,6 +123,57 @@ class ControlRoomShiftControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_handover_keeps_the_operator_supplied_incoming_shift_name(): void
+    {
+        $shift = Shift::query()->create([
+            'name' => 'Outgoing Shift',
+            'starts_at' => now()->subHours(8),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'handover_notes' => 'Quiet night — nothing outstanding.',
+                'incoming_shift_name' => 'Sunrise Team',
+                'incoming_lead_user_id' => $this->visibleWorker->id,
+                'incoming_team_members' => [$this->visibleWorker->id],
+            ])
+            ->assertRedirect(route('control-room.shifts.index'));
+
+        // The outgoing shift is completed and a new active shift carries the typed name.
+        $this->assertSame('completed', $shift->fresh()->status);
+        $this->assertDatabaseHas('control_room_shifts', [
+            'name' => 'Sunrise Team',
+            'status' => 'active',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+        ]);
+    }
+
+    public function test_handover_falls_back_to_a_timestamped_name_when_none_supplied(): void
+    {
+        $shift = Shift::query()->create([
+            'name' => 'Outgoing Shift',
+            'starts_at' => now()->subHours(8),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'handover_notes' => 'Quiet night — nothing outstanding.',
+                'incoming_lead_user_id' => $this->visibleWorker->id,
+                'incoming_team_members' => [$this->visibleWorker->id],
+            ])
+            ->assertRedirect(route('control-room.shifts.index'));
+
+        $newShift = Shift::query()->where('status', 'active')->latest('id')->first();
+        $this->assertNotNull($newShift);
+        $this->assertStringStartsWith('Shift ', $newShift->name);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([

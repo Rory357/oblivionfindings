@@ -183,6 +183,7 @@ class ControlRoomShiftController extends Controller
             'handover_notes' => ['required', 'string', 'max:5000'],
             'priority_items' => ['nullable', 'array'],
             'priority_items.*' => ['string', 'max:500'],
+            'incoming_shift_name' => ['nullable', 'string', 'max:255'],
             'incoming_lead_user_id' => ['required', 'integer', 'exists:users,id'],
             'incoming_team_members' => ['nullable', 'array'],
             'incoming_team_members.*' => ['integer', 'exists:users,id'],
@@ -212,10 +213,12 @@ class ControlRoomShiftController extends Controller
             'requires_followup' => false,
         ]);
 
-        // Start the new shift for the incoming team
+        // Start the new shift for the incoming team. Keep the name the operator
+        // typed on the handover wizard; fall back to a timestamped default.
+        $incomingShiftName = trim($validated['incoming_shift_name'] ?? '');
         $newShift = Shift::startNew(
             $incomingLead,
-            'Shift '.now()->format('Y-m-d H:i'),
+            $incomingShiftName !== '' ? $incomingShiftName : 'Shift '.now()->format('Y-m-d H:i'),
             $validated['incoming_team_members'] ?? [],
         );
 

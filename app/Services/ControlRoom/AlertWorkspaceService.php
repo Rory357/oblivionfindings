@@ -61,7 +61,7 @@ class AlertWorkspaceService
             'assignedBy:id,name',
             'createdBy:id,name',
             'playbookRun.playbook',
-            'playbookRun.steps',
+            'playbookRun.steps.step',
             'evidencePacks.evidenceItems',
             'communications',
             'sla.slaDefinition',
@@ -175,7 +175,8 @@ class AlertWorkspaceService
                 ],
                 'steps' => $alert->playbookRun->steps->map(fn ($s) => [
                     'id' => $s->id,
-                    'title' => $s->playbook_step_title ?? 'Step '.$s->step_number,
+                    'title' => ($s->step?->title ?: null) ?? 'Step '.((int) $s->order + 1),
+                    'instructions' => $s->step?->instructions,
                     'status' => $s->status,
                     'notes' => $s->notes,
                     'completed_at' => optional($s->completed_at)->toISOString(),

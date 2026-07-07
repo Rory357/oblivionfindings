@@ -233,6 +233,47 @@ class ControlRoomPlaybookControllerTest extends TestCase
         ]);
     }
 
+    public function test_started_run_steps_carry_their_template_titles(): void
+    {
+        // Regression: run steps were rendered as an empty "Step " because the
+        // workspace read a non-existent column instead of the linked step title.
+        $playbook = Playbook::create([
+            'code' => 'pb-titles',
+            'name' => 'Titled Run',
+            'category' => 'safety',
+            'is_active' => true,
+        ]);
+        PlaybookStep::create([
+            'playbook_id' => $playbook->id,
+            'order' => 0,
+            'title' => 'Ring the client',
+            'instructions' => 'Call their mobile first, then the landline.',
+            'type' => 'task',
+        ]);
+        PlaybookStep::create([
+            'playbook_id' => $playbook->id,
+            'order' => 1,
+            'title' => 'Ring the emergency contact',
+            'type' => 'task',
+        ]);
+
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/start", [
+                'playbook_id' => $playbook->id,
+            ])
+            ->assertRedirect();
+
+        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+            ->build($this->admin, $alert->id);
+
+        $steps = $detail['playbook_run']['steps'];
+        $this->assertSame('Ring the client', $steps[0]['title']);
+        $this->assertSame('Call their mobile first, then the landline.', $steps[0]['instructions']);
+        $this->assertSame('Ring the emergency contact', $steps[1]['title']);
+    }
+
     public function test_start_run_blocks_inactive_playbook(): void
     {
         $playbook = Playbook::create([

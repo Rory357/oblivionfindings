@@ -94,7 +94,7 @@ export type AlertWorkspaceDetail = {
         completed_steps: number;
         total_steps: number;
         playbook: { id: number; name: string; category: string };
-        steps: Array<{ id: number; title: string; status: string; notes: string | null; completed_at: string | null }>;
+        steps: Array<{ id: number; title: string; instructions: string | null; status: string; notes: string | null; completed_at: string | null }>;
     } | null;
     available_playbooks: Array<{ id: number; name: string; category: string; description: string | null }>;
     evidence_packs: Array<{
@@ -1032,8 +1032,17 @@ function OverviewSection({ d, onEditMeta }: { d: AlertWorkspaceDetail; onEditMet
             ) : null}
 
             <ReviewCard icon={FileText} title="What's happening" span>
-                <p className="text-sm whitespace-pre-wrap text-foreground">{summarise(a)}</p>
-                {a.notes ? <p className="mt-2 border-t border-border pt-2 text-xs whitespace-pre-wrap text-muted-foreground">{a.notes}</p> : null}
+                {(() => {
+                    const summary = summarise(a);
+                    return (
+                        <>
+                            <p className="text-sm whitespace-pre-wrap text-foreground">{summary}</p>
+                            {a.notes && a.notes.trim() !== summary.trim() ? (
+                                <p className="mt-2 border-t border-border pt-2 text-xs whitespace-pre-wrap text-muted-foreground">{a.notes}</p>
+                            ) : null}
+                        </>
+                    );
+                })()}
             </ReviewCard>
 
             <ReviewCard icon={RadioTower} title="Alert">
@@ -1247,6 +1256,7 @@ function PlaybookSection({ d, onStart }: { d: AlertWorkspaceDetail; onStart: () 
                             </span>
                             <div className="min-w-0 flex-1">
                                 <p className={`text-sm ${active ? 'font-semibold text-foreground' : 'font-medium text-foreground'}`}>{s.title}</p>
+                                {s.instructions ? <p className="mt-0.5 text-xs text-muted-foreground">{s.instructions}</p> : null}
                                 <p className="text-xs text-muted-foreground">
                                     {titleCase(s.status)}
                                     {s.completed_at ? ` · ${formatDateTime(s.completed_at)}` : ''}
