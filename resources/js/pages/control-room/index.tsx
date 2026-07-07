@@ -368,16 +368,11 @@ export default function ControlRoomIndex({
         prevCriticalRef.current = stats.critical;
     }, [stats.critical]);
 
-    // The dashboard's alert stat-chips, filter dropdowns and search all drill
-    // into the canonical Alerts worklist (the Overview list is a live preview).
-    // Filtering the dashboard in place is unreliable — its large payload lets a
-    // background inbox refresh cancel the visit mid-flight — and the Alerts tab
-    // is the one surface that owns filtering, matching the attention cards.
     const applyFilter = (key: string, value: string) => {
         router.get(
-            '/control-room/alerts',
-            value ? { [key]: value } : {},
-            { preserveScroll: true },
+            '/control-room',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true, preserveScroll: true },
         );
     };
 
@@ -387,7 +382,7 @@ export default function ControlRoomIndex({
     };
 
     const clearFilters = () => {
-        router.get('/control-room/alerts', {}, { preserveScroll: true });
+        router.get('/control-room', {}, { preserveState: true });
         setSearchValue('');
     };
 
@@ -482,13 +477,13 @@ export default function ControlRoomIndex({
                                   }
                                 : undefined
                         }
-                        href="/control-room/alerts?status=open"
+                        href="/control-room?status=open"
                     />
                     <KpiCard
                         label="Critical"
                         value={stats.critical}
                         icon={AlertTriangle}
-                        href="/control-room/alerts?severity=critical"
+                        href="/control-room?severity=critical"
                         className={
                             stats.critical > 0
                                 ? 'border-status-critical/30 bg-status-critical-bg'
@@ -534,7 +529,7 @@ export default function ControlRoomIndex({
                                     className="ml-auto"
                                     asChild
                                 >
-                                    <Link href="/control-room/alerts?severity=critical">
+                                    <Link href="/control-room?severity=critical">
                                         View
                                     </Link>
                                 </Button>
