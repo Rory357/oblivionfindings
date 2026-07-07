@@ -23,7 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRightLeft,
@@ -162,13 +162,6 @@ export default function ControlRoomShifts({
     const [newShiftLead, setNewShiftLead] = useState('');
     const [newShiftTeam, setNewShiftTeam] = useState<string[]>([]);
 
-    // Handover dialog state
-    const [handoverOpen, setHandoverOpen] = useState(false);
-    const [handoverNotes, setHandoverNotes] = useState('');
-    const [priorityItems, setPriorityItems] = useState<string[]>(['']);
-    const [incomingLead, setIncomingLead] = useState('');
-    const [incomingTeam, setIncomingTeam] = useState<string[]>([]);
-
     // Add note form state
     const [noteOpen, setNoteOpen] = useState(false);
     const [noteType, setNoteType] = useState('note');
@@ -196,31 +189,6 @@ export default function ControlRoomShifts({
         );
     };
 
-    const handleHandover = (e: FormEvent) => {
-        e.preventDefault();
-        if (!activeShift) return;
-        router.post(
-            `/control-room/shifts/${activeShift.id}/handover`,
-            {
-                handover_notes: handoverNotes,
-                priority_items: priorityItems.filter(
-                    (item) => item.trim() !== '',
-                ),
-                incoming_lead_user_id: parseInt(incomingLead),
-                incoming_team_members: incomingTeam.map((id) => parseInt(id)),
-            },
-            {
-                onSuccess: () => {
-                    setHandoverOpen(false);
-                    setHandoverNotes('');
-                    setPriorityItems(['']);
-                    setIncomingLead('');
-                    setIncomingTeam([]);
-                },
-            },
-        );
-    };
-
     const handleAddNote = (e: FormEvent) => {
         e.preventDefault();
         if (!activeShift) return;
@@ -242,15 +210,6 @@ export default function ControlRoomShifts({
                 },
             },
         );
-    };
-
-    const addPriorityItem = () => setPriorityItems([...priorityItems, '']);
-    const removePriorityItem = (index: number) =>
-        setPriorityItems(priorityItems.filter((_, i) => i !== index));
-    const updatePriorityItem = (index: number, value: string) => {
-        const updated = [...priorityItems];
-        updated[index] = value;
-        setPriorityItems(updated);
     };
 
     const toggleTeamMember = (
@@ -585,211 +544,13 @@ export default function ControlRoomShifts({
                                                 </form>
                                             </DialogContent>
                                         </Dialog>
-                                        <Dialog
-                                            open={handoverOpen}
-                                            onOpenChange={setHandoverOpen}
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button size="sm">
-                                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                    Begin Handover
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="sm:max-w-lg">
-                                                <form onSubmit={handleHandover}>
-                                                    <DialogHeader>
-                                                        <DialogTitle>
-                                                            Shift Handover
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Complete the current
-                                                            shift and hand over
-                                                            to the incoming
-                                                            team.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-                                                        <div>
-                                                            <Label htmlFor="handover-notes">
-                                                                Handover Notes
-                                                            </Label>
-                                                            <Textarea
-                                                                id="handover-notes"
-                                                                value={
-                                                                    handoverNotes
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setHandoverNotes(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                rows={4}
-                                                                required
-                                                                placeholder="Summary of shift activity, outstanding issues..."
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <Label>
-                                                                Priority Items
-                                                            </Label>
-                                                            <div className="mt-1 space-y-2">
-                                                                {priorityItems.map(
-                                                                    (
-                                                                        item,
-                                                                        i,
-                                                                    ) => (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className="flex gap-2"
-                                                                        >
-                                                                            <Input
-                                                                                value={
-                                                                                    item
-                                                                                }
-                                                                                onChange={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    updatePriorityItem(
-                                                                                        i,
-                                                                                        e
-                                                                                            .target
-                                                                                            .value,
-                                                                                    )
-                                                                                }
-                                                                                placeholder={`Priority item ${i + 1}`}
-                                                                            />
-                                                                            {priorityItems.length >
-                                                                                1 && (
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    onClick={() =>
-                                                                                        removePriorityItem(
-                                                                                            i,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    <X className="h-4 w-4" />
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={
-                                                                        addPriorityItem
-                                                                    }
-                                                                >
-                                                                    <Plus className="mr-1 h-3 w-3" />
-                                                                    Add Item
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <Label>
-                                                                Incoming Shift
-                                                                Lead
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    incomingLead
-                                                                }
-                                                                onValueChange={
-                                                                    setIncomingLead
-                                                                }
-                                                            >
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select incoming lead" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {staff.map(
-                                                                        (s) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    s.id
-                                                                                }
-                                                                                value={s.id.toString()}
-                                                                            >
-                                                                                {
-                                                                                    s.name
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Label>
-                                                                Incoming Team
-                                                                Members
-                                                            </Label>
-                                                            <div className="mt-1 flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-md border p-2">
-                                                                {staff.map(
-                                                                    (s) => (
-                                                                        <Button
-                                                                            key={
-                                                                                s.id
-                                                                            }
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                toggleTeamMember(
-                                                                                    s.id.toString(),
-                                                                                    incomingTeam,
-                                                                                    setIncomingTeam,
-                                                                                )
-                                                                            }
-                                                                            className={`h-7 rounded-full px-3 text-xs ${
-                                                                                incomingTeam.includes(
-                                                                                    s.id.toString(),
-                                                                                )
-                                                                                    ? 'border-primary bg-primary text-primary-foreground'
-                                                                                    : 'hover:bg-muted'
-                                                                            }`}
-                                                                        >
-                                                                            {
-                                                                                s.name
-                                                                            }
-                                                                        </Button>
-                                                                    ),
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <DialogFooter className="mt-6">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setHandoverOpen(
-                                                                    false,
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            type="submit"
-                                                            disabled={
-                                                                !handoverNotes ||
-                                                                !incomingLead
-                                                            }
-                                                        >
-                                                            Complete Handover
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
+                                        <Button size="sm" asChild>
+                                            {/* Handover is a guided, stepped page — summary, notes, incoming team, confirm. */}
+                                            <Link href={`/control-room/shifts/${activeShift.id}/handover`}>
+                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                Begin Handover
+                                            </Link>
+                                        </Button>
                                     </div>
                                 )}
                             </div>

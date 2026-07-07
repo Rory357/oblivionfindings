@@ -1,3 +1,4 @@
+import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ import {
     Lock,
     Pencil,
     Plus,
+    Power,
     Save,
     Search as SearchIcon,
     Shield,
@@ -436,16 +438,13 @@ export default function PlaybookShow({
                         actions={
                             can.manage ? (
                                 <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={playbook.is_active}
-                                        onCheckedChange={toggleActive}
-                                        aria-label="Toggle active"
+                                    <ConfirmChip
+                                        label={playbook.is_active ? 'Deactivate' : 'Activate'}
+                                        icon={Power}
+                                        destructive={playbook.is_active}
+                                        onConfirm={toggleActive}
+                                        title={playbook.is_active ? 'Stop this playbook auto-attaching to new alerts' : 'Make this playbook available'}
                                     />
-                                    <span className="text-sm text-muted-foreground">
-                                        {playbook.is_active
-                                            ? 'Active'
-                                            : 'Inactive'}
-                                    </span>
                                     {!editing ? (
                                         <Button
                                             variant="outline"

@@ -1,3 +1,4 @@
+import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -2048,27 +2049,19 @@ export default function ControlRoomSettings({
                                                                     )
                                                                 }
                                                             />
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-7 w-7 text-status-critical hover:text-status-critical"
-                                                                onClick={() => {
-                                                                    if (
-                                                                        confirm(
-                                                                            'Delete this option?',
-                                                                        )
-                                                                    ) {
-                                                                        router.delete(
-                                                                            `/control-room/settings/options/${opt.id}`,
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        );
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
+                                                            <ConfirmChip
+                                                                label="Delete"
+                                                                icon={Trash2}
+                                                                destructive
+                                                                onConfirm={() =>
+                                                                    router.delete(
+                                                                        `/control-room/settings/options/${opt.id}`,
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
                                                         </div>
                                                     </div>
                                                 ))}

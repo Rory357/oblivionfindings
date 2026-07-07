@@ -1,45 +1,13 @@
+import { BroadcastWizard } from '@/components/control-room/broadcast-wizard';
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { PageHero } from '@/components/page';
-import {
-    Megaphone,
-    Send,
-    CheckCircle,
-    XCircle,
-    Clock,
-    Users,
-    Mail,
-    Bell,
-    MessageSquare,
-    Smartphone,
-} from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { CheckCircle, Megaphone, Users, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
 // --- TypeScript Interfaces ---
 
@@ -85,46 +53,11 @@ interface Props {
     };
 }
 
-const TEMPLATES: Record<string, string> = {
-    fire_drill: 'URGENT: Fire drill commencing now. All staff please follow evacuation procedures immediately. Assemble at designated muster points. Await further instructions from your shift lead.',
-    missing_person: 'ALERT: A resident has been reported missing. All available staff report to the control room immediately for a coordinated search. Do not leave your assigned area unattended.',
-    severe_weather: 'WEATHER ALERT: Severe weather warning in effect. Secure all outdoor areas, ensure all residents are indoors, and check emergency supplies. Monitor for further updates.',
-    facility_lockdown: 'LOCKDOWN: Facility lockdown is now in effect. Secure all entry and exit points. Keep all residents in their current locations. Await further instructions from the control room.',
-    medication_recall: 'MEDICATION RECALL: An urgent medication recall has been issued. All nursing staff: immediately check your medication stores and quarantine affected items. Contact pharmacy for guidance.',
-    it_system_outage: 'IT NOTICE: System outage affecting core applications. Switch to manual paper-based procedures. IT team is investigating. Expected resolution time will be communicated shortly.',
-    custom: '',
-};
-
-const TEMPLATE_LABELS: Record<string, string> = {
-    fire_drill: 'Fire Drill',
-    missing_person: 'Missing Person',
-    severe_weather: 'Severe Weather',
-    facility_lockdown: 'Facility Lockdown',
-    medication_recall: 'Medication Recall',
-    it_system_outage: 'IT System Outage',
-    custom: 'Custom Message',
-};
-
 const CHANNEL_LABELS: Record<string, string> = {
     in_app: 'In-App',
     push: 'Push Notification',
     sms: 'SMS',
     email: 'Email',
-};
-
-const CHANNEL_ICONS: Record<string, React.ReactNode> = {
-    in_app: <Bell className="h-3.5 w-3.5" />,
-    push: <Smartphone className="h-3.5 w-3.5" />,
-    sms: <MessageSquare className="h-3.5 w-3.5" />,
-    email: <Mail className="h-3.5 w-3.5" />,
-};
-
-const ROLE_LABELS: Record<string, string> = {
-    admin: 'Admin',
-    coordinator: 'Coordinator',
-    support_worker: 'Support Worker',
-    shift_lead: 'Shift Lead',
-    nurse: 'Nurse',
 };
 
 function channelBadgeVariant(channel: string): 'default' | 'secondary' | 'outline' | 'destructive' {
@@ -160,70 +93,10 @@ export default function ControlRoomBroadcast({
     totalStaff,
     can,
 }: Props) {
-    const [template, setTemplate] = useState('custom');
-    const [content, setContent] = useState('');
-    const [channels, setChannels] = useState<string[]>(['in_app']);
-    const [targetRoles, setTargetRoles] = useState<string[]>([]);
-    const [sendToAll, setSendToAll] = useState(false);
-    const [forceDelivery, setForceDelivery] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-
-    const handleTemplateChange = (value: string) => {
-        setTemplate(value);
-        if (value !== 'custom') {
-            setContent(TEMPLATES[value] ?? '');
-        }
-    };
-
-    const toggleChannel = (channel: string) => {
-        setChannels((prev) =>
-            prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel],
-        );
-    };
-
-    const toggleRole = (role: string) => {
-        setTargetRoles((prev) =>
-            prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-        );
-    };
-
-    const estimatedRecipients = useMemo(() => {
-        if (sendToAll) return totalStaff;
-        if (targetRoles.length === 0) return 0;
-        // Sum role counts (may overcount due to users with multiple roles, but it's an estimate)
-        return targetRoles.reduce((sum, role) => sum + (roleCounts[role] ?? 0), 0);
-    }, [sendToAll, targetRoles, roleCounts, totalStaff]);
-
-    const canSend = content.trim().length > 0 && channels.length > 0 && (sendToAll || targetRoles.length > 0);
-
-    const handleSubmit = (e?: FormEvent) => {
-        e?.preventDefault();
-        if (!canSend || submitting) return;
-
-        setSubmitting(true);
-        router.post(
-            '/control-room/broadcast',
-            {
-                content,
-                channels,
-                target_roles: sendToAll ? [] : targetRoles,
-                send_to_all: sendToAll,
-                template: template !== 'custom' ? template : null,
-                force_delivery: forceDelivery,
-            },
-            {
-                onFinish: () => {
-                    setSubmitting(false);
-                    setContent('');
-                    setTemplate('custom');
-                    setChannels(['in_app']);
-                    setTargetRoles([]);
-                    setSendToAll(false);
-                    setForceDelivery(false);
-                },
-            },
-        );
-    };
+    // ?new=1 deep-links straight into the wizard (house pattern).
+    const [composerOpen, setComposerOpen] = useState<boolean>(
+        () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1',
+    );
 
     const handlePageChange = (url: string | null) => {
         if (url) {
@@ -249,187 +122,20 @@ export default function ControlRoomBroadcast({
                         { label: 'Broadcasts sent', value: broadcasts.total },
                         { label: 'Channels', value: Object.keys(CHANNEL_LABELS).length },
                     ]}
+                    actions={
+                        can.manage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setComposerOpen(true)}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Megaphone className="mr-2 h-4 w-4" />
+                                New broadcast
+                            </Button>
+                        ) : undefined
+                    }
                 />
-
-                {/* Compose Section */}
-                {can.manage && (
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Megaphone className="h-5 w-5" />
-                                New Broadcast
-                            </CardTitle>
-                            <CardDescription>
-                                Compose and send an urgent broadcast message to staff members.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-                                {/* Template Selector */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="template">Message Template</Label>
-                                    <Select value={template} onValueChange={handleTemplateChange}>
-                                        <SelectTrigger id="template" className="w-full sm:w-72">
-                                            <SelectValue placeholder="Select a template..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.entries(TEMPLATE_LABELS).map(([key, label]) => (
-                                                <SelectItem key={key} value={key}>
-                                                    {label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Message Content */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="content">Message Content</Label>
-                                    <Textarea
-                                        id="content"
-                                        value={content}
-                                        onChange={(e) => setContent(e.target.value)}
-                                        placeholder="Type your broadcast message here..."
-                                        rows={5}
-                                        maxLength={2000}
-                                        className="resize-y"
-                                    />
-                                    <p className="text-muted-foreground text-xs">
-                                        {content.length}/2000 characters
-                                    </p>
-                                </div>
-
-                                {/* Channels */}
-                                <div className="space-y-3">
-                                    <Label>Channels</Label>
-                                    <div className="flex flex-wrap gap-4">
-                                        {Object.entries(CHANNEL_LABELS).map(([key, label]) => (
-                                            <label
-                                                key={key}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <Checkbox
-                                                    checked={channels.includes(key)}
-                                                    onCheckedChange={() => toggleChannel(key)}
-                                                />
-                                                <span className="flex items-center gap-1.5 text-sm">
-                                                    {CHANNEL_ICONS[key]}
-                                                    {label}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Send to All Toggle */}
-                                <div className="flex items-center gap-3">
-                                    <Switch
-                                        id="send-to-all"
-                                        checked={sendToAll}
-                                        onCheckedChange={setSendToAll}
-                                    />
-                                    <Label htmlFor="send-to-all" className="cursor-pointer">
-                                        Send to All Staff ({totalStaff} members)
-                                    </Label>
-                                </div>
-
-                                {/* Force delivery — bypasses per-user notification prefs (DND, disabled channels) */}
-                                <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/30 px-4 py-3">
-                                    <Switch
-                                        id="force-delivery"
-                                        checked={forceDelivery}
-                                        onCheckedChange={setForceDelivery}
-                                    />
-                                    <div className="flex-1">
-                                        <Label
-                                            htmlFor="force-delivery"
-                                            className="cursor-pointer text-sm font-medium text-status-critical"
-                                        >
-                                            Force delivery (emergency)
-                                        </Label>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            Overrides recipients' Do Not Disturb and channel preferences. Use only for genuine emergencies (fire, lockdown, evacuation).
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Target Roles (hidden when send to all) */}
-                                {!sendToAll && (
-                                    <div className="space-y-3">
-                                        <Label>Target Roles</Label>
-                                        <div className="flex flex-wrap gap-4">
-                                            {roles.map((role) => (
-                                                <label
-                                                    key={role}
-                                                    className="flex items-center gap-2 cursor-pointer"
-                                                >
-                                                    <Checkbox
-                                                        checked={targetRoles.includes(role)}
-                                                        onCheckedChange={() => toggleRole(role)}
-                                                    />
-                                                    <span className="text-sm">
-                                                        {ROLE_LABELS[role] ?? role} ({roleCounts[role] ?? 0})
-                                                    </span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Estimated Recipients + Send Button */}
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg border p-4">
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                        <span>
-                                            Estimated recipients:{' '}
-                                            <strong>{estimatedRecipients}</strong>
-                                            {channels.length > 1 && (
-                                                <span className="text-muted-foreground">
-                                                    {' '}({estimatedRecipients * channels.length} total messages across {channels.length} channels)
-                                                </span>
-                                            )}
-                                        </span>
-                                    </div>
-
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button
-                                                disabled={!canSend || submitting}
-                                                className="gap-2"
-                                            >
-                                                <Send className="h-4 w-4" />
-                                                Send Broadcast
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Confirm Broadcast</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Send to{' '}
-                                                    <strong>{estimatedRecipients}</strong>{' '}
-                                                    recipient{estimatedRecipients !== 1 ? 's' : ''} via{' '}
-                                                    <strong>
-                                                        {channels.map((c) => CHANNEL_LABELS[c]).join(', ')}
-                                                    </strong>
-                                                    ? This action cannot be undone.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction
-                                                    onClick={() => handleSubmit()}
-                                                    disabled={submitting}
-                                                >
-                                                    {submitting ? 'Sending...' : 'Send Now'}
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
 
                 {/* Broadcast History */}
                 <Card>
@@ -444,6 +150,12 @@ export default function ControlRoomBroadcast({
                             <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
                                 <Megaphone className="mb-3 h-10 w-10 opacity-40" />
                                 <p className="text-sm">No broadcasts sent yet.</p>
+                                {can.manage ? (
+                                    <Button size="sm" className="mt-4" onClick={() => setComposerOpen(true)}>
+                                        <Megaphone className="mr-2 h-4 w-4" />
+                                        Send your first broadcast
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : (
                             <>
@@ -561,6 +273,17 @@ export default function ControlRoomBroadcast({
                     </CardContent>
                 </Card>
             </PageShell>
+
+            {/* Guided composer — message → audience → channels → review & send */}
+            {can.manage ? (
+                <BroadcastWizard
+                    open={composerOpen}
+                    onClose={() => setComposerOpen(false)}
+                    roles={roles}
+                    roleCounts={roleCounts}
+                    totalStaff={totalStaff}
+                />
+            ) : null}
         </AppLayout>
     );
 }

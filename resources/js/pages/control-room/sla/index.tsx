@@ -1,3 +1,4 @@
+import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
     Clock,
     Edit2,
     Plus,
+    Power,
     Shield,
     ShieldAlert,
     Timer,
@@ -737,9 +739,12 @@ function SlaCard({
                             </Button>
                         )}
                         {canManage && (
-                            <Switch
-                                checked={sla.is_active}
-                                onCheckedChange={() => onToggleActive(sla)}
+                            <ConfirmChip
+                                label={sla.is_active ? 'Deactivate' : 'Activate'}
+                                icon={Power}
+                                destructive={sla.is_active}
+                                onConfirm={() => onToggleActive(sla)}
+                                title={sla.is_active ? 'Stop applying this SLA to new alerts' : 'Apply this SLA to new alerts'}
                             />
                         )}
                         {!canManage && (
