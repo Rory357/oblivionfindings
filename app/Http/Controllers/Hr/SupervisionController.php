@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -449,6 +450,9 @@ class SupervisionController extends Controller
                 'employee_acknowledged_at' => now(),
                 'status' => 'acknowledged',
             ]);
+
+            // The supervisor is waiting to know the note landed — tell them.
+            app(HrNotificationService::class)->notifySupervisionAcknowledged($note->fresh());
         }
 
         return redirect()->back()->with('success', 'Supervision note acknowledged.');

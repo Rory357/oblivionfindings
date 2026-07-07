@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrSuccessionCandidate;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -391,6 +392,9 @@ class PerformanceReviewController extends Controller
             'updated_by' => $user->id,
         ]);
 
+        // The employee is now the waiting party — tell them to acknowledge.
+        app(HrNotificationService::class)->notifyReviewReadyForAcknowledgement($review->fresh());
+
         return redirect()->back()->with('success', 'Review signed off and locked.');
     }
 
@@ -412,6 +416,11 @@ class PerformanceReviewController extends Controller
                 'employee_signed_off' => true,
                 'employee_signed_off_at' => now(),
             ]);
+
+            // Match the My HR acknowledge path: let the reviewer know it's closed
+            // out. (The self-service /hr/my flow already fires this; the hub path
+            // was silent.)
+            app(HrNotificationService::class)->notifyReviewSignedOff($review->fresh());
         }
 
         return redirect()->back()->with('success', 'Review acknowledged.');

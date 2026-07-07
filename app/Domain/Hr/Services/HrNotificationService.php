@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
@@ -20,7 +21,9 @@ use App\Domain\Hr\Notifications\LeaveDeclinedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\PerformanceReviewDueNotification;
+use App\Domain\Hr\Notifications\ReviewReadyForAcknowledgementNotification;
 use App\Domain\Hr\Notifications\ReviewSignedOffNotification;
+use App\Domain\Hr\Notifications\SupervisionAcknowledgedNotification;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -310,6 +313,32 @@ class HrNotificationService
     }
 
     /**
+     * Notify the employee when their manager signs off their review — they are
+     * now the waiting party and need to read it and acknowledge. Skips the
+     * self-review edge (employee is their own reviewer).
+     */
+    public function notifyReviewReadyForAcknowledgement(HrPerformanceReview $review): void
+    {
+        $review->loadMissing('employee');
+
+        $employee = $review->employee_user_id && $review->employee_user_id !== $review->reviewer_user_id
+            ? User::find($review->employee_user_id)
+            : null;
+
+        if ($employee) {
+            try {
+                $employee->notify(new ReviewReadyForAcknowledgementNotification($review));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send review ready-for-acknowledgement notification', [
+                    'review_id' => $review->id,
+                    'employee_id' => $employee->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
      * Notify the reviewer when the employee signs off on their performance
      * review — the reviewer is waiting on that acknowledgement to close it out.
      */
@@ -328,6 +357,32 @@ class HrNotificationService
                 Log::warning('Failed to send review signed-off notification', [
                     'review_id' => $review->id,
                     'reviewer_id' => $reviewer->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Notify the supervisor when the employee acknowledges a supervision / 1:1
+     * note — the supervisor is waiting on that acknowledgement to close it out.
+     * Skips the edge where the supervisor is also the note's subject.
+     */
+    public function notifySupervisionAcknowledged(HrSupervisionNote $note): void
+    {
+        $note->loadMissing('employee');
+
+        $supervisor = $note->supervisor_user_id && $note->supervisor_user_id !== $note->employee_user_id
+            ? User::find($note->supervisor_user_id)
+            : null;
+
+        if ($supervisor) {
+            try {
+                $supervisor->notify(new SupervisionAcknowledgedNotification($note));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send supervision acknowledged notification', [
+                    'note_id' => $note->id,
+                    'supervisor_id' => $supervisor->id,
                     'error' => $e->getMessage(),
                 ]);
             }
