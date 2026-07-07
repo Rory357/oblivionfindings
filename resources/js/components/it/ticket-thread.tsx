@@ -101,6 +101,7 @@ export function TicketThread({
     events,
     canInternal,
     compact = false,
+    onPosted,
 }: {
     ticketId: number;
     requesterName: string;
@@ -109,6 +110,8 @@ export function TicketThread({
     events: ThreadEvent[];
     canInternal: boolean;
     compact?: boolean;
+    /** Drawer hosts pass a refetch — their snapshot doesn't refresh via Inertia props. */
+    onPosted?: () => void;
 }) {
     const [lane, setLane] = useState<'conversation' | 'activity'>('conversation');
     const form = useForm({ body: '', is_internal: false });
@@ -120,6 +123,7 @@ export function TicketThread({
             onSuccess: () => {
                 toast.success(form.data.is_internal ? 'Internal note added.' : 'Reply sent.');
                 form.reset('body');
+                onPosted?.();
             },
         });
     };

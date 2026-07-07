@@ -158,6 +158,40 @@ test('public replies notify the other side of the conversation only', function (
     Notification::assertNothingSent();
 });
 
+test('the quick-peek JSON branch mirrors the page payload and its stripping', function () {
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+    $ticket->comments()->create([
+        'tenant_id' => 1,
+        'author_user_id' => $this->worker->id,
+        'body' => 'Public message.',
+        'is_internal' => false,
+    ]);
+    $ticket->comments()->create([
+        'tenant_id' => 1,
+        'author_user_id' => $this->hr->id,
+        'body' => 'Internal-only note.',
+        'is_internal' => true,
+    ]);
+
+    // Agent: full thread over JSON (the drawer's fetch path).
+    $this->actingAs($this->hr)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonPath('ticket.id', $ticket->id)
+        ->assertJsonCount(2, 'comments');
+
+    // Requester: the JSON branch strips internal notes exactly like the page.
+    $this->actingAs($this->worker)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'comments')
+        ->assertJsonPath('comments.0.is_internal', false);
+
+    // Policy runs on the JSON branch too.
+    $stranger = itWorkspaceUser('support_worker');
+    $this->actingAs($stranger)->getJson("/it/tickets/{$ticket->id}")->assertForbidden();
+});
+
 test('the rail can retag category, subcategory and linked asset', function () {
     $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
     $asset = \App\Models\Asset::factory()->create(['status' => 'active']);

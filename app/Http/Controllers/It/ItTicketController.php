@@ -27,6 +27,21 @@ class ItTicketController extends Controller
 
     public function show(Request $request, ItTicket $ticket)
     {
+        $payload = $this->showPayload($request, $ticket);
+
+        // One route, two callers: the detail page (Inertia) and the
+        // quick-peek drawer (axios). Policy + internal-note stripping run
+        // identically for both — the payload IS the privacy boundary.
+        if (! $request->header('X-Inertia') && $request->wantsJson()) {
+            return response()->json($payload);
+        }
+
+        return Inertia::render('it/tickets/show', $payload);
+    }
+
+    /** @return array<string, mixed> */
+    private function showPayload(Request $request, ItTicket $ticket): array
+    {
         $user = $request->user();
         $this->authorize('view', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
@@ -82,7 +97,7 @@ class ItTicketController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('it/tickets/show', [
+        return [
             'ticket' => [
                 'id' => $ticket->id,
                 'reference' => $ticket->reference,
@@ -147,7 +162,7 @@ class ItTicketController extends Controller
                 'reopen' => $user->can('reopen', $ticket),
                 'watching' => $ticket->watchers->contains('id', $user->id),
             ],
-        ]);
+        ];
     }
 
     public function storeComment(StoreTicketCommentRequest $request, ItTicket $ticket)

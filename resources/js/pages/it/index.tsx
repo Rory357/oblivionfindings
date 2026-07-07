@@ -11,6 +11,7 @@ import {
     type RequestRow,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { TicketDrawer } from '@/components/it/ticket-drawer';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -175,7 +176,17 @@ export default function ItIndex({
 }: Props) {
     const [tab, setTab] = useHrTab(can.view ? 'provisioning' : 'my-tickets');
     const [modal, setModal] = useState<ItModal | null>(null);
+    const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
+
+    /** Row click: quick-peek drawer; Ctrl/⌘-click or double-click: full page. */
+    const openTicket = (id: number, e?: React.MouseEvent) => {
+        if (e && (e.ctrlKey || e.metaKey)) {
+            router.visit(`/it/tickets/${id}`);
+            return;
+        }
+        setPeekId(id);
+    };
 
     const tabItems: HrTabItem[] = [
         ...(can.view
@@ -272,6 +283,19 @@ export default function ItIndex({
     const ticketMenu = (t: TicketRow) => {
         const workable = t.status === 'open' || t.status === 'in_progress';
         return ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: Ticket,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Quick peek',
+                icon: Inbox,
+                onSelect: () => setPeekId(t.id),
+            },
+            { kind: 'divider' as const },
             ...(workable
                 ? [
                       ...(t.status === 'open'
@@ -336,6 +360,7 @@ export default function ItIndex({
             <Head title="IT & Provisioning" />
             {ctx.element}
             <ItWizard modal={modal} assignees={assignees} onClose={() => setModal(null)} />
+            <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
                 {/* Hero */}
@@ -565,7 +590,9 @@ export default function ItIndex({
                                 <div
                                     key={t.id}
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
-                                    className="grid grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                    onClick={(e) => openTicket(t.id, e)}
+                                    onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
+                                    className="grid cursor-pointer grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
@@ -604,7 +631,10 @@ export default function ItIndex({
                                             <button
                                                 type="button"
                                                 aria-label={`Actions for ${t.title}`}
-                                                onClick={ticketMenu(t)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    ticketMenu(t)(e);
+                                                }}
                                                 className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <MoreHorizontal className="h-4 w-4" />
@@ -658,7 +688,9 @@ export default function ItIndex({
                             {myTickets.map((t) => (
                                 <div
                                     key={t.id}
-                                    className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                    onClick={(e) => openTicket(t.id, e)}
+                                    onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
+                                    className="grid cursor-pointer grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
