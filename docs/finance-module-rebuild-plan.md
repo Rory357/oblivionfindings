@@ -560,7 +560,13 @@ vendor, receipt) — the mould for C2.
   (5) + dashboard/nav tests 17 green ✓ browser-smoked all four tabs with screenshots, console clean.
   *(By design kept: FinanceHubsBar on Summary; genuine drill-downs site-dashboard + clients/Financials stay
   pages — they come on-contract in C3.)*
-- **[~] C2 — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
+- **[x] C2 — Modal sweep — MERGED to main `fa184916` 2026-07-08.** Whole milestone shipped: 11 full-page
+  flows → WizardShell dialogs + all 16 native `confirm()` → shared ConfirmDialog + guarded period-close modal.
+  Browser-verified (donor-receipt + asset-disposal balanced journals, payment-run process guard, period-close
+  guard — screenshots). 2 real GL bugs fixed (recurring-charge `starts_at` 500; asset-disposal 8100/8400
+  out-of-balance). Finance suite 186 green. Only deferred item: GST-Prepare page→wizard (works as a page).
+  Batch detail below.
+- **[x] C2 (batch detail) — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
   edit pattern for edits; `alert-dialog` for every one of the 16 native `confirm()` sites; payment-run
   approve/process get confirm modals; period-close gets a guarded impact-preview modal; GST Prepare becomes a
   wizard ending in the return). Split into 3 batches:
