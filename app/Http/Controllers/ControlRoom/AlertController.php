@@ -158,6 +158,11 @@ class AlertController extends Controller
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
             ],
+            // Workspace-over-list: the shared alerts page opens the alert
+            // workspace via ?alert= on this view too.
+            'detail' => fn () => $request->filled('alert')
+                ? app(\App\Services\ControlRoom\AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                : null,
         ]);
     }
 

@@ -1,3 +1,4 @@
+import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ import {
     Layers,
     Play,
     Plus,
+    Power,
     Search as SearchIcon,
     Shield,
     Trash2,
@@ -954,12 +956,12 @@ export default function PlaybooksIndex({
                                                     </div>
                                                 </div>
                                                 {can.manage && (
-                                                    <Switch
-                                                        checked={pb.is_active}
-                                                        onCheckedChange={() =>
-                                                            toggleActive(pb)
-                                                        }
-                                                        aria-label={`Toggle ${pb.name} active`}
+                                                    <ConfirmChip
+                                                        label={pb.is_active ? 'Deactivate' : 'Activate'}
+                                                        icon={Power}
+                                                        destructive={pb.is_active}
+                                                        onConfirm={() => toggleActive(pb)}
+                                                        title={pb.is_active ? `Stop ${pb.name} auto-attaching to new alerts` : `Make ${pb.name} available`}
                                                     />
                                                 )}
                                             </div>
