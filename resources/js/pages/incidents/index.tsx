@@ -343,7 +343,9 @@ export default function IncidentsIndex({
             { sep: true },
             ...(i.client ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', sub: clientName, onClick: () => router.visit(`/operations/clients/${i.client!.id}/care`) } satisfies ShiftCtxItem] : []),
             ...(i.control_room_alert_id ? [{ icon: <RadioTower className="h-3.5 w-3.5" />, label: 'View Control Room alert', onClick: () => router.visit(`/control-room/alerts/${i.control_room_alert_id}`) } satisfies ShiftCtxItem] : []),
-            ...(i.status === 'draft' ? [{ sep: true } satisfies ShiftCtxItem, { icon: <Send className="h-3.5 w-3.5" />, label: 'Submit for review', onClick: () => router.post(`/incidents/${i.id}/submit`) } satisfies ShiftCtxItem] : []),
+            // Submitting is guided — open the incident so the submit pane shows
+            // what's being locked in (no instant POST from a context menu).
+            ...(i.status === 'draft' ? [{ sep: true } satisfies ShiftCtxItem, { icon: <Send className="h-3.5 w-3.5" />, label: 'Submit for review', sub: 'Opens the incident to confirm', onClick: () => openDetail(i.id) } satisfies ShiftCtxItem] : []),
         ];
         setCtx({ x: e.clientX, y: e.clientY, tag: (sev.label ?? i.severity).toUpperCase(), meta: `${clientName} · ${titleCase(i.type)}`, items });
     };

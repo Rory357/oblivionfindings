@@ -47,6 +47,7 @@ import {
     ShieldCheck,
     Trash2,
     User as UserIcon,
+    X,
     type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentType, type FormEvent, type MutableRefObject, type ReactNode } from 'react';
@@ -1177,6 +1178,28 @@ function ReturnActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
     );
 }
 
+/** Two-phase button: first click arms, second confirms — no single-click lifecycle moves. */
+function ArmedButton({ label, icon: Icon, onConfirm }: { label: string; icon: ComponentType<{ className?: string }>; onConfirm: () => void }) {
+    const [arming, setArming] = useState(false);
+    if (!arming) {
+        return (
+            <Button size="sm" variant="outline" onClick={() => setArming(true)}>
+                <Icon className="mr-1.5 h-3.5 w-3.5" /> {label}
+            </Button>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1">
+            <Button size="sm" onClick={() => { onConfirm(); setArming(false); }}>
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> {label}?
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setArming(false)} aria-label="Cancel">
+                <X className="h-3.5 w-3.5" />
+            </Button>
+        </span>
+    );
+}
+
 /** Per-action workflow buttons, driven by status. */
 function CorrectiveActionControls({ d, ca, onPane }: { d: EventDetail; ca: EventCorrectiveAction; onPane: (p: ActivePane) => void }) {
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}`;
@@ -1188,9 +1211,7 @@ function CorrectiveActionControls({ d, ca, onPane }: { d: EventDetail; ca: Event
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
             <div className="flex flex-wrap gap-2">
                 {ca.status === 'open' ? (
-                    <Button size="sm" variant="outline" onClick={() => router.post(`${base}/start`, {}, { preserveScroll: true, preserveState: true })}>
-                        <Play className="mr-1.5 h-3.5 w-3.5" /> Start
-                    </Button>
+                    <ArmedButton label="Start" icon={Play} onConfirm={() => router.post(`${base}/start`, {}, { preserveScroll: true, preserveState: true })} />
                 ) : null}
                 {ca.status === 'in_progress' ? (
                     <Button size="sm" onClick={() => onPane({ kind: 'ca_complete', actionId: ca.id })}>
@@ -1213,9 +1234,7 @@ function CorrectiveActionControls({ d, ca, onPane }: { d: EventDetail; ca: Event
                     </>
                 ) : null}
                 {ca.status === 'verified' ? (
-                    <Button size="sm" variant="outline" onClick={() => router.post(`${base}/close`, {}, { preserveScroll: true, preserveState: true })}>
-                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Close
-                    </Button>
+                    <ArmedButton label="Close" icon={CheckCircle2} onConfirm={() => router.post(`${base}/close`, {}, { preserveScroll: true, preserveState: true })} />
                 ) : null}
             </div>
             {ca.status === 'completed' ? (

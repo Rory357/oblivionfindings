@@ -30,6 +30,7 @@ import {
     Trash2,
     User,
     Users,
+    X,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent } from 'react';
 
@@ -150,7 +151,7 @@ function fmtSize(bytes: number | null): string {
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
-type LifecycleAction = 'review' | 'close' | 'reopen';
+type LifecycleAction = 'submit' | 'review' | 'close' | 'reopen';
 
 export function IncidentDetailDialog({ detail, open, onClose }: { detail: IncidentDetail; open: boolean; onClose: () => void }) {
     const [section, setSection] = useState<SectionKey>('overview');
@@ -173,9 +174,8 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
     ];
     const stepIndex = SECTIONS.findIndex((s) => s.key === section);
 
-    // Both endpoints return back() -> Inertia follows the redirect to the current
+    // Endpoints return back() -> Inertia follows the redirect to the current
     // URL (which still carries ?incident=), so the dialog + list refresh together.
-    const submit = () => router.post(`/incidents/${d.id}/submit`, {}, { preserveScroll: true });
     const completeFollowup = (fid: number) => router.post(`/incidents/${d.id}/followups/${fid}/complete`, {}, { preserveScroll: true });
 
     // While an action / edit pane is open it owns the body + its own buttons,
@@ -191,7 +191,7 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
                 </Button>
             ) : null}
             {d.can.submit && d.status === 'draft' ? (
-                <Button size="sm" onClick={submit}>
+                <Button size="sm" onClick={() => setAction('submit')}>
                     <Send className="mr-1.5 h-4 w-4" /> Submit for review
                 </Button>
             ) : null}
@@ -241,7 +241,7 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             {editing ? (
                 <EditPane d={d} onDone={() => setEditing(false)} />
             ) : action ? (
-                <ActionPane incidentId={d.id} action={action} onDone={() => setAction(null)} />
+                <ActionPane d={d} action={action} onDone={() => setAction(null)} />
             ) : (
                 <>
                     {section === 'overview' ? <OverviewSection d={d} isNearMiss={isNearMiss} /> : null}
@@ -261,12 +261,14 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
 /* ------------------------------------------------------------------ */
 
 const ACTION_META: Record<LifecycleAction, { title: string; blurb: string; icon: ComponentType<{ className?: string }>; cta: string }> = {
+    submit: { title: 'Submit for review', blurb: 'Sends the incident to a reviewer and locks the draft for audit — editing and attachments close once submitted.', icon: Send, cta: 'Submit incident' },
     review: { title: 'Review incident', blurb: 'Mark this incident as reviewed and add any notes.', icon: CheckCircle2, cta: 'Mark reviewed' },
     close: { title: 'Close incident', blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.', icon: CheckCircle2, cta: 'Close incident' },
     reopen: { title: 'Reopen incident', blurb: 'Reopen a closed incident — a reason is required for the audit trail.', icon: RotateCcw, cta: 'Reopen incident' },
 };
 
-function ActionPane({ incidentId, action, onDone }: { incidentId: number; action: LifecycleAction; onDone: () => void }) {
+function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: LifecycleAction; onDone: () => void }) {
+    const incidentId = d.id;
     const meta = ACTION_META[action];
     const form = useForm<{ review_notes: string; closed_outcome: string; closed_notes: string; reopened_reason: string }>({
         review_notes: '',
@@ -291,6 +293,21 @@ function ActionPane({ incidentId, action, onDone }: { incidentId: number; action
     return (
         <form onSubmit={submit} className="flex flex-col gap-4">
             <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
+
+            {action === 'submit' ? (
+                <>
+                    <ReviewCard icon={FileText} title="What you're submitting" span>
+                        <ReviewRow label="Incident" value={`${d.ref ?? `INC-${d.id}`} · ${titleCase(d.type)}`} />
+                        <ReviewRow label="Client" value={d.client ? `${d.client.first_name} ${d.client.last_name}` : undefined} />
+                        <ReviewRow label="Severity" value={SEV_LABEL[d.severity] ?? d.severity} />
+                        <ReviewRow label="What happened" value={d.description} />
+                        <ReviewRow label="Attachments" value={`${d.attachments.length}`} />
+                    </ReviewCard>
+                    <InfoCard icon={Send} tone="info">
+                        Check the details above — after submitting, the record locks and changes need a reviewer. Photos and documents can no longer be added.
+                    </InfoCard>
+                </>
+            ) : null}
 
             {action === 'review' ? (
                 <Field label="Review notes" hint="Optional">
@@ -549,6 +566,8 @@ function PhotosSection({ d }: { d: IncidentDetail }) {
 }
 
 function AttachmentRow({ a, incidentId, canEdit, canPortal }: { a: IncidentDetail['attachments'][number]; incidentId: number; canEdit: boolean; canPortal: boolean }) {
+    // Two-phase remove — evidence deletion should never be a single mis-click.
+    const [removeArming, setRemoveArming] = useState(false);
     const remove = () => router.delete(`/incidents/${incidentId}/attachments/${a.id}`, { preserveScroll: true });
     const togglePortal = () => router.patch(`/incidents/${incidentId}/attachments/${a.id}`, { portal_visible: !a.portal_visible }, { preserveScroll: true });
     return (
@@ -573,9 +592,20 @@ function AttachmentRow({ a, incidentId, canEdit, canPortal }: { a: IncidentDetai
                 <Download className="h-3.5 w-3.5" /> Download
             </a>
             {canEdit ? (
-                <Button variant="ghost" size="sm" onClick={remove} title="Remove attachment" className="text-status-critical hover:text-status-critical">
-                    <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                removeArming ? (
+                    <span className="inline-flex items-center gap-1">
+                        <Button variant="destructive" size="sm" onClick={remove}>
+                            Remove?
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setRemoveArming(false)} aria-label="Keep attachment">
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                    </span>
+                ) : (
+                    <Button variant="ghost" size="sm" onClick={() => setRemoveArming(true)} title="Remove attachment" className="text-status-critical hover:text-status-critical">
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                )
             ) : null}
         </div>
     );
@@ -769,16 +799,14 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
             form.setError('title', 'Give the corrective action a title.');
             return;
         }
-        const hsEventId = d.hs_event?.id;
         form.post(`/incidents/${d.id}/corrective-actions`, {
             preserveScroll: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) {
                     form.reset();
                     setOpen(false);
-                    // Land on the new action: open its parent H&S event on the
-                    // Corrective actions pane in the register (reads ?event=).
-                    if (hsEventId) router.visit(`/health-safety/corrective-actions?event=${hsEventId}`);
+                    // Stay in the incident — the refreshed detail shows the new
+                    // action in the list; the register link is there for follow-up.
                 }
             },
         });
