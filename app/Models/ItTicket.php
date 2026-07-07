@@ -170,6 +170,12 @@ class ItTicket extends Model
             ->withTimestamps();
     }
 
+    /** Files attached at raise time (thread replies carry their own). */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(ItAttachment::class, 'attachable');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Waiting clock (SLA pause/resume) */
     /* ------------------------------------------------------------------ */

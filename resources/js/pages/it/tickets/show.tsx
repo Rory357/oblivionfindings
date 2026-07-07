@@ -4,7 +4,12 @@
  * assignee / watchers / linked asset) — every control PATCHes a real route
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
-import { TicketThread, type ThreadComment, type ThreadEvent } from '@/components/it/ticket-thread';
+import {
+    TicketThread,
+    type ThreadAttachment,
+    type ThreadComment,
+    type ThreadEvent,
+} from '@/components/it/ticket-thread';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -52,6 +57,7 @@ interface TicketPayload {
     watchers: { id: number; name: string }[];
     asset: { id: number; name: string; tag: string | null } | null;
     provisioning_request: { id: number; item: string; status: string } | null;
+    attachments: ThreadAttachment[];
     created_at: string | null;
     created_human: string | null;
     updated_at: string | null;
@@ -262,6 +268,7 @@ export default function ItTicketShow({
                         ticketId={ticket.id}
                         requesterName={ticket.requester.name}
                         description={ticket.description}
+                        ticketAttachments={ticket.attachments}
                         comments={comments}
                         events={events}
                         canInternal={can.internal}

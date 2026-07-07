@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,6 +14,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreTicketCommentRequest extends FormRequest
 {
+    use StoresItAttachments;
+
     public function authorize(): bool
     {
         /** @var ItTicket $ticket */
@@ -35,6 +38,7 @@ class StoreTicketCommentRequest extends FormRequest
         return [
             'body' => ['required', 'string', 'max:5000'],
             'is_internal' => ['sometimes', 'boolean'],
+            ...$this->itAttachmentRules(),
         ];
     }
 }

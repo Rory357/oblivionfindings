@@ -28,7 +28,7 @@ use Inertia\Inertia;
  */
 class ItProvisioningController extends Controller
 {
-    use Concerns\BuildsItOptions, ResolvesHrTenant;
+    use Concerns\BuildsItOptions, Concerns\StoresItAttachments, ResolvesHrTenant;
 
     public function __construct(
         private readonly OnboardingService $onboardingService,
@@ -222,6 +222,7 @@ class ItProvisioningController extends Controller
                 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
+            ...$this->itAttachmentRules(),
         ]);
 
         // Triage fields are agent-only: a self-service requester cannot pick
@@ -239,6 +240,8 @@ class ItProvisioningController extends Controller
             'source' => $isAgent ? 'agent' : 'portal',
             'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
+
+        $this->storeItAttachments($ticket, $request->file('attachments'), $user);
 
         ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
             'source' => $ticket->source,

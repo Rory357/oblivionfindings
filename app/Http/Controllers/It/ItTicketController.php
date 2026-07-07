@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
+use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\StoreTicketCommentRequest;
+use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
@@ -23,7 +26,7 @@ use Inertia\Inertia;
  */
 class ItTicketController extends Controller
 {
-    use BuildsItOptions, ResolvesHrTenant;
+    use BuildsItOptions, ResolvesHrTenant, ServesPrivateAttachments, StoresItAttachments;
 
     public function show(Request $request, ItTicket $ticket)
     {
@@ -56,14 +59,22 @@ class ItTicketController extends Controller
             'watchers:id,name',
             'asset:id,name,asset_tag',
             'provisioningRequest:id,item,status',
+            'attachments',
         ]);
+
+        $mapAttachment = fn (ItAttachment $a) => [
+            'id' => $a->id,
+            'name' => $a->original_name,
+            'size' => $a->size,
+            'url' => "/it/attachments/{$a->id}",
+        ];
 
         $requesterProfile = HrEmployeeProfile::query()
             ->where('user_id', $ticket->requester_user_id)
             ->first();
 
         $comments = $ticket->comments()
-            ->with('author:id,name')
+            ->with(['author:id,name', 'attachments'])
             ->when(! $isAgent, fn ($q) => $q->publicOnly())
             ->orderBy('created_at')
             ->get()
@@ -76,6 +87,7 @@ class ItTicketController extends Controller
                     'name' => $c->author?->name ?? 'Unknown',
                     'is_requester' => $c->author_user_id === $ticket->requester_user_id,
                 ],
+                'attachments' => $c->attachments->map($mapAttachment)->values()->all(),
                 'at' => $c->created_at?->toIso8601String(),
                 'at_human' => $c->created_at?->diffForHumans(short: true),
             ])
@@ -134,6 +146,7 @@ class ItTicketController extends Controller
                         'status' => $ticket->provisioningRequest->status,
                     ]
                     : null,
+                'attachments' => $ticket->attachments->map($mapAttachment)->values()->all(),
                 'created_at' => $ticket->created_at?->toIso8601String(),
                 'created_human' => $ticket->created_at?->diffForHumans(short: true),
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
@@ -175,12 +188,14 @@ class ItTicketController extends Controller
         $isAgentSide = $user->canDo('it.manage');
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
 
-        $ticket->comments()->create([
+        $comment = $ticket->comments()->create([
             'tenant_id' => $ticket->tenant_id,
             'author_user_id' => $user->id,
             'body' => $request->validated('body'),
             'is_internal' => $isInternal,
         ]);
+
+        $this->storeItAttachments($comment, $request->file('attachments'), $user);
 
         // First PUBLIC agent reply stops the response clock.
         if ($isAgentSide && ! $isInternal && ! $ticket->first_responded_at) {
@@ -216,6 +231,39 @@ class ItTicketController extends Controller
         }
 
         return redirect()->back()->with('success', $isInternal ? 'Internal note added.' : 'Reply sent.');
+    }
+
+    /**
+     * Authorised download for thread evidence. The parent write's audience
+     * is the read audience: ticket files follow the ticket policy; comment
+     * files additionally hide with their internal note.
+     */
+    public function downloadAttachment(Request $request, ItAttachment $attachment)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, (int) $attachment->tenant_id);
+
+        $parent = $attachment->attachable;
+
+        if ($parent instanceof ItTicketComment) {
+            $this->authorize('view', $parent->ticket);
+            if ($parent->is_internal) {
+                abort_unless($user->canDo('it.manage'), 403);
+            }
+        } elseif ($parent instanceof ItTicket) {
+            $this->authorize('view', $parent);
+        } else {
+            // KB attachments arrive with the Knowledge tab; orphans 404.
+            abort(404);
+        }
+
+        return $this->streamPrivateAttachment(
+            null,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function watch(Request $request, ItTicket $ticket)

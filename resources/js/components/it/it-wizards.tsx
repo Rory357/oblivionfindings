@@ -38,6 +38,7 @@ import {
     type WizardStep,
 } from '@/components/hr/wizard';
 import { Button } from '@/components/ui/button';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -392,11 +393,18 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
     const [moreDetails, setMoreDetails] = useState(false);
     const [reference, setReference] = useState<string | null>(null);
 
-    const form = useForm({
+    const form = useForm<{
+        title: string;
+        description: string;
+        category: string;
+        priority: string;
+        attachments: File[];
+    }>({
         title: '',
         description: '',
         category: 'hardware',
         priority: 'normal',
+        attachments: [],
     });
 
     const valid = form.data.title.trim().length > 0;
@@ -404,6 +412,7 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
     const submit = () => {
         form.post('/it/tickets', {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: (page) => {
                 const err = pageFlashError(page);
                 if (err) {
@@ -490,14 +499,45 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
                         />
                     </Field>
                     {moreDetails ? (
-                        <Field label="More details" hint="optional" error={form.errors.description}>
-                            <Textarea
-                                value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
-                                placeholder="Anything that helps IT find or fix it — where you are, what you tried…"
-                                rows={4}
-                            />
-                        </Field>
+                        <>
+                            <Field label="More details" hint="optional" error={form.errors.description}>
+                                <Textarea
+                                    value={form.data.description}
+                                    onChange={(e) => form.setData('description', e.target.value)}
+                                    placeholder="Anything that helps IT find or fix it — where you are, what you tried…"
+                                    rows={4}
+                                />
+                            </Field>
+                            <Field
+                                label="Photos or files"
+                                hint="optional — a photo says a lot"
+                                error={form.errors.attachments}
+                            >
+                                <FileDropzone
+                                    onFiles={(files) =>
+                                        form.setData(
+                                            'attachments',
+                                            [...form.data.attachments, ...files].slice(0, 5),
+                                        )
+                                    }
+                                    accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
+                                    title="Drop a photo of the problem"
+                                    hint="Images, PDF or documents — up to 5 files"
+                                />
+                                {form.data.attachments.map((file, i) => (
+                                    <StagedFileCard
+                                        key={`${file.name}-${i}`}
+                                        file={file}
+                                        onRemove={() =>
+                                            form.setData(
+                                                'attachments',
+                                                form.data.attachments.filter((_, j) => j !== i),
+                                            )
+                                        }
+                                    />
+                                ))}
+                            </Field>
+                        </>
                     ) : (
                         // eslint-disable-next-line no-restricted-syntax -- text-link disclosure, not a button chrome
                         <button

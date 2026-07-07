@@ -4,6 +4,7 @@
  * requester payloads server-side), an Activity timeline lane fed by
  * it_ticket_events, and the composer (Reply ⇄ Internal note, Ctrl+Enter). */
 import { Button } from '@/components/ui/button';
+import { formatFileSize, StagedFileCard } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
@@ -12,6 +13,7 @@ import {
     Flag,
     Lock,
     MessageSquare,
+    Paperclip,
     Send,
     UserCog,
     Eye,
@@ -20,14 +22,22 @@ import {
     CheckCircle2,
     PlusCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+export interface ThreadAttachment {
+    id: number;
+    name: string;
+    size: number;
+    url: string;
+}
 
 export interface ThreadComment {
     id: number;
     body: string;
     is_internal: boolean;
     author: { id: number | null; name: string; is_requester: boolean };
+    attachments: ThreadAttachment[];
     at: string | null;
     at_human: string | null;
 }
@@ -43,6 +53,29 @@ export interface ThreadEvent {
 
 const label = (raw: string) =>
     raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+
+/** Download chips for a message's evidence — served via the authorised route. */
+function AttachmentChips({ attachments }: { attachments: ThreadAttachment[] }) {
+    if (!attachments.length) return null;
+
+    return (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+            {attachments.map((a) => (
+                <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
+                >
+                    <Paperclip className="h-3 w-3 flex-none" />
+                    <span className="min-w-0 truncate">{a.name}</span>
+                    <span className="flex-none text-muted-foreground">{formatFileSize(a.size)}</span>
+                </a>
+            ))}
+        </div>
+    );
+}
 
 /** Human sentence for an activity row. */
 function eventLine(e: ThreadEvent): string {
@@ -97,6 +130,7 @@ export function TicketThread({
     ticketId,
     requesterName,
     description,
+    ticketAttachments = [],
     comments,
     events,
     canInternal,
@@ -106,6 +140,8 @@ export function TicketThread({
     ticketId: number;
     requesterName: string;
     description: string | null;
+    /** Files attached when the ticket was raised (thread replies carry their own). */
+    ticketAttachments?: ThreadAttachment[];
     comments: ThreadComment[];
     events: ThreadEvent[];
     canInternal: boolean;
@@ -114,18 +150,30 @@ export function TicketThread({
     onPosted?: () => void;
 }) {
     const [lane, setLane] = useState<'conversation' | 'activity'>('conversation');
-    const form = useForm({ body: '', is_internal: false });
+    const fileInput = useRef<HTMLInputElement>(null);
+    const form = useForm<{ body: string; is_internal: boolean; attachments: File[] }>({
+        body: '',
+        is_internal: false,
+        attachments: [],
+    });
 
     const send = () => {
         if (!form.data.body.trim()) return;
         form.post(`/it/tickets/${ticketId}/comments`, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 toast.success(form.data.is_internal ? 'Internal note added.' : 'Reply sent.');
-                form.reset('body');
+                form.reset('body', 'attachments');
                 onPosted?.();
             },
         });
+    };
+
+    const stageFiles = (list: FileList | null) => {
+        if (!list?.length) return;
+        form.setData('attachments', [...form.data.attachments, ...Array.from(list)].slice(0, 5));
+        if (fileInput.current) fileInput.current.value = '';
     };
 
     return (
@@ -174,12 +222,15 @@ export function TicketThread({
                                 : 'flex flex-col gap-3 px-4.5 py-4'
                         }
                     >
-                        {description ? (
+                        {description || ticketAttachments.length ? (
                             <div className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-2.5">
                                 <div className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                                     {requesterName} — original report
                                 </div>
-                                <p className="mt-1 text-[13px] whitespace-pre-wrap">{description}</p>
+                                {description ? (
+                                    <p className="mt-1 text-[13px] whitespace-pre-wrap">{description}</p>
+                                ) : null}
+                                <AttachmentChips attachments={ticketAttachments} />
                             </div>
                         ) : null}
 
@@ -203,6 +254,7 @@ export function TicketThread({
                                     <span className="ml-auto">{c.at_human}</span>
                                 </div>
                                 <p className="mt-1 text-[13px] whitespace-pre-wrap">{c.body}</p>
+                                <AttachmentChips attachments={c.attachments} />
                             </div>
                         ))}
 
@@ -251,8 +303,44 @@ export function TicketThread({
                             }
                             rows={compact ? 2 : 3}
                         />
-                        <div className="mt-2 flex items-center justify-between">
-                            <span className="text-[11.5px] text-muted-foreground">Ctrl+Enter to send</span>
+                        {form.data.attachments.length ? (
+                            <div className="mt-2 flex flex-col gap-1.5">
+                                {form.data.attachments.map((file, i) => (
+                                    <StagedFileCard
+                                        key={`${file.name}-${i}`}
+                                        file={file}
+                                        onRemove={() =>
+                                            form.setData(
+                                                'attachments',
+                                                form.data.attachments.filter((_, j) => j !== i),
+                                            )
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        ) : null}
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    ref={fileInput}
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
+                                    onChange={(e) => stageFiles(e.target.files)}
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => fileInput.current?.click()}
+                                    disabled={form.data.attachments.length >= 5}
+                                >
+                                    <Paperclip className="h-3.5 w-3.5" /> Attach
+                                </Button>
+                                <span className="text-[11.5px] text-muted-foreground">
+                                    Ctrl+Enter to send
+                                </span>
+                            </div>
                             <Button
                                 size="sm"
                                 onClick={send}

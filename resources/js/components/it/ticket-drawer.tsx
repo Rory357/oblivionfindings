@@ -3,7 +3,12 @@
  * identical policy + internal-note stripping) and renders the shared
  * TicketThread with a condensed read-only rail. Actions beyond replying
  * live on the full page — one click away. */
-import { TicketThread, type ThreadComment, type ThreadEvent } from '@/components/it/ticket-thread';
+import {
+    TicketThread,
+    type ThreadAttachment,
+    type ThreadComment,
+    type ThreadEvent,
+} from '@/components/it/ticket-thread';
 import { Button } from '@/components/ui/button';
 import {
     Sheet,
@@ -30,6 +35,7 @@ interface PeekPayload {
         requester: { id: number | null; name: string; role: string | null };
         assignee: { id: number; name: string } | null;
         watchers: { id: number; name: string }[];
+        attachments: ThreadAttachment[];
         created_human: string | null;
     };
     comments: ThreadComment[];
@@ -144,6 +150,7 @@ export function TicketDrawer({
                         ticketId={t.id}
                         requesterName={t.requester.name}
                         description={t.description}
+                        ticketAttachments={t.attachments}
                         comments={data.comments}
                         events={data.events}
                         canInternal={data.can.internal}

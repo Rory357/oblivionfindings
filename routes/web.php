@@ -153,6 +153,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // (ItTicketPolicy; internal notes stripped server-side).
     Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
     Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
+    Route::get('/it/attachments/{attachment}', [ItTicketController::class, 'downloadAttachment'])->name('it.attachments.download');
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');

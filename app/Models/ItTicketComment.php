@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * One message on a helpdesk ticket's conversation thread. Public replies are
@@ -39,6 +40,11 @@ class ItTicketComment extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(ItAttachment::class, 'attachable');
     }
 
     /* ------------------------------------------------------------------ */
