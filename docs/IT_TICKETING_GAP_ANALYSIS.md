@@ -1,0 +1,54 @@
+# IT & Provisioning → Full IT Ticketing System — Gap Analysis & Build Checklist
+
+> Seeded by pass 0 of the loop (2026-07-07). Loop protocol: take the **first unchecked item**,
+> implement it as one small verifiable slice, verify, tick with a one-line note, commit, stop.
+> Schema only from §P of the loop prompt; anything beyond → `IT_TICKETING_QUESTIONS.md` (repo root).
+
+## Verify commands
+
+- `php artisan test` (Pest — scoped: `php artisan test tests/Feature/It`) — ⚠️ junctioned-vendor worktree: PHP tests autoload the PARENT's app/; verify in parent or copy vendor + dump-autoload first.
+- `npm run build` · `npm run types` · `npm run lint`
+- `npm run test` (vitest) · `npm run visual:test` (Playwright, axe available)
+
+## Audit findings (pass 0 — all confirmed against the code)
+
+1. **Self-service is impossible.** `routes/web.php:144–154`: the outer group is `permission:it.view` (gates even `GET /it`) and `it.tickets.store` sits inside the nested `permission:it.manage` group. `it.view`/`it.manage` are granted to admin/provider_manager/hr only (RbacSeeder L417–418, grants L628; grant migration `2026_07_02_100002`). Support workers 403 on everything — confirmed by the existing test ("the /it hub is gated on it.view").
+2. **No ticket detail surface.** No show route, no thread, no comments, no history. `resolveTicket` (controller L252–269) takes no resolution note; nothing records what fixed it. All actions live in row context menus.
+3. **No SLA anything.** `it_tickets` has no due/response columns (migration `2026_07_02_100001`), no breach state, no escalation, no scheduled command. `routes/console.php` is where commands schedule (`app(Schedule::class)` blocks, ~L70+).
+4. **`stats()` is thin but correct** (controller L353–376): requests pending/in_progress all-time + done_30d, tickets open + urgent. No unassigned, no SLA states, no awaiting-reply, no per-view counts. Needs a real summary payload.
+5. **Queues are unpaginated** — `requestRows`/`ticketRows` (L276–350) do `get()->map` full-table arrays. Needs server-side pagination + summary endpoint for hero counts.
+6. **Hero is hand-rolled** — `it/index.tsx:267` `bg-gradient-to-br from-primary/90 via-primary to-primary/80`, static (non-link) chips. Not the golden band kit (`people-hero.tsx` shape).
+7. **Ticket feature gaps:** flat 4 categories, no subcategory, no attachments, no watchers, no reopen, no auto-close, no CSAT, no merge, no saved views, no bulk, no reports, no KB, no email-in. Variant maps at `it/index.tsx:84–104` are semantic maps *feeding* `StatusBadge` — acceptable pattern, keep/extend.
+8. **Provisioning gaps:** no priority, no due date; `notes` is a single final-outcome field overwritten at fulfil.
+9. **Notifications:** only `ItProvisioningCancelledNotification` (app/Domain/Hr/Notifications) exists. Requesters hear nothing on create/assign/resolve. No ticket notifications at all.
+10. **Tests:** 4 happy-path tests in `tests/Feature/It/ItProvisioningTest.php` (gate, checklist bridge, fulfil→task-complete, ticket lifecycle). No policy/authz matrix, no SLA, no comment coverage. These 4 stay green forever.
+11. **Attachment infra answer (§P.4):** NO generic polymorphic attachment table exists — every module has its own model (`HsAttachment`, `PrivacyAttachment`, `ClientIncidentAttachment`, `ClinicalAttachment`, …). The shared piece is the controller concern `app/Http/Controllers/Concerns/ServesPrivateAttachments.php` (private disk, mime allowlist, CSP sandbox — closes stored-XSS) + frontend `components/ui/file-dropzone.tsx`. **Decision: build `it_attachments` (morphs: ticket|comment|kb_article) per §P.4 and serve downloads via `ServesPrivateAttachments`.**
+12. **Cross-loop bridge (sacred):** `OnboardingService::createItProvisioningRequests()` (L524–568) — IT-category tasks, equipment excluded (asset path), idempotent per task, Schema::hasTable-guarded, never blocks checklist creation. `fulfil` completes the linked task via `completeTask()` in a DB transaction (controller L114–137); `cancel` annotates the task + notifies the checklist creator best-effort (L163–183).
+13. **Tenancy pattern:** `ResolvesHrTenant` trait (`resolveHrTenantIdForUser`, `assertHrTenantAccess`, `rejectForeignTenantRecipient`) + `forTenant` scopes on both models. Keep on every new query/mutation.
+14. **No FormRequests in the module** — all inline `$request->validate()`. New mutations get FormRequests per the non-negotiables.
+
+## Build order (master checklist)
+
+- [x] 1. §A audit pass → seed this gap doc (pass 0). *(2026-07-07: findings above; attachment decision recorded — docs/IT_TICKETING_GAP_ANALYSIS.md)*
+- [ ] 2. §P.9 + §B permissions: `it.request` migration/seeder, sidebar gate, route regrouping (`it.tickets.store` out of manage), `ItTicketPolicy` + authz tests.
+- [ ] 3. §P.1–3, 5, 8, 10 migrations + model/relationship/constant updates (+ factories) — schema lands early, in one pass, tested.
+- [ ] 4. Reference generation + backfill; controller pagination + the new server summary payload + saved-view params.
+- [ ] 5. §B My tickets tab + Raise-a-ticket quick modal + created-receipt notification.
+- [ ] 6. §E ticket workspace: show route/policy payloads → `TicketThread` (comments API, internal notes) → properties rail (assign/status/priority/category/asset/watchers) → timeline → drawer.
+- [ ] 7. §N3 Resolve modal + close/reopen routes + auto-close command + `TicketResolved`/`TicketReopened` notifications.
+- [ ] 8. §G SLA: policies table/seeder/editor → stamping + waiting-pause → `it:check-sla` + notifications + queue/hero chips.
+- [ ] 9. §F2 queue rebuild: standard table, toolbar, saved views, bulk, pagination.
+- [ ] 10. §C hero (golden band + summary chips + right-rail toggle).
+- [ ] 11. §F1 Overview tab.
+- [ ] 12. §H provisioning uplift (priority/due, manual wizard, linked tickets, bulk, events).
+- [ ] 13. §N2 agent Log & triage wizard rebuild (SLA preview, on-behalf-of, asset link).
+- [ ] 14. §I Knowledge tab + KB modal + deflection + helpful votes.
+- [ ] 15. §K CSAT (prompt, store, rail display).
+- [ ] 16. §L Reports tab (server aggregates + recharts + export).
+- [ ] 17. §O right-click everywhere + default-tab persistence.
+- [ ] 18. §S delight + axe pass + screenshot diff of every tab/modal/workspace vs gold standards; final DoD sweep.
+
+## Decisions / questions
+
+- **§P.4 attachments:** no clean generic infra → build `it_attachments` with `attachable` morphs, serve via `ServesPrivateAttachments` (decision recorded in finding 11; within pre-approved schema).
+- Deferred decisions live in `IT_TICKETING_QUESTIONS.md` (repo root) — created when the first one arises.
