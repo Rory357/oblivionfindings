@@ -330,7 +330,9 @@ class ControlRoomIncidentController extends Controller
             'incident_source_id' => $data['source_id'],
         ]);
 
-        return back()->with('success', 'Alert created from incident.');
+        return back()
+            ->with('success', 'Alert created from incident.')
+            ->with('created_alert_id', $alert->id);
     }
 
     /**

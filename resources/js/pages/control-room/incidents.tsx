@@ -209,6 +209,17 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
             },
             {
                 preserveScroll: true,
+                onSuccess: (page) => {
+                    // Open the freshly-created alert's workspace right here so the
+                    // operator can act on it in one step, instead of hunting for it
+                    // on the Alerts tab.
+                    const newId = (page.props.flash as { created_alert_id?: number } | undefined)?.created_alert_id;
+                    if (newId) {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('alert', String(newId));
+                        router.get(`/control-room/incidents?${params.toString()}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+                    }
+                },
                 onFinish: () => {
                     setSubmitting(false);
                     setAlertDialogOpen(false);

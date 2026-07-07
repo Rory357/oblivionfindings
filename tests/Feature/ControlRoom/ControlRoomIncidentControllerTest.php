@@ -127,6 +127,9 @@ class ControlRoomIncidentControllerTest extends TestCase
 
         $alert = ControlRoomAlert::where('alert_type', 'client_incident')->first();
         $this->assertSame($incident->id, $alert->context['incident_source_id']);
+
+        // The new alert id is flashed so the UI can open its workspace in one step.
+        $this->assertEquals($alert->id, session('created_alert_id'));
     }
 
     public function test_flag_as_incident_requires_create_permission(): void
