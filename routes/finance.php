@@ -627,6 +627,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index')
         ->middleware('permission:finance.ar.view');
+    // CSV export must be registered BEFORE /invoices/{invoice} so "export" isn't
+    // captured as an invoice id.
+    Route::get('/invoices/export', [InvoiceController::class, 'export'])
+        ->name('invoices.export')
+        ->middleware('permission:finance.ar.view');
     Route::get('/invoices/create', [InvoiceController::class, 'create'])
         ->name('invoices.create')
         ->middleware('permission:finance.ar.manage');

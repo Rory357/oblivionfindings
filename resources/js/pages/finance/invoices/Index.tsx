@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -134,12 +134,20 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                             { label: 'Paid this month', value: formatMoney(summary.paid_this_month) },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Invoice
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/invoices/export?${new URLSearchParams(Object.entries({ status, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Invoice
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<ReceivablesTabsFooter active="invoices" />}
                     />
