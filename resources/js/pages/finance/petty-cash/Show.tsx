@@ -66,7 +66,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
     const { fund, transactions } = summary;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Petty Cash', href: '/finance/petty-cash' },
         { title: fund.name, href: `/finance/petty-cash/${fund.id}` },
     ];

@@ -122,7 +122,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Accounts Receivable', href: '/finance/receivables' },
                 { title: 'Statements', href: '/finance/receivables/statements' },
             ]}

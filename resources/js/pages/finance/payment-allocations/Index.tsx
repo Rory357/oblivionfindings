@@ -43,7 +43,7 @@ type Props = {
 const ANY = '__ANY__';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Payment Allocations', href: '/finance/payment-allocations' },
 ];
 

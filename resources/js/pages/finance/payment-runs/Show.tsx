@@ -59,7 +59,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
     const [processingRun, setProcessingRun] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Payment Runs', href: '/finance/payment-runs' },
         { title: paymentRun.run_number, href: `/finance/payment-runs/${paymentRun.id}` },
     ];

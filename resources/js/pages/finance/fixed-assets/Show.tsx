@@ -157,7 +157,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
     const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Fixed Assets', href: '/finance/fixed-assets' },
         { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
     ];

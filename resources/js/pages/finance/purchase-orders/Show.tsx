@@ -82,7 +82,7 @@ export default function PurchaseOrderShow() {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
             <Head title={`PO ${po.po_number}`} />
             <PageLayout
                 hero={

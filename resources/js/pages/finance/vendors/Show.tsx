@@ -122,7 +122,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
         .join(', ');
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Vendors', href: '/finance/vendors' },
         { title: vendor.name, href: `/finance/vendors/${vendor.id}` },
     ];

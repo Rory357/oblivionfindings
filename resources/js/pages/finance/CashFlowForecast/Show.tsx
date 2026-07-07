@@ -109,7 +109,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
     const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
         { title: forecast.name, href: `/finance/cash-flow-forecast/${forecast.id}` },
     ];

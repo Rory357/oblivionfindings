@@ -1,8 +1,12 @@
-import { Badge } from '@/components/ui/badge';
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
+import { OverviewTabsFooter } from '@/components/finance/overview-hub';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -12,7 +16,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { formatCurrency } from '@/lib/fleet-utils';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -20,10 +23,7 @@ import {
     ArrowUp,
     BarChart3,
     CalendarDays,
-    DollarSign,
     ExternalLink,
-    Percent,
-    TrendingUp,
 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { useMemo, useState } from 'react';
@@ -37,18 +37,6 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import type { ComponentType } from 'react';
-
-const CHART_COLORS = [
-    '#2563eb',
-    '#16a34a',
-    '#f59e0b',
-    '#dc2626',
-    '#0891b2',
-    '#7c3aed',
-    '#db2777',
-    '#475569',
-];
 
 type Category = {
     key: string;
@@ -100,7 +88,7 @@ type Props = {
 
 type SortKey = 'site' | 'total_cost' | 'variance_pct' | 'top_category';
 
-const money = (value: string | number) => formatCurrency(Number(value));
+const money = (value: string | number) => formatMoney(Number(value));
 const pct = (value: string | number) => `${Number(value).toFixed(1)}%`;
 const numericSortValue = (row: SiteRow, key: SortKey) => {
     if (key === 'total_cost') return Number(row.total_cost);
@@ -109,26 +97,22 @@ const numericSortValue = (row: SiteRow, key: SortKey) => {
     return 0;
 };
 
-const statusBadge = (status: string) => {
+const budgetVariant = (status: string): 'critical' | 'warning' | 'success' | 'neutral' => {
     switch (status) {
         case 'over_budget':
-            return <Badge variant="destructive">Over Budget</Badge>;
+            return 'critical';
         case 'approaching':
-            return (
-                <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                    Approaching
-                </Badge>
-            );
+            return 'warning';
         case 'under_budget':
-            return (
-                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
-                    Under Budget
-                </Badge>
-            );
+            return 'success';
         default:
-            return <Badge variant="outline">On Track</Badge>;
+            return 'neutral';
     }
 };
+
+const statusBadge = (status: string) => (
+    <StatusBadge variant={budgetVariant(status)} size="sm" label={status === 'on_track' ? 'On Track' : undefined} status={status} />
+);
 
 export default function SitesFinancialOverview({
     filters,
@@ -144,8 +128,8 @@ export default function SitesFinancialOverview({
     }>({ key: 'total_cost', direction: 'desc' });
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
-        { title: 'Sites' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'By site' },
     ];
 
     const sortedSites = useMemo(() => {
@@ -207,12 +191,20 @@ export default function SitesFinancialOverview({
             <Head title="Site Financials" />
 
             <PageLayout
+                width="wide"
                 hero={
-                    <PageHero category="finance"
-                        variant="compact"
-                        backHref="/finance/dashboard"
+                    <PageHero
+                        category="finance"
+                        icon={BarChart3}
                         title="All-Sites Comparison"
-                        description="Site Financials"
+                        description={`Cost, budget variance and category mix across ${kpis.site_count} ${kpis.site_count === 1 ? 'site' : 'sites'} for the selected period.`}
+                        stats={[
+                            { label: 'Total cost', value: money(kpis.total_cost) },
+                            { label: 'Sites over budget', value: kpis.sites_over_budget, tone: kpis.sites_over_budget > 0 ? 'warning' : undefined },
+                            { label: 'Avg cost / site', value: money(kpis.avg_cost_per_site) },
+                            { label: 'Sites', value: kpis.site_count },
+                        ]}
+                        footer={<OverviewTabsFooter active="by-site" />}
                         actions={
                             <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                                 <div className="space-y-1.5">
@@ -246,29 +238,6 @@ export default function SitesFinancialOverview({
                     />
                 }
             >
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <KpiCard
-                        label="Total Cost"
-                        value={money(kpis.total_cost)}
-                        icon={DollarSign}
-                    />
-                    <KpiCard
-                        label="Sites Over Budget"
-                        value={`${kpis.sites_over_budget}`}
-                        icon={TrendingUp}
-                    />
-                    <KpiCard
-                        label="Avg Cost / Site"
-                        value={money(kpis.avg_cost_per_site)}
-                        icon={Percent}
-                    />
-                    <KpiCard
-                        label="Period"
-                        value={`${filters.from} to ${filters.to}`}
-                        icon={CalendarDays}
-                    />
-                </div>
 
                 <Card>
                     <CardHeader>
@@ -318,20 +287,17 @@ export default function SitesFinancialOverview({
                                             dataKey={category.key}
                                             name={category.label}
                                             stackId="cost"
-                                            fill={
-                                                CHART_COLORS[
-                                                    index %
-                                                        CHART_COLORS.length
-                                                ]
-                                            }
+                                            fill={chartColor(index)}
                                         />
                                     ))}
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-                                No cost data for this period
-                            </div>
+                            <EmptyState
+                                icon={BarChart3}
+                                heading="No cost data for this period"
+                                description="Costs appear once journals post against site cost centres inside the selected date range."
+                            />
                         )}
                     </CardContent>
                 </Card>
@@ -512,30 +478,6 @@ export default function SitesFinancialOverview({
                 </Card>
             </PageLayout>
         </AppLayout>
-    );
-}
-
-function KpiCard({
-    label,
-    value,
-    icon: Icon,
-}: {
-    label: string;
-    value: string;
-    icon: ComponentType<{ className?: string }>;
-}) {
-    return (
-        <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <Icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground">{label}</p>
-                    <p className="truncate text-xl font-semibold">{value}</p>
-                </div>
-            </CardContent>
-        </Card>
     );
 }
 

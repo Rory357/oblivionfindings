@@ -29,7 +29,7 @@ interface Props extends PageProps {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Donor Funds', href: '/finance/donor-funds' },
     { title: 'New Fund', href: '/finance/donor-funds/create' },
 ];

@@ -73,7 +73,7 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Credit Notes', href: '/finance/credit-notes' },
                 { title: creditNote.credit_note_number, href: `/finance/credit-notes/${creditNote.id}` },
             ]}

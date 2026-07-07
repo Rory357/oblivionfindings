@@ -81,7 +81,7 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
 ];
 

@@ -88,7 +88,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
     const badge = statusBadge[batch.status] ?? statusBadge.open;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
         { title: `Batch ${batch.batch_number}`, href: `/finance/eftpos/batches/${batch.id}` },
     ];

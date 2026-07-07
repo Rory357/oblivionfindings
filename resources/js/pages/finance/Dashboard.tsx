@@ -58,6 +58,7 @@ import {
 } from '@/components/finance';
 import { FinanceHubsBar } from '@/components/finance/finance-hubs-bar';
 import { NeedsAttentionStrip, type AttentionItem } from '@/components/finance/needs-attention-strip';
+import { OverviewTabsFooter } from '@/components/finance/overview-hub';
 import { cn } from '@/lib/utils';
 
 interface MonthlyData {
@@ -165,8 +166,8 @@ type Modal = null | 'journal' | 'bill' | 'invoice' | 'receipt';
 type KpiTone = 'primary' | 'success' | 'warning' | 'critical' | 'info';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
-    { title: 'Dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Overview' },
 ];
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -467,6 +468,7 @@ export default function FinanceDashboard({
                 width="wide"
                 hero={
                     <PageHero
+                        category="finance"
                         icon={LayoutDashboard}
                         title={
                             <span>
@@ -481,8 +483,14 @@ export default function FinanceDashboard({
                             <span>
                                 Live general ledger for{' '}
                                 <span className="font-semibold text-primary-foreground">{orgName}</span> across{' '}
-                                <span className="font-semibold text-primary-foreground">14 sites</span> and{' '}
-                                <span className="font-semibold text-primary-foreground">5 funding streams</span>.
+                                <span className="font-semibold text-primary-foreground">
+                                    {siteCount ?? 0} {siteCount === 1 ? 'site' : 'sites'}
+                                </span>{' '}
+                                and{' '}
+                                <span className="font-semibold text-primary-foreground">
+                                    {fundingStreams.length} funding {fundingStreams.length === 1 ? 'stream' : 'streams'}
+                                </span>
+                                .
                             </span>
                         }
                         meta={[
@@ -536,7 +544,9 @@ export default function FinanceDashboard({
                             </div>
                         }
                         footer={
-                            <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-col gap-1">
+                                <OverviewTabsFooter active="summary" />
+                                <div className="flex flex-col items-stretch gap-2 pb-3 md:flex-row md:items-center md:justify-between">
                                 <div className="inline-flex w-fit rounded-[10px] bg-primary-foreground/15 p-[3px]">
                                     {PERIODS.map((p) => (
                                         // eslint-disable-next-line no-restricted-syntax -- segmented-control pill, not a shadcn Button
@@ -573,6 +583,7 @@ export default function FinanceDashboard({
                                         onChange={changeFunder}
                                         onDark
                                     />
+                                </div>
                                 </div>
                             </div>
                         }

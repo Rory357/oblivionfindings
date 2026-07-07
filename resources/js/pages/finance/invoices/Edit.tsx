@@ -85,7 +85,7 @@ const emptyLine = (): LineItem => ({
 
 export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Invoices', href: '/finance/invoices' },
         { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
         { title: 'Edit', href: `/finance/invoices/${invoice.id}/edit` },

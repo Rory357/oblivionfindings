@@ -61,7 +61,7 @@ type PageProps = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'IRD Filings', href: '/finance/ird-filings' },
 ];
 

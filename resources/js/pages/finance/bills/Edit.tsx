@@ -188,7 +188,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Bills', href: '/finance/bills' },
                 { title: bill.bill_number, href: `/finance/bills/${bill.id}` },
                 { title: 'Edit', href: `/finance/bills/${bill.id}/edit` },

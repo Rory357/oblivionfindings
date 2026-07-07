@@ -190,7 +190,7 @@ function IrdFormBox({
 
 export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'GST Returns', href: '/finance/gst-returns' },
         { title: `Period ending ${formatDate(gstReturn.period_end)}`, href: `/finance/gst-returns/${gstReturn.id}` },
     ];

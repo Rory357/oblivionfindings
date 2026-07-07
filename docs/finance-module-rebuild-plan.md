@@ -540,16 +540,26 @@ vendor, receipt) — the mould for C2.
 | Shared UI spine | `TabStrip`/`WizardShell`/`StatusBadge`/`PageHero` shared app-wide | finance wraps them in `components/finance/` ✓ | never fork |
 
 ### C-milestones (finalised)
-- **[ ] C0 — Hotfixes.** P&L ambiguous-column 500: qualify `FinAccount::scopeForOrganization` (+ audit the other
-  `forOrganization`+join call sites); test = P&L + funding-stream-summary endpoints 200 with posted journals.
-  *Acceptance: all 9 report tabs render live.*
-- **[ ] C1 — Overview hub (the 8th hub).** New `GET /finance` (`finance.index`) role-aware hub: tabs
-  **Summary · Executive · By site · Cash position** (Summary=Dashboard body on-contract; Executive/By-site =
-  migrated dashboards; Cash position = bank balances+runway+upcoming obligations from existing data). Fix hero
-  category + fake description stats; `OverviewTabsFooter`; FinanceHubsBar retained on all tabs; old routes
-  (`finance.dashboard`, `finance.executive-dashboard`, `finance.sites.overview`) → redirects; sidebar collapsed;
-  merged pages come fully on-contract (money.tsx, StatusBadge, EmptyState, badges w/ real counts).
-  *Acceptance: /finance renders 4 tabs, redirects live, screenshots vs Rostering attached.*
+- **[x] C0 — Hotfixes.** DONE 2026-07-07 (merge `7807f855`). Qualified `organization_id` via `qualifyColumn()`
+  in all 36 finance models' org scopes (both `fn (`/`fn(` spellings); new `ReportsRenderTest` renders all 8
+  report tabs against posted journals + locks P&L figures (revenue 1150/expenses 400/net 750). Finance suite
+  151 green. Browser-verified: P&L renders (amber hero, 9 tabs) on the local dev server.
+- **[x] C1 — Overview hub (the 8th hub).** DONE 2026-07-07. `GET /finance` now serves the Summary dashboard
+  (route NAME `finance.dashboard` kept → every existing caller lands on the hub; old `/finance/dashboard` URL
+  → `Route::redirect`). New `OverviewTabsFooter` (components/finance/overview-hub.tsx): **Summary · Executive ·
+  By site · Cash position**, all `finance.dashboard`-gated, rendered in all four heroes above the existing
+  period-pills/filters row. Summary hero fixed: `category="finance"` (was purple `--primary`) + real
+  site/funding-stream counts replace the hardcoded "14 sites / 5 funding streams". Executive + By-site brought
+  on-contract: PageLayout width=wide, hero KPI stats promoted from body cards, `formatMoney` replaces
+  fleet-utils `formatCurrency`, `StatusBadge` replaces the hand-rolled budget badge, `EmptyState` replaces
+  bespoke empties, new shared `chart-palette.ts` (CSS-var palette) kills sites-overview's hex `CHART_COLORS`.
+  NEW Cash-position tab: `CashPositionController` composes existing data only — live bank + petty-cash balances
+  and the next-30-days obligations from `FinanceCalendarAggregator` (in/out/projected totals) — page fully
+  on-contract. Sidebar entry renamed Overview → `/finance`. 65 breadcrumb hrefs + FinancePolicy/Rbac/visual
+  test URLs updated off the old path. Gates: types ✓ eslint(touched) ✓ build ✓ route:list ✓ OverviewHubTest
+  (5) + dashboard/nav tests 17 green ✓ browser-smoked all four tabs with screenshots, console clean.
+  *(By design kept: FinanceHubsBar on Summary; genuine drill-downs site-dashboard + clients/Financials stay
+  pages — they come on-contract in C3.)*
 - **[ ] C2 — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
   edit pattern for edits; `alert-dialog` for every one of the 16 native `confirm()` sites; payment-run
   approve/process get confirm modals; period-close gets a guarded impact-preview modal; GST Prepare becomes a

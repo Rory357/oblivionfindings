@@ -48,7 +48,7 @@ const typeLabels: Record<string, string> = {
 const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Reports' },
     { title: 'Trial Balance' },
 ];

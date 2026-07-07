@@ -120,7 +120,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Donor Funds', href: '/finance/donor-funds' },
         { title: fund.fund_name, href: `/finance/donor-funds/${fund.id}` },
     ];

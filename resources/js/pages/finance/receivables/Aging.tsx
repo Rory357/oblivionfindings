@@ -60,7 +60,7 @@ const bucketBgColors: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Accounts Receivable', href: '/finance/receivables' },
     { title: 'Aging Report', href: '/finance/receivables/aging' },
 ];
