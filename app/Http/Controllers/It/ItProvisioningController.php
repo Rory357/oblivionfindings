@@ -332,11 +332,9 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', 'Ticket updated.');
     }
 
-    public function resolveTicket(Request $request, ItTicket $ticket)
+    public function resolveTicket(\App\Http\Requests\It\ResolveTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
-        $this->authorize('resolve', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -344,12 +342,43 @@ class ItProvisioningController extends Controller
             return redirect()->back()->with('error', 'This ticket is already resolved.');
         }
 
-        $ticket->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
+        // The resolution note is the final PUBLIC reply — "what fixed it"
+        // always lands on the record, visible to the requester.
+        $ticket->comments()->create([
+            'tenant_id' => $ticket->tenant_id,
+            'author_user_id' => $user->id,
+            'body' => $request->validated('note'),
+            'is_internal' => false,
         ]);
 
-        return redirect()->back()->with('success', "Resolved “{$ticket->title}”.");
+        if ($ticket->status === 'waiting') {
+            $ticket->stopWaiting('resolved');
+        }
+        $ticket->status = 'resolved';
+        $ticket->resolved_at = now();
+        if (! $ticket->first_responded_at) {
+            $ticket->first_responded_at = now();
+        }
+        // Inside the resolution target → the SLA is met. (Due dates are
+        // stamped by the SLA engine; without one there is nothing to meet.)
+        if ($ticket->resolution_due_at && now()->lte($ticket->resolution_due_at->copy()->addMinutes((int) $ticket->sla_paused_minutes))) {
+            $ticket->sla_state = 'met';
+        }
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'resolved', $user->id);
+
+        // Requester hears (unless they resolved it themselves, or the agent
+        // untoggled it); watchers always hear — minus the actor.
+        if ($request->boolean('notify_requester', true)
+            && $ticket->requester
+            && $ticket->requester_user_id !== $user->id) {
+            $ticket->requester->notify(new \App\Notifications\It\TicketResolvedNotification($ticket, 'requester'));
+        }
+        $watchers = $ticket->watchers()->get()->reject(fn (User $w) => $w->id === $user->id);
+        NotificationFacade::send($watchers, new \App\Notifications\It\TicketResolvedNotification($ticket, 'watcher'));
+
+        return redirect()->back()->with('success', "Resolved {$ticket->reference} — the requester can see the fix.");
     }
 
     /* ================================================================== */

@@ -72,6 +72,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// IT helpdesk: tickets resolved 7+ days ago auto-close (the requester's
+// reopen window has passed): 07:10 NZ daily.
+app(Schedule::class)
+    ->command('it:close-resolved')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:10');
+
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)
     ->command('followups:remind-overdue')

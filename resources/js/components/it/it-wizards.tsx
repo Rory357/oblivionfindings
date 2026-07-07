@@ -38,6 +38,7 @@ import {
     type WizardStep,
 } from '@/components/hr/wizard';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -87,6 +88,7 @@ export interface TicketRow {
 export type ItModal =
     | { type: 'ticket' }
     | { type: 'raise' }
+    | { type: 'resolve'; ticket: { id: number; reference: string | null; title: string } }
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow };
@@ -121,6 +123,8 @@ export function ItWizard({
             return <CreateTicketWizard assignees={assignees} onClose={onClose} />;
         case 'raise':
             return <RaiseTicketDialog onClose={onClose} />;
+        case 'resolve':
+            return <ResolveTicketDialog ticket={modal.ticket} onClose={onClose} />;
         case 'fulfil':
             return <FulfilRequestDialog request={modal.request} onClose={onClose} />;
         case 'assign-request':
@@ -548,6 +552,115 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
                             + Add more details
                         </button>
                     )}
+                </div>
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  Resolve ticket (single step — the note IS the record)             */
+/* ================================================================== */
+
+const RESOLVE_STEPS: readonly WizardStep[] = [
+    { key: 'resolve', label: 'Resolve', blurb: 'What fixed it', icon: CheckCircle2 },
+];
+
+export function ResolveTicketDialog({
+    ticket,
+    onClose,
+}: {
+    ticket: { id: number; reference: string | null; title: string };
+    onClose: () => void;
+}) {
+    const wizard = useWizard(RESOLVE_STEPS.length);
+    const [done, setDone] = useState(false);
+
+    const form = useForm({
+        note: '',
+        notify_requester: true,
+    });
+
+    const valid = form.data.note.trim().length > 0;
+
+    const submit = () => {
+        form.post(`/it/tickets/${ticket.id}/resolve`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const err = pageFlashError(page);
+                if (err) {
+                    toast.error(err);
+                    return;
+                }
+                setDone(true);
+                toast.success(`Resolved ${ticket.reference ?? 'ticket'}.`);
+            },
+        });
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Resolve ticket"
+            description={`${ticket.reference ?? 'Ticket'} — ${ticket.title}`}
+            railIcon={CheckCircle2}
+            railTitle="Resolve"
+            railSub={ticket.reference ?? 'IT helpdesk'}
+            steps={RESOLVE_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title="Resolved"
+                        blurb={
+                            <>
+                                The resolution note is on the thread as the final reply
+                                {form.data.notify_requester ? ' and the requester has been emailed' : ''}.
+                                It auto-closes in 7 days unless reopened.
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={null}
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={form.processing || !valid}>
+                        {form.processing ? 'Resolving…' : 'Resolve ticket'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={CheckCircle2}
+                    title="What fixed it?"
+                    blurb="Posted to the thread as the final public reply — the requester reads this."
+                />
+                <div className="grid gap-3.5">
+                    <Field label="Resolution note" required error={form.errors.note}>
+                        <Textarea
+                            value={form.data.note}
+                            onChange={(e) => form.setData('note', e.target.value)}
+                            placeholder="e.g. Replaced the charging cable and tested — holding 100% overnight."
+                            rows={5}
+                            autoFocus
+                        />
+                    </Field>
+                    <label className="flex items-center gap-2 text-[13px] font-medium">
+                        <Checkbox
+                            checked={form.data.notify_requester}
+                            onCheckedChange={(v) => form.setData('notify_requester', v === true)}
+                        />
+                        Email the requester that it’s fixed
+                    </label>
                 </div>
             </WizardStepPane>
         </WizardShell>

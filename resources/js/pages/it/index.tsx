@@ -281,7 +281,8 @@ export default function ItIndex({
     };
 
     const ticketMenu = (t: TicketRow) => {
-        const workable = t.status === 'open' || t.status === 'in_progress';
+        const workable =
+            t.status === 'open' || t.status === 'in_progress' || t.status === 'waiting';
         return ctx.open([
             {
                 kind: 'item' as const,
@@ -317,10 +318,14 @@ export default function ItIndex({
                       { kind: 'divider' as const },
                       {
                           kind: 'item' as const,
-                          label: 'Resolve',
+                          label: 'Resolve…',
                           icon: CheckCircle2,
                           tone: 'success' as const,
-                          onSelect: () => act('post', `/it/tickets/${t.id}/resolve`),
+                          onSelect: () =>
+                              setModal({
+                                  type: 'resolve',
+                                  ticket: { id: t.id, reference: t.reference, title: t.title },
+                              }),
                       },
                   ]
                 : []),
@@ -330,13 +335,13 @@ export default function ItIndex({
                           kind: 'item' as const,
                           label: 'Close ticket',
                           icon: XCircle,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'closed' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/close`),
                       },
                       {
                           kind: 'item' as const,
                           label: 'Reopen',
                           icon: RotateCcw,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'open' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
                       },
                   ]
                 : []),
@@ -346,7 +351,7 @@ export default function ItIndex({
                           kind: 'item' as const,
                           label: 'Reopen',
                           icon: RotateCcw,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'open' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
                       },
                   ]
                 : []),

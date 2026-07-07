@@ -266,6 +266,63 @@ class ItTicketController extends Controller
         );
     }
 
+    /** Close a settled (or abandoned) ticket — terminal until reopened. */
+    public function close(Request $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->can('close', $ticket), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        if ($ticket->status === 'closed') {
+            return redirect()->back()->with('error', 'This ticket is already closed.');
+        }
+
+        if ($ticket->status === 'waiting') {
+            $ticket->stopWaiting('closed');
+        }
+        $ticket->status = 'closed';
+        $ticket->closed_at = now();
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'closed', $user->id);
+
+        return redirect()->back()->with('success', "Closed {$ticket->reference}.");
+    }
+
+    /**
+     * Bring a settled ticket back: agents anytime, the requester within
+     * 7 days of resolution (ItTicketPolicy::reopen).
+     */
+    public function reopen(Request $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $this->authorize('reopen', $ticket);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        if (! in_array($ticket->status, ['resolved', 'closed'], true)) {
+            return redirect()->back()->with('error', 'Only resolved or closed tickets can be reopened.');
+        }
+
+        $ticket->status = 'open';
+        $ticket->resolved_at = null;
+        $ticket->closed_at = null;
+        $ticket->reopened_count = (int) $ticket->reopened_count + 1;
+        // The clock runs again — a previously met/breached verdict no longer
+        // describes an open ticket; the SLA engine re-evaluates from here.
+        $ticket->sla_state = 'ok';
+        $ticket->save();
+
+        ItTicketEvent::record($ticket, 'reopened', $user->id);
+
+        if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
+            $ticket->assignee->notify(new \App\Notifications\It\TicketReopenedNotification($ticket));
+        }
+
+        return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
+    }
+
     public function watch(Request $request, ItTicket $ticket)
     {
         $user = $request->user();

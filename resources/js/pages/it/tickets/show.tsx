@@ -4,6 +4,7 @@
  * assignee / watchers / linked asset) — every control PATCHes a real route
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
+import { ResolveTicketDialog } from '@/components/it/it-wizards';
 import {
     TicketThread,
     type ThreadAttachment,
@@ -26,14 +27,17 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     Check,
+    CheckCircle2,
     Copy,
     Eye,
     EyeOff,
     Link2,
+    RotateCcw,
     Server,
     Ticket as TicketIcon,
     Timer,
     UserPlus,
+    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -128,6 +132,7 @@ export default function ItTicketShow({
     ];
 
     const [subcategory, setSubcategory] = useState(ticket.subcategory ?? '');
+    const [resolving, setResolving] = useState(false);
 
     /** PATCH a triage field and toast the outcome. */
     const patch = (data: Record<string, string | number | null>, doneMsg = 'Ticket updated.') =>
@@ -164,6 +169,12 @@ export default function ItTicketShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference ?? 'Ticket'} — ${ticket.title}`} />
+            {resolving ? (
+                <ResolveTicketDialog
+                    ticket={{ id: ticket.id, reference: ticket.reference, title: ticket.title }}
+                    onClose={() => setResolving(false)}
+                />
+            ) : null}
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
                 {/* Compact header band */}
@@ -223,42 +234,71 @@ export default function ItTicketShow({
                                 {ticket.created_human ? ` · ${ticket.created_human}` : ''}
                             </p>
                         </div>
-                        {can.manage ? (
-                            <div className="flex flex-none flex-wrap items-center gap-2">
-                                {ticket.assignee?.id !== myId && isWorking ? (
+                        <div className="flex flex-none flex-wrap items-center gap-2">
+                            {can.manage && isWorking ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                    onClick={() => setResolving(true)}
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Resolve…
+                                </Button>
+                            ) : null}
+                            {can.manage && ticket.status === 'resolved' ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                    onClick={() => act(`/it/tickets/${ticket.id}/close`, 'Ticket closed.')}
+                                >
+                                    <XCircle className="h-3.5 w-3.5" /> Close
+                                </Button>
+                            ) : null}
+                            {can.reopen && (ticket.status === 'resolved' || ticket.status === 'closed') ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                    onClick={() => act(`/it/tickets/${ticket.id}/reopen`, 'Ticket reopened.')}
+                                >
+                                    <RotateCcw className="h-3.5 w-3.5" /> Reopen
+                                </Button>
+                            ) : null}
+                            {can.manage ? (
+                                <>
+                                    {ticket.assignee?.id !== myId && isWorking ? (
+                                        <Button
+                                            size="sm"
+                                            className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                            onClick={() =>
+                                                myId !== null &&
+                                                patch({ assigned_to_user_id: myId }, 'Assigned to you.')
+                                            }
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5" /> Assign to me
+                                        </Button>
+                                    ) : null}
                                     <Button
                                         size="sm"
                                         className="bg-white/15 text-primary-foreground hover:bg-white/25"
                                         onClick={() =>
-                                            myId !== null &&
-                                            patch({ assigned_to_user_id: myId }, 'Assigned to you.')
+                                            act(
+                                                `/it/tickets/${ticket.id}/${can.watching ? 'unwatch' : 'watch'}`,
+                                                can.watching ? 'Stopped watching.' : 'Watching this ticket.',
+                                            )
                                         }
                                     >
-                                        <UserPlus className="h-3.5 w-3.5" /> Assign to me
+                                        {can.watching ? (
+                                            <>
+                                                <EyeOff className="h-3.5 w-3.5" /> Unwatch
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Eye className="h-3.5 w-3.5" /> Watch
+                                            </>
+                                        )}
                                     </Button>
-                                ) : null}
-                                <Button
-                                    size="sm"
-                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
-                                    onClick={() =>
-                                        act(
-                                            `/it/tickets/${ticket.id}/${can.watching ? 'unwatch' : 'watch'}`,
-                                            can.watching ? 'Stopped watching.' : 'Watching this ticket.',
-                                        )
-                                    }
-                                >
-                                    {can.watching ? (
-                                        <>
-                                            <EyeOff className="h-3.5 w-3.5" /> Unwatch
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Eye className="h-3.5 w-3.5" /> Watch
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        ) : null}
+                                </>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
 

@@ -203,7 +203,9 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
     expect($ticket->priority)->toBe('high');
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve")
+        ->post("/it/tickets/{$ticket->id}/resolve", [
+            'note' => 'Power-cycled the Kyocera and cleared the queue.',
+        ])
         ->assertRedirect();
 
     $ticket->refresh();

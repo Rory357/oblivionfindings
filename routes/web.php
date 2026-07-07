@@ -154,6 +154,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
     Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
     Route::get('/it/attachments/{attachment}', [ItTicketController::class, 'downloadAttachment'])->name('it.attachments.download');
+    // Reopen: agents anytime, the requester within 7 days of resolution
+    // (ItTicketPolicy::reopen owns the window).
+    Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
@@ -161,6 +164,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
+        Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
         Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
         Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
     });
