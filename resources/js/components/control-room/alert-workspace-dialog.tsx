@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -102,7 +102,7 @@ export type AlertWorkspaceDetail = {
         title: string;
         status: string;
         item_count: number;
-        items: Array<{ id: number; type: string; title: string; description: string | null; file_path: string | null; created_at: string | null }>;
+        items: Array<{ id: number; type: string; title: string; description: string | null; download_url: string | null; created_at: string | null }>;
     }>;
     communications: Array<{
         id: number;
@@ -873,20 +873,12 @@ function SensorDismissPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () 
     );
 }
 
-/** UTC ISO → the local wall-time string a datetime-local input expects. */
-function toDateTimeLocalInput(iso: string): string {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-}
-
 function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void }) {
     const a = d.alert;
     const form = useForm<{ priority: string; category: string; due_at: string; resolution_code: string }>({
         priority: a.priority ?? '',
         category: a.category ?? '',
-        due_at: a.due_at ? toDateTimeLocalInput(a.due_at) : '',
+        due_at: a.due_at ? toDatetimeLocal(a.due_at) : '',
         resolution_code: a.resolution_code ?? '',
     });
     const submit = () => {
@@ -1356,6 +1348,13 @@ function CreatePackForm({ alertId, onDone }: { alertId: number; onDone: () => vo
     );
 }
 
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+    note: 'Note',
+    photo: 'Photo',
+    document: 'Document',
+    cctv_bookmark: 'CCTV bookmark',
+};
+
 function EvidencePackCard({ pack, canManage }: { pack: AlertWorkspaceDetail['evidence_packs'][number]; canManage: boolean }) {
     const [adding, setAdding] = useState<'file' | 'note' | 'cctv' | null>(null);
     const [completing, setCompleting] = useState(false);
@@ -1406,19 +1405,31 @@ function EvidencePackCard({ pack, canManage }: { pack: AlertWorkspaceDetail['evi
                 <div className="flex flex-col gap-2 p-3">
                     {pack.items.length ? (
                         pack.items.map((item) => (
-                            <div key={item.id} className="flex items-center gap-2.5 rounded-lg border border-border/70 px-2.5 py-2">
+                            <div key={item.id} className="flex items-start gap-2.5 rounded-lg border border-border/70 px-2.5 py-2">
                                 {item.type === 'note' ? (
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 ) : item.type === 'cctv_bookmark' ? (
-                                    <Eye className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <Eye className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 ) : (
-                                    <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 )}
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm text-foreground">{item.title}</p>
-                                    {item.description ? <p className="text-xs whitespace-pre-wrap text-muted-foreground">{item.description}</p> : null}
+                                    {item.download_url ? (
+                                        <a
+                                            href={item.download_url}
+                                            className="block truncate text-sm font-medium text-primary hover:underline"
+                                            title="Download this file"
+                                        >
+                                            {item.title}
+                                        </a>
+                                    ) : (
+                                        <p className="truncate text-sm text-foreground">{item.title}</p>
+                                    )}
+                                    {item.description ? (
+                                        <p className="mt-0.5 text-xs whitespace-pre-wrap text-foreground/80">{item.description}</p>
+                                    ) : null}
                                     <p className="text-xs text-muted-foreground">
-                                        {titleCase(item.type)}
+                                        {EVIDENCE_TYPE_LABELS[item.type] ?? titleCase(item.type)}
                                         {item.created_at ? ` · ${formatDateTime(item.created_at)}` : ''}
                                     </p>
                                 </div>
@@ -2089,6 +2100,16 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
 
     if (incidentId) {
         rows.push(<LinkedRow key="inc" icon={ShieldAlert} title="Incident record" sub={`INC-${incidentId} · system of record`} href={`/incidents?incident=${incidentId}`} />);
+    } else {
+        rows.push(
+            <EmptyLinkedRow key="inc-none" icon={ShieldAlert} title="No linked incident">
+                If this alert needs a formal record, use{' '}
+                <Link href="/control-room/incidents" className="font-medium text-primary hover:underline">
+                    Flag incident on the Incident Tracker
+                </Link>{' '}
+                — the incident becomes the system of record and links back here.
+            </EmptyLinkedRow>,
+        );
     }
     if (hs) {
         rows.push(
@@ -2099,6 +2120,12 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
                 sub={`${hs.reference_number} · ${titleCase(hs.status)}${hs.investigation ? ` · investigation ${titleCase(hs.investigation.status)}` : ''}`}
                 href={`/health-safety/events/${hs.id}`}
             />,
+        );
+    } else {
+        rows.push(
+            <EmptyLinkedRow key="hs-none" icon={Activity} title="No Health & Safety event">
+                One is opened automatically when an incident is flagged, so investigations and corrective actions have a governed home.
+            </EmptyLinkedRow>,
         );
     }
     if (d.client) {
@@ -2111,6 +2138,20 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
     return (
         <div className="flex flex-col gap-2">
             {rows.length ? rows : <p className="text-sm text-muted-foreground">No linked records.</p>}
+        </div>
+    );
+}
+
+function EmptyLinkedRow({ icon: Icon, title, children }: { icon: ComponentType<{ className?: string }>; title: string; children: ReactNode }) {
+    return (
+        <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60">
+                <Icon className="h-4 w-4 text-muted-foreground/70" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground/80">{children}</p>
+            </div>
         </div>
     );
 }

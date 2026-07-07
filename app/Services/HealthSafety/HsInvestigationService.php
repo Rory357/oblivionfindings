@@ -2,6 +2,7 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +74,8 @@ class HsInvestigationService
                 'type' => $investigation->investigation_type,
             ]);
 
+            $this->syncSourceIncidentStatus($investigation, 'pending');
+
             return $investigation;
         });
     }
@@ -115,6 +118,8 @@ class HsInvestigationService
                 'investigation_id' => $investigation->id,
                 'lead_investigator_id' => $investigatorId,
             ]);
+
+            $this->syncSourceIncidentStatus($investigation, 'in_progress');
 
             return $investigation;
         });
@@ -202,6 +207,8 @@ class HsInvestigationService
             'investigation_id' => $investigation->id,
         ]);
 
+        $this->syncSourceIncidentStatus($investigation, 'in_progress');
+
         return $investigation;
     }
 
@@ -243,6 +250,8 @@ class HsInvestigationService
                 'approved_by' => $approval['approved_by_id'] ?? auth()->id(),
                 'recommendation_count' => count($investigation->recommendations ?? []),
             ]);
+
+            $this->syncSourceIncidentStatus($investigation, 'completed');
 
             return $investigation;
         });
@@ -341,6 +350,27 @@ class HsInvestigationService
                 'triggered_by_investigation' => $investigation->id,
             ]);
         }
+    }
+
+    /**
+     * Mirror the investigation lifecycle onto the originating ClientIncident.
+     *
+     * The incident close guardrail (and the register's "investigation" filter)
+     * read `client_incidents.investigation_status`; without this sync a
+     * completed H&S investigation never unlocks closing a high-severity
+     * incident.
+     */
+    private function syncSourceIncidentStatus(HsInvestigation $investigation, string $incidentStatus): void
+    {
+        $hsEvent = $investigation->hsEvent;
+
+        if (! $hsEvent || ltrim((string) $hsEvent->source_type, '\\') !== ClientIncident::class || ! $hsEvent->source_id) {
+            return;
+        }
+
+        ClientIncident::query()
+            ->whereKey($hsEvent->source_id)
+            ->update(['investigation_status' => $incidentStatus]);
     }
 
     /**

@@ -151,6 +151,37 @@ class ControlRoomShiftControllerTest extends TestCase
         ]);
     }
 
+    public function test_handover_notes_are_optional_and_skip_the_operator_note(): void
+    {
+        $shift = Shift::query()->create([
+            'name' => 'Outgoing Shift',
+            'starts_at' => now()->subHours(8),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+
+        // The wizard presents the narrative as optional — an empty one must not
+        // bounce the whole handover at the final step.
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_shift_name' => 'Quiet Night Crew',
+                'incoming_lead_user_id' => $this->visibleWorker->id,
+                'incoming_team_members' => [$this->visibleWorker->id],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('control-room.shifts.index'));
+
+        $this->assertSame('completed', $shift->fresh()->status);
+        $this->assertDatabaseHas('control_room_shifts', ['name' => 'Quiet Night Crew', 'status' => 'active']);
+
+        // No empty handover note should be written to the operator log.
+        $this->assertDatabaseMissing('control_room_operator_notes', [
+            'shift_id' => $shift->id,
+            'type' => 'handover',
+        ]);
+    }
+
     public function test_handover_falls_back_to_a_timestamped_name_when_none_supplied(): void
     {
         $shift = Shift::query()->create([

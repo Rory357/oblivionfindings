@@ -140,6 +140,32 @@ class ControlRoomEvidenceController extends Controller
     }
 
     /**
+     * Download a single evidence item's file.
+     *
+     * Uploads are validated to a safe allowlist at store time; serving as an
+     * attachment (never inline) keeps any document from executing in-browser.
+     */
+    public function downloadItem(Request $request, EvidenceItem $item)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        abort_unless($item->storage_path && Storage::disk('local')->exists($item->storage_path), 404);
+
+        AuditLogger::log('controlRoom.evidence.itemDownloaded', $item->evidencePack->alert, [
+            'pack_id' => $item->evidence_pack_id,
+            'item_id' => $item->id,
+        ]);
+
+        $filename = $item->title ?: basename($item->storage_path);
+
+        return Storage::disk('local')->download($item->storage_path, $filename, [
+            'Content-Type' => $item->mime_type ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
      * Mark an evidence pack as complete.
      */
     public function completePack(Request $request, EvidencePack $pack)

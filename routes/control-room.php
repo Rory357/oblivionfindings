@@ -280,6 +280,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.evidence.store-item');
         Route::delete('/control-room/evidence/items/{item}', [ControlRoomEvidenceController::class, 'destroyItem'])
             ->name('control-room.evidence.destroy-item');
+        Route::get('/control-room/evidence/items/{item}/download', [ControlRoomEvidenceController::class, 'downloadItem'])
+            ->name('control-room.evidence.download-item');
         Route::post('/control-room/evidence/{pack}/complete', [ControlRoomEvidenceController::class, 'completePack'])
             ->name('control-room.evidence.complete-pack');
         Route::get('/control-room/evidence/{pack}/export', [ControlRoomEvidenceController::class, 'export'])

@@ -209,7 +209,7 @@ class AlertWorkspaceService
                     // Note items keep their text here — without it the row reads
                     // just "Note" and the content is unreadable after adding.
                     'description' => $i->description,
-                    'file_path' => $i->file_path,
+                    'download_url' => $i->storage_path ? "/control-room/evidence/items/{$i->id}/download" : null,
                     'created_at' => optional($i->created_at)->toISOString(),
                 ])->values(),
             ])->values(),

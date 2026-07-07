@@ -999,6 +999,24 @@ class ControlRoomAlertControllerTest extends TestCase
         $this->assertSame(0, ClientIncident::where('source', 'sensor')->count());
     }
 
+    public function test_update_meta_parses_due_at_as_nz_wall_time_and_stores_utc(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        // The workspace Due field posts a naive datetime-local string typed in
+        // NZ wall time; 10pm NZST (UTC+12) must store as 10am UTC the same day.
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/meta", [
+                'due_at' => '2026-07-07T22:00',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(
+            '2026-07-07 10:00:00',
+            $alert->fresh()->due_at->utc()->toDateTimeString(),
+        );
+    }
+
     protected function scopeUserToSite(User $user, Site $site): void
     {
         HrEmployeeProfile::query()->updateOrCreate(

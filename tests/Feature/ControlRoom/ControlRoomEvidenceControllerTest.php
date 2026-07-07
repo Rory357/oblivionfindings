@@ -178,6 +178,104 @@ class ControlRoomEvidenceControllerTest extends TestCase
             ->assertSessionHasErrors('pack');
     }
 
+    public function test_uploaded_item_can_be_downloaded(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $pack = EvidencePack::create([
+            'alert_id' => $this->alert->id,
+            'title' => 'Pack',
+            'status' => 'collecting',
+            'item_count' => 0,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/evidence/{$pack->id}/items", [
+                'file' => \Illuminate\Http\UploadedFile::fake()->image('door-photo.png'),
+            ])
+            ->assertRedirect();
+
+        $item = EvidenceItem::query()->where('evidence_pack_id', $pack->id)->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->get("/control-room/evidence/items/{$item->id}/download")
+            ->assertOk()
+            ->assertDownload('door-photo.png');
+    }
+
+    public function test_download_requires_manage_permission_and_a_stored_file(): void
+    {
+        $pack = EvidencePack::create([
+            'alert_id' => $this->alert->id,
+            'title' => 'Pack',
+            'status' => 'collecting',
+            'item_count' => 0,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $note = EvidenceItem::create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'note',
+            'title' => 'Note',
+            'description' => 'Body only — no file',
+            'captured_at' => now(),
+            'captured_by_user_id' => $this->admin->id,
+        ]);
+
+        // A note has no stored file to download.
+        $this->actingAs($this->admin)
+            ->get("/control-room/evidence/items/{$note->id}/download")
+            ->assertNotFound();
+
+        $stranger = User::factory()->create(['approved_at' => now()]);
+        $this->actingAs($stranger)
+            ->get("/control-room/evidence/items/{$note->id}/download")
+            ->assertForbidden();
+    }
+
+    public function test_workspace_payload_exposes_note_text_and_file_download_url(): void
+    {
+        $pack = EvidencePack::create([
+            'alert_id' => $this->alert->id,
+            'title' => 'Pack',
+            'status' => 'collecting',
+            'item_count' => 2,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $note = EvidenceItem::create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'note',
+            'title' => 'Note',
+            'description' => 'Neighbour statement: client seen at 8:30am.',
+            'captured_at' => now(),
+            'captured_by_user_id' => $this->admin->id,
+        ]);
+
+        $file = EvidenceItem::create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'photo',
+            'title' => 'door-photo.png',
+            'storage_path' => 'evidence/x/door-photo.png',
+            'mime_type' => 'image/png',
+            'captured_at' => now(),
+            'captured_by_user_id' => $this->admin->id,
+        ]);
+
+        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+            ->build($this->admin, $this->alert->id);
+
+        $items = collect($detail['evidence_packs'][0]['items']);
+
+        $noteRow = $items->firstWhere('id', $note->id);
+        $this->assertSame('Neighbour statement: client seen at 8:30am.', $noteRow['description']);
+        $this->assertNull($noteRow['download_url']);
+
+        $fileRow = $items->firstWhere('id', $file->id);
+        $this->assertSame("/control-room/evidence/items/{$file->id}/download", $fileRow['download_url']);
+    }
+
     public function test_destroy_item_removes_item_from_collecting_pack(): void
     {
         $pack = EvidencePack::create([

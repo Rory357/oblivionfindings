@@ -529,7 +529,7 @@ class HsEventController extends Controller
                 'blockers' => $this->events->closeBlockers($hsEvent),
             ],
             'assignable_staff' => $canManage
-                ? User::query()->whereNotNull('approved_at')->orderBy('name')->limit(200)->get(['id', 'name'])
+                ? User::query()->staff()->whereNotNull('approved_at')->orderBy('name')->limit(200)->get(['id', 'name'])
                     ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->all()
                 : [],
             'can' => ['manage' => $canManage],
