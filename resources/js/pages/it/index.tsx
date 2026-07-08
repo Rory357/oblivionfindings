@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { fireConfetti } from '@/lib/confetti';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -464,6 +465,20 @@ export default function ItIndex({
         if (stored) navigate({ view: stored });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab]);
+
+    // Delight (§S): celebrate the moment an agent clears the breach queue —
+    // when the breached count goes from >0 to 0 across a reload. sessionStorage
+    // remembers the last-seen count so it fires once, not on every render.
+    const breachedCount = can.view ? (summary.tickets?.breached ?? 0) : 0;
+    useEffect(() => {
+        if (!can.view || typeof window === 'undefined') return;
+        const prev = Number(window.sessionStorage.getItem('it.lastBreached') ?? '-1');
+        if (prev > 0 && breachedCount === 0) {
+            fireConfetti();
+            toast.success('Breach queue cleared — every SLA back on track.');
+        }
+        window.sessionStorage.setItem('it.lastBreached', String(breachedCount));
+    }, [can.view, breachedCount]);
 
     const ticketFiltersActive = Boolean(
         filters?.q ||
