@@ -67,7 +67,7 @@
 
 | # | Seam | Status | Evidence so far |
 |---|------|--------|-----------------|
-| S1 | Attendance ↔ My Day | 🔶 | Code evidence GREEN (this run): both `/hr/my/time` (MyHrController::clockIn/Out ~1412/1450) and `/my-day` (AttendanceController::clockIn/Out 286/339) call the ONE `AttendanceService` + shared `TimeTrackingService::syncEntryFromSession`. Needs runtime proof (guardrail: no ✅ from code-reading alone). Watch: MyHr reads active state via `HrTimeEntry`, AttendanceController via `HrAttendanceSession.open()` — same synced state, two read paths; prove they can't disagree. |
+| S1 | Attendance ↔ My Day | ✅ | **PROVEN by test** (not code-reading). New `AttendanceClockWorkflowTest` › "S1 seam: the HrTimeEntry and HrAttendanceSession read paths agree across both clock surfaces" (14 assertions): clock-IN via `/my-day` (`AttendanceController`) sets BOTH `HrAttendanceSession::open()` (Attendance's read path) AND `HrTimeEntry::active()` (MyHr's read path); clock-OUT via the OTHER surface (`/hr/my/time`) clears both; the reverse (clock-in via `/hr/my/time`) also sets both; clock-out clears both — never a phantom "on shift" on either surface. The two read paths cannot disagree because both surfaces write through the ONE `AttendanceService` + `TimeTrackingService::syncEntryFromSession`. (Complements the pre-existing "clock-in endpoints share the single open attendance session guard" test, which proves the shared write-guard across all three clock routes.) |
 | S2 | HR Assets ↔ Fleet | ⬜ | |
 | S3 | Driver eligibility → Fleet/Rostering | ⬜ | |
 | S4 | Injuries (H&S) → HR | ⬜ | |
@@ -379,6 +379,12 @@ Three real 🟠s, all fixed — closes the surface pass. **All 25 surface rows a
 - **Verified green:** `AuditController::index` is clean — `hr.settings.manage`-gated, server-side tenant-scoped query with working filters (user/action/model-type/date-from/date-to) + pagination, filter-dropdown data server-computed; `show` is JSON tenant-scoped; the log exposes only the actor's name/email (no over-exposure beyond the record's own old/new values, which are the point of an audit trail). Webhooks (retry-delivery) + automations (toggle) + custom-fields CRUD all wired and `hr.settings.manage`-gated.
 
 **Run 25 gates:** types ✅ 0 errors · eslint ✅ 0 errors (3 files) · build ✅ exit 0 (3m1s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly**, zero new failures. **pest N/A — zero PHP files changed** (frontend-only slice).
+
+## Seam S1 (Attendance ↔ My Day) — PROVEN, first of the seams phase
+
+All 25 surface rows are ✅; the loop is now proving seams with runtime tests (no ✅ from code-reading). **S1 → ✅.** Deliverable = a new Pest test (the seam proof IS the fix). Added to `tests/Feature/Hr/AttendanceClockWorkflowTest.php`: *"S1 seam: the HrTimeEntry and HrAttendanceSession read paths agree across both clock surfaces"* — round-trips a clock-in/out on each of `/my-day` (`AttendanceController`) and `/hr/my/time` (`MyHrController`) and asserts, at every step, that BOTH the `HrAttendanceSession::open()` count (Attendance's read) and the `HrTimeEntry::active()` count (MyHr's read) move together (0→1 on clock-in, 1→0 on clock-out) — including clocking out on the *opposite* surface from the clock-in. First attempt caught a real test-timing trap ("sessions must end after they start" when in==out instant) → fixed with `$this->travel(2)->hours()` before each clock-out; the seam assertions themselves passed on the first run (the /my-day clock-in already set both read paths). Ran in isolation: **1 passed / 14 assertions**.
+
+**Seam S1 gates:** php -l ✅ (test file) · isolated test ✅ 1 passed/14 assertions · full HR pest ✅ **695 passed / 0 failed** (4306 assertions, 794s) = 694 baseline + 1 new seam test, zero regressions. **New baseline: 695.** Frontend gates N/A — zero `.ts/.tsx` files changed.
 
 ## Decisions needed (Chane)
 

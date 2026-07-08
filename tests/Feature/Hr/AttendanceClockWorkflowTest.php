@@ -139,6 +139,51 @@ test('clock-in endpoints share the single open attendance session guard', functi
     'hr_time',
 ]);
 
+test('S1 seam: the HrTimeEntry and HrAttendanceSession read paths agree across both clock surfaces', function () {
+    // /hr/my/time reads the live clock via HrTimeEntry::active(); /my-day's
+    // /attendance reads it via HrAttendanceSession::open(). Both are written
+    // through the ONE AttendanceService + TimeTrackingService::syncEntryFromSession,
+    // so a clock made on either surface must be visible to the other's read path,
+    // and a clock-out on either must clear both (never a phantom "on shift").
+    $hrTimePermission = Permission::query()->where('key', 'hr.time.viewAny')->firstOrFail();
+    $this->staff->permissionOverrides()->syncWithoutDetaching([
+        $hrTimePermission->id => ['allowed' => true],
+    ]);
+
+    $openSessions = fn () => HrAttendanceSession::query()
+        ->where('user_id', $this->staff->id)->open()->count();
+    $activeEntries = fn () => HrTimeEntry::query()
+        ->forUser($this->staff->id)->active()->count();
+
+    expect($openSessions())->toBe(0);
+    expect($activeEntries())->toBe(0);
+
+    // Clock IN on /my-day (AttendanceController) → BOTH read paths must see it.
+    $this->actingAs($this->staff)->post('/attendance/clock-in')->assertSessionHas('success');
+    expect($openSessions())->toBe(1);  // AttendanceController's read path
+    expect($activeEntries())->toBe(1); // MyHrController's read path — the /my-day clock surfaces in /hr/my/time
+
+    // A session must have positive duration — advance the clock before clocking out.
+    $this->travel(2)->hours();
+
+    // Clock OUT on the OTHER surface (/hr/my/time) → both must clear.
+    $this->actingAs($this->staff)->post('/hr/my/time/clock-out')->assertSessionHas('success');
+    expect($openSessions())->toBe(0);
+    expect($activeEntries())->toBe(0);
+
+    // Reverse: clock IN on /hr/my/time → BOTH read paths must see it.
+    $this->actingAs($this->staff)->post('/hr/my/time/clock-in')->assertSessionHas('success');
+    expect($openSessions())->toBe(1);  // the /hr/my/time clock surfaces in /my-day
+    expect($activeEntries())->toBe(1);
+
+    $this->travel(2)->hours();
+
+    // Clock OUT on /hr/my/time → both clear.
+    $this->actingAs($this->staff)->post('/hr/my/time/clock-out')->assertSessionHas('success');
+    expect($openSessions())->toBe(0);
+    expect($activeEntries())->toBe(0);
+});
+
 test('clock out reuses an existing draft timesheet for the same shift and staff member', function () {
     $serviceContext = ServiceContext::factory()->create();
     $client = Client::factory()->create();
