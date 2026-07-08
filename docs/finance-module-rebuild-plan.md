@@ -711,15 +711,31 @@ vendor, receipt) — the mould for C2.
     modals + shared ConfirmDialog, formatMoney/StatusBadge everywhere, the full command layer (export · badges ·
     search/filter/pagination · right-click menus), shared EmptyState/EmptySearch, axe-critical-clean, responsive,
     design-tokens-only. Next milestone: **C4 funding & client-money hub (PAUSE-AND-ASK on the canonical store).**
-- **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
-  Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +
-  `operations/client-funds/**` (routes/operations.php:1117-1126) in; redirects; **⚠️ PAUSE-AND-ASK Chane on the
-  canonical store first** (evidence: ClientFund writes have NO GL wiring — `ClientFundJournalService` exists
-  unused; ClientLedgerEntry has observer→GL + approval fields + audit trait; both stores empty in dev DB;
-  recommendation: ClientLedgerEntry canonical + ops UI writes it + backfill legacy rows if prod has any).
-  Then: Client-Money Transaction modal (deposit/withdrawal/purchase/reimbursement → trust path, receipt upload,
-  audited) + funder remittance reconciliation (approved vs claimed vs received). Client money never nets
-  against operational accounts (`ClientLedgerService` segregation preserved).
+- **[~] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
+  Client/resident funds · Donor/trust funds · Service billing).
+  **✅ CANONICAL-STORE DECISION MADE (Chane, this session): ClientFund/ClientFundTransaction is canonical.**
+  ⚠️ The PRIOR recommendation in this entry was BACKWARDS — re-derived from code (untrust-the-audit paid off):
+  - **ClientFund/ClientFundTransaction = the working, tested, GL-posting trust store.** `ClientFundController@addTransaction`
+    (app/Http/Controllers/Operations/ClientFundController.php:156) → `ClientFundTransactionObserver@created` →
+    `PostClientFundJournalJob` → `ClientFundJournalService::postClientFundJournal` posts a BALANCED journal to segregated
+    trust accounts (deposit DR 1010 Bank-Trust / CR 2500 Client Trust Funds; withdrawal reversed), idempotent on
+    `journal_id`. `ClientFundJournalDispatchTest` genuinely asserts the 1010/2500 lines + one-journal-per-txn (NOT a stub).
+  - **ClientLedgerEntry = DORMANT.** Modelled + observed (would GL-post via ProcessFinancialEventJob) + READ by
+    `ClientLedgerService` + `ClientController.php:806` — but a full `app/` grep finds ZERO `ClientLedgerEntry::create`/
+    `->create`/`new`. Nothing writes it → the client-profile "ledger entries" it feeds is always empty; the M6-2
+    segregation fix guards an empty store.
+  - **Both tables EMPTY in dev DB (0/0/0)** → NO data migration; purely architectural + low-risk.
+  **IMPLEMENTATION (per Chane = ClientFund canonical), staged sub-batches:**
+  (C4-A) build /finance/funding hub SHELL — finance PageHero + FinanceTabs footer (5 tabs) + a collect-first
+  FundingController@index redirect; tabs point at existing surfaces (finance funding-streams + donor-funds already
+  in finance; operations/funding-claims + operations/client-funds migrated into finance behind /finance/funding with
+  NAMED Route::redirects; finance/billing = service billing). (C4-B) repoint the client-profile finance tab
+  (ClientController + ClientFinancialSummaryService/ClientLedgerService, currently reading the empty ClientLedgerEntry)
+  at ClientFund/ClientFundTransaction so it shows real trust-fund activity; retire the dormant ClientLedgerEntry read
+  paths (leave the model, stop reading it — or feature-flag). ⚠️ C4-B touches the CLIENTS module (agreed seam — Chane approved).
+  Then: Client-Money Transaction modal (deposit/withdrawal via the working ClientFund trust path, receipt upload, audited)
+  + funder remittance reconciliation. Client money never nets against operational accounts (segregation preserved:
+  trust liability 2500, not operational revenue).
 - **[ ] C5 — Payroll residuals** (pipeline verified ~80% live, see seam table): (1) GL-post/pay status +
   failure surfacing on the run list (poll failed_jobs or persist a status column + preflight validation);
   (2) per-org role→GL mapping replacing hardcoded codes + preflight (open period, accounts seeded) with
