@@ -3,6 +3,7 @@
 use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\QualityChecklistController;
@@ -180,6 +181,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
         // SLA target grid — admin-only on top of it.manage (FormRequest authorize).
         Route::put('/it/sla-policies', [ItProvisioningController::class, 'updateSlaPolicies'])->name('it.sla.update');
+        // Knowledge base authoring (§I) — agents create/edit/publish/delete.
+        Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
+        Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
+        Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
     });
 });
 
