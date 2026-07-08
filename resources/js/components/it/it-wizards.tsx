@@ -3,7 +3,7 @@
  * (WizardShell + primitives) so they are visually identical to the
  * Add-Client / Asset lifecycle modals. Zero confirm(): every action is a
  * reviewed modal ending in a success pane. */
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     CheckCircle2,
     ClipboardCheck,
@@ -20,6 +20,7 @@ import {
     User,
     UserCheck,
     Wifi,
+    X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -53,6 +54,13 @@ import { Textarea } from '@/components/ui/textarea';
 export interface AssigneeOption {
     id: number;
     name: string;
+}
+
+/** An entry from the canonical assets register, for the ticket asset-link picker. */
+export interface AssetOption {
+    id: number;
+    name: string;
+    tag: string | null;
 }
 
 export interface RequestRow {
@@ -138,19 +146,29 @@ export function ItWizard({
     modal,
     assignees,
     employeeOptions = [],
+    assetOptions = [],
     slaPolicies,
     onClose,
 }: {
     modal: ItModal | null;
     assignees: AssigneeOption[];
     employeeOptions?: EmployeeOption[];
+    assetOptions?: AssetOption[];
     slaPolicies?: SlaPolicyGrid | null;
     onClose: () => void;
 }) {
     if (!modal) return null;
     switch (modal.type) {
         case 'ticket':
-            return <CreateTicketWizard assignees={assignees} provisioning={modal.provisioning} onClose={onClose} />;
+            return (
+                <CreateTicketWizard
+                    assignees={assignees}
+                    assetOptions={assetOptions}
+                    slaPolicies={slaPolicies}
+                    provisioning={modal.provisioning}
+                    onClose={onClose}
+                />
+            );
         case 'new-request':
             return (
                 <NewProvisioningRequestDialog
@@ -218,54 +236,121 @@ const PRIORITY_OPTIONS = [
 
 function CreateTicketWizard({
     assignees,
+    assetOptions,
+    slaPolicies,
     provisioning,
     onClose,
 }: {
     assignees: AssigneeOption[];
+    assetOptions: AssetOption[];
+    slaPolicies?: SlaPolicyGrid | null;
     provisioning?: { id: number; item: string };
     onClose: () => void;
 }) {
     const wizard = useWizard(TICKET_STEPS.length);
     const [done, setDone] = useState(false);
+    const [created, setCreated] = useState<{ id: number; reference: string | null } | null>(null);
 
-    const form = useForm({
+    const form = useForm<{
+        title: string;
+        description: string;
+        category: string;
+        subcategory: string;
+        priority: string;
+        requester_user_id: string;
+        assigned_to_user_id: string;
+        asset_id: string;
+        watchers: number[];
+        provisioning_request_id: number | null;
+        attachments: File[];
+    }>({
         title: provisioning ? `Issue with ${provisioning.item}` : '',
         description: '',
         category: 'hardware',
+        subcategory: '',
         priority: 'normal',
+        requester_user_id: UNASSIGNED,
         assigned_to_user_id: UNASSIGNED,
+        asset_id: UNASSIGNED,
+        watchers: [],
         provisioning_request_id: provisioning?.id ?? null,
+        attachments: [],
     });
 
     const assignee = assignees.find((a) => String(a.id) === form.data.assigned_to_user_id) ?? null;
+    const asset = assetOptions.find((a) => String(a.id) === form.data.asset_id) ?? null;
+    const requesterName =
+        form.data.requester_user_id === UNASSIGNED
+            ? 'Me (myself)'
+            : (assignees.find((a) => String(a.id) === form.data.requester_user_id)?.name ?? undefined);
     const detailsValid = form.data.title.trim().length > 0;
+
+    // Live SLA preview — the effective targets for the chosen priority,
+    // projected from now (client-side; updates as priority changes, no re-fetch).
+    const slaTarget = slaPolicies?.[form.data.priority] ?? null;
+    const dueLabel = (mins: number) =>
+        new Date(Date.now() + mins * 60000).toLocaleString('en-NZ', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
 
     const submit = () => {
         form.transform((data) => ({
             ...data,
+            requester_user_id: data.requester_user_id === UNASSIGNED ? null : Number(data.requester_user_id),
             assigned_to_user_id: data.assigned_to_user_id === UNASSIGNED ? null : Number(data.assigned_to_user_id),
+            asset_id: data.asset_id === UNASSIGNED ? null : Number(data.asset_id),
+            subcategory: data.subcategory.trim() === '' ? null : data.subcategory,
         }));
         form.post('/it/tickets', {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: (page) => {
                 const err = pageFlashError(page);
                 if (err) {
                     toast.error(err);
                     return;
                 }
+                const flash = page.props.flash as
+                    | { it_ticket?: { id?: number; reference?: string | null } }
+                    | undefined;
+                setCreated(
+                    flash?.it_ticket?.id
+                        ? { id: flash.it_ticket.id, reference: flash.it_ticket.reference ?? null }
+                        : null,
+                );
                 setDone(true);
+                toast.success(`Ticket logged${flash?.it_ticket?.reference ? ` — ${flash.it_ticket.reference}` : ''}.`);
             },
         });
+    };
+
+    const logAnother = () => {
+        form.reset();
+        setCreated(null);
+        setDone(false);
+        wizard.goTo(0);
+    };
+
+    const addWatcher = (v: string) => {
+        if (v === UNASSIGNED) return;
+        const id = Number(v);
+        if (!form.data.watchers.includes(id)) {
+            form.setData('watchers', [...form.data.watchers, id]);
+        }
     };
 
     return (
         <WizardShell
             open
             onClose={onClose}
-            title="Log IT ticket"
-            description="Log a new helpdesk ticket for the IT queue."
+            title="Log & triage ticket"
+            description="Log a helpdesk ticket on behalf of a colleague and triage it in one pass."
             railIcon={Ticket}
-            railTitle="Log ticket"
+            railTitle="Log & triage"
             railSub="IT helpdesk"
             steps={TICKET_STEPS}
             stepIndex={wizard.index}
@@ -274,14 +359,28 @@ function CreateTicketWizard({
             success={
                 done ? (
                     <WizardSuccessPane
-                        title="Ticket logged"
+                        title={created?.reference ? `Logged — ${created.reference}` : 'Ticket logged'}
                         blurb={
                             <>
                                 “{form.data.title}” is now in the helpdesk queue
                                 {assignee ? <> with {assignee.name}</> : null}.
                             </>
                         }
-                        actions={<Button onClick={onClose}>Done</Button>}
+                        actions={
+                            <>
+                                {created ? (
+                                    <Button onClick={() => router.visit(`/it/tickets/${created.id}`)}>
+                                        Open {created.reference ?? 'ticket'}
+                                    </Button>
+                                ) : null}
+                                <Button variant="outline" onClick={logAnother}>
+                                    Log another
+                                </Button>
+                                <Button variant="ghost" onClick={onClose}>
+                                    Done
+                                </Button>
+                            </>
+                        }
                     />
                 ) : undefined
             }
@@ -314,7 +413,7 @@ function CreateTicketWizard({
                     <StepHead
                         icon={FileText}
                         title="What’s the issue?"
-                        blurb="A clear one-liner plus any detail IT needs to act."
+                        blurb="Log it for the person who hit it, with any detail IT needs to act."
                     />
                     {provisioning ? (
                         <InfoCard icon={Server}>
@@ -323,6 +422,19 @@ function CreateTicketWizard({
                         </InfoCard>
                     ) : null}
                     <div className="grid gap-3.5">
+                        {assignees.length > 0 ? (
+                            <Field label="Requester" hint="who hit the problem" error={form.errors.requester_user_id}>
+                                <SelectInput
+                                    value={form.data.requester_user_id}
+                                    onChange={(v) => form.setData('requester_user_id', v)}
+                                    placeholder="Me (myself)"
+                                    options={[
+                                        { value: UNASSIGNED, label: 'Me — logging for myself' },
+                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
                         <Field label="Title" required error={form.errors.title}>
                             <Input
                                 value={form.data.title}
@@ -346,6 +458,36 @@ function CreateTicketWizard({
                                 options={[...CATEGORY_OPTIONS]}
                             />
                         </Field>
+                        <Field label="Subcategory" hint="optional" error={form.errors.subcategory}>
+                            <Input
+                                value={form.data.subcategory}
+                                onChange={(e) => form.setData('subcategory', e.target.value)}
+                                placeholder="e.g. Label printer, VPN, mailbox…"
+                                maxLength={255}
+                            />
+                        </Field>
+                        <Field label="Photos or files" hint="optional" error={form.errors.attachments}>
+                            <FileDropzone
+                                onFiles={(files) =>
+                                    form.setData('attachments', [...form.data.attachments, ...files].slice(0, 5))
+                                }
+                                accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
+                                title="Drop a photo or file"
+                                hint="Images, PDF or documents — up to 5 files"
+                            />
+                            {form.data.attachments.map((file, i) => (
+                                <StagedFileCard
+                                    key={`${file.name}-${i}`}
+                                    file={file}
+                                    onRemove={() =>
+                                        form.setData(
+                                            'attachments',
+                                            form.data.attachments.filter((_, j) => j !== i),
+                                        )
+                                    }
+                                />
+                            ))}
+                        </Field>
                     </div>
                 </WizardStepPane>
             )}
@@ -355,7 +497,7 @@ function CreateTicketWizard({
                     <StepHead
                         icon={Flag}
                         title="Priority & owner"
-                        blurb="How urgent is it, and who should pick it up?"
+                        blurb="How urgent is it, who picks it up, and what’s it about?"
                     />
                     <div className="grid gap-3.5">
                         <Field label="Priority" error={form.errors.priority}>
@@ -365,8 +507,14 @@ function CreateTicketWizard({
                                 options={[...PRIORITY_OPTIONS]}
                             />
                         </Field>
+                        {slaTarget ? (
+                            <InfoCard icon={Timer}>
+                                First response due <strong>{dueLabel(slaTarget.first_response_minutes)}</strong>,
+                                resolution by <strong>{dueLabel(slaTarget.resolution_minutes)}</strong> at this priority.
+                            </InfoCard>
+                        ) : null}
                         {/* Triage is agent work — self-service requesters get no
-                            assignee list from the server, so the field hides. */}
+                            assignee list from the server, so these fields hide. */}
                         {assignees.length > 0 ? (
                             <Field label="Assign to" hint="optional — leave unassigned for triage" error={form.errors.assigned_to_user_id}>
                                 <SelectInput
@@ -378,6 +526,66 @@ function CreateTicketWizard({
                                         ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
                                     ]}
                                 />
+                            </Field>
+                        ) : null}
+                        {assetOptions.length > 0 ? (
+                            <Field label="Linked asset" hint="optional — from the assets register" error={form.errors.asset_id}>
+                                <SelectInput
+                                    value={form.data.asset_id}
+                                    onChange={(v) => form.setData('asset_id', v)}
+                                    placeholder="No asset"
+                                    options={[
+                                        { value: UNASSIGNED, label: 'No asset' },
+                                        ...assetOptions.map((a) => ({
+                                            value: String(a.id),
+                                            label: a.tag ? `${a.name} · ${a.tag}` : a.name,
+                                        })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
+                        {assignees.length > 0 ? (
+                            <Field label="Watchers" hint="optional — kept in the loop on updates">
+                                <SelectInput
+                                    value={UNASSIGNED}
+                                    onChange={addWatcher}
+                                    placeholder="Add a watcher"
+                                    options={[
+                                        { value: UNASSIGNED, label: 'Add a watcher…' },
+                                        ...assignees
+                                            .filter((a) => !form.data.watchers.includes(a.id))
+                                            .map((a) => ({ value: String(a.id), label: a.name })),
+                                    ]}
+                                />
+                                {form.data.watchers.length > 0 ? (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {form.data.watchers.map((id) => {
+                                            const w = assignees.find((a) => a.id === id);
+                                            return (
+                                                <span
+                                                    key={id}
+                                                    className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[12px] font-medium text-primary"
+                                                >
+                                                    {w?.name ?? `#${id}`}
+                                                    {/* eslint-disable-next-line no-restricted-syntax -- inline chip remove, not button chrome */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            form.setData(
+                                                                'watchers',
+                                                                form.data.watchers.filter((x) => x !== id),
+                                                            )
+                                                        }
+                                                        aria-label={`Remove ${w?.name ?? 'watcher'}`}
+                                                        className="text-primary/70 hover:text-primary"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
                             </Field>
                         ) : null}
                     </div>
@@ -393,21 +601,36 @@ function CreateTicketWizard({
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <ReviewCard icon={FileText} title="Details" onEdit={() => wizard.goTo(0)}>
+                            <ReviewRow label="Requester" value={requesterName} />
                             <ReviewRow label="Title" value={form.data.title} />
                             <ReviewRow
                                 label="Category"
                                 value={CATEGORY_OPTIONS.find((c) => c.key === form.data.category)?.label}
                             />
+                            <ReviewRow label="Subcategory" value={form.data.subcategory || undefined} />
                             <ReviewRow label="Detail" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Files"
+                                value={form.data.attachments.length > 0 ? `${form.data.attachments.length} attached` : undefined}
+                            />
                         </ReviewCard>
                         <ReviewCard icon={Flag} title="Triage" onEdit={() => wizard.goTo(1)}>
                             <ReviewRow
                                 label="Priority"
                                 value={PRIORITY_OPTIONS.find((p) => p.key === form.data.priority)?.label}
                             />
-                            {assignees.length > 0 ? (
-                                <ReviewRow label="Assign to" value={assignee?.name} />
+                            {slaTarget ? (
+                                <ReviewRow label="Resolution due" value={dueLabel(slaTarget.resolution_minutes)} />
                             ) : null}
+                            <ReviewRow label="Assign to" value={assignee?.name} />
+                            <ReviewRow
+                                label="Asset"
+                                value={asset ? (asset.tag ? `${asset.name} · ${asset.tag}` : asset.name) : undefined}
+                            />
+                            <ReviewRow
+                                label="Watchers"
+                                value={form.data.watchers.length > 0 ? `${form.data.watchers.length}` : undefined}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

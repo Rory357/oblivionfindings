@@ -6,6 +6,7 @@ import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import {
     ItWizard,
+    type AssetOption,
     type AssigneeOption,
     type EmployeeOption,
     type ItModal,
@@ -148,6 +149,8 @@ interface Props {
     assignees?: AssigneeOption[];
     /** Tenant employee profiles for the manual provisioning-request picker. */
     employeeOptions?: EmployeeOption[];
+    /** Active assets register entries for the Log & triage asset-link picker. */
+    assetOptions?: AssetOption[];
     filters?: Filters;
     /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
     overview?: OverviewPayload;
@@ -243,6 +246,7 @@ export default function ItIndex({
     tickets,
     assignees = [],
     employeeOptions = [],
+    assetOptions = [],
     filters,
     overview,
     slaPolicies,
@@ -586,6 +590,7 @@ export default function ItIndex({
                 modal={modal}
                 assignees={assignees}
                 employeeOptions={employeeOptions}
+                assetOptions={assetOptions}
                 slaPolicies={slaPolicies}
                 onClose={() => setModal(null)}
             />
