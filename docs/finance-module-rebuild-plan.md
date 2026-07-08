@@ -780,9 +780,11 @@ vendor, receipt) — the mould for C2.
   - **[x] C6-1 double-sync fixed** — removed the redundant `governance:update-budget-variances` hourly schedule
     (SyncBudgetActualsJob already runs syncActuals + variance alerts hourly; the command stays for manual use).
     schedule:list confirms one budget sync; php -l clean.
-  - **[ ] C6-2 retire the orphaned BudgetSyncInterface** — both budgets read live GL directly, so the
-    governance-pulls-from-finance contract is unnecessary dead code (grep consumers first; remove the interface +
-    any references; do NOT implement FinanceBudgetSync — the audit's "implement it" was wrong).
+  - **[x] C6-2 retired the orphaned BudgetSyncInterface** — a full grep (app/ tests/ config/ routes/) found the ONLY
+    reference was its own definition file (no impl, no binding, no type-hint, no test). Deleted
+    app/Domain/Governance/Contracts/BudgetSyncInterface.php (zero blast radius). Did NOT implement FinanceBudgetSync —
+    both budgets read live GL directly, so the governance-pulls-from-finance contract was unnecessary; the audit's
+    "implement it" was wrong.
   - **[ ] C6-3 SpendApproval threshold** — FinBill→spendApproval relation on the existing `fin_bills.spend_approval_id`
     + a link picker on bill create/edit + config-gated threshold enforcement (bill over category threshold requires a
     linked approval); approve() NEVER creates bills.
