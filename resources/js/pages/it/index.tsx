@@ -734,6 +734,7 @@ export default function ItIndex({
                         openArticle(a);
                     }
                 }}
+                onDraftKb={(draft) => setModal({ type: 'kb', draft })}
                 onClose={() => setModal(null)}
             />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />

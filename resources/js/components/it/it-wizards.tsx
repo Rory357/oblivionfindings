@@ -149,8 +149,15 @@ export type ItModal =
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow }
     | { type: 'new-request' }
-    | { type: 'kb'; article?: KbRow }
+    | { type: 'kb'; article?: KbRow; draft?: KbDraft }
     | { type: 'sla' };
+
+/** Pre-fill for a NEW KB article (e.g. drafted from a resolution note). */
+export interface KbDraft {
+    title?: string;
+    body?: string;
+    category?: string;
+}
 
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
  *  from the page passed to onSuccess — `back()->with('error')` fires onSuccess,
@@ -175,6 +182,7 @@ export function ItWizard({
     slaPolicies,
     kbSuggestions = [],
     onOpenArticle,
+    onDraftKb,
     onClose,
 }: {
     modal: ItModal | null;
@@ -184,6 +192,7 @@ export function ItWizard({
     slaPolicies?: SlaPolicyGrid | null;
     kbSuggestions?: KbSuggestion[];
     onOpenArticle?: (id: number) => void;
+    onDraftKb?: (draft: KbDraft) => void;
     onClose: () => void;
 }) {
     if (!modal) return null;
@@ -207,7 +216,7 @@ export function ItWizard({
                 />
             );
         case 'kb':
-            return <KbArticleDialog article={modal.article} onClose={onClose} />;
+            return <KbArticleDialog article={modal.article} draft={modal.draft} onClose={onClose} />;
         case 'raise':
             return (
                 <RaiseTicketDialog
@@ -219,7 +228,7 @@ export function ItWizard({
         case 'sla':
             return slaPolicies ? <SlaPolicyDialog policies={slaPolicies} onClose={onClose} /> : null;
         case 'resolve':
-            return <ResolveTicketDialog ticket={modal.ticket} onClose={onClose} />;
+            return <ResolveTicketDialog ticket={modal.ticket} onDraftKb={onDraftKb} onClose={onClose} />;
         case 'fulfil':
             return <FulfilRequestDialog request={modal.request} onClose={onClose} />;
         case 'assign-request':
@@ -1102,9 +1111,11 @@ const RESOLVE_STEPS: readonly WizardStep[] = [
 
 export function ResolveTicketDialog({
     ticket,
+    onDraftKb,
     onClose,
 }: {
     ticket: { id: number; reference: string | null; title: string };
+    onDraftKb?: (draft: KbDraft) => void;
     onClose: () => void;
 }) {
     const wizard = useWizard(RESOLVE_STEPS.length);
@@ -1156,7 +1167,19 @@ export function ResolveTicketDialog({
                                 It auto-closes in 7 days unless reopened.
                             </>
                         }
-                        actions={<Button onClick={onClose}>Done</Button>}
+                        actions={
+                            <>
+                                {onDraftKb ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => onDraftKb({ title: ticket.title, body: form.data.note })}
+                                    >
+                                        <BookOpen className="h-3.5 w-3.5" /> Draft KB article
+                                    </Button>
+                                ) : null}
+                                <Button onClick={onClose}>Done</Button>
+                            </>
+                        }
                     />
                 ) : undefined
             }
@@ -1449,16 +1472,26 @@ export function KbPreview({ body }: { body: string }) {
     );
 }
 
-function KbArticleDialog({ article, onClose }: { article?: KbRow; onClose: () => void }) {
+function KbArticleDialog({
+    article,
+    draft,
+    onClose,
+}: {
+    article?: KbRow;
+    draft?: KbDraft;
+    onClose: () => void;
+}) {
     const editing = Boolean(article);
     const wizard = useWizard(KB_STEPS.length);
     const [done, setDone] = useState(false);
 
+    // A `draft` (e.g. from a resolution note) pre-fills a NEW article — no
+    // article means we still create, we just start with content in place.
     const form = useForm({
-        title: article?.title ?? '',
-        category: article?.category ?? 'hardware',
+        title: article?.title ?? draft?.title ?? '',
+        category: article?.category ?? draft?.category ?? 'hardware',
         status: article?.status ?? 'draft',
-        body: article?.body ?? '',
+        body: article?.body ?? draft?.body ?? '',
     });
 
     const basicsValid = form.data.title.trim().length > 0;
