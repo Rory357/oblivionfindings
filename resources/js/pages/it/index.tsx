@@ -19,6 +19,7 @@ import {
 import { CsatRater, CsatStars } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
+import { ItReports } from '@/components/it/it-reports';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
 import {
@@ -47,6 +48,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
+    BarChart3,
     BookOpen,
     CheckCircle2,
     ChevronDown,
@@ -329,6 +331,12 @@ export default function ItIndex({
                       icon: BookOpen,
                       tone: 'primary',
                       badge: kbArticles.length,
+                  },
+                  {
+                      id: 'reports',
+                      label: 'Reports',
+                      icon: BarChart3,
+                      tone: 'primary',
                   },
               ] as HrTabItem[])
             : []),
@@ -869,6 +877,9 @@ export default function ItIndex({
                         onOpenTicket={(id) => setPeekId(id)}
                     />
                 )}
+
+                {/* ── Reports (agents, §L) ── */}
+                {can.view && tab === 'reports' && <ItReports />}
 
                 {/* ── Provisioning queue (agents) ── */}
                 {can.view && tab === 'provisioning' && (
