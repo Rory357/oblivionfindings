@@ -7,6 +7,7 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
+use App\Domain\Hr\Notifications\HrCaseUpdateNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -358,7 +359,7 @@ class HrCaseController extends Controller
             'linked_incident_ids.*' => ['integer'],
         ]);
 
-        HrCase::create([
+        $case = HrCase::create([
             'tenant_id' => $tenantId,
             'case_number' => app(\App\Services\References\ReferenceNumberGenerator::class)->nextGlobal('HR', 5),
             'status' => 'open',
@@ -367,6 +368,9 @@ class HrCaseController extends Controller
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        // Tell the owner they've picked up a case (skip self-assignment).
+        $this->notifyCaseAssignee($case, $case->assigned_to !== null ? (int) $case->assigned_to : null, $user->id, 'assigned');
 
         return redirect()->back()->with('success', 'HR case opened.');
     }
@@ -397,7 +401,15 @@ class HrCaseController extends Controller
 
         $data['updated_by'] = $user->id;
 
+        $previousAssignee = $case->assigned_to !== null ? (int) $case->assigned_to : null;
+
         $case->update($data);
+
+        // Notify only when ownership actually moves to a new person.
+        $newAssignee = $case->assigned_to !== null ? (int) $case->assigned_to : null;
+        if ($newAssignee !== null && $newAssignee !== $previousAssignee) {
+            $this->notifyCaseAssignee($case, $newAssignee, $user->id, 'reassigned');
+        }
 
         return redirect()->back()->with('success', 'HR case updated.');
     }
@@ -454,6 +466,35 @@ class HrCaseController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'HR case closed.');
+    }
+
+    /**
+     * Notify a case's assigned owner that it has landed with them. Fires the
+     * previously-dead HrCaseUpdateNotification (database-only — sensitive HR
+     * data). Skips self-assignment and is best-effort so a notification failure
+     * never rolls back the case write. The assignee is always an authorised
+     * viewer (see canViewCase), so this can't leak a confidential case.
+     */
+    protected function notifyCaseAssignee(HrCase $case, ?int $assigneeId, int $actorId, string $eventType): void
+    {
+        if (! $assigneeId || $assigneeId === $actorId) {
+            return;
+        }
+
+        $assignee = User::find($assigneeId);
+        if (! $assignee) {
+            return;
+        }
+
+        try {
+            $assignee->notify(new HrCaseUpdateNotification($case, $eventType));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to send HR case assignment notification', [
+                'case_id' => $case->id,
+                'assignee_id' => $assigneeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
