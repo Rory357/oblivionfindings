@@ -745,14 +745,27 @@ vendor, receipt) — the mould for C2.
   Then: Client-Money Transaction modal (deposit/withdrawal via the working ClientFund trust path, receipt upload, audited)
   + funder remittance reconciliation. Client money never nets against operational accounts (segregation preserved:
   trust liability 2500, not operational revenue).
-- **[ ] C5 — Payroll residuals** (pipeline verified ~80% live, see seam table): (1) GL-post/pay status +
-  failure surfacing on the run list (poll failed_jobs or persist a status column + preflight validation);
-  (2) per-org role→GL mapping replacing hardcoded codes + preflight (open period, accounts seeded) with
-  surfaced errors; (3) "Create payday filing" action from a posted run (route exists `finance.php:583`);
-  (4) run-gross vs Σpayslip-gross reconcile guard before posting; (5) `hr_payslips.esct` column + calculator +
-  payload (replace hardcoded '0.00'); (6) `fin_payment_runs.type` (payroll|vendor) + net-pay disbursement
-  creates a typed run + forecast includes unpaid posted runs without double-count. Browser-walk lock → journal
-  → disburse → bank file → filing end-to-end.
+- **[~] C5 — Payroll residuals — RE-DERIVED FROM CODE (audit was optimistic; the FINANCE GL bridge is already SOUND).**
+  `PayrollJournalService::postPayrollJournal` (app/Domain/Finance/Services/PayrollJournalService.php) posts a BALANCED NZ
+  journal (DR 5000 Wages / 5010 KiwiSaver-er / 5020 ACC-levy; CR 2100 PAYE / 2110 ACC-payable / 2120 KiwiSaver-payable /
+  2130 Student-loan / 2300 Accrued-wages), idempotent (journal_id + findExistingPayrollJournal), resolves each canonical
+  code via findAccountByCode + THROWS if missing (never invents a code / never posts unbalanced); `postNetPayPayment`
+  (DR 2300 / CR bank) + `buildNetPayDirectCreditCsv` work. Verdict per claim:
+  - **(a) GL-post FAILURE surfacing = REAL but CROSS-MODULE.** PostPayrollJournalJob ($tries=1) catches→logs→re-throws →
+    silent failed_jobs; the run (HrPayrollRun) has `gl_posted_at` but NO gl_status/gl_error, so a failed post looks like
+    "not posted yet". Fixing = an hr_payroll_runs column + the HR-owned payroll-run UI + a retry endpoint (dispatched from
+    HR's PayrollExportController:164) → **HR-SEAM item, not finance-in-lane.**
+  - **(b) config-drive codes = LOW value** — hardcoded-canonical-codes + throw-if-missing is the CORRECT safe pattern
+    (same as ClientFundJournalService 1010/2500), not a bug. Skip.
+  - **(c) preflight** — the service already throws on missing accounts + (via JournalPostingService.post) closed period;
+    surfacing it before dispatch is part of (a)'s HR-side UI work.
+  - **(d) reconcile** run.total_gross vs Σpayslip gross — a real integrity guard, but also lands on the HR run.
+  - **(e) ESCT** = HR-OWNED (hr_payslips + NzPayrollCalculatorService compute it).
+  - **(f) forecast double-count = MOOT** — CashFlowForecastService has ZERO payroll references (no payroll outflow in the
+    forecast at all), so nothing to double-count. (Payroll-in-forecast would be a NEW feature, not a bug fix.)
+  **⇒ C5's finance-side is essentially done (GL bridge sound). Remaining residuals (a/c/d/e) are HR-SEAM/HR-owned — do
+  them WITH HR (hr_payroll_runs column + run UI + calculator), not as a finance fork.** (3) payday-filing action = M5-5
+  (route exists), can ship finance-side later.
 - **[ ] C6 — Budgets + approvals.** Implement `FinanceBudgetSync : BudgetSyncInterface` + container binding;
   Governance consumes through it; category-vocab mapping registry; slim `syncActuals` to alert-freshness only
   (report already live); **⚠️ PAUSE-AND-ASK Chane** before any store retirement/migration. SpendApproval: add
