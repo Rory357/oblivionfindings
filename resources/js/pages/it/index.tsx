@@ -54,12 +54,15 @@ import {
     ChevronDown,
     ChevronsUpDown,
     ChevronUp,
+    Copy,
     Download,
     Inbox,
     KeyRound,
     Laptop,
     LayoutDashboard,
+    Link2,
     Mail,
+    MessageSquare,
     MoreHorizontal,
     Pencil,
     Play,
@@ -553,6 +556,12 @@ export default function ItIndex({
         });
     };
 
+    /** Copy a reference or link to the clipboard and toast it (§O). */
+    const copyText = (text: string | null, what: string) => {
+        if (!text) return;
+        void navigator.clipboard.writeText(text).then(() => toast.success(`${what} copied.`));
+    };
+
     /** Delete a KB article (router.delete has no data arg — its own helper). */
     const runKbDelete = (a: KbRow) => {
         router.delete(`/it/kb/${a.id}`, {
@@ -617,6 +626,13 @@ export default function ItIndex({
                           label: `Open ${r.linked_ticket.reference ?? 'linked ticket'}`,
                           icon: Inbox,
                           onSelect: () => setPeekId(r.linked_ticket!.id),
+                      },
+                      {
+                          kind: 'item' as const,
+                          label: 'Copy link',
+                          icon: Link2,
+                          onSelect: () =>
+                              copyText(`${window.location.origin}/it/tickets/${r.linked_ticket!.id}`, 'Link'),
                       },
                   ]
                 : []),
@@ -724,8 +740,55 @@ export default function ItIndex({
                       },
                   ]
                 : []),
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Copy reference',
+                icon: Copy,
+                onSelect: () => copyText(t.reference, t.reference ?? 'Reference'),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Copy link',
+                icon: Link2,
+                onSelect: () => copyText(`${window.location.origin}/it/tickets/${t.id}`, 'Link'),
+            },
         ]);
     };
+
+    /** My-tickets row menu (requester-facing, §O). */
+    const myTicketMenu = (t: MyTicketRow) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: Ticket,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Reply',
+                icon: MessageSquare,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            ...(t.status === 'resolved'
+                ? ([
+                      {
+                          kind: 'item' as const,
+                          label: 'Reopen',
+                          icon: RotateCcw,
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
+                      },
+                  ] as const)
+                : []),
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Copy reference',
+                icon: Copy,
+                onSelect: () => copyText(t.reference, t.reference ?? 'Reference'),
+            },
+        ]);
 
     /* ---------------- render ---------------- */
 
@@ -1498,6 +1561,7 @@ export default function ItIndex({
                                     key={t.id}
                                     onClick={(e) => openTicket(t.id, e)}
                                     onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
+                                    onContextMenu={myTicketMenu(t)}
                                     className="grid cursor-pointer grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
