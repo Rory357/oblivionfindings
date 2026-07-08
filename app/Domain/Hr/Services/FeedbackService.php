@@ -43,7 +43,7 @@ class FeedbackService
         ?int $templateId = null,
         ?string $dueDate = null,
     ): array {
-        return DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId, $dueDate) {
+        $requests = DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId, $dueDate) {
             $tenantId = $requester->getAttribute('tenant_id')
                 ?? $requester->getAttribute('organization_id')
                 ?? HrEmployeeProfile::where('user_id', $requester->id)->value('tenant_id')
@@ -86,6 +86,27 @@ class FeedbackService
 
             return $requests;
         });
+
+        // Tell each reviewer they've been asked (best-effort, post-commit) — the
+        // request previously only surfaced if a manager later sent a reminder.
+        $subjectName = User::find($subjectUserId)?->name ?? 'a colleague';
+        foreach ($requests as $feedbackRequest) {
+            $reviewer = $feedbackRequest->reviewer;
+            if (! $reviewer) {
+                continue;
+            }
+            try {
+                $reviewer->notify(new \App\Domain\Hr\Notifications\FeedbackRequestedNotification($feedbackRequest, $subjectName));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to send feedback-requested notification', [
+                    'request_id' => $feedbackRequest->id,
+                    'reviewer_id' => $feedbackRequest->reviewer_user_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $requests;
     }
 
     /**
