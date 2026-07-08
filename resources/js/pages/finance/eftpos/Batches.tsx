@@ -6,11 +6,12 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, Clock, CreditCard, DollarSign, Hash, Layers } from 'lucide-react';
+import { CreditCard, Layers } from 'lucide-react';
+import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
 interface Batch {
@@ -67,21 +68,11 @@ interface Props extends PageProps {
     };
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
-const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
-    open: { label: 'Open', icon: Clock, className: 'border-status-info/30 text-status-info' },
-    closed: { label: 'Closed', icon: Clock, className: 'border-status-warning/30 text-status-warning' },
-    reconciled: { label: 'Reconciled', icon: CheckCircle2, className: 'border-status-success/30 text-status-success' },
-    discrepancy: { label: 'Discrepancy', icon: AlertTriangle, className: 'border-status-critical/30 text-status-critical' },
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
 ];
 
@@ -112,8 +103,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                         title="EFTPOS Batches"
                         description="Reconcile EFTPOS settlements with bank transactions."
                         stats={[
-                            { label: 'Settlement', value: formatCurrency(kpis.totalSettlement) },
-                            { label: 'Fees', value: formatCurrency(kpis.totalFees) },
+                            { label: 'Settlement', value: formatMoney(kpis.totalSettlement) },
+                            { label: 'Fees', value: formatMoney(kpis.totalFees) },
                             { label: 'Transactions', value: kpis.totalTxns },
                             { label: 'Unreconciled', value: kpis.unreconciledCount },
                         ]}
@@ -223,8 +214,6 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                 </TableHeader>
                                 <TableBody>
                                     {batches.data.map((batch) => {
-                                        const config = statusConfig[batch.status] ?? statusConfig.open;
-                                        const StatusIcon = config.icon;
                                         return (
                                             <TableRow key={batch.id}>
                                                 <TableCell>
@@ -235,22 +224,19 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                 <TableCell>{formatDate(batch.batch_date)}</TableCell>
                                                 <TableCell className="text-sm">{batch.terminal_name ?? '-'}</TableCell>
                                                 <TableCell className="text-right">{batch.total_transactions}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(batch.total_amount)}</TableCell>
+                                                <TableCell className="text-right">{formatMoney(batch.total_amount)}</TableCell>
                                                 <TableCell className="text-right text-destructive">
-                                                    {batch.total_refunds > 0 ? `-${formatCurrency(batch.total_refunds)}` : '-'}
+                                                    {batch.total_refunds > 0 ? `-${formatMoney(batch.total_refunds)}` : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right text-muted-foreground">
-                                                    {batch.fees > 0 ? formatCurrency(batch.fees) : '-'}
+                                                    {batch.fees > 0 ? formatMoney(batch.fees) : '-'}
                                                 </TableCell>
-                                                <TableCell className="text-right font-medium">{formatCurrency(batch.settlement_amount)}</TableCell>
+                                                <TableCell className="text-right font-medium">{formatMoney(batch.settlement_amount)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={config.className}>
-                                                        <StatusIcon className="mr-1 h-3 w-3" />
-                                                        {config.label}
-                                                    </Badge>
+                                                    <StatusBadge status={batch.status} />
                                                     {batch.discrepancy_amount !== 0 && (
                                                         <span className="ml-1 text-xs text-destructive">
-                                                            ({formatCurrency(batch.discrepancy_amount)})
+                                                            ({formatMoney(batch.discrepancy_amount)})
                                                         </span>
                                                     )}
                                                 </TableCell>

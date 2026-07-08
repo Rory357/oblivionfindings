@@ -7,7 +7,12 @@ import {
     Receipt,
 } from 'lucide-react';
 
-import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
+import {
+    FinanceTabs,
+    tabCountBadge,
+    type FinanceHubCounts,
+    type FinanceTabItem,
+} from './finance-tabs';
 
 /**
  * Canonical Purchases & Payables hub tabs. Mirrors the Receivables hub: each
@@ -54,6 +59,9 @@ export const PAYABLES_TABS: PayablesTabDef[] = [
 export function PayablesTabsFooter({ active }: { active: PayablesTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
+    const counts =
+        (page.props as { financeHubCounts?: FinanceHubCounts | null })
+            .financeHubCounts?.['payables'] ?? {};
 
     const visible = PAYABLES_TABS.filter((t) => t.id === active || t.requires(can));
 
@@ -74,6 +82,7 @@ export function PayablesTabsFooter({ active }: { active: PayablesTabId }) {
                 label: t.label,
                 icon: t.icon,
                 tone: t.tone,
+                badge: tabCountBadge(counts[t.id]),
             }))}
             ariaLabel="Purchases and payables views"
         />

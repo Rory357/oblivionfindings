@@ -29,7 +29,7 @@ function createUserWithRole(string $roleName): User
 test('finance role can access finance dashboard', function () {
     $user = createUserWithRole('finance');
 
-    $response = $this->actingAs($user)->get('/finance/dashboard');
+    $response = $this->actingAs($user)->get('/finance');
 
     expect($response->status())->toBeIn([200, 302]);
     expect($response->status())->not->toBe(403);
@@ -40,7 +40,7 @@ test('finance role can access finance dashboard', function () {
 test('support worker cannot access finance dashboard', function () {
     $user = createUserWithRole('support_worker');
 
-    $response = $this->actingAs($user)->get('/finance/dashboard');
+    $response = $this->actingAs($user)->get('/finance');
 
     $response->assertForbidden();
 });
@@ -83,7 +83,7 @@ test('finance role can access mark invoice as paid route', function () {
 test('auditor can view finance dashboard', function () {
     $user = createUserWithRole('auditor');
 
-    $response = $this->actingAs($user)->get('/finance/dashboard');
+    $response = $this->actingAs($user)->get('/finance');
 
     expect($response->status())->toBeIn([200, 302]);
     expect($response->status())->not->toBe(403);
@@ -138,7 +138,7 @@ test('auditor cannot mark invoices as paid', function () {
 test('admin can access finance dashboard', function () {
     $user = createUserWithRole('admin');
 
-    $response = $this->actingAs($user)->get('/finance/dashboard');
+    $response = $this->actingAs($user)->get('/finance');
 
     expect($response->status())->toBeIn([200, 302]);
     expect($response->status())->not->toBe(403);

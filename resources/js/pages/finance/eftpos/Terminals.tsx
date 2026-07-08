@@ -51,7 +51,7 @@ const providerLabels: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'EFTPOS', href: '/finance/eftpos/batches' },
     { title: 'Terminals', href: '/finance/eftpos/terminals' },
 ];

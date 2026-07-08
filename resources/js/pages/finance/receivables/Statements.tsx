@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,9 +67,6 @@ type PageProps = {
     filters: Filters;
 };
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 function ClientAddress({ client }: { client: Statement['client'] }) {
     const parts = [
         client.address_line_1,
@@ -122,7 +119,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Accounts Receivable', href: '/finance/receivables' },
                 { title: 'Statements', href: '/finance/receivables/statements' },
             ]}
@@ -140,7 +137,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                     ? [
                                           { label: 'Client', value: statement.client.name },
                                           { label: 'Invoices', value: statement.invoices.length },
-                                          { label: 'Outstanding', value: formatNZD(statement.total_outstanding) },
+                                          { label: 'Outstanding', value: formatMoney(statement.total_outstanding) },
                                       ]
                                     : undefined
                             }
@@ -275,13 +272,13 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                                     <TableCell>{inv.issue_date}</TableCell>
                                                     <TableCell>{inv.due_date}</TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatNZD(inv.total)}
+                                                        {formatMoney(inv.total)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatNZD(inv.amount_paid)}
+                                                        {formatMoney(inv.amount_paid)}
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium">
-                                                        {formatNZD(inv.amount_due)}
+                                                        {formatMoney(inv.amount_due)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -292,7 +289,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                                     Total Outstanding
                                                 </TableCell>
                                                 <TableCell className="text-right text-lg">
-                                                    {formatNZD(statement.total_outstanding)}
+                                                    {formatMoney(statement.total_outstanding)}
                                                 </TableCell>
                                             </TableRow>
                                         </TableFooter>

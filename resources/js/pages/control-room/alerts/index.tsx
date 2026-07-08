@@ -20,6 +20,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
+    BellOff,
     CheckCircle2,
     ChevronDown,
     ChevronUp,
@@ -50,6 +51,7 @@ interface AlertItem {
     assigned_to: { id: number; name: string } | null;
     client_name: string | null;
     sla_status: 'green' | 'yellow' | 'red' | null;
+    snoozed_until: string | null;
     notes: string | null;
 }
 
@@ -74,6 +76,7 @@ interface Props {
         critical: number;
         assigned_to_me: number;
         unassigned: number;
+        snoozed: number;
     };
     staff: Array<{ id: number; name: string; email: string }>;
     /** For the New-alert wizard (manual creation). */
@@ -322,9 +325,15 @@ export default function AlertsIndex({
             count: stats.unassigned,
             filter: { assigned_to: 'unassigned' },
         },
+        {
+            label: 'Snoozed',
+            count: stats.snoozed ?? 0,
+            filter: { snoozed: '1' },
+        },
     ];
 
     const activeTab = (() => {
+        if (filters.snoozed === '1') return 'Snoozed';
         if (filters.assigned_to === 'me') return 'Assigned to Me';
         if (filters.assigned_to === 'unassigned') return 'Unassigned';
         if (filters.status === 'open' && !filters.severity) return 'Open';
@@ -710,6 +719,17 @@ export default function AlertsIndex({
                                                 {statusLabels[alert.status] ??
                                                     alert.status}
                                             </Badge>
+                                            {alert.snoozed_until &&
+                                            new Date(alert.snoozed_until) >
+                                                new Date() ? (
+                                                <span
+                                                    className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                                                    title={`Snoozed until ${new Date(alert.snoozed_until).toLocaleString()}`}
+                                                >
+                                                    <BellOff className="h-3 w-3" />
+                                                    Snoozed
+                                                </span>
+                                            ) : null}
                                         </td>
                                         <td className="px-3 py-2.5">
                                             {alert.sla_status ? (

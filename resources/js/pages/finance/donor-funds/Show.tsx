@@ -8,14 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, TrendingUp, TrendingDown } from 'lucide-react';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import {
+    DonorFundTransactionDialog,
+    FinanceTabs,
+    formatMoney,
+    type DonorFundTxnAccount,
+    type DonorFundTxnBankAccount,
+    type DonorFundGlSummary,
+} from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
+import { ArrowDownCircle, ArrowUpCircle, Download, ArrowLeftRight, FileBarChart } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface FundData {
     id: number;
@@ -37,6 +43,7 @@ interface FundData {
     status: string;
     is_restricted: boolean;
     gl_account_name: string | null;
+    gl_account: DonorFundGlSummary;
     funding_stream_name: string | null;
     created_by: string | null;
 }
@@ -82,10 +89,8 @@ interface Props extends PageProps {
     reports: Report[];
     expenseAccounts: Account[];
     bankAccounts: BankAccount[];
+    canManage: boolean;
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -108,19 +113,21 @@ const txnTypeConfig: Record<string, { label: string; className: string; isInflow
     adjustment: { label: 'Adjustment', className: 'bg-muted text-foreground', isInflow: false },
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    active: { label: 'Active', className: 'border-status-success/30 text-status-success' },
-    fully_spent: { label: 'Fully Spent', className: 'border-status-warning/30 text-status-warning' },
-    expired: { label: 'Expired', className: 'border-status-critical/30 text-status-critical' },
-    returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
+const statusBadge: Record<string, { label: string; variant: StatusVariant }> = {
+    active: { label: 'Active', variant: 'success' },
+    fully_spent: { label: 'Fully Spent', variant: 'warning' },
+    expired: { label: 'Expired', variant: 'critical' },
+    returned: { label: 'Returned', variant: 'neutral' },
 };
 
-export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts }: Props) {
-    const config = statusConfig[fund.status] ?? statusConfig.active;
+export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts, canManage = false }: Props) {
+    const badge = statusBadge[fund.status] ?? statusBadge.active;
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
+    const [txnType, setTxnType] = useState<'receipt' | 'expenditure' | null>(null);
+    const [tab, setTab] = useState<'transactions' | 'reports'>('transactions');
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Donor Funds', href: '/finance/donor-funds' },
         { title: fund.fund_name, href: `/finance/donor-funds/${fund.id}` },
     ];
@@ -131,40 +138,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
         { name: 'Available', amount: fund.available_balance },
     ];
 
-    const receiptForm = useForm({
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: '',
-        amount: '',
-        reference: '',
-        bank_account_id: '',
-    });
-
-    const expenditureForm = useForm({
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: '',
-        amount: '',
-        reference: '',
-        expense_account_id: '',
-    });
-
     const reportForm = useForm({
         period_from: '',
         period_to: '',
     });
-
-    const handleReceipt = (e: FormEvent) => {
-        e.preventDefault();
-        receiptForm.post(`/finance/donor-funds/${fund.id}/receipt`, {
-            onSuccess: () => receiptForm.reset(),
-        });
-    };
-
-    const handleExpenditure = (e: FormEvent) => {
-        e.preventDefault();
-        expenditureForm.post(`/finance/donor-funds/${fund.id}/expenditure`, {
-            onSuccess: () => expenditureForm.reset(),
-        });
-    };
 
     const handleReport = (e: FormEvent) => {
         e.preventDefault();
@@ -191,9 +168,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         }
                         actions={
                             <>
-                                <Badge variant="outline" className={config.className}>
-                                    {config.label}
-                                </Badge>
+                                <StatusBadge variant={badge.variant} label={badge.label} />
                                 {fund.is_restricted && (
                                     <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                         Restricted
@@ -210,25 +185,25 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Received</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_received)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_received)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Spent</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_spent)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_spent)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Committed</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_committed)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_committed)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Available Balance</p>
-                                <p className="text-xl font-bold text-status-success">{formatCurrency(fund.available_balance)}</p>
+                                <p className="text-xl font-bold text-status-success">{formatMoney(fund.available_balance)}</p>
                             </CardContent>
                         </Card>
                         {fund.budget_amount && (
@@ -238,7 +213,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                     <p className={`text-xl font-bold ${utilisation && utilisation > 90 ? 'text-destructive' : ''}`}>
                                         {utilisation}%
                                     </p>
-                                    <p className="text-xs text-muted-foreground">of {formatCurrency(fund.budget_amount)}</p>
+                                    <p className="text-xs text-muted-foreground">of {formatMoney(fund.budget_amount)}</p>
                                 </CardContent>
                             </Card>
                         )}
@@ -257,10 +232,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                                     <YAxis tick={{ fontSize: 12 }} />
-                                    <Tooltip formatter={((value: number) => formatCurrency(value)) as any} />
+                                    <Tooltip formatter={((value: number) => formatMoney(value)) as any} />
                                     <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                         {chartData.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                            <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -329,19 +304,34 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                 )}
 
                 {/* Actions Tabs */}
-                <TabsRoot defaultValue="transactions" className="space-y-4">
-                    <TabsList>
-                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                        <TabsTrigger value="receipt">Record Receipt</TabsTrigger>
-                        <TabsTrigger value="expenditure">Record Expenditure</TabsTrigger>
-                        <TabsTrigger value="reports">Reports</TabsTrigger>
-                    </TabsList>
+                <div className="space-y-4">
+                    <FinanceTabs
+                        value={tab}
+                        onChange={(next) => setTab(next as 'transactions' | 'reports')}
+                        ariaLabel="Donor fund views"
+                        items={[
+                            { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight, tone: 'primary' },
+                            { id: 'reports', label: 'Reports', icon: FileBarChart, tone: 'info' },
+                        ]}
+                    />
 
                     {/* Transactions Tab */}
-                    <TabsContent value="transactions">
+                    {tab === 'transactions' && (
                         <Card>
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Transactions</CardTitle>
+                                {canManage && (
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => setTxnType('receipt')}>
+                                            <ArrowDownCircle className="mr-1.5 h-4 w-4 text-status-success" />
+                                            Record Receipt
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setTxnType('expenditure')}>
+                                            <ArrowUpCircle className="mr-1.5 h-4 w-4 text-status-critical" />
+                                            Record Expenditure
+                                        </Button>
+                                    </div>
+                                )}
                             </CardHeader>
                             <CardContent className="p-0">
                                 {transactions.length === 0 ? (
@@ -379,7 +369,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="text-right">
                                                             <span className={`font-medium ${typeConf.isInflow ? 'text-status-success' : 'text-destructive'}`}>
                                                                 {typeConf.isInflow ? '+' : '-'}
-                                                                {formatCurrency(txn.amount)}
+                                                                {formatMoney(txn.amount)}
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="font-mono text-sm">{txn.journal_number ?? '-'}</TableCell>
@@ -392,179 +382,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 )}
                             </CardContent>
                         </Card>
-                    </TabsContent>
-
-                    {/* Receipt Tab */}
-                    <TabsContent value="receipt">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-status-success" />
-                                    Record Receipt
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleReceipt} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="receipt_date">Date</Label>
-                                        <Input
-                                            id="receipt_date"
-                                            type="date"
-                                            value={receiptForm.data.transaction_date}
-                                            onChange={(e) => receiptForm.setData('transaction_date', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_amount">Amount (NZD)</Label>
-                                        <Input
-                                            id="receipt_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
-                                            value={receiptForm.data.amount}
-                                            onChange={(e) => receiptForm.setData('amount', e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Label htmlFor="receipt_description">Description</Label>
-                                        <Input
-                                            id="receipt_description"
-                                            value={receiptForm.data.description}
-                                            onChange={(e) => receiptForm.setData('description', e.target.value)}
-                                            placeholder="e.g. Q1 2026 grant instalment"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_reference">Reference</Label>
-                                        <Input
-                                            id="receipt_reference"
-                                            value={receiptForm.data.reference}
-                                            onChange={(e) => receiptForm.setData('reference', e.target.value)}
-                                            placeholder="Optional reference"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="receipt_bank">Bank Account</Label>
-                                        <Select
-                                            value={receiptForm.data.bank_account_id}
-                                            onValueChange={(val) => receiptForm.setData('bank_account_id', val)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select bank account" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {bankAccounts.map((acc) => (
-                                                    <SelectItem key={acc.id} value={String(acc.id)}>
-                                                        {acc.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Button type="submit" disabled={receiptForm.processing}>
-                                            {receiptForm.processing ? 'Recording...' : 'Record Receipt'}
-                                        </Button>
-                                        {(receiptForm.errors as Record<string, string>).receipt && (
-                                            <p className="mt-2 text-sm text-destructive">{(receiptForm.errors as Record<string, string>).receipt}</p>
-                                        )}
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Expenditure Tab */}
-                    <TabsContent value="expenditure">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <TrendingDown className="h-5 w-5 text-destructive" />
-                                    Record Expenditure
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleExpenditure} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="exp_date">Date</Label>
-                                        <Input
-                                            id="exp_date"
-                                            type="date"
-                                            value={expenditureForm.data.transaction_date}
-                                            onChange={(e) => expenditureForm.setData('transaction_date', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_amount">Amount (NZD)</Label>
-                                        <Input
-                                            id="exp_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
-                                            value={expenditureForm.data.amount}
-                                            onChange={(e) => expenditureForm.setData('amount', e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                        {fund.is_restricted && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Available: {formatCurrency(fund.available_balance)}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Label htmlFor="exp_description">Description</Label>
-                                        <Input
-                                            id="exp_description"
-                                            value={expenditureForm.data.description}
-                                            onChange={(e) => expenditureForm.setData('description', e.target.value)}
-                                            placeholder="e.g. Staff training programme"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_reference">Reference</Label>
-                                        <Input
-                                            id="exp_reference"
-                                            value={expenditureForm.data.reference}
-                                            onChange={(e) => expenditureForm.setData('reference', e.target.value)}
-                                            placeholder="Optional reference"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="exp_account">Expense Account</Label>
-                                        <Select
-                                            value={expenditureForm.data.expense_account_id}
-                                            onValueChange={(val) => expenditureForm.setData('expense_account_id', val)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select expense account" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {expenseAccounts.map((acc) => (
-                                                    <SelectItem key={acc.id} value={String(acc.id)}>
-                                                        {acc.code} - {acc.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <Button type="submit" disabled={expenditureForm.processing}>
-                                            {expenditureForm.processing ? 'Recording...' : 'Record Expenditure'}
-                                        </Button>
-                                        {(expenditureForm.errors as Record<string, string>).expenditure && (
-                                            <p className="mt-2 text-sm text-destructive">
-                                                {(expenditureForm.errors as Record<string, string>).expenditure}
-                                            </p>
-                                        )}
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Reports Tab */}
-                    <TabsContent value="reports">
+                    {tab === 'reports' && (
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader>
@@ -623,18 +444,18 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="text-sm">
                                                             {formatDate(report.period_from)} - {formatDate(report.period_to)}
                                                         </TableCell>
-                                                        <TableCell className="text-right">{formatCurrency(report.opening_balance)}</TableCell>
+                                                        <TableCell className="text-right">{formatMoney(report.opening_balance)}</TableCell>
                                                         <TableCell className="text-right text-status-success">
-                                                            {formatCurrency(report.total_receipts)}
+                                                            {formatMoney(report.total_receipts)}
                                                         </TableCell>
                                                         <TableCell className="text-right text-destructive">
-                                                            {formatCurrency(report.total_expenditure)}
+                                                            {formatMoney(report.total_expenditure)}
                                                         </TableCell>
                                                         <TableCell className="text-right font-medium">
-                                                            {formatCurrency(report.closing_balance)}
+                                                            {formatMoney(report.closing_balance)}
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Badge variant="outline">{report.status}</Badge>
+                                                            <StatusBadge status={report.status} />
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             {report.download_url ? (
@@ -656,9 +477,28 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 </Card>
                             )}
                         </div>
-                    </TabsContent>
-                </TabsRoot>
+                    )}
+                </div>
             </PageLayout>
+
+            {canManage && txnType && (
+                <DonorFundTransactionDialog
+                    key={txnType}
+                    open
+                    initialType={txnType}
+                    onClose={() => setTxnType(null)}
+                    fund={{
+                        id: fund.id,
+                        fund_name: fund.fund_name,
+                        fund_code: fund.fund_code,
+                        is_restricted: fund.is_restricted,
+                        available_balance: fund.available_balance,
+                        gl_account: fund.gl_account,
+                    }}
+                    expenseAccounts={expenseAccounts as DonorFundTxnAccount[]}
+                    bankAccounts={bankAccounts as DonorFundTxnBankAccount[]}
+                />
+            )}
         </AppLayout>
     );
 }

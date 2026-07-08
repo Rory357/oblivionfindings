@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 
 interface Account {
     id: number;
@@ -69,9 +70,6 @@ interface Props extends PageProps {
     billingEntries?: BillingEntry[];
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const emptyLine = (): LineItem => ({
     billing_entry_id: '',
     description: '',
@@ -84,7 +82,7 @@ const emptyLine = (): LineItem => ({
 });
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Invoices', href: '/finance/invoices' },
     { title: 'New Invoice', href: '/finance/invoices/create' },
 ];
@@ -95,7 +93,7 @@ const billingEntryLabel = (entry: BillingEntry) => {
     const client = entry.client ? clientName(entry.client) : 'No client';
     const date = entry.service_date ?? 'No date';
 
-    return `${date} - ${client} - ${formatCurrency(Number(entry.amount) || 0)}`;
+    return `${date} - ${client} - ${formatMoney(Number(entry.amount) || 0)}`;
 };
 
 export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients = [], billingEntries = [] }: Props) {
@@ -454,10 +452,10 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                                     </Select>
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm">
-                                                    {formatCurrency(calcLineTax(line))}
+                                                    {formatMoney(calcLineTax(line))}
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium text-sm">
-                                                    {formatCurrency(calcLineTotal(line))}
+                                                    {formatMoney(calcLineTotal(line))}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button
@@ -481,15 +479,15 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                 <div className="w-64 space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Subtotal</span>
-                                        <span>{formatCurrency(subtotal)}</span>
+                                        <span>{formatMoney(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">GST</span>
-                                        <span>{formatCurrency(taxTotal)}</span>
+                                        <span>{formatMoney(taxTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-base font-bold border-t pt-2">
                                         <span>Total</span>
-                                        <span>{formatCurrency(total)}</span>
+                                        <span>{formatMoney(total)}</span>
                                     </div>
                                 </div>
                             </div>

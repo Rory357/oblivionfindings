@@ -2,15 +2,16 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
+import { formatMoney, NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, useRowContextMenu, type ClientOption, type RowCtxItem, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -72,23 +73,11 @@ interface Props extends PageProps {
     taxRates: TaxRateOption[];
 }
 
-const formatCurrency = (amount: string | number, currency = 'NZD') =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(amount));
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    sent: { label: 'Sent', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    overdue: { label: 'Overdue', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-    cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Invoices', href: '/finance/invoices' },
 ];
 
@@ -124,9 +113,26 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
         router.get('/finance/invoices', {}, { preserveState: true });
     };
 
+    const hasFilters = Boolean(search || (status && status !== 'all') || dateFrom || dateTo);
+
     const isOverdue = (invoice: Invoice) => {
         if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
         return new Date(invoice.due_date) < new Date();
+    };
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (invoice: Invoice): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/invoices/${invoice.id}`) },
+        ];
+        if (canManage && invoice.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditInvoice(invoice) });
+        }
+        if (canReceipt(invoice)) {
+            items.push({ kind: 'item', label: 'Record receipt', icon: Wallet, onSelect: () => setReceiptInvoice(invoice) });
+        }
+        return items;
     };
 
     return (
@@ -140,18 +146,26 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         title="Invoices"
                         description="Manage and send invoices to clients"
                         stats={[
-                            { label: 'Outstanding', value: formatCurrency(summary.total_outstanding) },
-                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
+                            { label: 'Outstanding', value: formatMoney(summary.total_outstanding) },
+                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
                             { label: 'Drafts', value: summary.draft_count },
-                            { label: 'Paid this month', value: formatCurrency(summary.paid_this_month) },
+                            { label: 'Paid this month', value: formatMoney(summary.paid_this_month) },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Invoice
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/invoices/export?${new URLSearchParams(Object.entries({ status, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Invoice
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<ReceivablesTabsFooter active="invoices" />}
                     />
@@ -159,10 +173,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatCurrency(summary.total_outstanding)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatMoney(summary.total_outstanding)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
                     <FinanceSummaryCard icon={FileText} tone="muted" label="Drafts" value={summary.draft_count} />
-                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatCurrency(summary.paid_this_month)} />
+                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatMoney(summary.paid_this_month)} />
                 </div>
 
                 {/* Filters */}
@@ -180,7 +194,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                 />
                             </div>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -235,8 +249,29 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         <TableBody>
                             {invoices.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                                        No invoices found.
+                                    <TableCell colSpan={8} className="p-0">
+                                        {hasFilters ? (
+                                            <EmptySearch
+                                                onClear={clearFilters}
+                                                title="No invoices match your filters"
+                                                className="border-0"
+                                            />
+                                        ) : (
+                                            <EmptyList
+                                                icon={Receipt}
+                                                itemName="invoice"
+                                                title="No invoices yet"
+                                                description="Create and send your first invoice to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+                                                            New invoice
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -248,6 +283,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             isOverdue(invoice) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/invoices/${invoice.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(invoice))}
                                     >
                                         <TableCell className="font-medium">
                                             <Link href={`/finance/invoices/${invoice.id}`} className="text-primary hover:underline">
@@ -270,12 +306,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {formatCurrency(invoice.total_amount, invoice.currency_code)}
+                                            {formatMoney(invoice.total_amount, { currency: invoice.currency_code })}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
-                                                {statusConfig[invoice.status]?.label ?? invoice.status}
-                                            </Badge>
+                                            <StatusBadge status={invoice.status} />
                                         </TableCell>
                                         <TableCell>
                                             {invoice.sent_at ? (
@@ -333,6 +367,8 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         </div>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {receiptInvoice && (

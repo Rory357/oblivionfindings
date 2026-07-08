@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,10 +15,9 @@ import { Printer, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpDown } fr
 import { useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { type BreadcrumbItem } from '@/types';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 type Inflows = {
     total: string;
@@ -88,16 +87,8 @@ type PageProps = {
     chartData: ChartData;
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    final: { label: 'Final', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-};
 
 const periodTypeLabels: Record<string, string> = {
     weekly: 'Weekly',
@@ -107,14 +98,15 @@ const periodTypeLabels: Record<string, string> = {
 
 export default function CashFlowForecastShow({ forecast, chartData }: PageProps) {
     const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
         { title: forecast.name, href: `/finance/cash-flow-forecast/${forecast.id}` },
     ];
 
-    const status = statusConfig[forecast.status] ?? statusConfig.draft;
     const isDraft = forecast.status === 'draft';
 
     const activeForecastData =
@@ -127,10 +119,11 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
             ? forecast.scenarios.find((s) => s.id === selectedScenario)?.name ?? 'Base'
             : 'Base Forecast';
 
-    function handleDelete() {
-        if (confirm('Are you sure you want to delete this forecast?')) {
-            router.delete(`/finance/cash-flow-forecast/${forecast.id}`);
-        }
+    function confirmDelete() {
+        router.delete(`/finance/cash-flow-forecast/${forecast.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+        });
     }
 
     // Build Recharts data from active forecast data
@@ -175,15 +168,16 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {forecast.name}
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge
+                                    variant={forecast.status === 'final' ? 'success' : 'neutral'}
+                                    label={forecast.status === 'final' ? 'Final' : 'Draft'}
+                                />
                             </span>
                         }
                         description={
                             <>
                                 {formatDate(forecast.period_start)} &ndash; {formatDate(forecast.period_end)}
-                                {' | '}{periodTypeLabels[forecast.period_type]} | Opening: {formatNZD(forecast.opening_balance)}
+                                {' | '}{periodTypeLabels[forecast.period_type]} | Opening: {formatMoney(forecast.opening_balance)}
                                 {forecast.created_by && (
                                     <span className="mt-1 block text-sm">
                                         Generated on {formatDate(forecast.forecast_date)} by {forecast.created_by.name}
@@ -198,7 +192,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                     Print
                                 </Button>
                                 {isDraft && (
-                                    <Button variant="destructive" onClick={handleDelete}>
+                                    <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Delete
                                     </Button>
@@ -214,7 +208,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Inflows</p>
-                                <p className="text-2xl font-bold mt-1 text-status-success">{formatCurrency(totalInflows)}</p>
+                                <p className="text-2xl font-bold mt-1 text-status-success">{formatMoney(totalInflows)}</p>
                             </div>
                             <TrendingUp className="h-8 w-8 text-status-success" />
                         </CardContent>
@@ -223,7 +217,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Outflows</p>
-                                <p className="text-2xl font-bold mt-1 text-status-critical">{formatCurrency(Math.abs(totalOutflows))}</p>
+                                <p className="text-2xl font-bold mt-1 text-status-critical">{formatMoney(Math.abs(totalOutflows))}</p>
                             </div>
                             <TrendingDown className="h-8 w-8 text-status-critical" />
                         </CardContent>
@@ -233,7 +227,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                             <div>
                                 <p className="text-sm text-muted-foreground">Net Cash Flow</p>
                                 <p className={`text-2xl font-bold mt-1 ${netCashFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                    {formatCurrency(netCashFlow)}
+                                    {formatMoney(netCashFlow)}
                                 </p>
                             </div>
                             <ArrowUpDown className="h-8 w-8 text-muted-foreground/50" />
@@ -244,7 +238,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                             <div>
                                 <p className="text-sm text-muted-foreground">Final Balance</p>
                                 <p className={`text-2xl font-bold mt-1 ${finalBalance >= 0 ? 'text-foreground' : 'text-status-critical'}`}>
-                                    {formatCurrency(finalBalance)}
+                                    {formatMoney(finalBalance)}
                                 </p>
                             </div>
                             <DollarSign className="h-8 w-8 text-muted-foreground/50" />
@@ -313,15 +307,15 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                             return `$${value}`;
                                         }}
                                     />
-                                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                    <Tooltip formatter={(value) => formatMoney(Number(value))} />
                                     <Legend />
-                                    <Bar dataKey="inflows" name="Inflows" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="outflows" name="Outflows" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="inflows" name="Inflows" fill="var(--status-success)" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="outflows" name="Outflows" fill="var(--status-critical)" radius={[4, 4, 0, 0]} />
                                     <Line
                                         type="monotone"
                                         dataKey="closingBalance"
                                         name="Closing Balance"
-                                        stroke="#3b82f6"
+                                        stroke={chartColor(0)}
                                         strokeWidth={2}
                                         dot={{ r: 4 }}
                                     />
@@ -331,7 +325,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                             type="monotone"
                                             dataKey={`scenario_${scenario.id}`}
                                             name={scenario.name}
-                                            stroke={CHART_COLORS[(idx + 3) % CHART_COLORS.length]}
+                                            stroke={chartColor(idx + 3)}
                                             strokeWidth={2}
                                             strokeDasharray="5 5"
                                             dot={false}
@@ -377,34 +371,34 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                                     {period.period_label}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatNZD(period.opening_balance)}
+                                                    {formatMoney(period.opening_balance)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatNZD(period.inflows.invoice_receipts)}
+                                                    {formatMoney(period.inflows.invoice_receipts)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatNZD(period.inflows.overdue_collections)}
+                                                    {formatMoney(period.inflows.overdue_collections)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                    {formatNZD(period.inflows.recurring_income)}
+                                                    {formatMoney(period.inflows.recurring_income)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatNZD(period.outflows.bill_payments)}
+                                                    {formatMoney(period.outflows.bill_payments)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatNZD(period.outflows.overdue_bills)}
+                                                    {formatMoney(period.outflows.overdue_bills)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatNZD(period.outflows.recurring_expenses)}
+                                                    {formatMoney(period.outflows.recurring_expenses)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                    {formatNZD(period.outflows.gst_payments)}
+                                                    {formatMoney(period.outflows.gst_payments)}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                    {formatNZD(netFlow)}
+                                                    {formatMoney(netFlow)}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-status-critical'}`}>
-                                                    {formatNZD(closingBal)}
+                                                    {formatMoney(closingBal)}
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -456,13 +450,13 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                                         {scenario.adjustments.description}
                                                     </TableCell>
                                                     <TableCell className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-status-critical'}`}>
-                                                        {formatNZD(scenarioFinalBalance)}
+                                                        {formatMoney(scenarioFinalBalance)}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums text-status-success">
-                                                        {formatNZD(scenarioTotalInflows)}
+                                                        {formatMoney(scenarioTotalInflows)}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums text-status-critical">
-                                                        {formatNZD(scenarioTotalOutflows)}
+                                                        {formatMoney(scenarioTotalOutflows)}
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -490,6 +484,23 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title="Delete forecast?"
+                description={
+                    <>
+                        This permanently deletes the forecast{' '}
+                        <span className="font-medium text-foreground">{forecast.name}</span> and its
+                        scenarios. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete forecast"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

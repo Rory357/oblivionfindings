@@ -7,7 +7,7 @@ test('finance dashboard loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/finance/dashboard')
+            ->visit('/finance')
             ->waitForText('Finance', 10)
             ->assertSee('Finance');
     });

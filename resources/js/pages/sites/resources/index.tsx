@@ -50,7 +50,7 @@ const typeColors: Record<string, string> = {
     boardroom: 'bg-primary/20 text-primary/70 border-primary/30',
     training_room: 'bg-status-info-bg text-status-info border-status-info/30',
     meeting_room: 'bg-status-success-bg text-status-success border-status-success/30',
-    other: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+    other: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
 };
 
 export default function SiteResources({ site, resources }: Props) {

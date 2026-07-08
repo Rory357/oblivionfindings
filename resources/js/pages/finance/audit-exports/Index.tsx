@@ -1,13 +1,16 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { AuditExportDialog, ConfirmDialog, TaxTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Download, Trash2, Loader2, CheckCircle, XCircle, Clock, FileText, History } from 'lucide-react';
+import { EmptyList } from '@/components/ui/empty-state';
+import { Plus, Download, Trash2, FileText, History } from 'lucide-react';
+import { useState } from 'react';
 
 interface AuditExport {
     id: number;
@@ -37,10 +40,11 @@ interface PaginatedExports {
 
 interface PageProps {
     exports: PaginatedExports;
+    canManage: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Audit Exports', href: '/finance/audit-exports' },
 ];
 
@@ -62,13 +66,6 @@ const formatFileSize = (bytes: number | null) => {
     return `${size.toFixed(1)} ${units[i]}`;
 };
 
-const statusConfig: Record<string, { label: string; className: string; icon: typeof Clock }> = {
-    pending: { label: 'Pending', className: 'bg-muted text-muted-foreground border-border', icon: Clock },
-    generating: { label: 'Generating', className: 'bg-status-info-bg text-status-info border-status-info/30', icon: Loader2 },
-    completed: { label: 'Completed', className: 'bg-status-success-bg text-status-success border-status-success/30', icon: CheckCircle },
-    failed: { label: 'Failed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30', icon: XCircle },
-};
-
 const getSections = (exp: AuditExport): string[] => {
     const sections: string[] = [];
     if (exp.include_journals) sections.push('Journals');
@@ -80,11 +77,37 @@ const getSections = (exp: AuditExport): string[] => {
     return sections;
 };
 
-export default function AuditExportsIndex({ exports: exportData }: PageProps) {
-    const handleDelete = (exportItem: AuditExport) => {
-        if (confirm(`Are you sure you want to delete "${exportItem.export_name}"?`)) {
-            router.delete(`/finance/audit-exports/${exportItem.id}`);
+export default function AuditExportsIndex({ exports: exportData, canManage = false }: PageProps) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<AuditExport | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        router.delete(`/finance/audit-exports/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
+    };
+
+    // Right-click row menu — mirrors the row's existing inline actions (no row navigation, so no Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (exp: AuditExport): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (exp.status === 'completed') {
+            items.push({
+                kind: 'item',
+                label: 'Download',
+                icon: Download,
+                tone: 'success',
+                onSelect: () => window.location.assign(`/finance/audit-exports/${exp.id}/download`),
+            });
         }
+        if (canManage) {
+            items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(exp) });
+        }
+        return items;
     };
 
     const completedCount = exportData.data.filter((e) => e.status === 'completed').length;
@@ -108,12 +131,12 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                             { label: 'Failed', value: failedCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/audit-exports/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Export
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<TaxTabsFooter active="audit-exports" />}
                     />
@@ -143,17 +166,27 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                             <TableBody>
                                 {exportData.data.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No audit exports found. Create one to get started.
+                                        <TableCell colSpan={7} className="p-0">
+                                            <EmptyList
+                                                icon={History}
+                                                itemName="audit export"
+                                                title="No audit exports yet"
+                                                description="Generate an audit trail report for your auditors to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                            New audit export
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     exportData.data.map((exp) => {
-                                        const statusCfg = statusConfig[exp.status] ?? statusConfig.pending;
-                                        const StatusIcon = statusCfg.icon;
-
                                         return (
-                                            <TableRow key={exp.id}>
+                                            <TableRow key={exp.id} onContextMenu={rowMenu.open(rowMenuItems(exp))}>
                                                 <TableCell className="font-medium">{exp.export_name}</TableCell>
                                                 <TableCell>
                                                     <span className="text-sm">
@@ -170,10 +203,7 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={statusCfg.className}>
-                                                        <StatusIcon className={`w-3 h-3 mr-1 ${exp.status === 'generating' ? 'animate-spin' : ''}`} />
-                                                        {statusCfg.label}
-                                                    </Badge>
+                                                    <StatusBadge status={exp.status} />
                                                 </TableCell>
                                                 <TableCell className="text-sm">{formatFileSize(exp.file_size_bytes)}</TableCell>
                                                 <TableCell>
@@ -192,13 +222,16 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                                                                 </a>
                                                             </Button>
                                                         )}
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDelete(exp)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                                        </Button>
+                                                        {canManage && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                aria-label={`Delete ${exp.export_name}`}
+                                                                onClick={() => setDeleteTarget(exp)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -225,7 +258,32 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
+
+            {canManage && (
+                <AuditExportDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+            )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete audit export?"
+                description={
+                    <>
+                        This permanently deletes{' '}
+                        <span className="font-medium text-foreground">
+                            &ldquo;{deleteTarget?.export_name}&rdquo;
+                        </span>{' '}
+                        and its generated file. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete export"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

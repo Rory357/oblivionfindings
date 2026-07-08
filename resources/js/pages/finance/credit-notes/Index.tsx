@@ -2,13 +2,25 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import {
+    CreditNoteDialog,
+    formatMoney,
+    PayablesTabsFooter,
+    useRowContextMenu,
+    type CreditNoteAccountOption,
+    type CreditNoteClientOption,
+    type CreditNoteVendorOption,
+    type RowCtxItem,
+} from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Plus, FileMinus } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { FileText, Plus, FileMinus, Download, Search, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 interface CreditNote {
@@ -31,25 +43,22 @@ interface PaginatedCreditNotes {
 interface Filters {
     type?: string;
     status?: string;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
 }
 
 interface Props extends PageProps {
     creditNotes: PaginatedCreditNotes;
     filters: Filters;
+    canManage: boolean;
+    vendors: CreditNoteVendorOption[];
+    clients: CreditNoteClientOption[];
+    accounts: CreditNoteAccountOption[];
 }
-
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    applied: { label: 'Applied', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-};
 
 const typeConfig: Record<string, { label: string; className: string }> = {
     payable: { label: 'AP', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
@@ -57,18 +66,25 @@ const typeConfig: Record<string, { label: string; className: string }> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Credit Notes', href: '/finance/credit-notes' },
 ];
 
-export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) {
+export default function CreditNotesIndex({ auth, creditNotes, filters, canManage = false, vendors = [], clients = [], accounts = [] }: Props) {
     const [type, setType] = useState(filters.type ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
+    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const [createOpen, setCreateOpen] = useState(false);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
-        if (type) params.type = type;
-        if (status) params.status = status;
+        if (type && type !== 'all') params.type = type;
+        if (status && status !== 'all') params.status = status;
+        if (search) params.search = search;
+        if (dateFrom) params.date_from = dateFrom;
+        if (dateTo) params.date_to = dateTo;
 
         router.get('/finance/credit-notes', params, { preserveState: true, preserveScroll: true });
     };
@@ -76,11 +92,25 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
     const clearFilters = () => {
         setType('');
         setStatus('');
+        setSearch('');
+        setDateFrom('');
+        setDateTo('');
         router.get('/finance/credit-notes', {}, { preserveState: true });
     };
 
+    const hasFilters = Boolean(
+        search || (type && type !== 'all') || (status && status !== 'all') || dateFrom || dateTo,
+    );
+
     const payableCount = creditNotes.data.filter((cn) => cn.type === 'payable').length;
     const receivableCount = creditNotes.data.filter((cn) => cn.type === 'receivable').length;
+
+    // Right-click row menu — mirrors the row's only inline action: opening the
+    // credit note (row onClick + the CN-number link both go to the show route).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (creditNote: CreditNote): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/credit-notes/${creditNote.id}`) },
+    ];
 
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
@@ -98,12 +128,20 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                             { label: 'AR', value: receivableCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/credit-notes/create">
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Credit Note
-                                </Link>
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/credit-notes/export?${new URLSearchParams(Object.entries({ type: type !== 'all' ? type : '', status: status !== 'all' ? status : '', search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
+                                </Button>
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Credit Note
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="credit-notes" />}
                     />
@@ -112,9 +150,19 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search CN #, party..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    className="pl-9"
+                                />
+                            </div>
                             <Select value={type} onValueChange={setType}>
-                                <SelectTrigger className="w-48">
+                                <SelectTrigger aria-label="Filter by type">
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -124,7 +172,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                 </SelectContent>
                             </Select>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger className="w-48">
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -135,8 +183,22 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                     <SelectItem value="cancelled">Cancelled</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button onClick={applyFilters} variant="secondary">Filter</Button>
-                            <Button onClick={clearFilters} variant="ghost">Clear</Button>
+                            <Input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                placeholder="From"
+                            />
+                            <Input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                placeholder="To"
+                            />
+                            <div className="flex gap-2">
+                                <Button onClick={applyFilters} variant="secondary" className="shrink-0">Filter</Button>
+                                <Button onClick={clearFilters} variant="ghost" className="shrink-0">Clear</Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -144,21 +206,28 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                 {/* Table */}
                 <Card>
                     {creditNotes.data.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4">
-                            <div className="rounded-full bg-muted p-4 mb-4">
-                                <FileText className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground mb-1">No credit notes found</h3>
-                            <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
-                                Credit notes are used to adjust invoices or bills. Create one to get started.
-                            </p>
-                            <Button asChild>
-                                <Link href="/finance/credit-notes/create">
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    New Credit Note
-                                </Link>
-                            </Button>
-                        </div>
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No credit notes match your filters"
+                                className="border-0"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={FileText}
+                                itemName="credit note"
+                                title="No credit notes yet"
+                                description="Credit notes are used to adjust invoices or bills. Create one to get started."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            New credit note
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        )
                     ) : (
                         <>
                             <Table>
@@ -178,6 +247,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                             key={creditNote.id}
                                             className="cursor-pointer hover:bg-muted/50"
                                             onClick={() => router.get(`/finance/credit-notes/${creditNote.id}`)}
+                                            onContextMenu={rowMenu.open(rowMenuItems(creditNote))}
                                         >
                                             <TableCell className="font-medium">
                                                 <Link href={`/finance/credit-notes/${creditNote.id}`} className="text-primary hover:underline">
@@ -191,11 +261,9 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                             </TableCell>
                                             <TableCell>{creditNote.vendor?.name ?? '-'}</TableCell>
                                             <TableCell>{formatDate(creditNote.credit_date)}</TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(creditNote.total_amount)}</TableCell>
+                                            <TableCell className="text-right font-medium">{formatMoney(creditNote.total_amount)}</TableCell>
                                             <TableCell>
-                                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
-                                                    {statusConfig[creditNote.status]?.label ?? creditNote.status}
-                                                </Badge>
+                                                <StatusBadge status={creditNote.status} />
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -220,7 +288,19 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                         </>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
+
+            {canManage && (
+                <CreditNoteDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    vendors={vendors}
+                    clients={clients}
+                    accounts={accounts}
+                />
+            )}
         </AppLayout>
     );
 }

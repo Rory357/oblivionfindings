@@ -66,6 +66,48 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) purchase-order list as a sanitised CSV. Mirrors the
+     * index's status/vendor/search filters so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinPurchaseOrder::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinPurchaseOrder::forOrganization($orgId)
+            ->with('vendor:id,name')
+            ->orderBy('order_date', 'desc');
+
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+        if ($request->filled('vendor_id')) {
+            $query->where('vendor_id', $request->input('vendor_id'));
+        }
+        if ($request->filled('search')) {
+            $query->where('po_number', 'like', '%'.$request->input('search').'%');
+        }
+
+        $rows = $query->get()->map(fn (FinPurchaseOrder $po) => [
+            $po->po_number,
+            optional($po->vendor)->name,
+            optional($po->order_date)->format('Y-m-d'),
+            optional($po->expected_date)->format('Y-m-d'),
+            number_format((float) $po->subtotal, 2, '.', ''),
+            number_format((float) $po->gst_amount, 2, '.', ''),
+            number_format((float) $po->total_amount, 2, '.', ''),
+            $po->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'purchase-orders-'.now()->format('Y-m-d').'.csv',
+            ['PO #', 'Vendor', 'Order Date', 'Expected Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $this->authorize('create', FinPurchaseOrder::class);

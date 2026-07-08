@@ -35,33 +35,57 @@ class PettyCashController extends Controller
                 'is_active' => $fund->is_active,
             ]);
 
+        $canManage = (bool) $request->user()->canDo('finance.petty_cash.manage');
+
         return Inertia::render('finance/petty-cash/Index', [
             'funds' => $funds,
+            'canManage' => $canManage,
+            // Reference data for the New Fund modal (asset GL accounts + custodians).
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)
+                    ->active()
+                    ->whereIn('type', ['asset'])
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name'])
+                : [],
+            'users' => $canManage
+                ? User::query()
+                    ->when(
+                        $orgId && Schema::hasColumn('users', 'organization_id'),
+                        fn ($query) => $query->where('organization_id', $orgId),
+                    )
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                : [],
         ]);
     }
 
-    public function create(Request $request)
+    /**
+     * Stream the petty-cash fund list as a sanitised CSV. The index has no
+     * filters, so this mirrors its ordering and exports every fund.
+     */
+    public function export(Request $request)
     {
         $orgId = $request->user()->organization_id;
 
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name']);
-
-        $users = User::query()
-            ->when(
-                $orgId && Schema::hasColumn('users', 'organization_id'),
-                fn ($query) => $query->where('organization_id', $orgId),
-            )
+        $rows = FinPettyCashFund::forOrganization($orgId)
+            ->with('custodian:id,name', 'glAccount:id,code,name')
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get()
+            ->map(fn (FinPettyCashFund $fund) => [
+                $fund->name,
+                $fund->custodian->name ?? null,
+                number_format((float) $fund->float_amount, 2, '.', ''),
+                number_format((float) $fund->current_balance, 2, '.', ''),
+                $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
+                $fund->is_active ? 'Yes' : 'No',
+            ]);
 
-        return Inertia::render('finance/petty-cash/Create', [
-            'accounts' => $accounts,
-            'users' => $users,
-        ]);
+        return $this->streamSanitizedCsv(
+            'petty-cash-'.now()->format('Y-m-d').'.csv',
+            ['Fund Name', 'Custodian', 'Float Amount', 'Current Balance', 'GL Account', 'Active'],
+            $rows,
+        );
     }
 
     public function store(Request $request)

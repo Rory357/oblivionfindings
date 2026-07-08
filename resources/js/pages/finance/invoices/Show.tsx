@@ -3,12 +3,15 @@ import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface InvoiceLine {
     id: number;
@@ -52,23 +55,11 @@ interface Props extends PageProps {
     invoice: Invoice;
 }
 
-const formatCurrency = (amount: string | number, currency = 'NZD') =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(amount));
-
 const formatDate = (date: string | null) =>
     date ? new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
 const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    sent: { label: 'Sent', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    overdue: { label: 'Overdue', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-    cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
-};
 
 export default function InvoiceShow({ auth, invoice }: Props) {
     const isOverdue = invoice.status !== 'paid' && invoice.status !== 'cancelled' && new Date(invoice.due_date) < new Date();
@@ -77,21 +68,30 @@ export default function InvoiceShow({ auth, invoice }: Props) {
     const canMarkPaid = invoice.status !== 'cancelled' && invoice.status !== 'paid';
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Invoices', href: '/finance/invoices' },
         { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
     ];
 
-    const handleSend = () => {
-        if (confirm('Send this invoice to ' + invoice.client_email + '?')) {
-            router.post(`/finance/invoices/${invoice.id}/send`);
-        }
+    const [sendOpen, setSendOpen] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [markPaidOpen, setMarkPaidOpen] = useState(false);
+    const [markingPaid, setMarkingPaid] = useState(false);
+
+    const confirmSend = () => {
+        router.post(`/finance/invoices/${invoice.id}/send`, {}, {
+            onStart: () => setSending(true),
+            onFinish: () => setSending(false),
+            onSuccess: () => setSendOpen(false),
+        });
     };
 
-    const handleMarkPaid = () => {
-        if (confirm('Mark this invoice as paid?')) {
-            router.post(`/finance/invoices/${invoice.id}/mark-paid`);
-        }
+    const confirmMarkPaid = () => {
+        router.post(`/finance/invoices/${invoice.id}/mark-paid`, {}, {
+            onStart: () => setMarkingPaid(true),
+            onFinish: () => setMarkingPaid(false),
+            onSuccess: () => setMarkPaidOpen(false),
+        });
     };
 
     return (
@@ -106,9 +106,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {invoice.invoice_number}
-                                <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
-                                    {statusConfig[invoice.status]?.label ?? invoice.status}
-                                </Badge>
+                                <StatusBadge status={invoice.status} />
                                 {isOverdue && (
                                     <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
                                         <AlertTriangle className="w-3 h-3 mr-1" />
@@ -135,13 +133,13 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                     </a>
                                 </Button>
                                 {canSend && (
-                                    <Button onClick={handleSend}>
+                                    <Button onClick={() => setSendOpen(true)}>
                                         <Send className="w-4 h-4 mr-2" />
                                         Send Email
                                     </Button>
                                 )}
                                 {canMarkPaid && (
-                                    <Button variant="secondary" onClick={handleMarkPaid}>
+                                    <Button variant="secondary" onClick={() => setMarkPaidOpen(true)}>
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Mark Paid
                                     </Button>
@@ -220,16 +218,16 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(invoice.subtotal, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.subtotal, { currency: invoice.currency_code })}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">GST</span>
-                                <span>{formatCurrency(invoice.tax_amount, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.tax_amount, { currency: invoice.currency_code })}</span>
                             </div>
                             <Separator />
                             <div className="flex justify-between font-bold text-base">
                                 <span>Total</span>
-                                <span>{formatCurrency(invoice.total_amount, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.total_amount, { currency: invoice.currency_code })}</span>
                             </div>
 
                             {invoice.sent_at && (
@@ -279,15 +277,15 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                 <TableRow key={line.id}>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.unit_price, invoice.currency_code)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.unit_price, { currency: invoice.currency_code })}</TableCell>
                                     <TableCell className="text-sm">
                                         {line.tax_rate ? `${line.tax_rate.name} (${line.tax_rate.rate}%)` : '15% GST'}
                                     </TableCell>
                                     <TableCell className="text-sm">
                                         {line.account ? `${line.account.code} - ${line.account.name}` : '-'}
                                     </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.tax_amount, invoice.currency_code)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(line.line_total, invoice.currency_code)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.tax_amount, { currency: invoice.currency_code })}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatMoney(line.line_total, { currency: invoice.currency_code })}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -320,6 +318,25 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={sendOpen}
+                onOpenChange={setSendOpen}
+                title="Send invoice?"
+                description={`This marks ${invoice.invoice_number} as sent and records the send date. The client can then be issued the invoice.`}
+                confirmLabel="Send invoice"
+                processing={sending}
+                onConfirm={confirmSend}
+            />
+            <ConfirmDialog
+                open={markPaidOpen}
+                onOpenChange={setMarkPaidOpen}
+                title="Mark invoice as paid?"
+                description={`This records ${invoice.invoice_number} as fully paid and posts the receipt to the general ledger. This can't be undone.`}
+                confirmLabel="Mark as paid"
+                processing={markingPaid}
+                onConfirm={confirmMarkPaid}
+            />
         </AppLayout>
     );
 }

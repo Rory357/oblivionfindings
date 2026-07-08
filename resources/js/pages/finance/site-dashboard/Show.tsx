@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { formatCurrency } from '@/lib/fleet-utils';
+import { formatMoney } from '@/components/finance/money';
+import { chartColor } from '@/components/finance/chart-palette';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -30,8 +31,6 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-
-const CHART_COLORS = ['#7c3aed', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#84cc16'];
 
 type Insight = { type: string; severity: string; message: string; data: Record<string, any> };
 type VarianceLine = { category: string; label: string; planned: string; actual: string; variance: string; variance_pct: string; status: string };
@@ -64,7 +63,7 @@ const varianceBadge = (status: string) => {
     }
 };
 
-const $ = (v: string | number) => formatCurrency(Number(v));
+const $ = (v: string | number) => formatMoney(Number(v));
 const pct = (v: string | number) => `${Number(v).toFixed(1)}%`;
 
 export default function SiteFinancialDashboard({ site, dashboard, variance, insights, filters }: Props) {
@@ -172,7 +171,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                             paddingAngle={2}
                                         >
                                             {dashboard.breakdown.chart.map((_, idx) => (
-                                                <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                                <Cell key={idx} fill={chartColor(idx)} />
                                             ))}
                                         </Pie>
                                         <Tooltip formatter={(v?: number) => $(v ?? 0)} />
@@ -185,7 +184,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                             <div className="mt-4 grid grid-cols-2 gap-2">
                                 {dashboard.breakdown.chart.map((item, idx) => (
                                     <div key={item.type} className="flex items-center gap-2 text-xs">
-                                        <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
+                                        <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: chartColor(idx) }} />
                                         <span className="text-muted-foreground truncate">{item.label}</span>
                                         <span className="ml-auto font-medium tabular-nums">{$(item.value)}</span>
                                     </div>
@@ -205,15 +204,15 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                     <AreaChart data={trendData}>
                                         <defs>
                                             <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.15} />
-                                                <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={chartColor(0)} stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor={chartColor(0)} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis dataKey="month" className="text-xs" />
                                         <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} className="text-xs" />
                                         <Tooltip formatter={(v?: number) => $(v ?? 0)} />
-                                        <Area type="monotone" dataKey="cost" stroke="#7c3aed" fill="url(#costGradient)" strokeWidth={2} />
+                                        <Area type="monotone" dataKey="cost" stroke={chartColor(0)} fill="url(#costGradient)" strokeWidth={2} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             ) : (

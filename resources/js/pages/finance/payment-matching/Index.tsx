@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, formatMoney } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +23,6 @@ import {
 import { ArrowLeftRight, CheckCircle2, XCircle, Zap, Settings, Lightbulb, ThumbsDown } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { useCallback, useMemo } from 'react';
-
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankTransaction {
     id: number;
@@ -75,9 +73,6 @@ interface Props {
     matches: PaginatedMatches;
     filters: Filters;
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 function confidenceBadge(score: number) {
     if (score >= 80) {
@@ -314,7 +309,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {match.bank_transaction ? formatNZD(match.bank_transaction.amount) : '-'}
+                                                {match.bank_transaction ? formatMoney(match.bank_transaction.amount) : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {match.matchable ? (
@@ -338,7 +333,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {match.matchable ? formatNZD(match.matchable.amount_due) : '-'}
+                                                {match.matchable ? formatMoney(match.matchable.amount_due) : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {confidenceBadge(match.confidence_score)}

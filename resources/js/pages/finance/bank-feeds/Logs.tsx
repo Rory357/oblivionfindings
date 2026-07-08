@@ -3,8 +3,8 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { AlertTriangle } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 
 interface LogEntry {
@@ -44,12 +44,6 @@ const providerLabels: Record<string, string> = {
     anz: 'ANZ',
     westpac: 'Westpac',
     bnz: 'BNZ',
-};
-
-const statusConfig: Record<string, { icon: typeof CheckCircle2; variant: 'default' | 'destructive' | 'secondary'; label: string }> = {
-    success: { icon: CheckCircle2, variant: 'default', label: 'Success' },
-    failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
-    partial: { icon: AlertTriangle, variant: 'secondary', label: 'Partial' },
 };
 
 const formatDuration = (ms: number | null): string => {
@@ -108,19 +102,13 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                                         </thead>
                                         <tbody>
                                             {logs.data.map((log) => {
-                                                const config = statusConfig[log.status] || statusConfig.failed;
-                                                const StatusIcon = config.icon;
-
                                                 return (
                                                     <tr key={log.id} className="border-b last:border-0 hover:bg-muted/25">
                                                         <td className="px-4 py-3 font-mono text-xs">
                                                             {log.synced_at}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <Badge variant={config.variant} className="gap-1">
-                                                                <StatusIcon className="w-3 h-3" />
-                                                                {config.label}
-                                                            </Badge>
+                                                            <StatusBadge status={log.status} size="sm" />
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono tabular-nums">
                                                             {log.transactions_fetched}

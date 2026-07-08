@@ -1695,9 +1695,10 @@ function buildGovernanceSubPanelGroups({
 
 function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const overview: NavItem[] = [];
+    // Overview hub — Summary · Executive · By site · Cash position are tabs at /finance.
     overview.push({
-        title: 'Dashboard',
-        href: '/finance/dashboard',
+        title: 'Overview',
+        href: '/finance',
         icon: LayoutDashboard,
     });
 

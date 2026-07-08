@@ -6,6 +6,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { formatMoney } from '@/components/finance/money';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface BatchData {
@@ -54,9 +55,6 @@ interface Props extends PageProps {
     transactions: Transaction[];
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -88,7 +86,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
     const badge = statusBadge[batch.status] ?? statusBadge.open;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
         { title: `Batch ${batch.batch_number}`, href: `/finance/eftpos/batches/${batch.id}` },
     ];
@@ -117,31 +115,31 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Total Amount</p>
-                            <p className="text-xl font-bold">{formatCurrency(batch.total_amount)}</p>
+                            <p className="text-xl font-bold">{formatMoney(batch.total_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Refunds</p>
-                            <p className="text-xl font-bold text-destructive">{formatCurrency(batch.total_refunds)}</p>
+                            <p className="text-xl font-bold text-destructive">{formatMoney(batch.total_refunds)}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Net Amount</p>
-                            <p className="text-xl font-bold">{formatCurrency(batch.net_amount)}</p>
+                            <p className="text-xl font-bold">{formatMoney(batch.net_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Fees</p>
-                            <p className="text-xl font-bold text-muted-foreground">{formatCurrency(batch.fees)}</p>
+                            <p className="text-xl font-bold text-muted-foreground">{formatMoney(batch.fees)}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Settlement</p>
-                            <p className="text-xl font-bold text-status-success">{formatCurrency(batch.settlement_amount)}</p>
+                            <p className="text-xl font-bold text-status-success">{formatMoney(batch.settlement_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -191,7 +189,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                 <div className="col-span-2">
                                     <dt className="text-muted-foreground">Discrepancy</dt>
                                     <dd className="font-medium text-destructive">
-                                        {formatCurrency(batch.discrepancy_amount)}
+                                        {formatMoney(batch.discrepancy_amount)}
                                         {batch.discrepancy_notes && (
                                             <span className="ml-2 text-muted-foreground">- {batch.discrepancy_notes}</span>
                                         )}
@@ -202,7 +200,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                 <div className="col-span-2">
                                     <dt className="text-muted-foreground">Matched Bank Transaction</dt>
                                     <dd className="font-medium">
-                                        {formatCurrency(batch.bank_transaction.amount)} on {formatDate(batch.bank_transaction.transaction_date)}
+                                        {formatMoney(batch.bank_transaction.amount)} on {formatDate(batch.bank_transaction.transaction_date)}
                                         {batch.bank_transaction.description && (
                                             <span className="ml-2 text-muted-foreground">({batch.bank_transaction.description})</span>
                                         )}
@@ -256,10 +254,10 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                                     className={`text-right font-medium ${txn.transaction_type === 'refund' ? 'text-destructive' : ''}`}
                                                 >
                                                     {txn.transaction_type === 'refund' ? '-' : ''}
-                                                    {formatCurrency(txn.amount)}
+                                                    {formatMoney(txn.amount)}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm text-muted-foreground">
-                                                    {txn.fee_amount > 0 ? formatCurrency(txn.fee_amount) : '-'}
+                                                    {txn.fee_amount > 0 ? formatMoney(txn.fee_amount) : '-'}
                                                 </TableCell>
                                                 <TableCell className="font-mono text-sm">{txn.auth_code ?? '-'}</TableCell>
                                                 <TableCell className="font-mono text-sm">

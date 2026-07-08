@@ -72,7 +72,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Calendar', href: '/finance/calendar' },
 ];
 

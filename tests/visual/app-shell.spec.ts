@@ -9,7 +9,7 @@ const authenticatedPages = [
     { name: 'settings-branding', path: '/settings/branding' },
     { name: 'settings-notifications', path: '/settings/notifications' },
     { name: 'control-room-broadcasts', path: '/control-room/broadcast' },
-    { name: 'finance-dashboard', path: '/finance/dashboard' },
+    { name: 'finance-dashboard', path: '/finance' },
     { name: 'finance-accounts', path: '/finance/accounts' },
     { name: 'governance-policies', path: '/governance/policies' },
     { name: 'health-clinical-events', path: '/health-clinical/events' },

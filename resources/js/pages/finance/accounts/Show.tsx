@@ -14,6 +14,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { Filter } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -55,9 +56,6 @@ type PageProps = {
         end_date: string;
     };
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const typeLabels: Record<string, string> = {
     asset: 'Asset',
@@ -118,7 +116,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                 <div className="text-right">
                                     <p className="text-xs text-muted-foreground">Current Balance</p>
                                     <p className="text-xl font-bold font-mono tabular-nums">
-                                        {formatNZD(account.balance)}
+                                        {formatMoney(account.balance)}
                                     </p>
                                 </div>
                             </div>
@@ -178,7 +176,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                 <TableRow className="bg-muted/30 font-medium">
                                     <TableCell colSpan={5}>Opening Balance</TableCell>
                                     <TableCell className="text-right font-mono tabular-nums">
-                                        {formatNZD(ledger.opening_balance)}
+                                        {formatMoney(ledger.opening_balance)}
                                     </TableCell>
                                 </TableRow>
 
@@ -204,13 +202,13 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                                 {line.description}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {line.debit > 0 ? formatNZD(line.debit) : ''}
+                                                {line.debit > 0 ? formatMoney(line.debit) : ''}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {line.credit > 0 ? formatNZD(line.credit) : ''}
+                                                {line.credit > 0 ? formatMoney(line.credit) : ''}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                {formatNZD(line.running_balance)}
+                                                {formatMoney(line.running_balance)}
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -220,7 +218,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                 <TableRow className="bg-muted/30 font-semibold">
                                     <TableCell colSpan={5}>Closing Balance</TableCell>
                                     <TableCell className="text-right font-mono tabular-nums">
-                                        {formatNZD(ledger.closing_balance)}
+                                        {formatMoney(ledger.closing_balance)}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>

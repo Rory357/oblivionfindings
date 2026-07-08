@@ -93,6 +93,56 @@ class BillController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) bill list as a sanitised CSV. Mirrors the index's
+     * status/vendor/search/date filters so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinBill::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinBill::forOrganization($orgId)
+            ->with('vendor:id,name')
+            ->orderBy('bill_date', 'desc');
+
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+        if ($request->filled('vendor_id')) {
+            $query->where('vendor_id', $request->input('vendor_id'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('bill_number', 'like', "%{$search}%")
+                ->orWhere('vendor_reference', 'like', "%{$search}%"));
+        }
+        if ($request->filled('date_from')) {
+            $query->where('bill_date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('bill_date', '<=', $request->input('date_to'));
+        }
+
+        $rows = $query->get()->map(fn (FinBill $b) => [
+            $b->bill_number,
+            optional($b->vendor)->name,
+            optional($b->bill_date)->format('Y-m-d'),
+            optional($b->due_date)->format('Y-m-d'),
+            number_format((float) $b->subtotal, 2, '.', ''),
+            number_format((float) $b->gst_amount, 2, '.', ''),
+            number_format((float) $b->total_amount, 2, '.', ''),
+            $b->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'bills-'.now()->format('Y-m-d').'.csv',
+            ['Bill #', 'Vendor', 'Bill Date', 'Due Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $this->authorize('create', FinBill::class);

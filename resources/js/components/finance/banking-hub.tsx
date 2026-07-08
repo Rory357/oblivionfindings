@@ -10,7 +10,12 @@ import {
     SlidersHorizontal,
 } from 'lucide-react';
 
-import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
+import {
+    FinanceTabs,
+    tabCountBadge,
+    type FinanceHubCounts,
+    type FinanceTabItem,
+} from './finance-tabs';
 
 /**
  * Canonical Banking & Cash hub tabs. Mirrors the Ledger hub (heterogeneous
@@ -64,6 +69,9 @@ export const BANKING_TABS: BankingTabDef[] = [
 export function BankingTabsFooter({ active }: { active: BankingTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
+    const counts =
+        (page.props as { financeHubCounts?: FinanceHubCounts | null })
+            .financeHubCounts?.['banking'] ?? {};
 
     const visible = BANKING_TABS.filter((t) => t.id === active || t.requires(can));
 
@@ -84,6 +92,7 @@ export function BankingTabsFooter({ active }: { active: BankingTabId }) {
                 label: t.label,
                 icon: t.icon,
                 tone: t.tone,
+                badge: tabCountBadge(counts[t.id]),
             }))}
             ariaLabel="Banking and cash views"
         />

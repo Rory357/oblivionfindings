@@ -12,8 +12,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { formatMoney, PriceBookDialog } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { CalendarDays, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,22 +35,21 @@ type Props = {
         name: string;
         description: string | null;
         is_default: boolean;
+        is_active: boolean;
         effective_from: string | null;
         effective_to: string | null;
         items: PriceBookItem[];
     };
+    canManage: boolean;
 };
-
-function formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 2 }).format(n);
-}
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function PriceBookShow({ price_book }: Props) {
+export default function PriceBookShow({ price_book, canManage = false }: Props) {
+    const [editOpen, setEditOpen] = useState(false);
     const [showItemForm, setShowItemForm] = useState(false);
     const itemForm = useForm({
         service_code: '',
@@ -88,13 +88,13 @@ export default function PriceBookShow({ price_book }: Props) {
                             {formatDate(price_book.effective_from)} — {formatDate(price_book.effective_to)}
                         </span>
                     )}
-                    <div className="ml-auto flex gap-1">
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={`/finance/price-books/${price_book.id}/edit`}>
+                    {canManage && (
+                        <div className="ml-auto flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-                            </Link>
-                        </Button>
-                    </div>
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Items table */}
@@ -108,7 +108,7 @@ export default function PriceBookShow({ price_book }: Props) {
 
                     {/* Add Item Form */}
                     {showItemForm && (
-                        <Card className="mb-4 border-dashed border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/20">
+                        <Card className="mb-4 border-dashed border-primary bg-primary/10 dark:border-primary/30 dark:bg-primary/20">
                             <CardContent className="p-4">
                                 <form onSubmit={handleAddItem} className="space-y-3">
                                     <div className="grid gap-3 sm:grid-cols-3">
@@ -209,7 +209,7 @@ export default function PriceBookShow({ price_book }: Props) {
                                                     <td className="px-4 py-2 text-xs text-muted-foreground">{item.service_code ?? '-'}</td>
                                                     <td className="px-4 py-2 text-xs font-medium">{item.name}</td>
                                                     <td className="px-4 py-2 text-xs capitalize text-muted-foreground">{item.unit}</td>
-                                                    <td className="px-4 py-2 text-right text-xs tabular-nums">{formatCurrency(item.rate)}</td>
+                                                    <td className="px-4 py-2 text-right text-xs tabular-nums">{formatMoney(item.rate)}</td>
                                                     <td className="px-4 py-2 text-xs capitalize text-muted-foreground">{item.rate_type}</td>
                                                     <td className="px-4 py-2 text-xs text-muted-foreground">{item.category ?? '-'}</td>
                                                     <td className="px-4 py-2 text-center">
@@ -227,6 +227,22 @@ export default function PriceBookShow({ price_book }: Props) {
                     </Card>
                 </div>
             </PageShell>
+
+            {/* Mounted only while open so each edit starts from fresh props. */}
+            {canManage && editOpen && (
+                <PriceBookDialog
+                    open
+                    onClose={() => setEditOpen(false)}
+                    priceBook={{
+                        id: price_book.id,
+                        name: price_book.name,
+                        description: price_book.description,
+                        effective_from: price_book.effective_from,
+                        effective_to: price_book.effective_to,
+                        is_active: price_book.is_active,
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

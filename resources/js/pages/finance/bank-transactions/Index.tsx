@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList } from '@/components/ui/empty-state';
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Download, Plus } from 'lucide-react';
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 
@@ -69,14 +70,11 @@ type Props = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Bank Transactions', href: '/finance/bank-transactions' },
 ];
 
 const ALL = '__ALL__';
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (value: string | null) =>
     value
@@ -177,6 +175,16 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
+                                    <a href={`/finance/bank-transactions/export?${new URLSearchParams(Object.entries({ bank_account_id: filters.bank_account_id, status: filters.status, start_date: filters.start_date, end_date: filters.end_date }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
                                 <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
                                     <DialogTrigger asChild>
                                         <Button
@@ -384,7 +392,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                     <Card>
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Total value on this page</p>
-                            <p className="text-2xl font-semibold font-mono tabular-nums">{formatCurrency(summary.total)}</p>
+                            <p className="text-2xl font-semibold font-mono tabular-nums">{formatMoney(summary.total)}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -403,7 +411,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                         applyFilters({ bank_account_id: value === ALL ? '' : value })
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter by bank account">
                                         <SelectValue placeholder="All accounts" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -423,7 +431,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                     value={filters.status || ALL}
                                     onValueChange={(value) => applyFilters({ status: value === ALL ? '' : value })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter by status">
                                         <SelectValue placeholder="All statuses" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -464,9 +472,13 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                     </CardHeader>
                     <CardContent>
                         {transactions.data.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                No bank transactions matched the current filters.
-                            </p>
+                            <EmptyList
+                                icon={Banknote}
+                                itemName="transaction"
+                                title="No transactions yet"
+                                description="Import a bank statement or record a manual transaction to get started."
+                                className="border-0"
+                            />
                         ) : (
                             <div className="overflow-x-auto">
                                 <Table>
@@ -512,7 +524,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                                             ) : (
                                                                 <ArrowUpFromLine className="h-4 w-4" />
                                                             )}
-                                                            {formatCurrency(transaction.amount)}
+                                                            {formatMoney(transaction.amount)}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

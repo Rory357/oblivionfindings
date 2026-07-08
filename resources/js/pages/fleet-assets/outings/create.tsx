@@ -541,7 +541,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                             {stops.map((stop, index) => (
                                                 <div
                                                     key={stop.id}
-                                                    className="rounded-xl border-2 border-primary bg-primary/10/30 p-4 dark:border-primary/30 dark:bg-primary/20"
+                                                    className="rounded-xl border-2 border-primary bg-primary/10 p-4 dark:border-primary/30 dark:bg-primary/20"
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         {/* Stop Number */}

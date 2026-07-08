@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,12 +39,6 @@ type FiscalPeriod = {
 
 type PageProps = {
     periods: FiscalPeriod[];
-};
-
-const statusColors: Record<string, string> = {
-    open: 'bg-status-success-bg text-status-success border-status-success/30',
-    closed: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    locked: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 function CreatePeriodDialog() {
@@ -196,22 +190,35 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
 
 export default function FiscalPeriodsIndex({ periods }: PageProps) {
     const [closingId, setClosingId] = useState<number | null>(null);
+    const [closeTarget, setCloseTarget] = useState<FiscalPeriod | null>(null);
 
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Fiscal Periods', href: '/finance/fiscal-periods' },
     ];
 
-    function handleClose(periodId: number) {
-        setClosingId(periodId);
-        router.post(`/finance/fiscal-periods/${periodId}/close`, {}, {
+    function handleClose() {
+        if (!closeTarget) return;
+        setClosingId(closeTarget.id);
+        router.post(`/finance/fiscal-periods/${closeTarget.id}/close`, {}, {
             onFinish: () => setClosingId(null),
+            onSuccess: () => setCloseTarget(null),
         });
     }
 
     const openCount = periods.filter((p) => p.status === 'open').length;
     const closedCount = periods.filter((p) => p.status === 'closed').length;
     const lockedCount = periods.filter((p) => p.status === 'locked').length;
+
+    // Right-click row menu — mirrors the row's existing inline action (same guard).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (period: FiscalPeriod): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (period.status === 'open') {
+            items.push({ kind: 'item', label: 'Close', icon: Lock, onSelect: () => setCloseTarget(period) });
+        }
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -261,15 +268,18 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    periods.map((period) => (
-                                        <TableRow key={period.id}>
+                                    periods.map((period) => {
+                                        const menuItems = rowMenuItems(period);
+                                        return (
+                                        <TableRow
+                                            key={period.id}
+                                            onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
+                                        >
                                             <TableCell className="font-medium">{period.name}</TableCell>
                                             <TableCell>{period.start_date}</TableCell>
                                             <TableCell>{period.end_date}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={statusColors[period.status]}>
-                                                    {period.status.charAt(0).toUpperCase() + period.status.slice(1)}
-                                                </Badge>
+                                                <StatusBadge status={period.status} />
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {period.closed_by || '-'}
@@ -281,7 +291,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => handleClose(period.id)}
+                                                            onClick={() => setCloseTarget(period)}
                                                             disabled={closingId === period.id}
                                                         >
                                                             <Lock className="mr-1 h-3 w-3" />
@@ -291,13 +301,37 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!closeTarget}
+                onOpenChange={(open) => !open && setCloseTarget(null)}
+                title="Close fiscal period?"
+                description={
+                    <>
+                        This closes{' '}
+                        <span className="font-medium text-foreground">
+                            {closeTarget?.name} ({closeTarget?.start_date} – {closeTarget?.end_date})
+                        </span>
+                        . Once closed, <span className="font-medium text-foreground">no further journals can be posted</span>{' '}
+                        to this period — invoices, bills, payments and manual journals dated inside it will be rejected.
+                        Make sure the period is fully reconciled first.
+                    </>
+                }
+                confirmLabel="Close period"
+                variant="destructive"
+                processing={closingId === closeTarget?.id}
+                onConfirm={handleClose}
+            />
         </AppLayout>
     );
 }

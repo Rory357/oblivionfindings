@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Head, useForm } from '@inertiajs/react';
 import { Banknote, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
 type BankAccount = {
@@ -34,9 +35,6 @@ type PageProps = {
     bankAccounts: BankAccount[];
     bills: Bill[];
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
     const breadcrumbs = [
@@ -228,7 +226,7 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatNZD(bill.amount_due)}
+                                                        {formatMoney(bill.amount_due)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -242,7 +240,7 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                                         <div className="text-right">
                                             <span className="text-sm text-muted-foreground">Selected Total: </span>
                                             <span className="text-lg font-semibold font-mono tabular-nums">
-                                                {formatNZD(selectedTotal)}
+                                                {formatMoney(selectedTotal)}
                                             </span>
                                         </div>
                                     </div>

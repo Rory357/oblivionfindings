@@ -118,6 +118,14 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.meta');
 
+        Route::post('/control-room/alerts/{alert}/snooze', [ControlRoomAlertController::class, 'snooze'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.snooze');
+
+        Route::post('/control-room/alerts/{alert}/unsnooze', [ControlRoomAlertController::class, 'unsnooze'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.unsnooze');
+
         // Alert tasks
         Route::get('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'index'])
             ->whereNumber('alert')

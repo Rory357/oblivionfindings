@@ -135,7 +135,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                 className={`transition-colors ${
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
-                                            ? 'border-primary/30 bg-primary/10/30 dark:bg-primary/10'
+                                            ? 'border-primary/30 bg-primary/5 dark:bg-primary/10'
                                             : 'border-status-warning/30 bg-status-warning-bg'
                                         : 'border-status-critical/30 bg-status-critical-bg'
                                 }`}

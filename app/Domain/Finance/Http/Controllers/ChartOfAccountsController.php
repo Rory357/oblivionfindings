@@ -51,6 +51,35 @@ class ChartOfAccountsController extends Controller
         ]);
     }
 
+    /**
+     * Stream the chart of accounts as a sanitised CSV. The index renders a
+     * nested account tree; the export is a FLAT list of every account ordered
+     * by code so it opens cleanly in a spreadsheet.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinAccount::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $rows = FinAccount::forOrganization($orgId)
+            ->orderBy('code')
+            ->get()
+            ->map(fn (FinAccount $account) => [
+                $account->code,
+                $account->name,
+                $account->type,
+                $account->sub_type,
+                $account->is_active ? 'Yes' : 'No',
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'accounts-'.now()->format('Y-m-d').'.csv',
+            ['Code', 'Name', 'Type', 'Sub-type', 'Active'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $this->authorize('create', FinAccount::class);

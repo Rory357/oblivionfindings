@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -59,6 +60,11 @@ class FinCreditNote extends Model
         return $this->belongsTo(FinBill::class, 'bill_id');
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
     public function journal(): BelongsTo
     {
         return $this->belongsTo(FinJournal::class, 'journal_id');
@@ -81,7 +87,7 @@ class FinCreditNote extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopePayable($query)

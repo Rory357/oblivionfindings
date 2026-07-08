@@ -1,11 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
+import { useState } from 'react';
 
 type TaxRate = {
     id: number;
@@ -116,9 +118,6 @@ type PageProps = {
     irdFormData: IrdFormData;
 };
 
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -130,12 +129,6 @@ const formatDateTime = (dateStr: string) =>
         hour: '2-digit',
         minute: '2-digit',
     });
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-};
 
 const frequencyLabels: Record<string, string> = {
     monthly: 'Monthly',
@@ -181,7 +174,7 @@ function IrdFormBox({
                         : ''
                 }`}
             >
-                {formatNZD(Math.abs(amount))}
+                {formatMoney(Math.abs(amount))}
                 {highlight && amount < 0 ? ' (Refund)' : ''}
             </span>
         </div>
@@ -190,18 +183,21 @@ function IrdFormBox({
 
 export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'GST Returns', href: '/finance/gst-returns' },
         { title: `Period ending ${formatDate(gstReturn.period_end)}`, href: `/finance/gst-returns/${gstReturn.id}` },
     ];
 
-    const status = statusConfig[gstReturn.status] ?? statusConfig.draft;
     const isDraft = gstReturn.status === 'draft';
+    const [fileOpen, setFileOpen] = useState(false);
+    const [filing, setFiling] = useState(false);
 
-    function handleFile() {
-        if (confirm('Are you sure you want to mark this return as filed? This action cannot be undone.')) {
-            router.post(`/finance/gst-returns/${gstReturn.id}/file`);
-        }
+    function confirmFile() {
+        router.post(`/finance/gst-returns/${gstReturn.id}/file`, {}, {
+            onStart: () => setFiling(true),
+            onFinish: () => setFiling(false),
+            onSuccess: () => setFileOpen(false),
+        });
     }
 
     function handlePrint() {
@@ -220,9 +216,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 GST Return
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge status={gstReturn.status} />
                             </span>
                         }
                         description={
@@ -245,7 +239,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                     Print
                                 </Button>
                                 {isDraft && (
-                                    <Button onClick={handleFile}>
+                                    <Button onClick={() => setFileOpen(true)}>
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Mark as Filed
                                     </Button>
@@ -339,10 +333,10 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                                 {Number(item.rate)}%
                                             </td>
                                             <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatNZD(item.net_amount)}
+                                                {formatMoney(item.net_amount)}
                                             </td>
                                             <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatNZD(item.gst_amount)}
+                                                {formatMoney(item.gst_amount)}
                                             </td>
                                             <td className="py-3 text-right">{item.line_count}</td>
                                         </tr>
@@ -402,10 +396,10 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                                     {line.description || '-'}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatNZD(line.net_amount)}
+                                                    {formatMoney(line.net_amount)}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatNZD(line.gst_amount)}
+                                                    {formatMoney(line.gst_amount)}
                                                 </td>
                                                 <td className="py-2 text-xs">
                                                     {line.tax_rate
@@ -421,6 +415,22 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={fileOpen}
+                onOpenChange={setFileOpen}
+                title="Mark GST return as filed?"
+                description={
+                    <>
+                        This marks the GST return for IRD period{' '}
+                        <span className="font-medium text-foreground">{gstReturn.ird_period}</span>{' '}
+                        as filed and locks it. This action can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Mark as filed"
+                processing={filing}
+                onConfirm={confirmFile}
+            />
         </AppLayout>
     );
 }

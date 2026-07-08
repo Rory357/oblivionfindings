@@ -529,7 +529,7 @@ export default function UserShow({
                                 <CardContent className="space-y-3">
                                     {showAddRole &&
                                         availableRoles.length > 0 && (
-                                            <div className="bg-primary/10/50 flex flex-wrap gap-1.5 rounded-lg border border-dashed border-primary p-3">
+                                            <div className="bg-primary/10 flex flex-wrap gap-1.5 rounded-lg border border-dashed border-primary p-3">
                                                 <span className="mb-1 w-full text-xs text-muted-foreground">
                                                     Click to assign:
                                                 </span>

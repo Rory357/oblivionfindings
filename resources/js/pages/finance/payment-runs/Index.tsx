@@ -1,14 +1,15 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
-import { Badge } from '@/components/ui/badge';
+import { PayablesTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, Plus, Send } from 'lucide-react';
+import { Banknote, Plus, Send, Download, Eye } from 'lucide-react';
 
 type PaymentRun = {
     id: number;
@@ -35,19 +36,8 @@ type PageProps = {
     filters: { status: string };
 };
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-    draft: { label: 'Draft', variant: 'secondary' },
-    approved: { label: 'Approved', variant: 'outline' },
-    processing: { label: 'Processing', variant: 'default' },
-    completed: { label: 'Completed', variant: 'default' },
-    failed: { label: 'Failed', variant: 'destructive' },
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Payment Runs', href: '/finance/payment-runs' },
 ];
 
@@ -60,9 +50,23 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
         );
     };
 
+    const clearFilters = () => {
+        router.get('/finance/payment-runs', {}, { preserveState: true, replace: true });
+    };
+
+    const hasFilters = Boolean(filters.status);
+
     const completedCount = paymentRuns.data.filter((r) => r.status === 'completed').length;
     const processingCount = paymentRuns.data.filter((r) => r.status === 'processing').length;
     const draftCount = paymentRuns.data.filter((r) => r.status === 'draft').length;
+
+    // Right-click row menu — mirrors the row's only inline action: opening the
+    // payment run (the row onClick navigates to the show route). Approve/Process
+    // live on the detail page behind confirm dialogs, not as inline row actions.
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (run: PaymentRun): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/payment-runs/${run.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -81,12 +85,20 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                             { label: 'Drafts', value: draftCount },
                         ]}
                         actions={
-                            <Link href="/finance/payment-runs/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Payment Run
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/payment-runs/export?${new URLSearchParams(Object.entries({ status: filters.status }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            </Link>
+                                <Link href="/finance/payment-runs/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Payment Run
+                                    </Button>
+                                </Link>
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="payment-runs" />}
                     />
@@ -103,7 +115,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                 value={filters.status || 'all'}
                                 onValueChange={handleStatusFilter}
                             >
-                                <SelectTrigger className="w-[160px]">
+                                <SelectTrigger className="w-[160px]" aria-label="Filter by status">
                                     <SelectValue placeholder="Filter by status" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -119,21 +131,26 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                     </CardHeader>
                     <CardContent>
                         {paymentRuns.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 px-4">
-                                <div className="rounded-full bg-muted p-4 mb-4">
-                                    <Banknote className="h-8 w-8 text-muted-foreground" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground mb-1">No payment runs found</h3>
-                                <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
-                                    Payment runs allow you to batch payments to vendors. Create one to get started.
-                                </p>
-                                <Link href="/finance/payment-runs/create">
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        New Payment Run
-                                    </Button>
-                                </Link>
-                            </div>
+                            hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No payment runs match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={Banknote}
+                                    itemName="payment run"
+                                    title="No payment runs yet"
+                                    description="Payment runs let you batch payments to vendors. Create one to get started."
+                                    className="border-0"
+                                    action={
+                                        <Link href="/finance/payment-runs/create">
+                                            <Button size="sm">New payment run</Button>
+                                        </Link>
+                                    }
+                                />
+                            )
                         ) : (
                             <>
                                 <Table>
@@ -150,12 +167,12 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                     </TableHeader>
                                     <TableBody>
                                         {paymentRuns.data.map((run) => {
-                                            const config = statusConfig[run.status] || { label: run.status, variant: 'secondary' as const };
                                             return (
                                                 <TableRow
                                                     key={run.id}
                                                     className="cursor-pointer hover:bg-muted/50"
                                                     onClick={() => router.visit(`/finance/payment-runs/${run.id}`)}
+                                                    onContextMenu={rowMenu.open(rowMenuItems(run))}
                                                 >
                                                     <TableCell className="font-mono font-medium">
                                                         {run.run_number}
@@ -168,10 +185,10 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                                     </TableCell>
                                                     <TableCell className="text-center">{run.item_count}</TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatNZD(run.total_amount)}
+                                                        {formatMoney(run.total_amount)}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={config.variant}>{config.label}</Badge>
+                                                        <StatusBadge status={run.status} />
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
                                                         {run.processed_at || '-'}
@@ -204,6 +221,8 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

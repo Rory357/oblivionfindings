@@ -455,7 +455,7 @@ function NoteCard({
                         )}
 
                         {note.assigned_shift && (
-                            <div className="bg-primary/10/60 mt-2 rounded-lg border border-primary p-2 text-xs text-primary">
+                            <div className="bg-primary/10 mt-2 rounded-lg border border-primary p-2 text-xs text-primary">
                                 <p className="font-medium">
                                     Assigned to{' '}
                                     {formatShiftType(

@@ -296,7 +296,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                         {/* Signed Document Upload */}
                         <div className="space-y-1.5">
                             <Label>Signed Document</Label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-primary bg-primary/10/50 p-4 transition-colors hover:bg-primary/10">
+                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-primary bg-primary/5 p-4 transition-colors hover:bg-primary/10">
                                 <Upload className="h-5 w-5 text-primary" />
                                 <div>
                                     <p className="text-sm font-medium text-primary">{consentFile ? consentFile.name : 'Click to upload signed consent form'}</p>

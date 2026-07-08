@@ -57,5 +57,24 @@ export function useFinanceTab(
     return [tab, change] as const;
 }
 
+/**
+ * Shape of the shared `financeHubCounts` Inertia prop: hub id → tab id → row count.
+ * Populated only on finance routes (see HandleInertiaRequests + FinanceHubCountsService);
+ * each `*TabsFooter` reads its own hub's slice to badge its tabs.
+ */
+export type FinanceHubCounts = Record<string, Record<string, number>>;
+
+/**
+ * Format a tab's row count for the strip badge. Returns `undefined` for 0/absent so
+ * the TabStrip omits the badge entirely (an empty list reads clean — its page shows
+ * the EmptyState instead). Large counts are capped at `999+` to keep the chip tidy.
+ */
+export function tabCountBadge(count: number | undefined): string | undefined {
+    if (!count || count <= 0) {
+        return undefined;
+    }
+    return count > 999 ? '999+' : String(count);
+}
+
 export { TabStrip };
 export default FinanceTabs;

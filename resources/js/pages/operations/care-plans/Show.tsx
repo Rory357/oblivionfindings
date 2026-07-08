@@ -718,7 +718,7 @@ export default function CarePlanShow({
 
             {/* Add Goal Form */}
             {showGoalForm && (
-                <Card className="bg-primary/10/50 border-dashed border-primary dark:border-primary/30 dark:bg-primary/20">
+                <Card className="bg-primary/10 border-dashed border-primary dark:border-primary/30 dark:bg-primary/20">
                     <CardContent className="p-4">
                         <form onSubmit={handleAddGoal} className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -1062,7 +1062,7 @@ export default function CarePlanShow({
 
                                     {/* Quick Note Input (inline) */}
                                     {noteGoalId === goal.id && (
-                                        <div className="bg-primary/10/30 mt-2 rounded-lg border border-primary p-3">
+                                        <div className="bg-primary/10 mt-2 rounded-lg border border-primary p-3">
                                             <Textarea
                                                 className="min-h-[60px] bg-background text-sm"
                                                 value={quickNote}
@@ -1297,7 +1297,7 @@ export default function CarePlanShow({
 
             {/* Add Note Form */}
             {showNoteForm && (
-                <Card className="bg-primary/10/50 border-dashed border-primary dark:border-primary/30 dark:bg-primary/20">
+                <Card className="bg-primary/10 border-dashed border-primary dark:border-primary/30 dark:bg-primary/20">
                     <CardContent className="p-4">
                         <form onSubmit={handleAddNote} className="space-y-3">
                             <div className="space-y-1">

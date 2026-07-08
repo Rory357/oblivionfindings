@@ -1281,7 +1281,7 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_edit && showAddMed && (
-                                <div className="bg-primary/10/30 rounded-xl border border-dashed border-primary p-4">
+                                <div className="bg-primary/10 rounded-xl border border-dashed border-primary p-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                             <Plus className="h-4 w-4" />
@@ -2800,7 +2800,7 @@ export default function ClientMedical({
                             {can_stock &&
                                 medications.length > 0 &&
                                 showStockForm && (
-                                    <div className="bg-primary/10/30 rounded-xl border border-dashed border-primary p-4">
+                                    <div className="bg-primary/10 rounded-xl border border-dashed border-primary p-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                                 <Plus className="h-4 w-4" />
