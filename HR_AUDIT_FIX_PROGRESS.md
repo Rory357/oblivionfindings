@@ -4,6 +4,14 @@
 > Severity: 🔴 broken workflow / dead end / data-integrity · 🟠 misleading inconsistency · 🟡 polish.
 > Row status: ⬜ not started · 🔶 partial · ✅ done.
 
+## ✅ LOOP COMPLETE — Executive Summary (2026-07-08)
+
+**HR module audit + cross-module seam verification: DONE.** 25/25 surface rows ✅ · 16/16 seam rows ✅ · findings F-1..F-78 (fixed inline or deferred to their own redesign prompts) · 11 open Decisions D-1..D-11 (policy/build calls for Chane — none are blocking bugs) · final HR pest **723 passed / 0 failed** (4399 assertions), zero regressions. Branch `claude/nifty-fermi-50967a` — all committed, **NOT pushed/deployed**.
+- **Surfaces (Runs 0–25):** every `/hr/*` page audited (4A hero · 4B UI · 4C workflow); ~30 real 🟠/🔴 fixed — dead notification classes wired, native `confirm()/prompt()` → kit AlertDialogs, KPI-that-lies paginated counts → server-side, unreachable statuses reached. ~⅓ of pre-seeded findings proved STALE and were debunked against source.
+- **Seams (S1–S16):** every settled source-of-truth proven with a RUNTIME test — one AttendanceService (S1); Fleet owns assets (S2); driver/compliance/training gate rostering (S3/S6/S7); injuries H&S-owned read-only (S4); H&S incidents vs HR cases (S5); expenses→GL exactly once (S8); leave SoT + payroll lock (S9); announcements (S10); feed & shoutouts one HrKudos dataset (S11); recruitment→onboarding (S12); HR vs governance performance no-fork (S13); approvals inbox (S14); wellbeing stays in HR (S15); procedures federated read-only (S16).
+- **Bugs the seam proofs caught + fixed same-slice:** F-76 (HR-case NOT-NULL `description` → 500), F-77 (recruitment welcome dropped on the auto-accept path — hire provisioned+onboarded but never welcomed), F-78 (approval instances stamped under tenant NULL → invisible to their own inbox). D-7's "governance performance model is inert/unrouted" premise proven STALE — it is a live board-governance module.
+- **Awaiting Chane (D-1..D-11):** approvals-spine wiring (D-1) · role-assignment guard (D-2) · user-write auditability (D-3) · hard-delete vs archive (D-4) · exit-interview immutability (D-5) · payroll CSV formula-injection (D-6) · performance two-model consolidation (D-7) · HR injury surfacing (D-8) · case↔incident cross-link (D-9) · wellbeing→Control Room escalation (D-10) · procedure-ack→HR-compliance (D-11). Then push the branch when ready.
+
 **Run log**
 - **Run 0 (2026-07-07)** — Ledger seeded. Slice 1 (My HR hub) audited + fixed. Gates green (see baselines below). Commit `145c101a`.
 - **Run 1 (2026-07-07)** — 🔴-queue-jump slice: fixed all three pre-existing HR Pest failures (TrainingService `source` crash = real production 500; two stale test contracts). **HR pest suite now green — future runs measure against 0 fails.** Commit `d1cda667`.
