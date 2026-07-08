@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
+use App\Domain\Hr\Notifications\FeedReplyNotification;
 use App\Domain\Hr\Notifications\KudosReceivedNotification;
 use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Models\User;
@@ -227,12 +228,47 @@ class FeedService
      */
     public function addReply(HrKudos $kudos, int $userId, string $body): HrKudosReply
     {
-        return HrKudosReply::create([
+        $reply = HrKudosReply::create([
             'tenant_id' => $kudos->tenant_id,
             'kudos_id' => $kudos->id,
             'user_id' => $userId,
             'body' => $body,
         ]);
+
+        // A kudos thread is between exactly two people — tell the other one.
+        $otherId = $userId === $kudos->from_user_id ? $kudos->to_user_id : $kudos->from_user_id;
+        if ($otherId) {
+            $this->notifyReply((int) $otherId, $userId, 'your kudos', $body);
+        }
+
+        return $reply;
+    }
+
+    /**
+     * Best-effort "someone replied" notification (database/bell only). Skips the
+     * self-reply case and any missing users; never breaks the reply write.
+     */
+    private function notifyReply(int $recipientId, int $replierId, string $context, string $body): void
+    {
+        if ($recipientId === $replierId) {
+            return;
+        }
+
+        $recipient = User::find($recipientId);
+        $replier = User::find($replierId);
+        if (! $recipient || ! $replier) {
+            return;
+        }
+
+        try {
+            $recipient->notify(new FeedReplyNotification($replier->name, $context, $body));
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send feed reply notification', [
+                'recipient_id' => $recipientId,
+                'replier_id' => $replierId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -271,13 +307,24 @@ class FeedService
 
     public function addFeedReply(string $subjectType, int $subjectId, int $tenantId, int $userId, string $body): HrFeedReply
     {
-        return HrFeedReply::create([
+        $reply = HrFeedReply::create([
             'tenant_id' => $tenantId,
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'user_id' => $userId,
             'body' => $body,
         ]);
+
+        // Tell a post's author that someone replied. (Announcements are org-wide;
+        // reply-to-announcement notifications are a separate follow-up.)
+        if ($subjectType === 'post') {
+            $authorId = HrFeedPost::where('tenant_id', $tenantId)->whereKey($subjectId)->value('user_id');
+            if ($authorId) {
+                $this->notifyReply((int) $authorId, $userId, 'your post', $body);
+            }
+        }
+
+        return $reply;
     }
 
     /**
