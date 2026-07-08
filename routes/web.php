@@ -5,6 +5,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
+use App\Http\Controllers\It\ItReportsController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
@@ -167,6 +168,12 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/provisioning/export', [ItProvisioningController::class, 'exportProvisioning'])
         ->middleware('permission:it.view')
         ->name('it.provisioning.export');
+
+    // Reports (§L) — server-computed analytics as JSON; any agent (it.view)
+    // reads, requesters (it.request only) are refused.
+    Route::get('/it/reports/data', [ItReportsController::class, 'data'])
+        ->middleware('permission:it.view')
+        ->name('it.reports.data');
 
     // Knowledge base browse — anyone who can reach /it (it.request or it.view)
     // reads published articles and votes; the controller guards published + tenant.
