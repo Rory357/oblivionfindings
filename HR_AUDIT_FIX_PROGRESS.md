@@ -61,7 +61,7 @@
 | 22 | Approvals inbox | `/hr/approvals` | ✅ | F-69 fixed: hero "Pending" count was current-page length (lied >20) → server `total`. `action` catches LogicException→flash. Spine gap = D-1 (Chane); deep-link + polish noted |
 | 23 | Signatures | `/hr/signatures` | ✅ | F-70 fixed: manual "nudge" stamped reminder_sent_at without sending → lied AND suppressed the auto-sweep (dedup on whereNull); now sends. F-71: "resend" was a silent flip → now re-notifies signer. sign/decline→requester noted |
 | 24 | Analytics/reports/headcount/succession/import-export | various | ✅ | Analytics/Headcount/Succession/Import-export all audited CLEAN (server-side data, guarded deletes, wired exports). Reports F-72 fixed (native confirm→kit AlertDialog). Cluster complete |
-| 25 | Settings + audit log | `/hr/settings/*` | ⬜ | |
+| 25 | Settings + audit log | `/hr/settings/*` | ✅ | F-73 audit-log hero count→server total (was page-length — egregious on the SoT). F-74 custom-fields + F-75 automations native confirm()→kit AlertDialog. AuditController clean. **All 25 surface rows now ✅** |
 
 ## §6 Seams
 
@@ -368,6 +368,17 @@ No new code fix this run — the three remaining sub-surfaces audit **genuinely 
 - **Cluster-wide 🟡 (noted, deferred as redesign-scope):** Analytics + Headcount + Succession all sit on generic `PageHero` rather than specialised heroes — a consistent 4A gap, but building three analytics heroes is a redesign effort, not a smallest-honest-fix; logged for a future hero pass, not built.
 
 **Run 24 (part 2) gates:** N/A — ledger-only completion (no code changed; the deliverable is the source-verified clean audit + row 24 → ✅). The cluster's one code fix (F-72) shipped in part 1 (`e4f86585`), gates green there.
+
+## Run 25 findings (Slice 25 — Settings + audit log `/hr/settings/*`) — LAST SURFACE ROW
+
+Three real 🟠s, all fixed — closes the surface pass. **All 25 surface rows are now ✅; the loop moves to the seams (S1-S9, S11-S16).**
+
+- **F-73 🟠 fixed — the audit-log hero "Entries" count lied (page-length, not total).** `settings/audit-log.tsx` set `{ label: 'Entries', value: logs.data.length }` — `logs.data` is the `paginate(30)` page (≤30). The audit log is the **SoT for every `AuditableChanges` write across HR**, so any active org has far more than 30 entries → the hero permanently under-reported (e.g. "Entries: 30" over thousands). The most egregious KPI-that-lies in the module (F-69 pattern, on the one surface that must never under-count). Fix: `logs.total` (server-side paginator total), typed `total: number` on the `logs` prop.
+- **F-74 🟠 fixed — `custom-fields.tsx` native `confirm()` delete.** Deleting a custom-field definition (which also cascades all stored values across every employee) ran behind a native `confirm(...)`. Replaced with the kit `AlertDialog` (a `deletingId` state; the trash button opens a "Delete this custom field?" dialog spelling out the cascade; only its action deletes).
+- **F-75 🟠 fixed — `automations.tsx` native `window.confirm()` delete.** Deleting an automation rule ran behind `window.confirm(...)`. Replaced with the kit `AlertDialog` (a `deletingRuleId` state; "Delete this automation rule?" dialog noting run-history is kept).
+- **Verified green:** `AuditController::index` is clean — `hr.settings.manage`-gated, server-side tenant-scoped query with working filters (user/action/model-type/date-from/date-to) + pagination, filter-dropdown data server-computed; `show` is JSON tenant-scoped; the log exposes only the actor's name/email (no over-exposure beyond the record's own old/new values, which are the point of an audit trail). Webhooks (retry-delivery) + automations (toggle) + custom-fields CRUD all wired and `hr.settings.manage`-gated.
+
+**Run 25 gates:** types ✅ 0 errors · eslint ✅ 0 errors (3 files) · build ✅ exit 0 (3m1s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly**, zero new failures. **pest N/A — zero PHP files changed** (frontend-only slice).
 
 ## Decisions needed (Chane)
 

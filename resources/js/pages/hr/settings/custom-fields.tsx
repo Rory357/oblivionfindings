@@ -1,4 +1,14 @@
 import PageShell from '@/components/page-shell';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,6 +84,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
     const [open, setOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [optionInput, setOptionInput] = useState('');
+    const [deletingId, setDeletingId] = useState<number | null>(null);
 
     const form = useForm({
         name: '',
@@ -140,14 +151,13 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         );
     };
 
-    const deleteDefinition = (id: number) => {
-        if (
-            confirm(
-                'Are you sure? This will also delete all custom field values for employees.',
-            )
-        ) {
-            router.delete(`/hr/settings/custom-fields/${id}`);
+    const confirmDeleteDefinition = () => {
+        if (deletingId !== null) {
+            router.delete(`/hr/settings/custom-fields/${deletingId}`, {
+                preserveScroll: true,
+            });
         }
+        setDeletingId(null);
     };
 
     return (
@@ -420,9 +430,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() =>
-                                                            deleteDefinition(
-                                                                def.id,
-                                                            )
+                                                            setDeletingId(def.id)
                                                         }
                                                         title="Delete"
                                                     >
@@ -437,6 +445,30 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                <AlertDialog
+                    open={deletingId !== null}
+                    onOpenChange={(o) => !o && setDeletingId(null)}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Delete this custom field?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This also deletes all stored values for this
+                                field across every employee. This can’t be
+                                undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDeleteDefinition}>
+                                Delete field
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );

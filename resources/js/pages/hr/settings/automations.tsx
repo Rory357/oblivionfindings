@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +105,7 @@ export default function HrAutomationsPage({
 }: Props) {
     const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
     const [advancedMode, setAdvancedMode] = useState(false);
+    const [deletingRuleId, setDeletingRuleId] = useState<number | null>(null);
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '',
         event_type: eventOptions[0]?.value ?? '',
@@ -270,11 +281,13 @@ export default function HrAutomationsPage({
         );
     };
 
-    const deleteRule = (id: number) => {
-        if (!window.confirm('Delete this automation rule? Its run history is kept.')) return;
-        router.delete(`/hr/settings/automations/${id}`, {
-            preserveScroll: true,
-        });
+    const confirmDeleteRule = () => {
+        if (deletingRuleId !== null) {
+            router.delete(`/hr/settings/automations/${deletingRuleId}`, {
+                preserveScroll: true,
+            });
+        }
+        setDeletingRuleId(null);
     };
 
     const updateRecipients = (value: string) => {
@@ -989,7 +1002,9 @@ export default function HrAutomationsPage({
                                                         variant="outline"
                                                         className="text-status-critical hover:text-status-critical"
                                                         onClick={() =>
-                                                            deleteRule(rule.id)
+                                                            setDeletingRuleId(
+                                                                rule.id,
+                                                            )
                                                         }
                                                     >
                                                         Delete
@@ -1087,6 +1102,29 @@ export default function HrAutomationsPage({
                         </table>
                     </CardContent>
                 </Card>
+
+                <AlertDialog
+                    open={deletingRuleId !== null}
+                    onOpenChange={(o) => !o && setDeletingRuleId(null)}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Delete this automation rule?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                The rule stops running. Its run history is kept.
+                                This can’t be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDeleteRule}>
+                                Delete rule
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageLayout>
         </AppLayout>
     );

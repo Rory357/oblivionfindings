@@ -56,7 +56,7 @@ interface Filters {
 }
 
 interface Props {
-    logs: { data: AuditEntry[]; links: any[] };
+    logs: { data: AuditEntry[]; total: number; links: any[] };
     actions: string[];
     modelTypes: string[];
     users: { id: number; name: string }[];
@@ -183,7 +183,7 @@ export default function AuditLogIndex({
                     title="Audit Log"
                     description="View all HR module activity and changes."
                     stats={[
-                        { label: 'Entries', value: logs.data.length },
+                        { label: 'Entries', value: logs.total },
                         { label: 'Actions', value: actions.length },
                         { label: 'Model types', value: modelTypes.length },
                     ]}
