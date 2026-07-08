@@ -36,17 +36,6 @@ type FundTransaction = {
     reference?: string | null;
 };
 
-type LedgerEntry = {
-    id: number;
-    type?: string | null;
-    category?: string | null;
-    direction?: string | null;
-    amount: number;
-    description?: string | null;
-    entry_date?: string | null;
-    approved_at?: string | null;
-};
-
 type PurchaseRequest = {
     id: number;
     description?: string | null;
@@ -69,7 +58,6 @@ type FinanceTabProps = {
     finance?: {
         funds?: FundSummary[];
         recent_transactions?: FundTransaction[];
-        ledger_entries?: LedgerEntry[];
         purchase_requests?: PurchaseRequest[];
         discrepancies?: Discrepancy[];
     };
@@ -102,7 +90,6 @@ export function FinanceTab({
 }: FinanceTabProps) {
     const funds = finance?.funds ?? [];
     const transactions = finance?.recent_transactions ?? [];
-    const ledger = finance?.ledger_entries ?? [];
     const purchaseRequests = finance?.purchase_requests ?? [];
     const discrepancies = finance?.discrepancies ?? [];
 
@@ -309,57 +296,6 @@ export function FinanceTab({
                     ) : (
                         <p className="text-sm italic text-muted-foreground">
                             No transactions yet.
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <DollarSign className="h-4 w-4 text-primary" />
-                        Client ledger
-                        <Badge variant="outline" className="ml-auto">
-                            {ledger.length}
-                        </Badge>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {ledger.length > 0 ? (
-                        <ul className="divide-y">
-                            {ledger.map((entry) => (
-                                <li
-                                    key={entry.id}
-                                    className="flex items-start gap-3 py-3"
-                                >
-                                    <Badge
-                                        variant="outline"
-                                        className="capitalize"
-                                    >
-                                        {entry.direction ?? entry.type ?? '—'}
-                                    </Badge>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium">
-                                            {entry.description
-                                                ?? entry.category
-                                                ?? 'Ledger entry'}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {dateLabel(entry.entry_date)}
-                                            {entry.approved_at
-                                                ? ' · approved'
-                                                : ' · pending approval'}
-                                        </p>
-                                    </div>
-                                    <p className="shrink-0 text-sm font-semibold">
-                                        {money(Math.abs(entry.amount))}
-                                    </p>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-sm italic text-muted-foreground">
-                            No ledger entries yet.
                         </p>
                     )}
                 </CardContent>

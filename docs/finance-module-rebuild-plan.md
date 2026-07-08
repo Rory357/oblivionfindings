@@ -736,9 +736,12 @@ vendor, receipt) — the mould for C2.
   show REAL trust-fund activity + a correct personal running balance (segregation preserved — operational FinCostAllocation
   costs shown, never move the personal balance). ClientMoneySegregationTest updated to seed ClientFundTransaction; finance
   suite 232. ClientLedgerEntry model+observer+table left intact (reserved).
-  **(C4-B-2 remaining):** remove the vestigial empty `ledger_entries` (ClientLedgerEntry) read from the client PROFILE
-  (ClientController.php:806-821) + its frontend section — the profile already shows ClientFund funds/transactions directly.
-  ⚠️ C4-B touches the CLIENTS module (agreed seam — Chane approved).
+  **(C4-B-2 DONE — merged this session):** removed the vestigial empty `ledger_entries` (ClientLedgerEntry) read from the
+  client PROFILE (ClientController.php + the operations/clients/tabs/finance.tsx "Client ledger" Card) — the profile already
+  shows ClientFund funds + recent_transactions. Pure removal (−81 lines); types/eslint/build clean; browser-verified the
+  finance tab renders Funds/Recent-fund-transactions/Purchase-requests/Discrepancies with the empty Client-ledger section
+  gone + no console errors. ClientLedgerEntry model/observer/table left intact (reserved). **✅ C4-B COMPLETE — client money
+  is fully repointed at the canonical ClientFund store.** ⚠️ C4-B touched the CLIENTS module (agreed seam — Chane approved).
   Then: Client-Money Transaction modal (deposit/withdrawal via the working ClientFund trust path, receipt upload, audited)
   + funder remittance reconciliation. Client money never nets against operational accounts (segregation preserved:
   trust liability 2500, not operational revenue).
