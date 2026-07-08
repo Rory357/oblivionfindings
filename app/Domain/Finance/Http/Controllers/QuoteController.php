@@ -22,18 +22,127 @@ class QuoteController extends Controller
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired,converted'],
         ]);
 
-        $quotes = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['client:id,first_name,last_name'])
+        $baseQuery = fn () => Quote::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+
+        $quotes = $baseQuery()
+            ->with(['client:id,first_name,last_name', 'creator:id,name', 'lineItems'])
+            ->withCount('lineItems')
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->orderByDesc('created_at')
             ->paginate(20)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Quote $quote) => [
+                'id' => $quote->id,
+                'reference' => $quote->quote_number,
+                'status' => $quote->status,
+                'total_amount' => (float) $quote->total_amount,
+                'valid_until' => $quote->valid_until?->toDateString(),
+                'created_at' => $quote->created_at?->toDateString(),
+                'items_count' => $quote->line_items_count,
+                'client' => $quote->client ? [
+                    'id' => $quote->client->id,
+                    'first_name' => $quote->client->first_name,
+                    'last_name' => $quote->client->last_name,
+                ] : null,
+                'creator' => $quote->creator ? ['id' => $quote->creator->id, 'name' => $quote->creator->name] : null,
+                // Raw header + lines so a DRAFT row can prefill the edit modal.
+                'client_id' => $quote->client_id,
+                'title' => $quote->title,
+                'notes' => $quote->notes,
+                'lines' => $quote->lineItems->map(fn ($li) => [
+                    'description' => $li->description,
+                    'quantity' => $li->quantity,
+                    'unit_price' => $li->unit_price,
+                ])->values(),
+            ]);
+
+        $canManage = (bool) $auth->canDo('finance.ar.manage');
+
+        $stats = [
+            'total' => $baseQuery()->count(),
+            'pending' => $baseQuery()->whereIn('status', ['draft', 'sent'])->count(),
+            'accepted' => $baseQuery()->where('status', 'accepted')->count(),
+            'converted' => $baseQuery()->where('status', 'converted')->count(),
+        ];
 
         return inertia('finance/quotes/Index', [
             'quotes' => $quotes,
             'filters' => $request->only(['status']),
+            'stats' => $stats,
+            'canManage' => $canManage,
+            // Reference data for the create/edit modal.
+            'clients' => $canManage ? $this->clientOptions($auth->organization_id) : [],
+            'priceBooks' => $canManage ? $this->priceBookOptions($auth->organization_id) : [],
         ]);
+    }
+
+    /**
+     * Stream the (filtered) quote list as a sanitised CSV. Honours the same
+     * status filter as the index so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
+
+        $data = $request->validate([
+            'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired,converted'],
+        ]);
+
+        $rows = Quote::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->with('client:id,first_name,last_name')
+            ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (Quote $quote) => [
+                $quote->quote_number,
+                $quote->client ? trim($quote->client->first_name.' '.$quote->client->last_name) : ($quote->client_name ?? ''),
+                optional($quote->created_at)->format('Y-m-d'),
+                optional($quote->valid_until)->format('Y-m-d'),
+                number_format((float) $quote->subtotal, 2, '.', ''),
+                number_format((float) $quote->tax_amount, 2, '.', ''),
+                number_format((float) $quote->total_amount, 2, '.', ''),
+                $quote->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'quotes-'.now()->format('Y-m-d').'.csv',
+            ['Quote #', 'Client', 'Date', 'Valid Until', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
+    /** Client options for the quote modal. */
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+    }
+
+    /** Active price books with their rate items for the quote modal's quick-add. */
+    private function priceBookOptions(?int $orgId)
+    {
+        return PriceBook::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('is_active', true)
+            ->with(['items' => fn ($q) => $q->orderBy('name')])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (PriceBook $pb) => [
+                'id' => $pb->id,
+                'name' => $pb->name,
+                'items' => $pb->items->map(fn ($it) => [
+                    'id' => $it->id,
+                    'service_code' => $it->service_code ?? null,
+                    'name' => $it->name,
+                    'unit' => $it->unit,
+                    'rate' => (float) $it->rate,
+                ])->values(),
+            ]);
     }
 
     public function show(Request $request, $quote)
@@ -48,29 +157,6 @@ class QuoteController extends Controller
 
         return inertia('finance/quotes/Show', [
             'quote' => $quote,
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
-
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
-
-        $priceBooks = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->where('is_active', true)
-            ->with(['items' => fn ($q) => $q->orderBy('name')])
-            ->orderBy('name')
-            ->get();
-
-        return inertia('finance/quotes/Create', [
-            'clients' => $clients,
-            'priceBooks' => $priceBooks,
         ]);
     }
 
@@ -132,35 +218,6 @@ class QuoteController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Quote created.');
-    }
-
-    public function edit(Request $request, $quote)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
-
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['lineItems'])
-            ->findOrFail($quote);
-
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
-
-        $priceBooks = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->where('is_active', true)
-            ->with(['items' => fn ($q) => $q->orderBy('name')])
-            ->orderBy('name')
-            ->get();
-
-        return inertia('finance/quotes/Edit', [
-            'quote' => $quote,
-            'clients' => $clients,
-            'priceBooks' => $priceBooks,
-        ]);
     }
 
     public function update(Request $request, $quote)

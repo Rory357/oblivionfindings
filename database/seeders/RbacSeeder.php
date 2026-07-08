@@ -416,6 +416,7 @@ class RbacSeeder extends Seeder
             // IT & Provisioning (/it — onboarding-driven requests + helpdesk tickets)
             ['key' => 'it.view', 'description' => 'View the IT & Provisioning queues', 'group' => 'it', 'module' => 'Operations'],
             ['key' => 'it.manage', 'description' => 'Work IT provisioning requests and helpdesk tickets', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.request', 'description' => 'Raise and track your own IT tickets', 'group' => 'it', 'module' => 'Operations'],
 
             // Settings
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology', 'group' => 'settings', 'module' => 'System'],
@@ -893,6 +894,17 @@ class RbacSeeder extends Seeder
             foreach ($hazard->roles()->pluck('roles.id')->all() as $roleId) {
                 Role::find($roleId)?->permissions()->syncWithoutDetaching($grantIds);
             }
+        }
+
+        // Self-service IT ticketing: every STAFF role can raise and track its
+        // own helpdesk tickets. Dynamic over the roles table so niche roles
+        // (it_manager, board_*, exec) are covered; the external portal
+        // personas are excluded — they are not staff and never see the
+        // internal helpdesk. Mirrors 2026_07_07_100001. Runs after the role
+        // syncs above; syncWithoutDetaching augments rather than replaces.
+        $itRequestId = Permission::where('key', 'it.request')->pluck('id')->all();
+        foreach (Role::whereNotIn('name', ['client', 'next_of_kin'])->get() as $staffRole) {
+            $staffRole->permissions()->syncWithoutDetaching($itRequestId);
         }
 
         /*

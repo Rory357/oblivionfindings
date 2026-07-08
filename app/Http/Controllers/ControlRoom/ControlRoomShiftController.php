@@ -179,8 +179,10 @@ class ControlRoomShiftController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
+        // Narrative is optional — the wizard presents it that way and the confirm
+        // step renders "No handover notes provided" for an empty one.
         $validated = $request->validate([
-            'handover_notes' => ['required', 'string', 'max:5000'],
+            'handover_notes' => ['nullable', 'string', 'max:5000'],
             'priority_items' => ['nullable', 'array'],
             'priority_items.*' => ['string', 'max:500'],
             'incoming_shift_name' => ['nullable', 'string', 'max:255'],
@@ -195,23 +197,27 @@ class ControlRoomShiftController extends Controller
         ]);
 
         $incomingLead = User::findOrFail($validated['incoming_lead_user_id']);
+        $handoverNotes = trim((string) ($validated['handover_notes'] ?? ''));
 
         // Complete the current shift via handover
         $shift->handover(
             $incomingLead,
-            $validated['handover_notes'],
+            $handoverNotes,
             $validated['priority_items'] ?? [],
         );
 
-        // Create a handover operator note on the outgoing shift
-        OperatorNote::create([
-            'shift_id' => $shift->id,
-            'user_id' => $user->id,
-            'type' => 'handover',
-            'content' => $validated['handover_notes'],
-            'is_pinned' => false,
-            'requires_followup' => false,
-        ]);
+        // Create a handover operator note on the outgoing shift (only when
+        // there is a narrative to record).
+        if ($handoverNotes !== '') {
+            OperatorNote::create([
+                'shift_id' => $shift->id,
+                'user_id' => $user->id,
+                'type' => 'handover',
+                'content' => $handoverNotes,
+                'is_pinned' => false,
+                'requires_followup' => false,
+            ]);
+        }
 
         // Start the new shift for the incoming team. Keep the name the operator
         // typed on the handover wizard; fall back to a timestamped default.

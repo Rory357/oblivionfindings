@@ -60,6 +60,7 @@ class AlertWorkspaceService
             'escalatedBy:id,name',
             'assignedBy:id,name',
             'createdBy:id,name',
+            'snoozedBy:id,name',
             'playbookRun.playbook',
             'playbookRun.steps.step',
             'evidencePacks.evidenceItems',
@@ -159,6 +160,12 @@ class AlertWorkspaceService
                 'due_at' => optional($alert->due_at)->toISOString(),
                 'category' => $alert->category,
                 'resolution_code' => $alert->resolution_code,
+                'is_snoozed' => $alert->isSnoozed(),
+                'snoozed_until' => optional($alert->snoozed_until)->toISOString(),
+                'snoozed_by' => $alert->snoozedBy ? [
+                    'id' => $alert->snoozedBy->id,
+                    'name' => $alert->snoozedBy->name,
+                ] : null,
                 'created_at' => optional($alert->created_at)->toISOString(),
                 'updated_at' => optional($alert->updated_at)->toISOString(),
             ],
@@ -206,7 +213,10 @@ class AlertWorkspaceService
                     'id' => $i->id,
                     'type' => $i->type,
                     'title' => $i->title,
-                    'file_path' => $i->file_path,
+                    // Note items keep their text here — without it the row reads
+                    // just "Note" and the content is unreadable after adding.
+                    'description' => $i->description,
+                    'download_url' => $i->storage_path ? "/control-room/evidence/items/{$i->id}/download" : null,
                     'created_at' => optional($i->created_at)->toISOString(),
                 ])->values(),
             ])->values(),

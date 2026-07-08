@@ -116,6 +116,50 @@ class InvoiceController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) invoice list as a sanitised CSV. Honours the same
+     * status/search/date filters as the index so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $orgId = $request->user()->organization_id;
+
+        $query = FinInvoice::forOrganization($orgId)->orderBy('invoice_date', 'desc');
+
+        if ($request->filled('status')) {
+            $query->ofStatus($request->input('status'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('invoice_number', 'like', "%{$search}%")
+                ->orWhere('client_name', 'like', "%{$search}%")
+                ->orWhere('client_email', 'like', "%{$search}%"));
+        }
+        if ($request->filled('date_from')) {
+            $query->where('invoice_date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('invoice_date', '<=', $request->input('date_to'));
+        }
+
+        $rows = $query->get()->map(fn (FinInvoice $i) => [
+            $i->invoice_number,
+            $i->client_name ?? $i->funding_body,
+            optional($i->invoice_date)->format('Y-m-d'),
+            optional($i->due_date)->format('Y-m-d'),
+            number_format((float) $i->subtotal, 2, '.', ''),
+            number_format((float) $i->tax_amount, 2, '.', ''),
+            number_format((float) $i->total_amount, 2, '.', ''),
+            $i->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'invoices-'.now()->format('Y-m-d').'.csv',
+            ['Invoice #', 'Client / Funder', 'Invoice Date', 'Due Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $orgId = $request->user()->organization_id;

@@ -118,6 +118,14 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.meta');
 
+        Route::post('/control-room/alerts/{alert}/snooze', [ControlRoomAlertController::class, 'snooze'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.snooze');
+
+        Route::post('/control-room/alerts/{alert}/unsnooze', [ControlRoomAlertController::class, 'unsnooze'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.unsnooze');
+
         // Alert tasks
         Route::get('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'index'])
             ->whereNumber('alert')
@@ -280,6 +288,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.evidence.store-item');
         Route::delete('/control-room/evidence/items/{item}', [ControlRoomEvidenceController::class, 'destroyItem'])
             ->name('control-room.evidence.destroy-item');
+        Route::get('/control-room/evidence/items/{item}/download', [ControlRoomEvidenceController::class, 'downloadItem'])
+            ->name('control-room.evidence.download-item');
         Route::post('/control-room/evidence/{pack}/complete', [ControlRoomEvidenceController::class, 'completePack'])
             ->name('control-room.evidence.complete-pack');
         Route::get('/control-room/evidence/{pack}/export', [ControlRoomEvidenceController::class, 'export'])

@@ -918,8 +918,12 @@ class IncidentController extends Controller
         ]);
 
         // Guardrail: high-severity incidents require a completed investigation before closure.
-        if (in_array($incident->severity, ['high', 'critical'], true) && $incident->investigation_status !== 'completed') {
-            return back()->with('error', 'High-severity incidents require a completed investigation before closure.');
+        // The investigation normally lives on the incident's governance HsEvent, so accept a
+        // completed investigation there too (covers records written before the status sync).
+        if (in_array($incident->severity, ['high', 'critical'], true)
+            && $incident->investigation_status !== 'completed'
+            && ! $this->hasCompletedHsInvestigation($incident)) {
+            return back()->with('error', 'High-severity incidents require a completed investigation before closure. Open the Investigation section to start one.');
         }
 
         // Guardrail: incidents cannot be closed while there are any open follow-ups.
@@ -1048,6 +1052,20 @@ class IncidentController extends Controller
         );
 
         return back()->with('success', 'Incident reopened.');
+    }
+
+    /**
+     * Whether the incident's governance HsEvent carries a completed investigation.
+     * Used by the high-severity close guardrail alongside the mirrored
+     * `investigation_status` column.
+     */
+    private function hasCompletedHsInvestigation(ClientIncident $incident): bool
+    {
+        return HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->whereHas('investigations', fn ($q) => $q->where('status', \App\Models\HsInvestigation::STATUS_COMPLETED))
+            ->exists();
     }
 
     /**

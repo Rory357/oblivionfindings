@@ -81,6 +81,59 @@ class JournalController extends Controller
     }
 
     /**
+     * Stream the (filtered) journal list as a sanitised CSV. Honours the same
+     * status/type/date/search filters as the index. Debit/Credit totals are
+     * summed from each journal's lines (withSum), not the header total_amount.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinJournal::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinJournal::forOrganization($orgId)
+            ->withSum('lines as debit_total', 'debit')
+            ->withSum('lines as credit_total', 'credit');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('type')) {
+            $query->ofType($request->input('type'));
+        }
+        if ($request->filled('date_from')) {
+            $query->where('journal_date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('journal_date', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('journal_number', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%"));
+        }
+
+        $rows = $query->orderByDesc('journal_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (FinJournal $j) => [
+                $j->journal_number,
+                optional($j->journal_date)->format('Y-m-d'),
+                $j->type,
+                $j->description,
+                number_format((float) $j->debit_total, 2, '.', ''),
+                number_format((float) $j->credit_total, 2, '.', ''),
+                $j->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'journals-'.now()->format('Y-m-d').'.csv',
+            ['Journal #', 'Date', 'Type', 'Description', 'Debit Total', 'Credit Total', 'Status'],
+            $rows,
+        );
+    }
+
+    /**
      * Show the create journal form.
      */
     public function create(Request $request)

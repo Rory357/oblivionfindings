@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { LedgerTabsFooter, NewJournalDialog } from '@/components/finance';
+import { LedgerTabsFooter, NewJournalDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, BookOpen } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { Plus, Search, BookOpen, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -65,9 +66,6 @@ interface Props extends PageProps {
     costCentres?: RefItem[];
     fundingStreams?: RefItem[];
 }
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
@@ -122,14 +120,22 @@ export default function JournalsIndex({
         router.get('/finance/journals', {}, { preserveState: true });
     };
 
+    const hasFilters = Boolean(search || status || type || dateFrom || dateTo);
+
     const postedCount = journals.data.filter((j) => j.status === 'posted').length;
     const draftCount = journals.data.filter((j) => j.status === 'draft').length;
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (journal: Journal): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/journals/${journal.id}`) },
+    ];
 
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
             ]}
         >
@@ -148,12 +154,20 @@ export default function JournalsIndex({
                             { label: 'Drafts (this page)', value: draftCount },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Journal
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/journals/export?${new URLSearchParams(Object.entries({ status, type, date_from: dateFrom, date_to: dateTo, search }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Journal
+                                    </Button>
+                                )}
+                            </div>
                         }
                     />
                 }
@@ -174,7 +188,7 @@ export default function JournalsIndex({
                             </div>
 
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -185,7 +199,7 @@ export default function JournalsIndex({
                             </Select>
 
                             <Select value={type} onValueChange={setType}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by type">
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -238,8 +252,29 @@ export default function JournalsIndex({
                             <TableBody>
                                 {journals.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                            No journals found.
+                                        <TableCell colSpan={6} className="p-0">
+                                            {hasFilters ? (
+                                                <EmptySearch
+                                                    onClear={clearFilters}
+                                                    title="No journals match your search"
+                                                    className="border-0"
+                                                />
+                                            ) : (
+                                                <EmptyList
+                                                    icon={BookOpen}
+                                                    itemName="journal"
+                                                    title="No journals yet"
+                                                    description="Create your first general ledger journal entry to get started."
+                                                    className="border-0"
+                                                    action={
+                                                        canManage ? (
+                                                            <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                                New journal
+                                                            </Button>
+                                                        ) : undefined
+                                                    }
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -248,6 +283,7 @@ export default function JournalsIndex({
                                         key={journal.id}
                                         className="cursor-pointer hover:bg-muted"
                                         onClick={() => router.visit(`/finance/journals/${journal.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(journal))}
                                     >
                                         <TableCell className="font-medium">{journal.journal_number}</TableCell>
                                         <TableCell>{new Date(journal.journal_date).toLocaleDateString('en-NZ')}</TableCell>
@@ -257,7 +293,7 @@ export default function JournalsIndex({
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate">{journal.description ?? '-'}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatNZD(journal.total_amount)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatMoney(journal.total_amount)}</TableCell>
                                         <TableCell>
                                             <Badge className={statusBadge(journal.status)}>
                                                 {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
@@ -302,6 +338,8 @@ export default function JournalsIndex({
                         fundingStreams={fundingStreams}
                     />
                 )}
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

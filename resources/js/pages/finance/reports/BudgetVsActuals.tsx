@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/table';
 import { RefreshCw, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
 import { useState, useMemo } from 'react';
 
 type LineItem = {
@@ -81,9 +83,6 @@ type PageProps = {
     };
     flash?: { success?: string };
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatPct = (pct: number) => `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
@@ -240,8 +239,8 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                                 : 'Compare budgeted amounts against actual GL transactions.'
                         }
                         stats={hasBudget ? [
-                            { label: 'Budget', value: formatNZD(totals.budget_amount) },
-                            { label: 'Actual', value: formatNZD(totals.actual_amount) },
+                            { label: 'Budget', value: formatMoney(totals.budget_amount) },
+                            { label: 'Actual', value: formatMoney(totals.actual_amount) },
                             { label: 'Variance', value: formatPct(totals.variance_pct) },
                             { label: 'Utilisation', value: `${totals.utilization_pct.toFixed(1)}%` },
                         ] : undefined}
@@ -297,27 +296,27 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <SummaryCard
                             title="Total Budget"
-                            value={formatNZD(totals.budget_amount)}
+                            value={formatMoney(totals.budget_amount)}
                             subtitle={`FY${report.budget!.fiscal_year}`}
                             icon={DollarSign}
                         />
                         <SummaryCard
                             title="Total Actual"
-                            value={formatNZD(totals.actual_amount)}
+                            value={formatMoney(totals.actual_amount)}
                             subtitle="From posted journals"
                             icon={BarChart3}
                         />
                         <SummaryCard
                             title="Overall Variance"
                             value={formatPct(totals.variance_pct)}
-                            subtitle={formatNZD(totals.variance_amount)}
+                            subtitle={formatMoney(totals.variance_amount)}
                             icon={totals.variance_amount >= 0 ? TrendingUp : TrendingDown}
                             color={overallColor}
                         />
                         <SummaryCard
                             title="Budget Utilisation"
                             value={`${totals.utilization_pct.toFixed(1)}%`}
-                            subtitle={`${formatNZD(totals.actual_amount)} of ${formatNZD(totals.budget_amount)}`}
+                            subtitle={`${formatMoney(totals.actual_amount)} of ${formatMoney(totals.budget_amount)}`}
                             icon={BarChart3}
                         />
                     </div>
@@ -335,11 +334,11 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                                     <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                        <YAxis tickFormatter={(v) => formatNZD(v)} />
-                                        <Tooltip formatter={(value) => formatNZD(value as number)} />
+                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
                                         <Legend />
-                                        <Bar dataKey="Budget" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="Actual" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Budget" fill={chartColor(0)} radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Actual" fill={chartColor(1)} radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -374,13 +373,13 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                                     <TableRow className="bg-muted/50 font-bold border-t-2">
                                         <TableCell className="font-bold">Grand Total</TableCell>
                                         <TableCell className="text-right font-mono tabular-nums">
-                                            {formatNZD(totals.budget_amount)}
+                                            {formatMoney(totals.budget_amount)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono tabular-nums">
-                                            {formatNZD(totals.actual_amount)}
+                                            {formatMoney(totals.actual_amount)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono tabular-nums">
-                                            {formatNZD(totals.variance_amount)}
+                                            {formatMoney(totals.variance_amount)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono tabular-nums">
                                             <span className={overallColor}>
@@ -449,14 +448,14 @@ function CategorySection({ category }: { category: Category }) {
                         </div>
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-sm">
-                        {formatNZD(item.budget_amount)}
+                        {formatMoney(item.budget_amount)}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-sm">
-                        {formatNZD(item.actual_amount)}
+                        {formatMoney(item.actual_amount)}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-sm">
                         <span className={varianceColorClasses[item.variance_color]?.split(' ')[0] || ''}>
-                            {formatNZD(item.variance_amount)}
+                            {formatMoney(item.variance_amount)}
                         </span>
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-sm">
@@ -497,14 +496,14 @@ function CategorySection({ category }: { category: Category }) {
                     {label} Subtotal
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm font-semibold">
-                    {formatNZD(subtotals.budget_amount)}
+                    {formatMoney(subtotals.budget_amount)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm font-semibold">
-                    {formatNZD(subtotals.actual_amount)}
+                    {formatMoney(subtotals.actual_amount)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm font-semibold">
                     <span className={varianceColorClasses[subtotals.variance_color]?.split(' ')[0] || ''}>
-                        {formatNZD(subtotals.variance_amount)}
+                        {formatMoney(subtotals.variance_amount)}
                     </span>
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm">

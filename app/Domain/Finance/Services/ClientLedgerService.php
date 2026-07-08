@@ -3,7 +3,7 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinCostAllocation;
-use App\Models\ClientLedgerEntry;
+use App\Models\ClientFundTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -12,14 +12,25 @@ use Illuminate\Support\Facades\DB;
  * Client Ledger Service — personal financial view for a client.
  *
  * Aggregates two data sources:
- *   1. ClientLedgerEntry records (personal transactions: contributions, purchases, etc.)
- *   2. fin_cost_allocations with client_id (GL-backed operational costs attributed to client)
+ *   1. ClientFundTransaction records — the resident's TRUST-FUND movements
+ *      (deposits/withdrawals held for them). This is the canonical client-money
+ *      store (posts balanced GL to trust accounts 1010/2500 via
+ *      ClientFundJournalService). [C4: repointed from the dormant, never-written
+ *      ClientLedgerEntry to this working store — Chane's canonical-store decision.]
+ *   2. fin_cost_allocations with client_id (GL-backed operational costs attributed
+ *      to the client — the org's cost of support).
  *
- * Returns a unified chronological ledger with optional running balance.
- * Every entry is traceable back to either a ClientLedgerEntry or a FinJournal.
+ * Returns a unified chronological ledger with optional running balance. The personal
+ * running balance moves ONLY on the resident's own trust transactions; operational
+ * cost allocations are shown for transparency but NEVER reduce the personal balance
+ * (client money is segregated — trust liability 2500, never netted vs operational).
+ * Every entry is traceable back to a ClientFundTransaction or a FinJournal.
  */
 class ClientLedgerService
 {
+    /** transaction_type values that represent money coming IN to the resident's trust fund. */
+    private const INFLOW_TYPES = ['credit', 'deposit', 'inflow'];
+
     /**
      * Get the full client ledger for a date range.
      *
@@ -102,15 +113,14 @@ class ClientLedgerService
      */
     public function summary(int $clientId, Carbon $from, Carbon $to): array
     {
-        $ledgerEntries = ClientLedgerEntry::forClient($clientId)
-            ->forPeriod($from, $to)
+        $txns = $this->clientFundTransactions($clientId)
+            ->whereBetween('transaction_date', [$from, $to])
             ->select(
-                'direction',
-                'type',
+                'transaction_type',
                 DB::raw('SUM(amount) as total'),
                 DB::raw('COUNT(*) as count'),
             )
-            ->groupBy('direction', 'type')
+            ->groupBy('transaction_type')
             ->get();
 
         $glAllocations = FinCostAllocation::forClient($clientId)
@@ -127,9 +137,9 @@ class ClientLedgerService
             'client_id' => $clientId,
             'period_from' => $from->toDateString(),
             'period_to' => $to->toDateString(),
-            'personal_transactions' => $ledgerEntries->map(fn ($r) => [
-                'direction' => $r->direction,
-                'type' => $r->type,
+            'personal_transactions' => $txns->map(fn ($r) => [
+                'direction' => $this->isInflow($r->transaction_type) ? 'inflow' : 'outflow',
+                'type' => $r->transaction_type,
                 'total' => number_format((float) $r->total, 2, '.', ''),
                 'count' => (int) $r->count,
             ])->toArray(),
@@ -146,37 +156,55 @@ class ClientLedgerService
     /* ------------------------------------------------------------------ */
 
     /**
+     * Base query: every trust-fund transaction belonging to any of the client's funds.
+     */
+    private function clientFundTransactions(int $clientId)
+    {
+        return ClientFundTransaction::query()
+            ->whereHas('fund', fn ($q) => $q->where('client_id', $clientId));
+    }
+
+    private function isInflow(?string $transactionType): bool
+    {
+        return in_array(strtolower((string) $transactionType), self::INFLOW_TYPES, true);
+    }
+
+    /**
      * Build unified entry list from both sources.
      */
     private function buildEntries(int $clientId, Carbon $from, Carbon $to): Collection
     {
         $entries = collect();
 
-        // Source 1: ClientLedgerEntry records
-        $ledgerEntries = ClientLedgerEntry::forClient($clientId)
-            ->forPeriod($from, $to)
-            ->orderBy('entry_date')
+        // Source 1: the resident's trust-fund transactions (canonical client money).
+        $txns = $this->clientFundTransactions($clientId)
+            ->whereBetween('transaction_date', [$from, $to])
+            ->orderBy('transaction_date')
             ->get();
 
-        foreach ($ledgerEntries as $le) {
+        foreach ($txns as $txn) {
+            $isInflow = $this->isInflow($txn->transaction_type);
+            $amount = (string) $txn->amount;
+            $signed = $isInflow ? $amount : '-'.ltrim($amount, '-');
+
             $entries->push([
-                'date' => $le->entry_date->toDateString(),
-                'source' => 'client_ledger',
-                'source_id' => $le->id,
-                'type' => $le->type,
-                'category' => $le->category,
-                'direction' => $le->direction,
-                'amount' => (string) $le->amount,
-                'signed_amount' => $le->signedAmount(),
-                'description' => $le->description,
-                'reference' => $le->reference,
-                'journal_id' => $le->journal_id,
-                'is_gl_backed' => $le->journal_id !== null,
+                'date' => $txn->transaction_date->toDateString(),
+                'source' => 'client_ledger', // personal (moves the personal running balance)
+                'source_id' => $txn->id,
+                'type' => $txn->transaction_type,
+                'category' => $txn->category,
+                'direction' => $isInflow ? 'inflow' : 'outflow',
+                'amount' => $amount,
+                'signed_amount' => $signed,
+                'description' => $txn->description,
+                'reference' => $txn->reference,
+                'journal_id' => $txn->journal_id,
+                'is_gl_backed' => $txn->journal_id !== null,
             ]);
         }
 
-        // Source 2: fin_cost_allocations with client_id (operational costs)
-        // Exclude entries that originated from ClientLedgerEntry (already included above)
+        // Source 2: fin_cost_allocations with client_id (operational costs — the org's
+        // cost of support). Informational only; never move the personal balance.
         $allocations = FinCostAllocation::forClient($clientId)
             ->forPeriod($from, $to)
             ->with(['journal:id,description,journal_date,source_type,source_id', 'financialEvent:id,event_type,description,source_type'])
@@ -184,12 +212,6 @@ class ClientLedgerService
             ->get();
 
         foreach ($allocations as $alloc) {
-            // Skip if this allocation came from a ClientLedgerEntry — already shown above
-            $event = $alloc->financialEvent;
-            if ($event && $event->source_type === ClientLedgerEntry::class) {
-                continue;
-            }
-
             $entries->push([
                 'date' => $alloc->event_date->toDateString(),
                 'source' => 'cost_allocation',
@@ -212,23 +234,28 @@ class ClientLedgerService
     /**
      * Calculate the PERSONAL opening balance as of a given date.
      *
-     * Personal inflows minus outflows from ClientLedgerEntry only. Operational cost
-     * allocations (the org's cost of supporting the client) are deliberately NOT
-     * subtracted — they are not deductions from the resident's personal trust money,
-     * so they must never reduce the personal balance.
+     * Personal inflows minus outflows from the resident's trust transactions only.
+     * Operational cost allocations (the org's cost of supporting the client) are
+     * deliberately NOT subtracted — they are not deductions from the resident's
+     * personal trust money, so they must never reduce the personal balance.
      */
     private function getOpeningBalance(int $clientId, Carbon $asOf): string
     {
-        $ledgerInflows = ClientLedgerEntry::forClient($clientId)
-            ->where('entry_date', '<', $asOf)
-            ->inflows()
-            ->sum('amount');
+        $priorTxns = $this->clientFundTransactions($clientId)
+            ->where('transaction_date', '<', $asOf)
+            ->get(['transaction_type', 'amount']);
 
-        $ledgerOutflows = ClientLedgerEntry::forClient($clientId)
-            ->where('entry_date', '<', $asOf)
-            ->outflows()
-            ->sum('amount');
+        $inflows = '0';
+        $outflows = '0';
+        foreach ($priorTxns as $txn) {
+            $amount = ltrim((string) $txn->amount, '-');
+            if ($this->isInflow($txn->transaction_type)) {
+                $inflows = bcadd($inflows, $amount, 2);
+            } else {
+                $outflows = bcadd($outflows, $amount, 2);
+            }
+        }
 
-        return bcsub((string) $ledgerInflows, (string) $ledgerOutflows, 2);
+        return bcsub($inflows, $outflows, 2);
     }
 }

@@ -72,6 +72,20 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// IT helpdesk: tickets resolved 7+ days ago auto-close (the requester's
+// reopen window has passed): 07:10 NZ daily.
+app(Schedule::class)
+    ->command('it:close-resolved')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:10');
+
+// IT helpdesk SLA watchdog: hourly at-risk/breach transitions plus the
+// unassigned-urgent escalation (idempotent — one notification per transition).
+app(Schedule::class)
+    ->command('it:check-sla')
+    ->timezone('Pacific/Auckland')
+    ->hourly();
+
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)
     ->command('followups:remind-overdue')
@@ -579,16 +593,16 @@ app(Schedule::class)
     ->dailyAt('07:45')
     ->withoutOverlapping();
 
+// Single hourly budget-actuals sync (C6). SyncBudgetActualsJob refreshes each
+// budget line item's actual_amount from posted GL journals — the model's saving
+// event recomputes variance — and fires variance alerts. The separate hourly
+// `governance:update-budget-variances` schedule was a REDUNDANT second call to the
+// same BudgetActualsService::syncActuals (a double-write of the cache every hour) —
+// removed. The command still exists for manual/on-demand recompute.
 app(Schedule::class)
     ->job(new SyncBudgetActualsJob)
     ->timezone('Pacific/Auckland')
     ->hourly()
-    ->withoutOverlapping();
-
-app(Schedule::class)
-    ->command('governance:update-budget-variances')
-    ->timezone('Pacific/Auckland')
-    ->hourlyAt(10)
     ->withoutOverlapping();
 
 app(Schedule::class)

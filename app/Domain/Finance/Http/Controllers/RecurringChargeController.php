@@ -49,6 +49,9 @@ class RecurringChargeController extends Controller
             ->through(fn (RecurringCharge $charge) => [
                 'id' => $charge->id,
                 'name' => $charge->name ?: $charge->description,
+                // Raw fields so the row can prefill the edit modal.
+                'client_id' => $charge->client_id,
+                'description' => $charge->description,
                 'amount' => (float) $charge->amount,
                 'frequency' => $charge->frequency,
                 'is_active' => (bool) $charge->is_active,
@@ -60,9 +63,14 @@ class RecurringChargeController extends Controller
                 ] : null,
             ]);
 
+        $canManage = (bool) $auth->canDo('finance.ar.manage');
+
         return inertia('finance/recurring-charges/Index', [
             'charges' => $charges,
             'filters' => $filters,
+            'canManage' => $canManage,
+            // Client options for the create/edit modal.
+            'clients' => $canManage ? $this->clientOptions($auth->organization_id) : [],
             'stats' => [
                 'active' => RecurringCharge::query()
                     ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -78,16 +86,6 @@ class RecurringChargeController extends Controller
                     ->whereDate('next_charge_at', '<=', now()->addDays(7))
                     ->count(),
             ],
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
-        $clients = $this->clientOptions($auth->organization_id);
-
-        return inertia('finance/recurring-charges/Create', [
-            'clients' => $clients,
         ]);
     }
 
@@ -112,6 +110,10 @@ class RecurringChargeController extends Controller
             'description' => $data['description'],
             'amount' => $data['amount'],
             'frequency' => $data['frequency'],
+            // The series starts at its first charge date — starts_at is NOT NULL
+            // with no default, so omitting it 500'd every create (the retired
+            // full-page form had the same bug).
+            'starts_at' => $data['next_charge_date'],
             'next_charge_at' => $data['next_charge_date'],
             'ends_at' => $data['ends_at'] ?? null,
             'is_active' => $data['is_active'] ?? true,
@@ -119,31 +121,6 @@ class RecurringChargeController extends Controller
         ]);
 
         return redirect()->route('finance.recurring_charges.index')->with('success', 'Recurring charge created.');
-    }
-
-    public function edit(Request $request, $charge)
-    {
-        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
-
-        $charge = RecurringCharge::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['client:id,first_name,last_name'])
-            ->findOrFail($charge);
-
-        $clients = $this->clientOptions($auth->organization_id);
-
-        return inertia('finance/recurring-charges/Edit', [
-            'charge' => [
-                'id' => $charge->id,
-                'client_id' => $charge->client_id,
-                'description' => $charge->description,
-                'amount' => (string) $charge->amount,
-                'frequency' => $charge->frequency,
-                'next_charge_date' => $charge->next_charge_at?->toDateString(),
-                'is_active' => (bool) $charge->is_active,
-            ],
-            'clients' => $clients,
-        ]);
     }
 
     public function update(Request $request, $charge)

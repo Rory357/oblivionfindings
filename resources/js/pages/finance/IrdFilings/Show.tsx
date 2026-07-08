@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type GstReturn = {
@@ -37,9 +39,6 @@ type PageProps = {
     filing: Filing;
 };
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -61,15 +60,6 @@ const filingTypeLabels: Record<string, string> = {
     ir3: 'IR3',
     ir4: 'IR4',
     ir7: 'IR7',
-};
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
-    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 const filingDataLabels: Record<string, string> = {
@@ -94,7 +84,7 @@ const filingDataLabels: Record<string, string> = {
 
 export default function IrdFilingShow({ filing }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'IRD E-Filing', href: '/finance/ird-filings' },
         {
             title: `${filingTypeLabels[filing.filing_type]} - ${formatDate(filing.period_to)}`,
@@ -102,24 +92,24 @@ export default function IrdFilingShow({ filing }: PageProps) {
         },
     ];
 
-    const status = statusConfig[filing.status] ?? statusConfig.draft;
     const canValidate = filing.status === 'draft';
     const canSubmit = filing.status === 'validated' || filing.status === 'error';
     const amount = Number(filing.total_amount);
     const isRefund = amount < 0;
+
+    const [confirmSubmit, setConfirmSubmit] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     function handleValidate() {
         router.post(`/finance/ird-filings/${filing.id}/validate`);
     }
 
     function handleSubmit() {
-        if (
-            confirm(
-                'Are you sure you want to submit this filing to IRD? This will transmit the data to Inland Revenue.',
-            )
-        ) {
-            router.post(`/finance/ird-filings/${filing.id}/submit`);
-        }
+        router.post(`/finance/ird-filings/${filing.id}/submit`, {}, {
+            onStart: () => setSubmitting(true),
+            onFinish: () => setSubmitting(false),
+            onSuccess: () => setConfirmSubmit(false),
+        });
     }
 
     return (
@@ -134,9 +124,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
-                                <Badge variant="outline" className={status.className}>
-                                    {status.label}
-                                </Badge>
+                                <StatusBadge status={filing.status} />
                             </span>
                         }
                         description={
@@ -158,7 +146,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                     </Button>
                                 )}
                                 {canSubmit && (
-                                    <Button onClick={handleSubmit}>
+                                    <Button onClick={() => setConfirmSubmit(true)}>
                                         <Send className="mr-2 h-4 w-4" />
                                         Submit to IRD
                                     </Button>
@@ -224,7 +212,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Amount</p>
                                 <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}>
-                                    {formatCurrency(Math.abs(amount))}
+                                    {formatMoney(Math.abs(amount))}
                                     {isRefund ? ' (Refund)' : ''}
                                 </p>
                             </div>
@@ -287,7 +275,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                                                     : 'text-status-success'
                                                                 : ''
                                                         }`}>
-                                                            {isMonetary ? formatCurrency(Number(value)) : String(value)}
+                                                            {isMonetary ? formatMoney(Number(value)) : String(value)}
                                                         </span>
                                                     </div>
                                                 );
@@ -340,7 +328,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                     </p>
                                     <p className="text-sm text-muted-foreground">
                                         IRD Period: {filing.gst_return.ird_period} | GST Payable:{' '}
-                                        {formatCurrency(Number(filing.gst_return.gst_payable))}
+                                        {formatMoney(Number(filing.gst_return.gst_payable))}
                                     </p>
                                 </div>
                                 <Button
@@ -357,6 +345,16 @@ export default function IrdFilingShow({ filing }: PageProps) {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmSubmit}
+                onOpenChange={setConfirmSubmit}
+                title="Submit filing to IRD?"
+                description="This transmits the filing data to Inland Revenue. Only simulated submissions are made unless a live IRD gateway is configured."
+                confirmLabel="Submit to IRD"
+                processing={submitting}
+                onConfirm={handleSubmit}
+            />
         </AppLayout>
     );
 }

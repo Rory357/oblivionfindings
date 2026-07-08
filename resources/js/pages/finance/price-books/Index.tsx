@@ -12,10 +12,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import {
+    PriceBookDialog,
+    ReceivablesTabsFooter,
+    type EditablePriceBook,
+} from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BookOpen, CalendarDays, Eye, Hash, Pencil, Plus, Search, Star } from 'lucide-react';
+import { useState } from 'react';
 
 const ANY = '__ANY__';
 
@@ -47,6 +52,7 @@ type Props = {
         active_items: number;
         default_book: string;
     };
+    canManage: boolean;
 };
 
 function formatDate(d: string | null): string {
@@ -54,10 +60,23 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function PriceBooksIndex({ price_books = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function PriceBooksIndex({ price_books = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, canManage = false }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editBook, setEditBook] = useState<EditablePriceBook | null>(null);
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/finance/price-books', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
+
+    const openEdit = (book: PriceBook) =>
+        setEditBook({
+            id: book.id,
+            name: book.name,
+            description: book.description,
+            effective_from: book.effective_from,
+            effective_to: book.effective_to,
+            is_active: book.is_active,
+        });
 
     return (
         <AppLayout>
@@ -93,7 +112,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                         />
                     </div>
                     <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[130px] text-xs">
+                        <SelectTrigger className="h-9 w-[130px] text-xs" aria-label="Filter by status">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -102,12 +121,12 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                             <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/finance/price-books/create">
+                    {canManage && (
+                        <Button size="sm" onClick={() => setCreateOpen(true)}>
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
                             New Price Book
-                        </Link>
-                    </Button>
+                        </Button>
+                    )}
                 </div>
 
                 {/* List */}
@@ -118,9 +137,11 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                                 <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/30" />
                                 <h2 className="text-lg font-semibold text-muted-foreground">No Price Books Found</h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">Create your first price book to get started.</p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/finance/price-books/create">Create Price Book</Link>
-                                </Button>
+                                {canManage && (
+                                    <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+                                        Create Price Book
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -157,15 +178,21 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                                 </div>
                                 <div className="flex shrink-0 gap-1">
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/price-books/${book.id}`}>
+                                        <Link href={`/finance/price-books/${book.id}`} aria-label={`View ${book.name}`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/price-books/${book.id}/edit`}>
+                                    {canManage && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            aria-label={`Edit ${book.name}`}
+                                            onClick={() => openEdit(book)}
+                                        >
                                             <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -189,6 +216,19 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                     </div>
                 )}
             </PageShell>
+
+            {canManage && (
+                <PriceBookDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+            )}
+
+            {canManage && editBook && (
+                <PriceBookDialog
+                    key={editBook.id}
+                    open
+                    priceBook={editBook}
+                    onClose={() => setEditBook(null)}
+                />
+            )}
         </AppLayout>
     );
 }

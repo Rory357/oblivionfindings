@@ -9,6 +9,7 @@ use App\Domain\Finance\Services\AccountsPayableService;
 use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -29,6 +30,70 @@ class CreditNoteController extends Controller
             ->with('vendor:id,name')
             ->orderBy('credit_date', 'desc');
 
+        $this->applyCreditNoteFilters($query, $request);
+
+        $creditNotes = $query->paginate(20)->withQueryString();
+
+        $user = $request->user();
+        $canManage = (bool) $user->can('create', FinCreditNote::class);
+
+        return Inertia::render('finance/credit-notes/Index', [
+            'creditNotes' => $creditNotes,
+            'filters' => $request->only(['type', 'status', 'search', 'date_from', 'date_to']),
+            'canManage' => $canManage,
+            // Reference data for the create modal.
+            'vendors' => $canManage ? $this->vendorOptions($orgId) : [],
+            'clients' => $canManage ? $this->clientOptions($orgId) : [],
+            'accounts' => $canManage ? $this->accountOptions($orgId) : [],
+        ]);
+    }
+
+    /**
+     * Stream the (filtered) credit-note list as a sanitised CSV. Mirrors the
+     * index's search/type/status/date filters so "Export" respects the current
+     * view. Party resolves to the client (receivable) or the vendor (payable).
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinCreditNote::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinCreditNote::forOrganization($orgId)
+            ->with(['vendor:id,name', 'client:id,first_name,last_name'])
+            ->orderBy('credit_date', 'desc');
+
+        $this->applyCreditNoteFilters($query, $request);
+
+        $rows = $query->get()->map(fn (FinCreditNote $cn) => [
+            $cn->credit_note_number,
+            $cn->type,
+            $cn->type === 'receivable'
+                ? optional($cn->client)->full_name
+                : optional($cn->vendor)->name,
+            optional($cn->credit_date)->format('Y-m-d'),
+            number_format((float) $cn->subtotal, 2, '.', ''),
+            number_format((float) $cn->gst_amount, 2, '.', ''),
+            number_format((float) $cn->total_amount, 2, '.', ''),
+            $cn->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'credit-notes-'.now()->format('Y-m-d').'.csv',
+            ['Credit Note #', 'Type', 'Party', 'Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
+    /**
+     * Apply the shared credit-note list filters (type / status / search / date range)
+     * so the index list and the CSV export always show the same rows for a given
+     * query string. Search matches the CN number or the party (vendor or client) name.
+     *
+     * @param  Builder<FinCreditNote>  $query
+     */
+    private function applyCreditNoteFilters(Builder $query, Request $request): void
+    {
         if ($request->filled('type')) {
             if ($request->input('type') === 'payable') {
                 $query->payable();
@@ -41,26 +106,39 @@ class CreditNoteController extends Controller
             $query->withStatus($request->input('status'));
         }
 
-        $creditNotes = $query->paginate(20)->withQueryString();
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('credit_note_number', 'like', "%{$search}%")
+                    ->orWhereHas('vendor', fn ($v) => $v->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('client', fn ($c) => $c
+                        ->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%"));
+            });
+        }
 
-        return Inertia::render('finance/credit-notes/Index', [
-            'creditNotes' => $creditNotes,
-            'filters' => $request->only(['type', 'status']),
-        ]);
+        if ($request->filled('date_from')) {
+            $query->where('credit_date', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('credit_date', '<=', $request->input('date_to'));
+        }
     }
 
-    public function create(Request $request)
+    /** Active vendors for the credit-note modal. */
+    private function vendorOptions(?int $orgId)
     {
-        $this->authorize('create', FinCreditNote::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $vendors = FinVendor::forOrganization($orgId)
+        return FinVendor::forOrganization($orgId)
             ->active()
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
 
-        $clients = Client::query()
+    /** Clients for the credit-note modal (receivable type). */
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
             ->when(
                 $orgId && Schema::hasColumn('clients', 'organization_id'),
                 fn ($query) => $query->where('organization_id', $orgId),
@@ -73,17 +151,15 @@ class CreditNoteController extends Controller
                 'name' => trim($client->first_name . ' ' . $client->last_name),
             ])
             ->values();
+    }
 
-        $accounts = FinAccount::forOrganization($orgId)
+    /** Active GL accounts (with type) for the credit-note modal's per-line account picker. */
+    private function accountOptions(?int $orgId)
+    {
+        return FinAccount::forOrganization($orgId)
             ->active()
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type']);
-
-        return Inertia::render('finance/credit-notes/Create', [
-            'vendors' => $vendors,
-            'clients' => $clients,
-            'accounts' => $accounts,
-        ]);
     }
 
     public function store(StoreCreditNoteRequest $request)

@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +34,7 @@ import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } fr
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { type BreadcrumbItem } from '@/types';
 
 type Entity = {
@@ -83,13 +85,6 @@ type PageProps = {
     entities: Entity[];
     recentRuns: Run[];
     mappings?: Mapping[];
-};
-
-const statusColors: Record<string, string> = {
-    draft: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
-    processing: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed: 'bg-status-success-bg text-status-success border-status-success/30',
-    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const methodLabels: Record<string, string> = {
@@ -270,25 +265,27 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
     );
 }
 
-function formatCurrency(value: string | number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(value));
-}
-
 function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function ConsolidationShow({ group, entities, recentRuns, mappings }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
     ];
 
-    function handleRemoveEntity(entityId: number) {
-        if (confirm('Are you sure you want to remove this entity from the group?')) {
-            router.delete(`/finance/consolidation/${group.id}/entities/${entityId}`);
-        }
+    const [removeTarget, setRemoveTarget] = useState<Entity | null>(null);
+    const [removing, setRemoving] = useState(false);
+
+    function confirmRemoveEntity() {
+        if (!removeTarget) return;
+        router.delete(`/finance/consolidation/${group.id}/entities/${removeTarget.id}`, {
+            onStart: () => setRemoving(true),
+            onFinish: () => setRemoving(false),
+            onSuccess: () => setRemoveTarget(null),
+        });
     }
 
     // KPI calculations
@@ -410,7 +407,7 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                     className={
                                                         entity.is_active
                                                             ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/80/10 text-muted-foreground border-border/30'
+                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
                                                     }
                                                 >
                                                     {entity.is_active ? 'Active' : 'Inactive'}
@@ -420,7 +417,8 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => handleRemoveEntity(entity.id)}
+                                                    aria-label={`Remove ${entity.entity_name}`}
+                                                    onClick={() => setRemoveTarget(entity)}
                                                 >
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
@@ -468,15 +466,13 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                 {run.period_from} to {run.period_to}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={statusColors[run.status]}>
-                                                    {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                                                </Badge>
+                                                <StatusBadge status={run.status} />
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
-                                                {formatCurrency(run.total_revenue)}
+                                                {formatMoney(run.total_revenue)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
-                                                {formatCurrency(run.total_expenses)}
+                                                {formatMoney(run.total_expenses)}
                                             </TableCell>
                                             <TableCell>{run.eliminations_count}</TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
@@ -497,6 +493,26 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!removeTarget}
+                onOpenChange={(open) => !open && setRemoveTarget(null)}
+                title="Remove entity from group?"
+                description={
+                    <>
+                        This removes{' '}
+                        <span className="font-medium text-foreground">
+                            {removeTarget?.entity_name}
+                        </span>{' '}
+                        from this consolidation group. Its account mappings will no longer be
+                        included in future runs.
+                    </>
+                }
+                confirmLabel="Remove entity"
+                variant="destructive"
+                processing={removing}
+                onConfirm={confirmRemoveEntity}
+            />
         </AppLayout>
     );
 }

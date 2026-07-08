@@ -23,12 +23,10 @@ class AuditExportController extends Controller
 
         return Inertia::render('finance/audit-exports/Index', [
             'exports' => $exports,
+            // Creating/deleting exports needs finance.admin (index only needs
+            // finance.reports.view) — gates the New Export modal + delete action.
+            'canManage' => (bool) $request->user()->canDo('finance.admin'),
         ]);
-    }
-
-    public function create()
-    {
-        return Inertia::render('finance/audit-exports/Create');
     }
 
     public function store(Request $request)

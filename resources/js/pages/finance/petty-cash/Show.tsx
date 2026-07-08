@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Receipt } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { FormEvent } from 'react';
 
 interface FundDetails {
@@ -50,9 +52,6 @@ interface Props extends PageProps {
     expenseAccounts: Account[];
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -66,7 +65,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
     const { fund, transactions } = summary;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Petty Cash', href: '/finance/petty-cash' },
         { title: fund.name, href: `/finance/petty-cash/${fund.id}` },
     ];
@@ -100,11 +99,9 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                             <span className="flex flex-wrap items-center gap-3">
                                 {fund.name}
                                 {fund.is_active ? (
-                                    <Badge variant="outline" className="border-status-success/30 text-status-success">
-                                        Active
-                                    </Badge>
+                                    <StatusBadge variant="success" label="Active" />
                                 ) : (
-                                    <Badge variant="secondary">Inactive</Badge>
+                                    <StatusBadge variant="neutral" label="Inactive" />
                                 )}
                             </span>
                         }
@@ -116,13 +113,13 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Float Amount</p>
-                            <p className="text-xl font-bold">{formatCurrency(fund.float_amount)}</p>
+                            <p className="text-xl font-bold">{formatMoney(fund.float_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Current Balance</p>
-                            <p className="text-xl font-bold">{formatCurrency(fund.current_balance)}</p>
+                            <p className="text-xl font-bold">{formatMoney(fund.current_balance)}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -131,7 +128,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                             <p
                                 className={`text-xl font-bold ${fund.variance < 0 ? 'text-destructive' : fund.variance > 0 ? 'text-status-success' : ''}`}
                             >
-                                {formatCurrency(fund.variance)}
+                                {formatMoney(fund.variance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -279,11 +276,11 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                                                     className={`text-right font-medium ${txn.type === 'expense' ? 'text-destructive' : 'text-status-success'}`}
                                                 >
                                                     {txn.type === 'expense' ? '-' : '+'}
-                                                    {formatCurrency(txn.amount)}
+                                                    {formatMoney(txn.amount)}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {txn.running_balance !== null
-                                                        ? formatCurrency(txn.running_balance)
+                                                        ? formatMoney(txn.running_balance)
                                                         : '-'}
                                                 </TableCell>
                                                 <TableCell>

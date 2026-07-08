@@ -14,6 +14,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { ArrowLeft, Clock } from 'lucide-react';
+import { formatMoney } from '@/components/finance/money';
 
 type ClientAging = {
     client_id: number;
@@ -40,9 +41,6 @@ type PageProps = {
     totals: Totals;
 };
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const bucketColors: Record<string, string> = {
     current: 'text-status-success dark:text-status-success',
     '1_30': 'text-status-warning dark:text-status-warning',
@@ -60,7 +58,7 @@ const bucketBgColors: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Accounts Receivable', href: '/finance/receivables' },
     { title: 'Aging Report', href: '/finance/receivables/aging' },
 ];
@@ -71,7 +69,7 @@ function AmountCell({ amount, bucket }: { amount: number; bucket: string }) {
     }
     return (
         <TableCell className={`text-right ${bucketColors[bucket] ?? ''}`}>
-            {formatNZD(amount)}
+            {formatMoney(amount)}
         </TableCell>
     );
 }
@@ -87,10 +85,10 @@ export default function AgingReport({ clients, totals }: PageProps) {
                         title="Aged Receivables"
                         description="Outstanding receivables grouped by client and aging bucket."
                         stats={[
-                            { label: 'Total', value: formatNZD(totals.total) },
-                            { label: 'Current', value: formatNZD(totals.current) },
-                            { label: '31-90', value: formatNZD(totals['31_60'] + totals['61_90']) },
-                            { label: '90+', value: formatNZD(totals['90_plus']) },
+                            { label: 'Total', value: formatMoney(totals.total) },
+                            { label: 'Current', value: formatMoney(totals.current) },
+                            { label: '31-90', value: formatMoney(totals['31_60'] + totals['61_90']) },
+                            { label: '90+', value: formatMoney(totals['90_plus']) },
                         ]}
                         actions={
                             <Link href="/finance/receivables">
@@ -130,7 +128,7 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                             : ''
                                     }`}
                                 >
-                                    {formatNZD(
+                                    {formatMoney(
                                         totals[bucket.key as keyof Totals]
                                     )}
                                 </div>
@@ -189,7 +187,7 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                                 bucket="90_plus"
                                             />
                                             <TableCell className="text-right font-bold">
-                                                {formatNZD(client.total)}
+                                                {formatMoney(client.total)}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -198,22 +196,22 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                     <TableRow className="font-bold">
                                         <TableCell>Grand Total</TableCell>
                                         <TableCell className={`text-right ${bucketColors.current}`}>
-                                            {formatNZD(totals.current)}
+                                            {formatMoney(totals.current)}
                                         </TableCell>
                                         <TableCell className={`text-right ${bucketColors['1_30']}`}>
-                                            {formatNZD(totals['1_30'])}
+                                            {formatMoney(totals['1_30'])}
                                         </TableCell>
                                         <TableCell className={`text-right ${bucketColors['31_60']}`}>
-                                            {formatNZD(totals['31_60'])}
+                                            {formatMoney(totals['31_60'])}
                                         </TableCell>
                                         <TableCell className={`text-right ${bucketColors['61_90']}`}>
-                                            {formatNZD(totals['61_90'])}
+                                            {formatMoney(totals['61_90'])}
                                         </TableCell>
                                         <TableCell className={`text-right ${bucketColors['90_plus']}`}>
-                                            {formatNZD(totals['90_plus'])}
+                                            {formatMoney(totals['90_plus'])}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {formatNZD(totals.total)}
+                                            {formatMoney(totals.total)}
                                         </TableCell>
                                     </TableRow>
                                 </TableFooter>

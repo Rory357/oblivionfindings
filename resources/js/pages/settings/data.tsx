@@ -1145,7 +1145,7 @@ export default function Data() {
                                     return (
                                         <div
                                             key={imp.id}
-                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-primary hover:bg-primary/10/50 dark:hover:border-primary dark:hover:bg-primary/20"
+                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-primary hover:bg-primary/10 dark:hover:border-primary dark:hover:bg-primary/20"
                                         >
                                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/40">
                                                 <Icon className="h-5 w-5 text-primary" />

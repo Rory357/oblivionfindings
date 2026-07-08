@@ -26,6 +26,23 @@ it('populates every transactional finance hub for organization 1', function () {
         ->and(FinGstReturn::where('organization_id', 1)->count())->toBeGreaterThan(0);
 });
 
+it('seeds the COMPLETE canonical chart for org 1 so capture-at-source GL posting resolves', function () {
+    $this->seed(FinanceDemoSeeder::class);
+
+    // GL posting resolves accounts STRICTLY per-org (FinancialEventService throws on
+    // a missing code), so the operational org must hold the full chart — not the old
+    // 8-account subset — or house-ledger/fuel/maintenance journals silently vanish.
+    $has = fn (string $code) => FinAccount::where('organization_id', 1)
+        ->where('code', $code)->where('is_active', true)->exists();
+
+    expect($has('6431'))->toBeTrue()   // House Groceries — shopping capture-at-source
+        ->and($has('6200'))->toBeTrue() // Fuel & Oil — fleet fuel capture
+        ->and($has('6300'))->toBeTrue() // Equipment Maintenance — maintenance capture
+        ->and($has('2000'))->toBeTrue() // Accounts Payable
+        ->and($has('1000'))->toBeTrue() // Bank
+        ->and(FinAccount::where('organization_id', 1)->count())->toBeGreaterThan(50);
+});
+
 it('gives the finance calendar live events around today, including an overdue marker', function () {
     $this->seed(FinanceDemoSeeder::class);
 

@@ -569,8 +569,9 @@ function buildIconNavItems({
     }
 
     // IT & Provisioning — the account/access/equipment request queue fed by
-    // onboarding IT tasks, plus the helpdesk ticket queue.
-    if (can?.it?.view) {
+    // onboarding IT tasks, plus the helpdesk. Requesters (everyone on staff)
+    // see it too: they raise and track their own tickets there.
+    if (can?.it?.view || can?.it?.request) {
         items.push({
             id: 'it-provisioning',
             icon: Server,
@@ -1694,9 +1695,10 @@ function buildGovernanceSubPanelGroups({
 
 function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const overview: NavItem[] = [];
+    // Overview hub — Summary · Executive · By site · Cash position are tabs at /finance.
     overview.push({
-        title: 'Dashboard',
-        href: '/finance/dashboard',
+        title: 'Overview',
+        href: '/finance',
         icon: LayoutDashboard,
     });
 

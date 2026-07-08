@@ -85,6 +85,15 @@ class ControlRoomAlertController extends Controller
             $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
         }
 
+        // Snooze — the "Snoozed" tab shows currently-snoozed alerts; every other
+        // view hides them so the desk stays decluttered. An elapsed snooze
+        // returns the alert to the worklist automatically (scopes key off now()).
+        if ($request->input('snoozed') === '1') {
+            $query->snoozed();
+        } else {
+            $query->notSnoozed();
+        }
+
         // Sorting — default is operational priority (severity → escalation → oldest first)
         $sortField = $request->input('sort', 'priority');
         $sortDir = $request->input('dir', 'desc');
@@ -122,6 +131,7 @@ class ControlRoomAlertController extends Controller
                 ? trim($alert->client->first_name.' '.$alert->client->last_name)
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
+            'snoozed_until' => optional($alert->snoozed_until)->toISOString(),
             'notes' => $alert->notes ? \Illuminate\Support\Str::limit($alert->notes, 120) : null,
             // Operator context — what this alert is about (from normalized_data)
             'summary' => $this->extractAlertSummary($alert),
@@ -141,13 +151,16 @@ class ControlRoomAlertController extends Controller
         $statsBase = ControlRoomAlert::query();
         $this->siteAccess()->applyAlertScope($statsBase, $user, $this->alertBypassPermissions());
 
+        // The five tab counts mirror the worklist, which hides currently-snoozed
+        // alerts — so they exclude snoozed too. Snoozed gets its own count/tab.
         $stats = [
-            'total' => (clone $statsBase)->count(),
-            'open' => (clone $statsBase)->where('status', 'open')->count(),
-            'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'total' => (clone $statsBase)->notSnoozed()->count(),
+            'open' => (clone $statsBase)->notSnoozed()->where('status', 'open')->count(),
+            'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
             'in_triage' => (clone $statsBase)->where('status', 'triaging')->count(),
-            'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'snoozed' => (clone $statsBase)->snoozed()->count(),
             'sla_breached' => (clone $statsBase)->whereNotIn('status', ['resolved', 'closed'])
                 ->whereHas('sla', fn ($q) => $q->where(fn ($sq) => $sq->where('acknowledge_breached', true)
                     ->orWhere('response_breached', true)
@@ -176,7 +189,7 @@ class ControlRoomAlertController extends Controller
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
-            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),
             'stats' => $stats,
             'queues' => $queues,
             'staff' => $staff,
@@ -519,6 +532,82 @@ class ControlRoomAlertController extends Controller
     }
 
     /**
+     * Snooze an alert — set it aside on the operator worklist for a window
+     * (15 minutes, an hour, until end of day, or a custom time). The alert stays
+     * open and its SLA clocks keep running; it just drops off the default
+     * worklist until the window elapses or an operator unsnoozes it, and it is
+     * always reachable via the Snoozed tab. Critical and terminal alerts can't
+     * be snoozed — mirrors the frontline /my-day rule.
+     */
+    public function snooze(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
+
+        if ($alert->isTerminal()) {
+            return back()->withErrors(['alert' => 'Resolved or closed alerts can\'t be snoozed.']);
+        }
+
+        if (strtolower((string) $alert->severity) === 'critical') {
+            return back()->withErrors(['alert' => 'Critical alerts can\'t be snoozed — acknowledge or triage them.']);
+        }
+
+        $data = $request->validate([
+            'window' => ['required', 'in:15m,1h,shift,custom'],
+            'snoozed_until' => ['required_if:window,custom', 'nullable', 'date', 'after:now'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $tz = config('app.worker_timezone');
+        $until = match ($data['window']) {
+            '1h' => now()->addHour(),
+            'shift' => now()->timezone($tz)->endOfDay()->utc(),
+            'custom' => Carbon::parse($data['snoozed_until'], $tz)->utc(),
+            default => now()->addMinutes(15),
+        };
+
+        $alert->update([
+            'snoozed_until' => $until,
+            'snoozed_by_user_id' => $user->id,
+        ]);
+
+        AuditLogger::log('controlRoom.alert.snooze', $alert, [
+            'alert_id' => $alert->id,
+            'snoozed_by' => $user->id,
+            'snoozed_until' => $until->toIso8601String(),
+            'window' => $data['window'],
+            'note' => $data['note'] ?? null,
+        ]);
+
+        $label = $until->copy()->timezone($tz)->format('D j M, g:i a');
+
+        return back()->with('success', "Snoozed until {$label}.");
+    }
+
+    /**
+     * Unsnooze an alert — return it to the worklist immediately.
+     */
+    public function unsnooze(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
+
+        $alert->update([
+            'snoozed_until' => null,
+            'snoozed_by_user_id' => null,
+        ]);
+
+        AuditLogger::log('controlRoom.alert.unsnooze', $alert, [
+            'alert_id' => $alert->id,
+            'unsnoozed_by' => $user->id,
+        ]);
+
+        return back()->with('success', 'Alert returned to the worklist.');
+    }
+
+    /**
      * Start triaging an alert.
      */
     public function triage(Request $request, ControlRoomAlert $alert)
@@ -819,6 +908,16 @@ class ControlRoomAlertController extends Controller
             if ($request->has($field)) {
                 $fieldsToUpdate[$field] = $data[$field];
             }
+        }
+
+        // The due time arrives as a naive datetime-local string in the worker's
+        // wall clock; interpret it in the worker timezone and store UTC, or a
+        // 9:00 am target displays as 9:00 pm.
+        if (! empty($fieldsToUpdate['due_at'])) {
+            $fieldsToUpdate['due_at'] = \Illuminate\Support\Carbon::parse(
+                $fieldsToUpdate['due_at'],
+                config('app.worker_timezone'),
+            )->utc();
         }
 
         if (! empty($fieldsToUpdate)) {

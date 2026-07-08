@@ -6,12 +6,36 @@ import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import {
     ItWizard,
+    KbPreview,
+    type AssetOption,
     type AssigneeOption,
+    type EmployeeOption,
     type ItModal,
+    type KbRow,
     type RequestRow,
+    type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { CsatRater, CsatStars } from '@/components/it/csat';
+import { ItHero } from '@/components/it/it-hero';
+import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
+import { ItReports } from '@/components/it/it-reports';
+import { SlaChip } from '@/components/it/sla-chip';
+import { TicketDrawer } from '@/components/it/ticket-drawer';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -21,36 +45,87 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { fireConfetti } from '@/lib/confetti';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
+    BarChart3,
+    BookOpen,
     CheckCircle2,
+    ChevronDown,
+    ChevronsUpDown,
+    ChevronUp,
+    Copy,
+    Download,
     Inbox,
     KeyRound,
     Laptop,
+    LayoutDashboard,
+    Link2,
     Mail,
+    MessageSquare,
     MoreHorizontal,
+    Pencil,
     Play,
     Plus,
     RotateCcw,
+    Search,
     Server,
+    Star,
+    ThumbsDown,
+    ThumbsUp,
     Ticket,
+    Timer,
     UserCog,
+    X,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
 /*  Props & constants                                                  */
 /* ------------------------------------------------------------------ */
 
-interface Stats {
-    requests_pending: number;
-    requests_in_progress: number;
-    requests_done_30d: number;
-    tickets_open: number;
-    tickets_urgent: number;
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+/** Laravel LengthAwarePaginator as serialised into Inertia props. */
+interface Paginated<T> {
+    data: T[];
+    links: PaginationLink[];
+    current_page: number;
+    last_page: number;
+    total: number;
+}
+
+/** Server summary — all-time counts feeding hero chips and tab badges. */
+interface Summary {
+    my: { open: number; waiting: number; resolved_30d: number };
+    tickets?: {
+        open: number;
+        unassigned: number;
+        urgent_unassigned: number;
+        urgent_open: number;
+        at_risk: number;
+        breached: number;
+        awaiting_reply: number;
+        waiting: number;
+        resolved_30d: number;
+        met_30d: number;
+        by_status: Record<string, number>;
+        views: Record<string, number>;
+    };
+    provisioning?: {
+        pending: number;
+        in_progress: number;
+        done_30d: number;
+        overdue: number;
+        pending_over_7d: number;
+    };
 }
 
 interface Filters {
@@ -59,21 +134,74 @@ interface Filters {
     assignee: number | null;
     ticket_status: string | null;
     ticket_priority: string | null;
+    ticket_category: string | null;
+    sla: string | null;
+    view: string | null;
+    q: string | null;
+    from: string | null;
+    to: string | null;
+    sort: string | null;
+    dir: string | null;
+}
+
+interface MyTicketRow {
+    id: number;
+    reference: string | null;
+    title: string;
+    description: string | null;
+    category: string;
+    priority: string;
+    status: string;
+    assignee: string | null;
+    age: string | null;
+    resolved: string | null;
+    /** §K CSAT: a resolved ticket invites a rating; the given score shows back. */
+    can_rate: boolean;
+    csat_score: number | null;
+}
+
+/** A published KB article as browsed by a requester (§I). */
+interface KbPublishedRow {
+    id: number;
+    title: string;
+    category: string;
+    body: string | null;
+    views: number;
+    helpful_yes: number;
+    helpful_no: number;
+    helpful_percent: number | null;
 }
 
 interface Props {
-    requests: RequestRow[];
-    tickets: TicketRow[];
-    stats: Stats;
-    assignees: AssigneeOption[];
-    filters: Filters;
-    can: { manage: boolean };
+    /** Agent-only props — absent from self-service (requester) payloads. */
+    requests?: Paginated<RequestRow> | null;
+    tickets?: Paginated<TicketRow> | null;
+    assignees?: AssigneeOption[];
+    /** Tenant employee profiles for the manual provisioning-request picker. */
+    employeeOptions?: EmployeeOption[];
+    /** Active assets register entries for the Log & triage asset-link picker. */
+    assetOptions?: AssetOption[];
+    /** Knowledge-base catalogue for the agent Knowledge tab (§I). */
+    kbArticles?: KbRow[];
+    filters?: Filters;
+    /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
+    overview?: OverviewPayload;
+    /** Effective SLA grid — present only for admins (the policy editor). */
+    slaPolicies?: SlaPolicyGrid | null;
+    /** The viewer's own tickets — present for anyone with it.request. */
+    myTickets: MyTicketRow[];
+    /** Published KB articles for a requester's browse tab (§I). */
+    kbPublished?: KbPublishedRow[];
+    summary: Summary;
+    can: { view: boolean; manage: boolean; request: boolean; edit_sla?: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it' }];
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
 const ALL = 'all';
+/** Bulk-assign sentinel for "remove the assignee" (empty value is illegal). */
+const UNASSIGN = 'unassign';
 
 const typeIcon: Record<string, typeof Mail> = {
     account: Mail,
@@ -105,49 +233,382 @@ const priorityVariant: Record<string, StatusVariant> = {
 const label = (raw: string) =>
     raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
+/** Today as `YYYY-MM-DD` for lexical overdue comparison against a due_date. */
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/** A `YYYY-MM-DD` due date as a compact en-NZ label ("8 Jul"). */
+const formatDue = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+
 const REQUEST_STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
 const REQUEST_TYPES = ['account', 'access', 'equipment', 'other'];
-const TICKET_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+const TICKET_STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
+const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
+
+/** Saved views — server `view` param; counts come from `summary.tickets.views`
+ *  keyed identically. Order mirrors the triage funnel (open → attention → done). */
+const TICKET_VIEWS: { key: string; label: string }[] = [
+    { key: 'all_open', label: 'All open' },
+    { key: 'unassigned', label: 'Unassigned' },
+    { key: 'mine', label: 'Mine' },
+    { key: 'breaching', label: 'Breaching soon' },
+    { key: 'breached', label: 'Breached' },
+    { key: 'awaiting_reply', label: 'Awaiting reply' },
+    { key: 'waiting', label: 'Waiting on requester' },
+    { key: 'recently_resolved', label: 'Recently resolved' },
+];
+
+/** localStorage key for an agent's default tickets view (§F2). */
+const TICKETS_VIEW_KEY = 'it.ticketsView';
+
+const readStoredView = (): string | null => {
+    try {
+        return localStorage.getItem(TICKETS_VIEW_KEY);
+    } catch {
+        return null;
+    }
+};
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function ItIndex({ requests, tickets, stats, assignees, filters, can }: Props) {
-    const [tab, setTab] = useHrTab('provisioning');
+export default function ItIndex({
+    requests,
+    tickets,
+    assignees = [],
+    employeeOptions = [],
+    assetOptions = [],
+    kbArticles = [],
+    filters,
+    overview,
+    slaPolicies,
+    myTickets,
+    kbPublished = [],
+    summary,
+    can,
+}: Props) {
+    // Default landing tab (§O): a right-click "Set as default view" persists to
+    // localStorage; a `?tab=` deep link always wins over it. Validate the stored
+    // id against what this user can actually see before trusting it.
+    const capabilityDefault = can.view ? 'overview' : 'my-tickets';
+    const tabIsAllowed = (id: string | null): id is string => {
+        if (!id) return false;
+        if (id === 'my-tickets') return can.request;
+        if (id === 'knowledge') return can.view || can.request;
+        return can.view; // overview / tickets / provisioning / reports
+    };
+    const [storedDefault] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const v = window.localStorage.getItem('it.defaultTab');
+        return tabIsAllowed(v) ? v : null;
+    });
+    const [defaultTab, setDefaultTab] = useState<string | null>(storedDefault);
+    const [tab, setTab] = useHrTab(storedDefault ?? capabilityDefault);
     const [modal, setModal] = useState<ItModal | null>(null);
+    const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
 
+    /** Row click: quick-peek drawer; Ctrl/⌘-click or double-click: full page. */
+    const openTicket = (id: number, e?: React.MouseEvent) => {
+        if (e && (e.ctrlKey || e.metaKey)) {
+            router.visit(`/it/tickets/${id}`);
+            return;
+        }
+        setPeekId(id);
+    };
+
     const tabItems: HrTabItem[] = [
-        {
-            id: 'provisioning',
-            label: 'Provisioning',
-            icon: Server,
-            tone: 'primary',
-            badge: stats.requests_pending + stats.requests_in_progress,
-        },
-        {
-            id: 'tickets',
-            label: 'Tickets',
-            icon: Ticket,
-            tone: 'info',
-            badge: stats.tickets_open,
-        },
+        ...(can.view
+            ? ([
+                  {
+                      id: 'overview',
+                      label: 'Overview',
+                      icon: LayoutDashboard,
+                      tone: 'primary',
+                  },
+                  {
+                      id: 'tickets',
+                      label: 'Tickets',
+                      icon: Ticket,
+                      tone: 'info',
+                      badge: summary.tickets?.open ?? 0,
+                  },
+                  {
+                      id: 'provisioning',
+                      label: 'Provisioning',
+                      icon: Server,
+                      tone: 'primary',
+                      badge:
+                          (summary.provisioning?.pending ?? 0) +
+                          (summary.provisioning?.in_progress ?? 0),
+                  },
+                  {
+                      id: 'knowledge',
+                      label: 'Knowledge',
+                      icon: BookOpen,
+                      tone: 'primary',
+                      badge: kbArticles.length,
+                  },
+                  {
+                      id: 'reports',
+                      label: 'Reports',
+                      icon: BarChart3,
+                      tone: 'primary',
+                  },
+              ] as HrTabItem[])
+            : []),
+        ...(can.request
+            ? ([
+                  {
+                      id: 'my-tickets',
+                      label: 'My tickets',
+                      icon: Inbox,
+                      tone: 'success',
+                      badge: summary.my.waiting,
+                  },
+                  // Requester-only Knowledge browse — agents get the manage
+                  // version in their own (can.view) Knowledge tab above.
+                  ...(!can.view
+                      ? [{ id: 'knowledge', label: 'Knowledge', icon: BookOpen, tone: 'primary' as const }]
+                      : []),
+              ] as HrTabItem[])
+            : []),
     ];
 
-    const applyFilter = (key: keyof Filters, value: string) =>
+    /** Tab-strip right-click (§O): pin the default landing view for next time. */
+    const tabMenu = (id: string, e: React.MouseEvent) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: defaultTab === id ? 'Default view (current)' : 'Set as default view',
+                icon: Star,
+                onSelect: () => {
+                    if (typeof window !== 'undefined') window.localStorage.setItem('it.defaultTab', id);
+                    setDefaultTab(id);
+                    const name = tabItems.find((t) => t.id === id)?.label ?? id;
+                    toast.success(`${name} is now your default view.`);
+                },
+            },
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: LayoutDashboard,
+                onSelect: () => setTab(id),
+            },
+        ])(e);
+
+    /** A gold star marks the pinned default tab. */
+    const tabDecorations = defaultTab
+        ? {
+              [defaultTab]: (
+                  <Star
+                      className="h-3 w-3"
+                      style={{ color: 'var(--status-warning)', fill: 'var(--status-warning)' }}
+                      aria-hidden
+                  />
+              ),
+          }
+        : undefined;
+
+    /** Merge a param patch onto the current filters and reload the queue. A
+     *  filter change drops the page cursor (not in `filters`) → back to page 1. */
+    const navigate = (patch: Record<string, string | undefined>) =>
         router.get(
             '/it',
             {
                 ...Object.fromEntries(
-                    Object.entries(filters).filter(([, v]) => v !== null && v !== ''),
+                    Object.entries(filters ?? {}).filter(([, v]) => v !== null && v !== ''),
                 ),
-                [key]: value === ALL ? undefined : value,
+                ...patch,
                 tab,
             },
             { preserveState: true, preserveScroll: true, replace: true },
         );
+
+    const applyFilter = (key: keyof Filters, value: string) =>
+        navigate({ [key]: value === ALL || value === '' ? undefined : value });
+
+    /** Saved-view chip: remember it as the agent's default, then filter. */
+    const applyView = (key: string) => {
+        try {
+            localStorage.setItem(TICKETS_VIEW_KEY, key);
+        } catch {
+            /* private mode — persistence is best-effort */
+        }
+        navigate({ view: key });
+    };
+
+    /** Sortable header: first click → desc, re-click toggles asc⇄desc. */
+    const applySort = (col: string) => {
+        const active = filters?.sort === col;
+        const dir = !active ? 'desc' : filters?.dir === 'asc' ? 'desc' : 'asc';
+        navigate({ sort: col, dir });
+    };
+
+    // Debounced free-text search over reference / title / requester.
+    const [search, setSearch] = useState(filters?.q ?? '');
+    useEffect(() => {
+        if ((filters?.q ?? '') === search) return;
+        const timer = setTimeout(() => navigate({ q: search.trim() === '' ? undefined : search }), 350);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    // Land an agent on their remembered view when they open Tickets with none set
+    // (a hero deep-link carrying ?view= always wins).
+    useEffect(() => {
+        if (!can.view || tab !== 'tickets' || filters?.view) return;
+        const stored = readStoredView();
+        if (stored) navigate({ view: stored });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
+
+    // Delight (§S): celebrate the moment an agent clears the breach queue —
+    // when the breached count goes from >0 to 0 across a reload. sessionStorage
+    // remembers the last-seen count so it fires once, not on every render.
+    const breachedCount = can.view ? (summary.tickets?.breached ?? 0) : 0;
+    useEffect(() => {
+        if (!can.view || typeof window === 'undefined') return;
+        const prev = Number(window.sessionStorage.getItem('it.lastBreached') ?? '-1');
+        if (prev > 0 && breachedCount === 0) {
+            fireConfetti();
+            toast.success('Breach queue cleared — every SLA back on track.');
+        }
+        window.sessionStorage.setItem('it.lastBreached', String(breachedCount));
+    }, [can.view, breachedCount]);
+
+    const ticketFiltersActive = Boolean(
+        filters?.q ||
+            filters?.view ||
+            filters?.ticket_status ||
+            filters?.ticket_priority ||
+            filters?.ticket_category ||
+            filters?.sla ||
+            filters?.assignee ||
+            filters?.from ||
+            filters?.to,
+    );
+
+    /** Wipe every tickets filter (and the search box) back to the full queue. */
+    const clearTicketFilters = () => {
+        setSearch('');
+        router.get('/it', { tab: 'tickets' }, { preserveState: true, preserveScroll: true, replace: true });
+    };
+
+    /* ---------------- bulk selection (§F2 tickets · §H provisioning) ---------------- */
+    // Both queues share one per-page selection hook (useRowSelection, below).
+    // Only one tab is visible at a time, so the busy flag is shared.
+
+    const ticketSel = useRowSelection((tickets?.data ?? []).map((t) => t.id));
+    const reqSel = useRowSelection((requests?.data ?? []).map((r) => r.id));
+    const [confirmBulkClose, setConfirmBulkClose] = useState(false);
+    const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
+
+    /* ---------------- requester KB browse (§I) ---------------- */
+    const [readerArticle, setReaderArticle] = useState<KbPublishedRow | null>(null);
+    const [kbSearch, setKbSearch] = useState('');
+    const [kbCategory, setKbCategory] = useState<string>(ALL);
+    // One-vote-per-article guard is client-side (localStorage), fine for v1.
+    const [votedKb, setVotedKb] = useState<Set<number>>(() => {
+        try {
+            return new Set<number>(JSON.parse(localStorage.getItem('it.kb.voted') ?? '[]'));
+        } catch {
+            return new Set<number>();
+        }
+    });
+
+    const filteredKb = kbPublished.filter((a) => {
+        const q = kbSearch.trim().toLowerCase();
+        return (
+            (kbCategory === ALL || a.category === kbCategory) &&
+            (q === '' || a.title.toLowerCase().includes(q) || (a.body ?? '').toLowerCase().includes(q))
+        );
+    });
+
+    /** Open the reader and count the read (server guards published + tenant). */
+    const openArticle = (a: KbPublishedRow) => {
+        setReaderArticle(a);
+        router.post(`/it/kb/${a.id}/view`, {}, { preserveScroll: true, preserveState: true, only: ['kbPublished'] });
+    };
+
+    const voteHelpful = (a: KbPublishedRow, helpful: boolean) => {
+        if (votedKb.has(a.id)) return;
+        router.post(
+            `/it/kb/${a.id}/helpful`,
+            { helpful },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['kbPublished'],
+                onSuccess: (page) => {
+                    const flash = page.props.flash as { success?: string } | undefined;
+                    if (flash?.success) toast.success(flash.success);
+                },
+            },
+        );
+        const next = new Set(votedKb).add(a.id);
+        setVotedKb(next);
+        try {
+            localStorage.setItem('it.kb.voted', JSON.stringify([...next]));
+        } catch {
+            /* private mode — best effort */
+        }
+    };
+
+    /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
+    const runBulkTo = (
+        url: string,
+        sel: ReturnType<typeof useRowSelection>,
+        payload: Record<string, unknown>,
+    ) => {
+        if (sel.selected.size === 0) return;
+        setBulkBusy(true);
+        router.post(
+            url,
+            { ids: [...sel.selected], ...payload },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const flash = page.props.flash as { error?: string; success?: string } | undefined;
+                    if (flash?.error) toast.error(flash.error);
+                    else if (flash?.success) toast.success(flash.success);
+                    sel.clear();
+                },
+                onFinish: () => setBulkBusy(false),
+            },
+        );
+    };
+
+    const runBulk = (payload: Record<string, unknown>) => runBulkTo('/it/tickets/bulk', ticketSel, payload);
+    const runProvisioningBulk = (payload: Record<string, unknown>) =>
+        runBulkTo('/it/provisioning/bulk', reqSel, payload);
+
+    /** CSV export of the provisioning queue, carrying the active filters so the
+     *  download matches what the agent is looking at (streamed, agent-only). */
+    const provisioningExportUrl = () => {
+        const params = new URLSearchParams();
+        if (filters?.status) params.set('status', filters.status);
+        if (filters?.type) params.set('type', filters.type);
+        if (filters?.assignee != null) params.set('assignee', String(filters.assignee));
+        const qs = params.toString();
+        return `/it/provisioning/export${qs ? `?${qs}` : ''}`;
+    };
+
+    // Bulk select is agent-only (it.manage) — the checkbox column and action
+    // bar only exist for people who can mutate. Each grid gains a leading
+    // 36px checkbox track when it does.
+    const ticketGridCols = can.manage
+        ? 'grid-cols-[36px_3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]'
+        : 'grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]';
+    const reqGridCols = can.manage
+        ? 'grid-cols-[36px_1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]'
+        : 'grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]';
 
     /** Direct row action — surfaces the redirect flash as a toast. */
     const act = (method: 'post' | 'patch', url: string, data: Record<string, string> = {}) => {
@@ -161,13 +622,89 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
         });
     };
 
+    /** Copy a reference or link to the clipboard and toast it (§O). */
+    const copyText = (text: string | null, what: string) => {
+        if (!text) return;
+        void navigator.clipboard.writeText(text).then(() => toast.success(`${what} copied.`));
+    };
+
+    /** Delete a KB article (router.delete has no data arg — its own helper). */
+    const runKbDelete = (a: KbRow) => {
+        router.delete(`/it/kb/${a.id}`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const flash = page.props.flash as { error?: string; success?: string } | undefined;
+                if (flash?.error) toast.error(flash.error);
+                else if (flash?.success) toast.success(flash.success);
+            },
+        });
+        setConfirmKbDelete(null);
+    };
+
+    const kbMenu = (a: KbRow) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => setModal({ type: 'kb', article: a }),
+            },
+            a.status === 'published'
+                ? {
+                      kind: 'item' as const,
+                      label: 'Unpublish',
+                      icon: RotateCcw,
+                      onSelect: () => act('patch', `/it/kb/${a.id}`, { status: 'draft' }),
+                  }
+                : {
+                      kind: 'item' as const,
+                      label: 'Publish',
+                      icon: CheckCircle2,
+                      tone: 'success' as const,
+                      onSelect: () => act('patch', `/it/kb/${a.id}`, { status: 'published' }),
+                  },
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Delete',
+                icon: XCircle,
+                tone: 'critical' as const,
+                onSelect: () => setConfirmKbDelete(a),
+            },
+        ]);
+
     /* ---------------- row context menus ---------------- */
 
     const requestMenu = (r: RequestRow) => {
         const open = r.status === 'pending' || r.status === 'in_progress';
         return ctx.open([
+            // Available on any request — a fulfilled item can still arrive broken.
+            {
+                kind: 'item' as const,
+                label: 'Raise linked ticket',
+                icon: Ticket,
+                onSelect: () => setModal({ type: 'ticket', provisioning: { id: r.id, item: r.item } }),
+            },
+            ...(r.linked_ticket
+                ? [
+                      {
+                          kind: 'item' as const,
+                          label: `Open ${r.linked_ticket.reference ?? 'linked ticket'}`,
+                          icon: Inbox,
+                          onSelect: () => setPeekId(r.linked_ticket!.id),
+                      },
+                      {
+                          kind: 'item' as const,
+                          label: 'Copy link',
+                          icon: Link2,
+                          onSelect: () =>
+                              copyText(`${window.location.origin}/it/tickets/${r.linked_ticket!.id}`, 'Link'),
+                      },
+                  ]
+                : []),
             ...(open
                 ? ([
+                      { kind: 'divider' as const },
                       {
                           kind: 'item' as const,
                           label: 'Fulfil…',
@@ -195,8 +732,22 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
     };
 
     const ticketMenu = (t: TicketRow) => {
-        const workable = t.status === 'open' || t.status === 'in_progress';
+        const workable =
+            t.status === 'open' || t.status === 'in_progress' || t.status === 'waiting';
         return ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: Ticket,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Quick peek',
+                icon: Inbox,
+                onSelect: () => setPeekId(t.id),
+            },
+            { kind: 'divider' as const },
             ...(workable
                 ? [
                       ...(t.status === 'open'
@@ -218,10 +769,14 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                       { kind: 'divider' as const },
                       {
                           kind: 'item' as const,
-                          label: 'Resolve',
+                          label: 'Resolve…',
                           icon: CheckCircle2,
                           tone: 'success' as const,
-                          onSelect: () => act('post', `/it/tickets/${t.id}/resolve`),
+                          onSelect: () =>
+                              setModal({
+                                  type: 'resolve',
+                                  ticket: { id: t.id, reference: t.reference, title: t.title },
+                              }),
                       },
                   ]
                 : []),
@@ -231,13 +786,13 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                           kind: 'item' as const,
                           label: 'Close ticket',
                           icon: XCircle,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'closed' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/close`),
                       },
                       {
                           kind: 'item' as const,
                           label: 'Reopen',
                           icon: RotateCcw,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'open' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
                       },
                   ]
                 : []),
@@ -247,12 +802,59 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                           kind: 'item' as const,
                           label: 'Reopen',
                           icon: RotateCcw,
-                          onSelect: () => act('patch', `/it/tickets/${t.id}`, { status: 'open' }),
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
                       },
                   ]
                 : []),
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Copy reference',
+                icon: Copy,
+                onSelect: () => copyText(t.reference, t.reference ?? 'Reference'),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Copy link',
+                icon: Link2,
+                onSelect: () => copyText(`${window.location.origin}/it/tickets/${t.id}`, 'Link'),
+            },
         ]);
     };
+
+    /** My-tickets row menu (requester-facing, §O). */
+    const myTicketMenu = (t: MyTicketRow) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: Ticket,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            {
+                kind: 'item' as const,
+                label: 'Reply',
+                icon: MessageSquare,
+                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+            },
+            ...(t.status === 'resolved'
+                ? ([
+                      {
+                          kind: 'item' as const,
+                          label: 'Reopen',
+                          icon: RotateCcw,
+                          onSelect: () => act('post', `/it/tickets/${t.id}/reopen`),
+                      },
+                  ] as const)
+                : []),
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Copy reference',
+                icon: Copy,
+                onSelect: () => copyText(t.reference, t.reference ?? 'Reference'),
+            },
+        ]);
 
     /* ---------------- render ---------------- */
 
@@ -260,101 +862,297 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="IT & Provisioning" />
             {ctx.element}
-            <ItWizard modal={modal} assignees={assignees} onClose={() => setModal(null)} />
+            <ItWizard
+                modal={modal}
+                assignees={assignees}
+                employeeOptions={employeeOptions}
+                assetOptions={assetOptions}
+                slaPolicies={slaPolicies}
+                kbSuggestions={kbPublished}
+                onOpenArticle={(id) => {
+                    const a = kbPublished.find((x) => x.id === id);
+                    if (a) {
+                        setModal(null);
+                        openArticle(a);
+                    }
+                }}
+                onDraftKb={(draft) => setModal({ type: 'kb', draft })}
+                onClose={() => setModal(null)}
+            />
+            <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
 
-            <div className="flex flex-col gap-5 p-4 sm:p-6">
-                {/* Hero */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-9 py-8 text-primary-foreground">
-                    <div className="flex flex-wrap items-center justify-between gap-5">
-                        <div className="flex items-center gap-4">
-                            <span className="grid h-[54px] w-[54px] flex-none place-items-center rounded-2xl border border-white/20 bg-white/15">
-                                <Server className="h-6 w-6" />
-                            </span>
-                            <div>
-                                <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
-                                    IT &amp; Provisioning
-                                </h1>
-                                <p className="mt-1 text-[13px] font-medium text-white/75">
-                                    Account, access &amp; equipment requests — and the IT helpdesk queue.
-                                </p>
+            {/* KB reader (requester browse) */}
+            <Dialog open={readerArticle !== null} onOpenChange={(open) => !open && setReaderArticle(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{readerArticle?.title}</DialogTitle>
+                    </DialogHeader>
+                    {readerArticle ? (
+                        <div className="space-y-4">
+                            <StatusBadge variant="info" size="sm">
+                                {label(readerArticle.category)}
+                            </StatusBadge>
+                            <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/30 p-4">
+                                <KbPreview body={readerArticle.body ?? ''} />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                <span className="text-[13px] font-medium">Was this helpful?</span>
+                                {votedKb.has(readerArticle.id) ? (
+                                    <span className="text-[13px] text-muted-foreground">
+                                        Thanks — that helps us tune the knowledge base.
+                                    </span>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => voteHelpful(readerArticle, true)}
+                                        >
+                                            <ThumbsUp className="h-3.5 w-3.5" /> Yes
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => voteHelpful(readerArticle, false)}
+                                        >
+                                            <ThumbsDown className="h-3.5 w-3.5" /> No
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         </div>
-                        {can.manage ? (
-                            <Button
-                                onClick={() => setModal({ type: 'ticket' })}
-                                className="bg-white/15 text-primary-foreground hover:bg-white/25"
-                            >
-                                <Plus className="h-4 w-4" /> Log ticket
-                            </Button>
-                        ) : null}
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-2.5">
-                        {[
-                            { label: 'Pending requests', value: stats.requests_pending },
-                            { label: 'In progress', value: stats.requests_in_progress },
-                            { label: 'Fulfilled · 30d', value: stats.requests_done_30d },
-                            { label: 'Open tickets', value: stats.tickets_open },
-                            { label: 'Urgent', value: stats.tickets_urgent },
-                        ].map((s) => (
-                            <div
-                                key={s.label}
-                                className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2"
-                            >
-                                <div className="text-[20px] leading-none font-bold">{s.value}</div>
-                                <div className="mt-1 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
-                                    {s.label}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
 
-                <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
+            <AlertDialog open={confirmBulkClose} onOpenChange={setConfirmBulkClose}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Close {ticketSel.selected.size} ticket{ticketSel.selected.size === 1 ? '' : 's'}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Closed tickets leave the working queue. Requesters can still reopen within seven days.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep open</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => runBulk({ action: 'close' })}>
+                            Close tickets
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
-                {/* ── Provisioning queue ── */}
-                {tab === 'provisioning' && (
+            <AlertDialog open={confirmBulkFulfil} onOpenChange={setConfirmBulkFulfil}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Fulfil {reqSel.selected.size} request{reqSel.selected.size === 1 ? '' : 's'}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Each request is marked done and any linked onboarding task is completed. This can’t be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => runProvisioningBulk({ action: 'fulfil' })}>
+                            Fulfil requests
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={confirmKbDelete !== null}
+                onOpenChange={(open) => !open && setConfirmKbDelete(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete “{confirmKbDelete?.title}”?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This removes the article from the knowledge base. This can’t be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep it</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => confirmKbDelete && runKbDelete(confirmKbDelete)}>
+                            Delete article
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <div className="flex flex-col gap-5 p-4 sm:p-6">
+                <ItHero
+                    summary={summary}
+                    can={can}
+                    onRaise={() => setModal({ type: 'raise' })}
+                    onLog={() => setModal({ type: 'ticket' })}
+                />
+
+                <HrTabs
+                    value={tab}
+                    onChange={setTab}
+                    items={tabItems}
+                    ariaLabel="IT views"
+                    onItemContextMenu={tabMenu}
+                    decorations={tabDecorations}
+                />
+
+                {/* ── Overview (agents) ── */}
+                {can.view && tab === 'overview' && overview && summary.tickets && (
+                    <ItOverview
+                        overview={overview}
+                        kpis={{
+                            open: summary.tickets.open,
+                            unassigned: summary.tickets.unassigned,
+                            at_risk: summary.tickets.at_risk,
+                            breached: summary.tickets.breached,
+                        }}
+                        onOpenTicket={(id) => setPeekId(id)}
+                    />
+                )}
+
+                {/* ── Reports (agents, §L) ── */}
+                {can.view && tab === 'reports' && <ItReports />}
+
+                {/* ── Provisioning queue (agents) ── */}
+                {can.view && tab === 'provisioning' && (
                     <>
                         <div className="flex flex-wrap items-center gap-2">
                             <FilterSelect
                                 ariaLabel="Filter by status"
-                                value={filters.status ?? ALL}
+                                value={filters?.status ?? ALL}
                                 onChange={(v) => applyFilter('status', v)}
                                 allLabel="All statuses"
                                 options={REQUEST_STATUSES}
                             />
                             <FilterSelect
                                 ariaLabel="Filter by type"
-                                value={filters.type ?? ALL}
+                                value={filters?.type ?? ALL}
                                 onChange={(v) => applyFilter('type', v)}
                                 allLabel="All types"
                                 options={REQUEST_TYPES}
                             />
                             <AssigneeFilter
-                                value={filters.assignee != null ? String(filters.assignee) : ALL}
+                                value={filters?.assignee != null ? String(filters.assignee) : ALL}
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
+                            <div className="ml-auto flex items-center gap-2">
+                                <Button asChild size="sm" variant="outline">
+                                    <a
+                                        href={provisioningExportUrl()}
+                                        aria-label="Export the provisioning queue as CSV"
+                                    >
+                                        <Download className="h-3.5 w-3.5" /> Export CSV
+                                    </a>
+                                </Button>
+                                {can.manage ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setModal({ type: 'new-request' })}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> New request
+                                    </Button>
+                                ) : null}
+                            </div>
                         </div>
 
+                        {/* Bulk action bar — appears when requests are selected */}
+                        {can.manage && reqSel.selected.size > 0 ? (
+                            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
+                                <span className="text-[12.5px] font-semibold text-foreground">
+                                    {reqSel.selected.size} selected
+                                </span>
+                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                                <Select
+                                    value=""
+                                    onValueChange={(v) =>
+                                        runProvisioningBulk({ action: 'assign', assigned_to_user_id: Number(v) })
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-[160px]" aria-label="Assign selected requests to">
+                                        <SelectValue placeholder="Assign to…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {assignees.map((a) => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={bulkBusy}
+                                    onClick={() => setConfirmBulkFulfil(true)}
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Fulfil
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="ml-auto"
+                                    onClick={() => reqSel.clear()}
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                        ) : null}
+
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[2fr_2fr_1.5fr_1fr_0.8fr_100px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <div className={`grid ${reqGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}>
+                                {can.manage ? (
+                                    <span className="flex items-center">
+                                        <Checkbox
+                                            checked={
+                                                reqSel.allOnPage
+                                                    ? true
+                                                    : reqSel.someOnPage
+                                                      ? 'indeterminate'
+                                                      : false
+                                            }
+                                            onCheckedChange={(v) => reqSel.toggleAll(v === true)}
+                                            aria-label="Select all requests on this page"
+                                        />
+                                    </span>
+                                ) : null}
                                 <span>Employee</span>
                                 <span>Item</span>
                                 <span>Assignee</span>
+                                <span>Priority</span>
                                 <span>Status</span>
-                                <span>Raised</span>
+                                <span>Due</span>
                                 <span />
                             </div>
-                            {requests.map((r) => {
+                            {(requests?.data ?? []).map((r) => {
                                 const Icon = typeIcon[r.type] ?? Server;
                                 const actionable =
                                     can.manage && (r.status === 'pending' || r.status === 'in_progress');
+                                const overdue =
+                                    r.due_date != null &&
+                                    r.status !== 'done' &&
+                                    r.status !== 'cancelled' &&
+                                    r.due_date < todayISO();
                                 return (
                                     <div
                                         key={r.id}
-                                        onContextMenu={actionable ? requestMenu(r) : undefined}
-                                        className="grid grid-cols-[2fr_2fr_1.5fr_1fr_0.8fr_100px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                        onContextMenu={can.manage ? requestMenu(r) : undefined}
+                                        className={`grid ${reqGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${reqSel.selected.has(r.id) ? 'bg-primary/5' : overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
                                     >
+                                        {can.manage ? (
+                                            <span className="flex items-center">
+                                                <Checkbox
+                                                    checked={reqSel.selected.has(r.id)}
+                                                    onCheckedChange={(v) => reqSel.toggle(r.id, v === true)}
+                                                    aria-label={`Select ${r.item}`}
+                                                />
+                                            </span>
+                                        ) : null}
                                         <div className="min-w-0">
                                             <div className="truncate text-[13.5px] font-semibold">
                                                 {r.employee.name}
@@ -376,47 +1174,81 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                                         Ref: {r.external_ref}
                                                     </span>
                                                 ) : null}
+                                                {r.linked_ticket ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPeekId(r.linked_ticket!.id)}
+                                                        className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-semibold text-primary transition-colors hover:bg-primary/10"
+                                                    >
+                                                        <Ticket className="h-3 w-3" />
+                                                        {r.linked_ticket.reference ?? 'Linked ticket'}
+                                                        {r.linked_ticket_count > 1 ? ` +${r.linked_ticket_count - 1}` : ''}
+                                                    </button>
+                                                ) : null}
                                             </span>
                                         </div>
                                         <span className="truncate text-[12.5px] text-muted-foreground">
                                             {r.assignee?.name ?? 'Unassigned'}
                                         </span>
                                         <span>
+                                            <StatusBadge variant={priorityVariant[r.priority] ?? 'neutral'} size="sm">
+                                                {label(r.priority)}
+                                            </StatusBadge>
+                                        </span>
+                                        <span className="flex flex-col items-start gap-0.5">
                                             <StatusBadge
                                                 variant={requestStatusVariant[r.status] ?? 'neutral'}
                                                 size="sm"
                                             >
                                                 {label(r.status)}
                                             </StatusBadge>
+                                            <span className="text-[10.5px] text-muted-foreground">
+                                                {r.status === 'done'
+                                                    ? r.fulfilled
+                                                        ? `Done ${r.fulfilled}`
+                                                        : ''
+                                                    : r.created
+                                                      ? `Raised ${r.created}`
+                                                      : ''}
+                                            </span>
                                         </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            {r.status === 'done' ? (r.fulfilled ?? r.created ?? '—') : (r.created ?? '—')}
+                                        <span
+                                            className={
+                                                overdue
+                                                    ? 'text-[12px] font-semibold text-[color:var(--status-critical)]'
+                                                    : 'text-[12px] text-muted-foreground'
+                                            }
+                                        >
+                                            {r.due_date ? formatDue(r.due_date) : '—'}
+                                            {overdue ? (
+                                                <span className="block text-[10px] font-semibold">Overdue</span>
+                                            ) : null}
                                         </span>
                                         <span className="flex items-center justify-end gap-1.5">
                                             {actionable ? (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setModal({ type: 'fulfil', request: r })}
-                                                        className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
-                                                    >
-                                                        Fulfil
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`Actions for ${r.item}`}
-                                                        onClick={requestMenu(r)}
-                                                        className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                    >
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </button>
-                                                </>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModal({ type: 'fulfil', request: r })}
+                                                    className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
+                                                >
+                                                    Fulfil
+                                                </button>
+                                            ) : null}
+                                            {can.manage ? (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Actions for ${r.item}`}
+                                                    onClick={requestMenu(r)}
+                                                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                >
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </button>
                                             ) : null}
                                         </span>
                                     </div>
                                 );
                             })}
-                            {requests.length === 0 ? (
+                            {(requests?.data ?? []).length === 0 ? (
                                 <EmptyState
                                     icon={Inbox}
                                     title="No provisioning requests"
@@ -424,60 +1256,237 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                 />
                             ) : null}
                         </div>
+                        {requests ? (
+                            <LaravelPagination links={requests.links} lastPage={requests.last_page} />
+                        ) : null}
                     </>
                 )}
 
-                {/* ── Ticket queue ── */}
-                {tab === 'tickets' && (
+                {/* ── Ticket queue (agents) ── */}
+                {can.view && tab === 'tickets' && (
                     <>
+                        {/* Saved views — counts from the all-time summary */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {TICKET_VIEWS.map((v) => {
+                                const activeView = filters?.view === v.key;
+                                const count = summary.tickets?.views[v.key] ?? 0;
+                                return (
+                                    <button
+                                        key={v.key}
+                                        type="button"
+                                        aria-pressed={activeView}
+                                        onClick={() => applyView(v.key)}
+                                        className={
+                                            activeView
+                                                ? 'inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground'
+                                                : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground'
+                                        }
+                                    >
+                                        {v.label}
+                                        <span
+                                            className={
+                                                activeView
+                                                    ? 'rounded-full bg-white/20 px-1.5 text-[11px] font-bold tabular-nums'
+                                                    : 'rounded-full bg-muted px-1.5 text-[11px] font-bold tabular-nums text-muted-foreground'
+                                            }
+                                        >
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Toolbar — search + filters */}
                         <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="search"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search reference, title, requester…"
+                                    aria-label="Search tickets"
+                                    className="h-8 w-[248px] rounded-md border border-border bg-card pr-7 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                                {search ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearch('')}
+                                        aria-label="Clear search"
+                                        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
+                            </div>
                             <FilterSelect
                                 ariaLabel="Filter by ticket status"
-                                value={filters.ticket_status ?? ALL}
+                                value={filters?.ticket_status ?? ALL}
                                 onChange={(v) => applyFilter('ticket_status', v)}
                                 allLabel="All statuses"
                                 options={TICKET_STATUSES}
                             />
                             <FilterSelect
                                 ariaLabel="Filter by priority"
-                                value={filters.ticket_priority ?? ALL}
+                                value={filters?.ticket_priority ?? ALL}
                                 onChange={(v) => applyFilter('ticket_priority', v)}
                                 allLabel="All priorities"
                                 options={TICKET_PRIORITIES}
                             />
+                            <FilterSelect
+                                ariaLabel="Filter by category"
+                                value={filters?.ticket_category ?? ALL}
+                                onChange={(v) => applyFilter('ticket_category', v)}
+                                allLabel="All categories"
+                                options={TICKET_CATEGORIES}
+                            />
+                            <FilterSelect
+                                ariaLabel="Filter by SLA state"
+                                value={filters?.sla ?? ALL}
+                                onChange={(v) => applyFilter('sla', v)}
+                                allLabel="Any SLA state"
+                                options={SLA_STATES}
+                            />
                             <AssigneeFilter
-                                value={filters.assignee != null ? String(filters.assignee) : ALL}
+                                value={filters?.assignee != null ? String(filters.assignee) : ALL}
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
-                            {can.manage ? (
+                            <DateRange
+                                from={filters?.from ?? ''}
+                                to={filters?.to ?? ''}
+                                onChange={(k, val) => applyFilter(k, val)}
+                            />
+                            <div className="ml-auto flex items-center gap-2">
+                                {can.manage ? (
+                                    <Button size="sm" variant="outline" onClick={() => setModal({ type: 'ticket' })}>
+                                        <Plus className="h-3.5 w-3.5" /> Log ticket
+                                    </Button>
+                                ) : null}
+                                {can.edit_sla && slaPolicies ? (
+                                    <Button size="sm" variant="outline" onClick={() => setModal({ type: 'sla' })}>
+                                        <Timer className="h-3.5 w-3.5" /> SLA targets
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </div>
+
+                        {/* Bulk action bar — appears when rows are selected */}
+                        {can.manage && ticketSel.selected.size > 0 ? (
+                            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
+                                <span className="text-[12.5px] font-semibold text-foreground">
+                                    {ticketSel.selected.size} selected
+                                </span>
+                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                                <Select
+                                    value=""
+                                    onValueChange={(v) =>
+                                        runBulk({
+                                            action: 'assign',
+                                            assigned_to_user_id: v === UNASSIGN ? null : Number(v),
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-[150px]" aria-label="Assign selected tickets to">
+                                        <SelectValue placeholder="Assign to…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={UNASSIGN}>Unassign</SelectItem>
+                                        {assignees.map((a) => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value="" onValueChange={(v) => runBulk({ action: 'priority', priority: v })}>
+                                    <SelectTrigger className="h-8 w-[140px]" aria-label="Set priority for selected">
+                                        <SelectValue placeholder="Set priority…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {TICKET_PRIORITIES.map((p) => (
+                                            <SelectItem key={p} value={p}>
+                                                {label(p)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value="" onValueChange={(v) => runBulk({ action: 'status', status: v })}>
+                                    <SelectTrigger className="h-8 w-[150px]" aria-label="Set status for selected">
+                                        <SelectValue placeholder="Set status…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {['open', 'in_progress', 'waiting'].map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                                {label(s)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="ml-auto"
-                                    onClick={() => setModal({ type: 'ticket' })}
+                                    disabled={bulkBusy}
+                                    onClick={() => setConfirmBulkClose(true)}
                                 >
-                                    <Plus className="h-3.5 w-3.5" /> Log ticket
+                                    <XCircle className="h-3.5 w-3.5" /> Close
                                 </Button>
-                            ) : null}
-                        </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="ml-auto"
+                                    onClick={() => ticketSel.clear()}
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                        ) : null}
 
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
-                                <span>Ticket</span>
+                            <div className={`grid ${ticketGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}>
+                                {can.manage ? (
+                                    <span className="flex items-center">
+                                        <Checkbox
+                                            checked={
+                                                ticketSel.allOnPage
+                                                    ? true
+                                                    : ticketSel.someOnPage
+                                                      ? 'indeterminate'
+                                                      : false
+                                            }
+                                            onCheckedChange={(v) => ticketSel.toggleAll(v === true)}
+                                            aria-label="Select all tickets on this page"
+                                        />
+                                    </span>
+                                ) : null}
+                                <SortHeader label="Ticket" col="reference" filters={filters} onSort={applySort} />
                                 <span>Requester</span>
                                 <span>Assignee</span>
-                                <span>Priority</span>
-                                <span>Status</span>
-                                <span>Age</span>
+                                <SortHeader label="Priority" col="priority" filters={filters} onSort={applySort} />
+                                <SortHeader label="Status" col="status" filters={filters} onSort={applySort} />
+                                <span>SLA</span>
+                                <SortHeader label="Age" col="created" filters={filters} onSort={applySort} />
                                 <span />
                             </div>
-                            {tickets.map((t) => (
+                            {(tickets?.data ?? []).map((t) => (
                                 <div
                                     key={t.id}
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
-                                    className="grid grid-cols-[3fr_1.3fr_1.3fr_0.9fr_1fr_0.7fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                    onClick={(e) => openTicket(t.id, e)}
+                                    onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
+                                    className={`grid cursor-pointer ${ticketGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40 ${ticketSel.selected.has(t.id) ? 'bg-primary/5' : ''}`}
                                 >
+                                    {can.manage ? (
+                                        <span className="flex items-center">
+                                            <Checkbox
+                                                checked={ticketSel.selected.has(t.id)}
+                                                onCheckedChange={(v) => ticketSel.toggle(t.id, v === true)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                aria-label={`Select ${t.reference ?? t.title}`}
+                                            />
+                                        </span>
+                                    ) : null}
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
                                             <Ticket className="h-3.5 w-3.5" />
@@ -487,6 +1496,7 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                                 {t.title}
                                             </span>
                                             <span className="block truncate text-[11px] text-muted-foreground">
+                                                {t.reference ? `${t.reference} · ` : ''}
                                                 {label(t.category)}
                                                 {t.description ? ` · ${t.description}` : ''}
                                             </span>
@@ -508,13 +1518,19 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                             {label(t.status)}
                                         </StatusBadge>
                                     </span>
+                                    <span className="min-w-0">
+                                        <SlaChip ticket={t} />
+                                    </span>
                                     <span className="text-[12px] text-muted-foreground">{t.age ?? '—'}</span>
                                     <span className="flex justify-end">
                                         {can.manage ? (
                                             <button
                                                 type="button"
                                                 aria-label={`Actions for ${t.title}`}
-                                                onClick={ticketMenu(t)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    ticketMenu(t)(e);
+                                                }}
                                                 className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <MoreHorizontal className="h-4 w-4" />
@@ -523,18 +1539,328 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                     </span>
                                 </div>
                             ))}
-                            {tickets.length === 0 ? (
+                            {(tickets?.data ?? []).length === 0 ? (
+                                ticketFiltersActive ? (
+                                    <EmptyState
+                                        icon={Ticket}
+                                        title="No tickets match"
+                                        blurb="Nothing fits these filters. Widen or clear them to see more of the queue."
+                                        action={{ label: 'Clear filters', onClick: clearTicketFilters }}
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        icon={Ticket}
+                                        title="No tickets"
+                                        blurb={
+                                            can.manage
+                                                ? 'Log the first helpdesk ticket with the button above.'
+                                                : 'The helpdesk queue is clear.'
+                                        }
+                                    />
+                                )
+                            ) : null}
+                        </div>
+                        {tickets ? (
+                            <LaravelPagination links={tickets.links} lastPage={tickets.last_page} />
+                        ) : null}
+                    </>
+                )}
+
+                {/* ── My tickets (everyone with it.request) ── */}
+                {can.request && tab === 'my-tickets' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[12.5px] text-muted-foreground">
+                                Tickets you’ve raised — IT sees new ones instantly.
+                            </p>
+                            <Button
+                                size="sm"
+                                className="ml-auto"
+                                onClick={() => setModal({ type: 'raise' })}
+                            >
+                                <Plus className="h-3.5 w-3.5" /> Raise a ticket
+                            </Button>
+                        </div>
+
+                        {/* CSAT prompt (§K) — a nudge to rate freshly resolved tickets;
+                            it empties as each is rated (confetti on a perfect five). */}
+                        {myTickets.some((t) => t.can_rate && t.csat_score == null) ? (
+                            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4.5 py-4">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-primary/10 text-primary">
+                                        <Star className="h-4 w-4" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <h3 className="text-[14px] leading-tight font-bold">How did IT do?</h3>
+                                        <p className="text-[12px] text-muted-foreground">
+                                            Rate your resolved tickets — it takes a moment and helps IT improve.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex flex-col gap-2.5">
+                                    {myTickets
+                                        .filter((t) => t.can_rate && t.csat_score == null)
+                                        .map((t) => (
+                                            <div
+                                                key={t.id}
+                                                className="rounded-xl border border-border/60 bg-card px-3.5 py-3"
+                                            >
+                                                <div className="flex flex-wrap items-baseline gap-x-2">
+                                                    <span className="text-[13px] font-semibold">{t.title}</span>
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {t.reference ?? ''}
+                                                        {t.resolved ? ` · resolved ${t.resolved}` : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2">
+                                                    <CsatRater ticketId={t.id} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                            <div className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <span>Ticket</span>
+                                <span>Assignee</span>
+                                <span>Priority</span>
+                                <span>Status</span>
+                                <span>Raised</span>
+                            </div>
+                            {myTickets.map((t) => (
+                                <div
+                                    key={t.id}
+                                    onClick={(e) => openTicket(t.id, e)}
+                                    onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
+                                    onContextMenu={myTicketMenu(t)}
+                                    className="grid cursor-pointer grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                                >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                            <Ticket className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-[13px] font-semibold">
+                                                {t.title}
+                                            </span>
+                                            <span className="block truncate text-[11px] text-muted-foreground">
+                                                {t.reference ? `${t.reference} · ` : ''}
+                                                {label(t.category)}
+                                                {t.description ? ` · ${t.description}` : ''}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <span className="truncate text-[12.5px] text-muted-foreground">
+                                        {t.assignee ?? 'With IT for triage'}
+                                    </span>
+                                    <span>
+                                        <StatusBadge
+                                            variant={priorityVariant[t.priority] ?? 'neutral'}
+                                            size="sm"
+                                        >
+                                            {label(t.priority)}
+                                        </StatusBadge>
+                                    </span>
+                                    <span className="flex flex-col items-start gap-1">
+                                        <StatusBadge
+                                            variant={
+                                                t.status === 'waiting'
+                                                    ? 'warning'
+                                                    : (ticketStatusVariant[t.status] ?? 'neutral')
+                                            }
+                                            size="sm"
+                                        >
+                                            {t.status === 'waiting' ? 'Waiting on you' : label(t.status)}
+                                        </StatusBadge>
+                                        <StatusDots status={t.status} />
+                                        {t.csat_score != null ? (
+                                            <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
+                                                You rated <CsatStars score={t.csat_score} size="h-3 w-3" />
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                    <span className="text-[12px] text-muted-foreground">
+                                        {t.age ?? '—'}
+                                    </span>
+                                </div>
+                            ))}
+                            {myTickets.length === 0 ? (
                                 <EmptyState
-                                    icon={Ticket}
-                                    title="No tickets"
+                                    icon={Inbox}
+                                    title="No tickets yet"
+                                    blurb="Broken phone? Locked out? Raise it here — IT sees it instantly and you can track progress on this tab."
+                                />
+                            ) : null}
+                        </div>
+                    </>
+                )}
+
+                {/* ── Knowledge base (agents) ── */}
+                {can.view && tab === 'knowledge' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[12.5px] text-muted-foreground">
+                                Articles that deflect repeat tickets — publish the fixes people keep asking for.
+                            </p>
+                            {can.manage ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="ml-auto"
+                                    onClick={() => setModal({ type: 'kb' })}
+                                >
+                                    <BookOpen className="h-3.5 w-3.5" /> New KB article
+                                </Button>
+                            ) : null}
+                        </div>
+
+                        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                            <div className="grid grid-cols-[3fr_1fr_1fr_0.7fr_0.9fr_1fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <span>Title</span>
+                                <span>Category</span>
+                                <span>Status</span>
+                                <span>Views</span>
+                                <span>Helpful</span>
+                                <span>Updated</span>
+                                <span />
+                            </div>
+                            {kbArticles.map((a) => (
+                                <div
+                                    key={a.id}
+                                    onContextMenu={can.manage ? kbMenu(a) : undefined}
+                                    className="grid grid-cols-[3fr_1fr_1fr_0.7fr_0.9fr_1fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                                >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                            <BookOpen className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-[13px] font-semibold">{a.title}</span>
+                                            {a.author ? (
+                                                <span className="block truncate text-[11px] text-muted-foreground">
+                                                    by {a.author}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    </div>
+                                    <span className="truncate text-[12.5px] text-muted-foreground">
+                                        {label(a.category)}
+                                    </span>
+                                    <span>
+                                        <StatusBadge
+                                            variant={a.status === 'published' ? 'success' : 'neutral'}
+                                            size="sm"
+                                        >
+                                            {label(a.status)}
+                                        </StatusBadge>
+                                    </span>
+                                    <span className="text-[12.5px] text-muted-foreground tabular-nums">
+                                        {a.views}
+                                    </span>
+                                    <span className="text-[12.5px] text-muted-foreground tabular-nums">
+                                        {a.helpful_percent != null ? `${a.helpful_percent}%` : '—'}
+                                    </span>
+                                    <span className="text-[12px] text-muted-foreground">{a.updated ?? '—'}</span>
+                                    <span className="flex justify-end">
+                                        {can.manage ? (
+                                            <button
+                                                type="button"
+                                                aria-label={`Actions for ${a.title}`}
+                                                onClick={kbMenu(a)}
+                                                className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </button>
+                                        ) : null}
+                                    </span>
+                                </div>
+                            ))}
+                            {kbArticles.length === 0 ? (
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title="No articles yet"
                                     blurb={
                                         can.manage
-                                            ? 'Log the first helpdesk ticket with the button above.'
-                                            : 'The helpdesk queue is clear.'
+                                            ? 'Write the first fix people keep asking for — it deflects the ticket every time after.'
+                                            : 'The knowledge base is empty.'
+                                    }
+                                    action={
+                                        can.manage
+                                            ? { label: 'New KB article', onClick: () => setModal({ type: 'kb' }) }
+                                            : undefined
                                     }
                                 />
                             ) : null}
                         </div>
+                    </>
+                )}
+
+                {/* ── Knowledge browse (requesters) ── */}
+                {!can.view && can.request && tab === 'knowledge' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="search"
+                                    value={kbSearch}
+                                    onChange={(e) => setKbSearch(e.target.value)}
+                                    placeholder="Search the knowledge base…"
+                                    aria-label="Search articles"
+                                    className="h-8 w-[260px] rounded-md border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                            </div>
+                            <FilterSelect
+                                ariaLabel="Filter by category"
+                                value={kbCategory}
+                                onChange={setKbCategory}
+                                allLabel="All categories"
+                                options={TICKET_CATEGORIES}
+                            />
+                        </div>
+
+                        {filteredKb.length === 0 ? (
+                            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title={kbPublished.length === 0 ? 'No articles yet' : 'No matches'}
+                                    blurb={
+                                        kbPublished.length === 0
+                                            ? 'IT will publish fixes here — check back, or raise a ticket and they’ll sort it.'
+                                            : 'Nothing matches your search. Try a different word or category.'
+                                    }
+                                />
+                            </div>
+                        ) : (
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {filteredKb.map((a) => (
+                                    <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => openArticle(a)}
+                                        className="flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
+                                    >
+                                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-primary">
+                                            <BookOpen className="h-4 w-4" />
+                                        </span>
+                                        <span className="mt-2 text-[14px] font-semibold">{a.title}</span>
+                                        <span className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
+                                            {(a.body ?? '').replace(/[#>*\-\n]+/g, ' ').trim()}
+                                        </span>
+                                        <span className="mt-3 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                                            <StatusBadge variant="info" size="sm">
+                                                {label(a.category)}
+                                            </StatusBadge>
+                                            {a.helpful_percent != null ? (
+                                                <span>{a.helpful_percent}% helpful</span>
+                                            ) : null}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -545,6 +1871,41 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
 /* ------------------------------------------------------------------ */
 /*  Bits                                                               */
 /* ------------------------------------------------------------------ */
+
+/** Per-page row selection for the bulk-action queues (tickets & provisioning).
+ *  The selection is per-view: it clears whenever the visible page changes
+ *  (filter, sort, page, or a bulk action that reshuffles rows). */
+function useRowSelection(pageIds: number[]) {
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const key = pageIds.join(',');
+    useEffect(() => {
+        setSelected(new Set());
+    }, [key]);
+
+    const toggle = (id: number, on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (on) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+
+    const toggleAll = (on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            pageIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            return next;
+        });
+
+    return {
+        selected,
+        clear: () => setSelected(new Set()),
+        toggle,
+        toggleAll,
+        allOnPage: pageIds.length > 0 && pageIds.every((id) => selected.has(id)),
+        someOnPage: pageIds.some((id) => selected.has(id)),
+    };
+}
 
 function FilterSelect({
     ariaLabel,
@@ -602,14 +1963,108 @@ function AssigneeFilter({
     );
 }
 
+/** Created-date range — two native pickers feeding the `from`/`to` params. */
+function DateRange({
+    from,
+    to,
+    onChange,
+}: {
+    from: string;
+    to: string;
+    onChange: (key: 'from' | 'to', value: string) => void;
+}) {
+    const base =
+        'h-8 rounded-md border border-border bg-card px-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
+    return (
+        <div className="flex items-center gap-1.5">
+            <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => onChange('from', e.target.value)}
+                aria-label="Raised from"
+                className={base}
+            />
+            <span className="text-[12px] text-muted-foreground">→</span>
+            <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => onChange('to', e.target.value)}
+                aria-label="Raised to"
+                className={base}
+            />
+        </div>
+    );
+}
+
+/** A sortable column header — chevron shows the active direction. */
+function SortHeader({
+    label,
+    col,
+    filters,
+    onSort,
+}: {
+    label: string;
+    col: string;
+    filters?: Filters;
+    onSort: (col: string) => void;
+}) {
+    const active = filters?.sort === col;
+    return (
+        <button
+            type="button"
+            onClick={() => onSort(col)}
+            aria-label={`Sort by ${label}`}
+            className="flex items-center gap-1 text-left tracking-wide uppercase transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+        >
+            {label}
+            {active ? (
+                filters?.dir === 'asc' ? (
+                    <ChevronUp className="h-3 w-3" />
+                ) : (
+                    <ChevronDown className="h-3 w-3" />
+                )
+            ) : (
+                <ChevronsUpDown className="h-3 w-3 opacity-40" />
+            )}
+        </button>
+    );
+}
+
+/** Progress dots for a requester's ticket: raised → working → resolved →
+ *  closed. Decorative (aria-hidden) — the StatusBadge text beside it carries
+ *  the meaning; `waiting` sits at the working stage with its own flag. */
+const DOT_STAGES = ['open', 'in_progress', 'resolved', 'closed'];
+
+function StatusDots({ status }: { status: string }) {
+    const reached = status === 'waiting' ? 1 : DOT_STAGES.indexOf(status);
+    return (
+        <span aria-hidden className="flex items-center gap-1 pl-0.5">
+            {DOT_STAGES.map((stage, i) => (
+                <span
+                    key={stage}
+                    className={
+                        i <= reached
+                            ? 'h-1.5 w-1.5 rounded-full bg-primary'
+                            : 'h-1.5 w-1.5 rounded-full bg-border'
+                    }
+                />
+            ))}
+        </span>
+    );
+}
+
 function EmptyState({
     icon: Icon,
     title,
     blurb,
+    action,
 }: {
     icon: typeof Inbox;
     title: string;
     blurb: string;
+    action?: { label: string; onClick: () => void };
 }) {
     return (
         <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
@@ -618,6 +2073,11 @@ function EmptyState({
             </span>
             <div className="text-[14px] font-bold">{title}</div>
             <p className="max-w-sm text-[12.5px] leading-relaxed text-muted-foreground">{blurb}</p>
+            {action ? (
+                <Button size="sm" variant="outline" className="mt-1" onClick={action.onClick}>
+                    {action.label}
+                </Button>
+            ) : null}
         </div>
     );
 }

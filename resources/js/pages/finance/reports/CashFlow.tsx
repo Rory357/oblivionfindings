@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Printer, Activity, ArrowUpCircle, ArrowDownCircle, TrendingUp, Wallet } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
 
 interface CashFlowEntry {
     account_name: string;
@@ -37,14 +37,11 @@ interface Props extends PageProps {
     filters: { start_date: string; end_date: string };
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Reports' },
     { title: 'Cash Flow' },
 ];
@@ -71,7 +68,7 @@ function CashFlowSection({
                     <TableCell
                         className={`text-right ${entry.amount < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
                     >
-                        {formatCurrency(entry.amount)}
+                        {formatMoney(entry.amount)}
                     </TableCell>
                 </TableRow>
             ))}
@@ -87,7 +84,7 @@ function CashFlowSection({
                 <TableCell
                     className={`text-right ${total < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
                 >
-                    {formatCurrency(total)}
+                    {formatMoney(total)}
                 </TableCell>
             </TableRow>
         </>
@@ -134,10 +131,10 @@ export default function CashFlow({ report, filters }: Props) {
                         title="Cash Flow Statement"
                         description="Cash inflows and outflows across operating, investing, and financing activities."
                         stats={[
-                            { label: 'Operating', value: formatCurrency(report.total_operating) },
-                            { label: 'Investing', value: formatCurrency(report.total_investing) },
-                            { label: 'Financing', value: formatCurrency(report.total_financing) },
-                            { label: 'Net Change', value: formatCurrency(report.net_cash_change) },
+                            { label: 'Operating', value: formatMoney(report.total_operating) },
+                            { label: 'Investing', value: formatMoney(report.total_investing) },
+                            { label: 'Financing', value: formatMoney(report.total_financing) },
+                            { label: 'Net Change', value: formatMoney(report.net_cash_change) },
                         ]}
                         actions={
                             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
@@ -177,7 +174,7 @@ export default function CashFlow({ report, filters }: Props) {
                                             : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
-                                    {formatCurrency(report.total_operating)}
+                                    {formatMoney(report.total_operating)}
                                 </p>
                             </div>
                         </CardContent>
@@ -208,7 +205,7 @@ export default function CashFlow({ report, filters }: Props) {
                                             : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
-                                    {formatCurrency(report.total_investing)}
+                                    {formatMoney(report.total_investing)}
                                 </p>
                             </div>
                         </CardContent>
@@ -239,7 +236,7 @@ export default function CashFlow({ report, filters }: Props) {
                                             : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
-                                    {formatCurrency(report.total_financing)}
+                                    {formatMoney(report.total_financing)}
                                 </p>
                             </div>
                         </CardContent>
@@ -270,7 +267,7 @@ export default function CashFlow({ report, filters }: Props) {
                                             : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
-                                    {formatCurrency(report.net_cash_change)}
+                                    {formatMoney(report.net_cash_change)}
                                 </p>
                             </div>
                         </CardContent>
@@ -315,13 +312,13 @@ export default function CashFlow({ report, filters }: Props) {
                                     <BarChart data={barData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']} />
+                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Amount']} />
                                         <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                             {barData.map((entry, index) => (
                                                 <Cell
                                                     key={`cell-${index}`}
-                                                    fill={entry.amount >= 0 ? '#10b981' : '#ef4444'}
+                                                    fill={entry.amount >= 0 ? 'var(--status-success)' : 'var(--status-critical)'}
                                                 />
                                             ))}
                                         </Bar>
@@ -342,11 +339,11 @@ export default function CashFlow({ report, filters }: Props) {
                                     <BarChart data={cashCompareData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Cash']} />
+                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Cash']} />
                                         <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                                            <Cell fill="#3b82f6" />
-                                            <Cell fill="#8b5cf6" />
+                                            <Cell fill={chartColor(0)} />
+                                            <Cell fill={chartColor(1)} />
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -375,7 +372,7 @@ export default function CashFlow({ report, filters }: Props) {
                                 <TableRow className="font-semibold">
                                     <TableCell>Opening Cash Balance</TableCell>
                                     <TableCell className="text-right">
-                                        {formatCurrency(report.opening_cash)}
+                                        {formatMoney(report.opening_cash)}
                                     </TableCell>
                                 </TableRow>
 
@@ -405,7 +402,7 @@ export default function CashFlow({ report, filters }: Props) {
                                                 : 'text-status-critical dark:text-status-critical'
                                         }`}
                                     >
-                                        {formatCurrency(report.net_cash_change)}
+                                        {formatMoney(report.net_cash_change)}
                                     </TableCell>
                                 </TableRow>
 
@@ -413,7 +410,7 @@ export default function CashFlow({ report, filters }: Props) {
                                 <TableRow className="text-lg font-bold">
                                     <TableCell>Closing Cash Balance</TableCell>
                                     <TableCell className="text-right">
-                                        {formatCurrency(report.closing_cash)}
+                                        {formatMoney(report.closing_cash)}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>

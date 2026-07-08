@@ -2,12 +2,13 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { TaxTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download, Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
 type GstReturn = {
@@ -41,9 +42,6 @@ type PageProps = {
     };
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -59,14 +57,8 @@ const basisLabels: Record<string, string> = {
     hybrid: 'Hybrid',
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'GST Returns', href: '/finance/gst-returns' },
 ];
 
@@ -93,6 +85,20 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
         router.get('/finance/gst-returns', params, { preserveState: true });
     }
 
+    const clearFilters = () => {
+        router.get('/finance/gst-returns', {}, { preserveState: true });
+    };
+
+    const hasFilters = Boolean(
+        (filters.status && filters.status !== 'all') || (filters.year && filters.year !== 'all'),
+    );
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (gstReturn: GstReturn): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/gst-returns/${gstReturn.id}`) },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="GST Returns" />
@@ -104,18 +110,26 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         title="GST Returns"
                         description="Manage and file GST returns with IRD"
                         stats={[
-                            { label: 'GST collected', value: formatNZD(kpis.totalCollected) },
-                            { label: 'GST paid', value: formatNZD(kpis.totalPaid) },
-                            { label: 'Net payable', value: formatNZD(Math.abs(kpis.totalPayable)) },
+                            { label: 'GST collected', value: formatMoney(kpis.totalCollected) },
+                            { label: 'GST paid', value: formatMoney(kpis.totalPaid) },
+                            { label: 'Net payable', value: formatMoney(Math.abs(kpis.totalPayable)) },
                             { label: 'Drafts', value: kpis.draftCount },
                         ]}
                         actions={
-                            <Link href={'/finance/gst-returns/prepare'}>
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Prepare Return
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/gst-returns/export?${new URLSearchParams(Object.entries({ status: filters.status ?? '', year: filters.year ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            </Link>
+                                <Link href={'/finance/gst-returns/prepare'}>
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Prepare Return
+                                    </Button>
+                                </Link>
+                            </div>
                         }
                         footer={<TaxTabsFooter active="gst-returns" />}
                     />
@@ -131,7 +145,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Collected</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalCollected)}</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalCollected)}</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -144,7 +158,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Paid</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalPaid)}</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalPaid)}</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -158,7 +172,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Payable</p>
                                     <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}>
-                                        {formatNZD(Math.abs(kpis.totalPayable))}
+                                        {formatMoney(Math.abs(kpis.totalPayable))}
                                         {kpis.totalPayable < 0 ? ' (Refund)' : ''}
                                     </p>
                                 </div>
@@ -168,7 +182,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-muted-foreground/80/10 p-2">
+                                <div className="rounded-lg bg-muted-foreground/10 p-2">
                                     <FileText className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <div>
@@ -192,7 +206,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     value={filters.status ?? 'all'}
                                     onValueChange={(v) => applyFilter('status', v)}
                                 >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-[140px]" aria-label="Filter by status">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -206,7 +220,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     value={filters.year ?? 'all'}
                                     onValueChange={(v) => applyFilter('year', v)}
                                 >
-                                    <SelectTrigger className="w-[120px]">
+                                    <SelectTrigger className="w-[120px]" aria-label="Filter by year">
                                         <SelectValue placeholder="Year" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -239,15 +253,33 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 <tbody>
                                     {gstReturns.data.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                                                No GST returns found. Prepare your first return to get started.
+                                            <td colSpan={8} className="p-0">
+                                                {hasFilters ? (
+                                                    <EmptySearch
+                                                        onClear={clearFilters}
+                                                        title="No GST returns match your filters"
+                                                        className="border-0"
+                                                    />
+                                                ) : (
+                                                    <EmptyList
+                                                        icon={Calculator}
+                                                        itemName="GST return"
+                                                        title="No GST returns yet"
+                                                        description="Prepare your first return to get started."
+                                                        className="border-0"
+                                                        action={
+                                                            <Link href="/finance/gst-returns/prepare">
+                                                                <Button size="sm">New GST return</Button>
+                                                            </Link>
+                                                        }
+                                                    />
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (
                                         gstReturns.data.map((gstReturn) => {
                                             const payable = Number(gstReturn.gst_payable);
                                             const isRefund = payable < 0;
-                                            const status = statusConfig[gstReturn.status] ?? statusConfig.draft;
 
                                             return (
                                                 <tr
@@ -258,6 +290,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                             `/finance/gst-returns/${gstReturn.id}`,
                                                         )
                                                     }
+                                                    onContextMenu={rowMenu.open(rowMenuItems(gstReturn))}
                                                 >
                                                     <td className="py-3 pr-4">
                                                         <div className="font-medium">
@@ -276,13 +309,13 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         {basisLabels[gstReturn.basis] ?? gstReturn.basis}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_sales)}
+                                                        {formatMoney(gstReturn.total_sales)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_gst_collected)}
+                                                        {formatMoney(gstReturn.total_gst_collected)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_gst_paid)}
+                                                        {formatMoney(gstReturn.total_gst_paid)}
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
@@ -290,13 +323,11 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         }`}
                                                     >
                                                         {isRefund ? '(' : ''}
-                                                        {formatNZD(Math.abs(payable))}
+                                                        {formatMoney(Math.abs(payable))}
                                                         {isRefund ? ')' : ''}
                                                     </td>
                                                     <td className="py-3">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={gstReturn.status} />
                                                     </td>
                                                 </tr>
                                             );
@@ -322,6 +353,8 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

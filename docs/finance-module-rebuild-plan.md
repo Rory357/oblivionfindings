@@ -473,6 +473,385 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
 
 ---
 
+## Completion phase (C-series) — appended 2026-07-07 after full re-audit
+
+**Method:** 4 parallel adversarial code sweeps + a full browser sweep (local dev server at `bdf8189e` == origin/main,
+demo admin, FinanceDemoSeeder data) — every hub, every tab, the dashboards, operations funding/client-funds, and
+`/hr/payroll` opened and probed; Rostering captured as the parity bar. Prior claims re-derived; corrections below.
+
+### P0 defects found live (fix first — C0)
+1. **`/finance/reports/profit-loss` → 500** on any org. `FinancialReportService::getAccountBalancesForPeriod`
+   (`app/Domain/Finance/Services/FinancialReportService.php:594-617`) applies `FinAccount::forOrganization()`
+   (unqualified `where organization_id`) then joins `fin_journal_lines`+`fin_journals` → MySQL 1052 ambiguous
+   column. Same pattern risk at `:534` (funding-stream summary joins). **Fix:** qualify the scope
+   (`qualifyColumn`) so every joined use is safe; regression test hits the P&L endpoint.
+2. **Flagship hero off-contract:** `pages/finance/Dashboard.tsx:469` renders `PageHero` **without**
+   `category="finance"` (purple `--primary`, every other finance page is the amber finance token) AND hardcodes
+   "across **14 sites** and **5 funding streams**" as literal text (`:484-485`) while real `siteCount` props sit
+   in the meta row. Fixed inside C1.
+3. **Local demo-data trap (dev only):** `FinanceDemoSeeder` guard = "any FinInvoice for org 1 exists" — one junk
+   factory invoice blocked all demo data. Extend guard/seeder in C8 (seed marker, not mere existence).
+
+### Consistency ledger (browser-verified 2026-07-07)
+Global truths (apply to EVERY finance list page unless noted): **no tab count badges anywhere**, **no row
+context-menus anywhere**, **no Skeleton loaders**, **EmptyState/EmptySearch component used nowhere** (bespoke
+empty divs exist on ~half the pages), **~80 of 106 pages format money with inline `Intl.NumberFormat`** instead
+of `money.tsx`, **16 pages use native `confirm()`**, **8 report pages + Dashboard + donor-funds share a
+hardcoded hex `CHART_COLORS` array**, ~25 pages hand-roll `statusConfig` colour maps beside ~15 correct
+`StatusBadge` users. Export exists only on: invoices/Show, IrdFilings/Show, CashFlowForecast/Show,
+bank-accounts (Index+Show), Consolidation/RunResults, audit-exports.
+
+| Surface (hub) | Hub footer tabs | Notable divergences beyond the global truths |
+|---|---|---|
+| Dashboard `/finance/dashboard` | – (FinanceHubsBar) | **No `category="finance"`** (purple hero); hardcoded site/stream counts; hex chart colours; otherwise strongest page (formatMoney ✓ StatusBadge ✓ NeedsAttentionStrip ✓ wizard quick-actions ✓) |
+| executive-dashboard | ✗ none | `category` ✓ (verified via CSS probe — earlier sweep claim wrong); `formatCurrency` from **fleet-utils**; hand-rolled severity colours; orphan (no hub) |
+| sites-overview `/finance/sites` | ✗ none | orphan dashboard; fleet-utils money; hex chart colours |
+| site-dashboard (drill-down) | ✗ | fleet-utils money, hex chart colours |
+| clients/Financials (drill-down) | ✗ | fleet-utils money; severity colour map |
+| Ledger ×7 tabs | ✓ all 7 pages | cost-centres+currencies `confirm()`; fx-reval `confirm()` on post; Create/Edit full-pages for accounts/fixed-assets/fx-reval; accounts Show inline `formatNZD` |
+| Receivables ×8 tabs | ✓ all 8 (incl. billing/Entries — earlier claim wrong) | quotes+recurring+price-books Create/Edit full-pages; invoices Show `confirm()`×2; no aged-AR drill filters |
+| Payables ×5 tabs | ✓ all 5 | bills/PO/vendors/credit-notes Create/Edit full-pages; PO Show `confirm()`×2; payment-run approve/process bare `router.post` |
+| Banking ×8 tabs | ✓ all 8 | bank-accounts+petty-cash Create full-pages; bank-feeds `confirm()`; match-rules `confirm()`; reconcile workspace = page (by design, confirm steps need modals) |
+| Tax ×4 tabs | ✓ all 4 | gst-returns Show `confirm()` (mark filed); IrdFilings Show `confirm()` (submit); gst Prepare = full page; audit-exports Create full-page + `confirm()` delete; Intercompany is `/finance/intercompany/{group}` detail (no hub tab — fold under Consolidation) |
+| Reports ×9 tabs | ✓ all 9 | **P&L 500 (C0)**; all 8 use hex `CHART_COLORS`; all inline Intl money; budget-vs-actuals lives here (`/finance/reports/budget-vs-actuals`) |
+| Settings ×2 tabs | ✓ both | funding-streams inline CRUD forms + `confirm()` delete |
+| Calendar | – (by design) | ✓ formatMoney; STATUS_TONE local map |
+| donor-funds Index/Show | ✗ **orphan** | Show imports **`ui/tabs`** (only straggler); hex colours; Create full-page; inline receipt/expenditure/report forms |
+| CashFlowForecast | ✓ Reports footer | Create full-page; `confirm()` delete ×2 |
+| operations/client-funds ×3 | ✗ (ops module) | **purple ops hero**, no finance idioms at all; Create full-page → C4 migrates into Funding hub |
+| operations/funding + claims | ✗ (ops module) | plain pages, no PageHero contract → C4 |
+| hr/payroll | HR tabs (1 tab visible) | run list has Lock/Pay net/Bank file/Export actions; **no GL-failure surfacing, no filing action** → C5 |
+
+**No dead buttons / stub controls / orphan endpoints found** (route map 246 routes, all POST/PUT/DELETE have UI
+triggers; all `disabled` states conditional). 7 WizardShell dialogs exist (journal, account, bill, invoice, PO,
+vendor, receipt) — the mould for C2.
+
+### Seam table (owners re-verified 2026-07-07)
+| Seam | Owner | Verified state | C-series action |
+|---|---|---|---|
+| Pay calculation (PAYE/KiwiSaver/net) | HR — `NzPayrollCalculatorService`, `PayslipService` | payslips generate in `lockRun` ✓ (`PayrollExportService:176-180`) | consume, never re-derive |
+| Payroll GL post | Finance — `PayrollJournalService` via `PostPayrollJournalJob` (dispatched from `PayrollExportController@lockRun:163`) | balanced ✓, idempotent ✓, **hardcoded chart codes** (`:393-415`), **failures die in failed_jobs** | C5: per-org mapping + preflight + surfaced status |
+| Net-pay disbursement | Finance — `postNetPayPayment` (DR 2300/CR bank, `PayrollJournalService:214-295`) + `buildNetPayDirectCreditCsv` (`:302-320`); UI `hr/payroll/index.tsx:404-419`; routes `hr.php:682,684` | **shipped ✓** (post-plan-doc) | C5: link a typed `FinPaymentRun`, forecast outflow |
+| Payday filing (IR348) | Finance — `IrdFilingService::createPaydayFiling:40-87`, route `finance.php:583` | backend ✓, **no UI trigger**; **ESCT hardcoded '0.00'** (`IrdFilingService:68-69`), no payslip esct column | C5: filing action on run + esct column/calc (coordinate: HR owns payslip schema — additive migration OK per seam) |
+| Finance calendar payroll | Finance — `PayrollObligationProvider` registered in `FinanceCalendarAggregator:51` | **shipped ✓** | none |
+| Expenses → AP | Finance observers (`HrExpenseClaimObserver` → `ProcessFinancialEventJob`) | canonical path live | don't resurrect `PostExpenseJournalJob` |
+| Client money | **split**: ops `ClientFundController` (writes `ClientFundTransaction`, **GL columns orphaned — `ClientFundJournalService` never called**, rows: 0 locally) vs finance `ClientLedgerEntry` (observer→GL wired, `ClientLedgerService` netting fixed f9d1fbf9, rows: 0) | **both empty in dev**; ledger-entry store is the schema/GL-complete one | C4: PAUSE-AND-ASK Chane, then unify |
+| Budgets | Governance `Budget`+`BudgetLineItem` (denorm `actual_amount`) vs Finance `SiteBudgetLine`+live-GL. Report reads **live GL** ✓ (069a36fc intact); **ONE** hourly sync (`console.php:583` — "double sync" claim false); `BudgetSyncInterface` orphaned (0 impls); `fin_bills.spend_approval_id` **column exists**, no model relation/enforcement | C6: PAUSE-AND-ASK store, implement+bind interface, approval linkage |
+| Shared UI spine | `TabStrip`/`WizardShell`/`StatusBadge`/`PageHero` shared app-wide | finance wraps them in `components/finance/` ✓ | never fork |
+
+### C-milestones (finalised)
+- **[x] C0 — Hotfixes.** DONE 2026-07-07 (merge `7807f855`). Qualified `organization_id` via `qualifyColumn()`
+  in all 36 finance models' org scopes (both `fn (`/`fn(` spellings); new `ReportsRenderTest` renders all 8
+  report tabs against posted journals + locks P&L figures (revenue 1150/expenses 400/net 750). Finance suite
+  151 green. Browser-verified: P&L renders (amber hero, 9 tabs) on the local dev server.
+- **[x] C1 — Overview hub (the 8th hub).** DONE 2026-07-07. `GET /finance` now serves the Summary dashboard
+  (route NAME `finance.dashboard` kept → every existing caller lands on the hub; old `/finance/dashboard` URL
+  → `Route::redirect`). New `OverviewTabsFooter` (components/finance/overview-hub.tsx): **Summary · Executive ·
+  By site · Cash position**, all `finance.dashboard`-gated, rendered in all four heroes above the existing
+  period-pills/filters row. Summary hero fixed: `category="finance"` (was purple `--primary`) + real
+  site/funding-stream counts replace the hardcoded "14 sites / 5 funding streams". Executive + By-site brought
+  on-contract: PageLayout width=wide, hero KPI stats promoted from body cards, `formatMoney` replaces
+  fleet-utils `formatCurrency`, `StatusBadge` replaces the hand-rolled budget badge, `EmptyState` replaces
+  bespoke empties, new shared `chart-palette.ts` (CSS-var palette) kills sites-overview's hex `CHART_COLORS`.
+  NEW Cash-position tab: `CashPositionController` composes existing data only — live bank + petty-cash balances
+  and the next-30-days obligations from `FinanceCalendarAggregator` (in/out/projected totals) — page fully
+  on-contract. Sidebar entry renamed Overview → `/finance`. 65 breadcrumb hrefs + FinancePolicy/Rbac/visual
+  test URLs updated off the old path. Gates: types ✓ eslint(touched) ✓ build ✓ route:list ✓ OverviewHubTest
+  (5) + dashboard/nav tests 17 green ✓ browser-smoked all four tabs with screenshots, console clean.
+  *(By design kept: FinanceHubsBar on Summary; genuine drill-downs site-dashboard + clients/Financials stay
+  pages — they come on-contract in C3.)*
+- **[x] C2 — Modal sweep — MERGED to main `fa184916` 2026-07-08.** Whole milestone shipped: 11 full-page
+  flows → WizardShell dialogs + all 16 native `confirm()` → shared ConfirmDialog + guarded period-close modal.
+  Browser-verified (donor-receipt + asset-disposal balanced journals, payment-run process guard, period-close
+  guard — screenshots). 2 real GL bugs fixed (recurring-charge `starts_at` 500; asset-disposal 8100/8400
+  out-of-balance). Finance suite 186 green. Only deferred item: GST-Prepare page→wizard (works as a page).
+  Batch detail below.
+- **[x] C2 (batch detail) — Modal sweep** (retire full-page flows via `Route::redirect` + WizardShell conversions, the M10-6
+  edit pattern for edits; `alert-dialog` for every one of the 16 native `confirm()` sites; payment-run
+  approve/process get confirm modals; period-close gets a guarded impact-preview modal; GST Prepare becomes a
+  wizard ending in the return). Split into 3 batches:
+  - **[x] C2a (committed `f4a06c41` on finance/c2-modal-sweep):** recurring charge · price book · petty-cash
+    fund · bank account · audit export · cash-flow forecast → WizardShell dialogs; 9 retired URLs → NAMED
+    `Route::redirect`; all six browser-verified with REAL submissions (rows persist, KPIs move, success panes,
+    console clean). **2 real bugs fixed:** RecurringChargeController@store 500'd on every create (`starts_at`
+    NOT NULL, never set — retired full-page form had the same latent bug); FinanceDemoSeeder GL accounts had
+    no `sub_type` so the bank modal's GL picker was empty/unsubmittable on fresh seed. ModalSweepRedirectsTest
+    (redirects + renders + starts_at persistence). ⚠️ named redirects only — unnamed ones inside the
+    `->name('finance.')` group collide on `route:cache`.
+  - **[~] C2b (agent running):** quote C/E · credit-note C · fixed-asset C/E + disposal · donor-fund C +
+    receipt/expenditure transaction modals (post trust journals → PostingPreview) · funding-stream inline→modal.
+  - **[x] C2c (confirm sweep):** shared `components/finance/confirm-dialog.tsx` (`ConfirmDialog` wrapping
+    shadcn AlertDialog; `variant` destructive|default, `processing` guard) replaces **all 16 native `confirm()`
+    sites** — audit-exports, bank-feeds, bills/Show, CashFlowForecast (Index+Show), Consolidation/Show,
+    cost-centres, currencies, funding-streams, fx-reval post, gst-returns mark-filed, invoices send + mark-paid,
+    IrdFilings submit, match-rules, PO approve + convert, payment-run approve + process. `grep confirm(` under
+    pages/finance = **0**. **PLUS a guarded period-close impact modal** (fiscal-periods/Index — closing a period
+    previously fired on a single click with NO confirmation; now a destructive ConfirmDialog spelling out that no
+    further journals can post to a closed period). ⚠️ Fixed 3 defects in the sub-agent's partial work: it hit its
+    session limit having (a) DELETED both payment-run confirmations without replacing them (approve/process fired
+    unguarded — a regression), (b) left invoices/Show with the send + mark-paid triggers but NO dialog renders
+    (dead buttons), (c) left 3 confirm() stragglers (PO ×2, IRD ×1). All fixed + re-verified: every touched file
+    renders its dialog and every trigger opens it. types/eslint/build green.
+  - **[ ] C2c leftover — GST Prepare page → wizard.** `gst-returns/Prepare.tsx` is still a full page (frequency
+    + period selection → creates the return). It WORKS (no dead button) — this is purely an idiom upgrade to a
+    WizardShell dialog on the gst-returns index, deferred as a small follow-up (lower priority than banking the
+    verified conversion + confirm sweep).
+  *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked (except GST-Prepare, tracked above);
+  zero native confirm() ✓; every new modal browser-smoked.*
+- **[~] C3 — Consistency sweep** (mechanical, per-hub ticks). Split into sub-batches:
+  - **[x] C3a — format/token sweep (branch finance/c3-consistency, 4 parallel agents, verified).** 68 finance
+    pages migrated off inline `Intl.NumberFormat`/local `formatCurrency`/`formatNZD`/fleet-utils → canonical
+    `formatMoney`/`formatMoneyCompact` (components/finance/money.tsx). 16 files' hardcoded hex `CHART_COLORS`
+    arrays → `chart-palette.ts` (`chartColor(i)` / `CHART_PALETTE`); semantic red/green recharts fills kept as
+    `var(--status-success|critical)` (meaning preserved, still no literal hex). The last `ui/tabs` straggler
+    (donor-funds/Show.tsx) → canonical `FinanceTabs` (controlled state, same two sections). Module-wide greps:
+    `Intl.NumberFormat`=0, `#rrggbb`=0, `@/components/ui/tabs`=0, fleet-utils=0. Gates: types 0, eslint clean on
+    all 68, build clean, Finance suite green (frontend-only). Browser-verified: report themed charts, index
+    money, donor-funds tabs. (One kept wrapper: Consolidation `formatCurrencyStr(v,currency)` delegates to
+    `formatMoney` for multi-currency — on-contract.) ⚠️ AGENT VERIFY LESSON: grep the module globally after
+    parallel agents (a half-migrated sibling file showed as a transient tsc error mid-run — cleared when its
+    owning agent finished; don't gate until ALL agents land).
+  - **[x] C3b — StatusBadge sweep — MERGED to main `b221252b` 2026-07-08.** Extended `resources/js/lib/
+    status-colors.ts` with the finance status vocabulary (sent/paid/partially_paid/awaiting_approval/processing/
+    failed/validated/submitted/accepted/received/reconciled/posted/filed/amended/reversed/discrepancy/generating/
+    eliminated/partial/final/fully_spent/…) — ONE shared map, so `<StatusBadge status={x}/>` renders the right
+    severity everywhere. 35 pages migrated off local statusConfig/statusColors/STATUS_VARIANTS maps + local
+    StatusBadge helper fns (3 parallel per-hub agents + Integrations/bank-feeds finished by hand). Module-wide
+    grep: hand-rolled status colour maps = 0. Categorical TYPE maps (account/txn type, category, frequency,
+    filing type) correctly LEFT. Intentional standardisation: cancelled→neutral, PO sent→info, some completed→
+    info (single source of truth). Per-status icons StatusBadge has no slot for were dropped. Gates: types 0,
+    eslint clean, build clean, suite 186 green. Browser-verified: invoices Paid=green/Sent=info, bills
+    Approved=green — right colours, no console errors. *(EmptyState/skeleton adoption folded into C3d/C3e — the
+    empty-list states are lower-risk and pair naturally with the command-layer list work.)*
+  - **[ ] C3d — command layer** (search + filter chips synced to URL + sort + CSV export + pagination on every
+    list tab; right-click context menus (shift-context-menu mould); **tab count badges** wired from controllers).
+    Shipping per-concern sub-batches:
+    - **[x] C3d-export — CSV export on all 15 lists** (merged `e7ea0a9e`). Shared `streamSanitizedCsv` helper on
+      `SanitizesCsvOutput` (base Controller) → BOM + `putCsv` per row (formula-injection safe); an `export(Request)`
+      on every finance list controller mirroring its index filters; 14 `finance.<x>.export` routes registered
+      **before** resource routes (so `/x/export` isn't captured as `{param}`); Export-CSV `<a href>` in each hero.
+      41 tests (ListExport{,Payables,Ledger,TaxBank}Test), full finance suite 227 green. ⚠️ helper is
+      `streamSanitizedCsv` not `streamCsv`/`exportCsv` (both taken as `private` elsewhere → visibility fatal);
+      ⚠️ Vendor export omits the encrypted bank_account_number by design.
+    - **[x] C3d-badges — tab count badges.** `FinanceHubCountsService` returns `[hub][tab => count]` for the
+      list tabs (report / dashboard / workspace tabs carry none); shared once per finance request as a lazy,
+      finance-route-scoped `financeHubCounts` Inertia prop (non-finance pages + partial reloads pay nothing);
+      each of the 5 list-hub `*TabsFooter` reads its slice and badges tabs via `tabCountBadge` (omits 0, caps
+      `999+`). Every count org-scoped + individually guarded (bad table → no badge, never a 500 in middleware).
+      Browser-verified on demo data: receivables (Invoices 6 · Quotes 1 · Recurring 1 · Price books 1; Billing/
+      Allocations 0 → no badge; Aged-AR/Statements reports → no badge) + payables (Bills 4 · POs 2 · Vendors 4 ·
+      Credit notes 2 · Payment runs 2), no console errors. Gates: types 0, eslint 0, vitest 3, suite 230 green.
+    - **[x] C3d-list — command layer on the laggard lists.** Replicated the invoices/bills golden template (hand-rolled
+      inline filter Card + inline paginator `.links`, no shared FilterBar/LaravelPagination so the pages stay visually
+      identical to invoices/bills; broad EmptyState/skeleton adoption stays C3e's module-wide job). **Donor-funds**:
+      now `->paginate(20)->withQueryString()->through(…)` + search / status / restricted filters (shared
+      `applyFundFilters` so index + CSV export show the same rows) + filter bar + paginator + filter-aware empty.
+      **Credit-notes**: added search (CN # / vendor / client) + credit-date range on top of its type/status
+      (shared `applyCreditNoteFilters`). **Accounts** (a *tree*): client-side search + active filter over the loaded
+      chart (you never paginate a chart of accounts) — prunes to matches keeping ancestors. **GST returns**: already
+      had status/year + pagination → left as-is. No clickable column sort (the golden template has none — adding it to
+      only these would break consistency; defer a uniform sort). Gates: types 0, eslint 0, suite 232, browser-verified
+      (donor-funds `?search=` round-trips + hydrates; accounts tree 8→1 on "bank"; credit-notes bar renders), no console errors.
+    - **[x] C3d-menus — right-click context menus** on list rows. Reused HR's generic `useRowContextMenu()`
+      (portal, cursor-positioned, token-styled, keyboard-nav; `RowCtxItem[]` API) — re-exported via the finance
+      barrel alongside the existing StatusBadge HR re-export (no fork, zero HR files touched). Each row's menu
+      MIRRORS that page's existing inline actions (Open first), same guards + same handlers — never an invented
+      route or a bypassed confirm (payment-run Approve/Process stay on the Show page behind ConfirmDialog, so the
+      Index menu is Open-only). **Batch 1 MERGED — the 7 AP/AR transactional lists**: invoices (Open/Edit-draft/
+      Record-receipt), bills (Open/Edit-draft), purchase-orders (Open), quotes (Open/Edit-draft), vendors (Open),
+      credit-notes (Open), payment-runs (Open). Gates: types 0, eslint 0, build clean, suite 232 (no PHP touched);
+      browser-verified the menu opens per-row with the right guarded items (invoices Paid→Open, Sent→Open+Record
+      receipt), no console errors. **Follow-up batch MERGED — 12 ledger/banking/tax lists** (4 parallel agents,
+      every diff verified additive + grep + types): journals/accounts-tree/gst-returns/ird-filings/bank-accounts/
+      petty-cash → Open; fixed-assets → Open+Edit; bank-accounts → Open+Edit; audit-exports → Download+Delete
+      (via ConfirmDialog); cost-centres → Delete; currencies → Delete (non-base); fiscal-periods → Close (open);
+      fx-revaluations → Post-to-GL (draft) — all through the page's own setState/confirm handler with the same
+      guard, `onContextMenu` attached only when a row has an applicable action (no empty menus). accounts-tree
+      threads `onRowContextMenu` down the recursive AccountRow (element stays at page level). **bank-transactions
+      N/A** — plain rows with no navigation and no inline actions (menu would be empty), correctly skipped. Gates:
+      types 0, eslint 0, build clean, suite 232 (no PHP); browser-verified fixed-assets (Open+Edit / Open by status)
+      + audit-exports (Download+Delete), no console errors. **C3d-menus is now DONE across every finance list that
+      has a navigable row or an inline action.**
+  - **[x] C3e — empty states + axe + responsive + Intercompany fold. COMPLETE.** Per-concern sub-batches:
+    - **[x] C3e-1 — EmptyState/EmptySearch adoption** on 16 finance list pages (invoices golden + 4 agents): each
+      empty branch now renders the shared `@/components/ui/empty-state` — `EmptySearch` (filters active → "No X match
+      your filters" + Clear, via the page's `clearFilters`; several pages that lacked one got a minimal `clearFilters`
+      added) vs `EmptyList` (empty → "No X yet" + a create CTA wired to the page's own existing trigger). In-table
+      empties keep the `TableRow/TableCell colSpan` wrapper (cell `p-0`, EmptyState `border-0`); Card/div empties swap
+      inner content. Pages: invoices/bills/purchase-orders/vendors/quotes/credit-notes/donor-funds/journals/fixed-assets/
+      bank-accounts/bank-transactions/petty-cash/gst-returns/ird-filings/audit-exports/payment-runs. Gates: types 0
+      (validated every create-trigger/clearFilters ref), eslint 0, build clean, suite 232 (no PHP); browser-verified
+      invoices EmptySearch renders ("No invoices match your filters" + Clear), no console errors. ⚠️ DEFERRED (low-value,
+      rarely-empty pure-config lists): cost-centres / fiscal-periods / currencies / fx-revaluations keep hand-rolled empties.
+    - **[x] C3e-2 — skeletons: N/A (code-confirmed).** No finance controller uses `Inertia::defer` and no finance
+      list does a client-side fetch — every list loads synchronously, so a loading skeleton would never render.
+      Deliberately shipped none (no stub skeletons). Revisit only if a future finance surface adds a deferred prop.
+    - **[x] C3e-3 — axe no-criticals.** Ran real axe-core (served temporarily from public/, deleted after) on the
+      hubs + list pages. Finance was nearly clean; the ONE critical was `button-name` on the shadcn filter
+      `<SelectTrigger>` comboboxes (visible placeholder, no accessible name) → added a descriptive `aria-label` to
+      all 26 filter-toolbar Selects across 16 list pages (modal/form Selects left alone — labelled via their own
+      Label). Browser-verified 0 `button-name` (and 0 criticals) on invoices + bills. NOTE: `color-contrast`
+      (serious, NOT critical) remains on the shared status-badge tokens (status-info-bg/text) + sidebar chrome —
+      app-wide design-token/chrome concern, out of finance scope, not fixed here.
+    - **[x] C3e-4 — responsive: finance is clean.** Finance list tables ride the shadcn `<Table>` wrapper
+      (`relative w-full overflow-x-auto`), so wide tables scroll in their own container with ZERO body overflow at
+      tablet (verified invoices 775px table @ 753px viewport, no horizontal body scroll). Only /finance overview has
+      a minor ~34px overflow from the SHARED PageHero decoration circle (`-right-16`, all modules) + a recharts SVG —
+      not finance-authored, minor, desktop-first app → left as acceptable. No finance code changes needed.
+    - **[x] C3e-5 — Intercompany already nested under Consolidation (verified from code — the prior "orphan" claim
+      was stale).** `intercompany.index` is `/finance/intercompany/{group}` — a PER-GROUP page, not a top-level orphan;
+      there is no standalone `/finance/intercompany` route to redirect. It's reached from the Consolidation group Show
+      page (an "Intercompany" button, Consolidation/Show.tsx:315) and its breadcrumb is already
+      `Finance › Consolidation › {group} › Intercompany` (Intercompany/Index.tsx:197-201). It can't be a TAX_TABS tab
+      because it needs a group context. So no restructure/redirect was needed. Only polish applied: added a hero
+      `backHref` to the parent group (matching the Consolidation Show hero) for consistent back-nav. types 0, eslint 0,
+      build clean. ⚠️ browser-verify of the Intercompany page is blocked by demo data (no consolidation group seeded);
+      change is type-safe + code-verified (same href as the breadcrumb).
+  - **✅ C3 COMPLETE** — one visual language across the finance module: PageHero+FinanceTabs+count badges, WizardShell
+    modals + shared ConfirmDialog, formatMoney/StatusBadge everywhere, the full command layer (export · badges ·
+    search/filter/pagination · right-click menus), shared EmptyState/EmptySearch, axe-critical-clean, responsive,
+    design-tokens-only. Next milestone: **C4 funding & client-money hub (PAUSE-AND-ASK on the canonical store).**
+- **[~] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
+  Client/resident funds · Donor/trust funds · Service billing).
+  **✅ CANONICAL-STORE DECISION MADE (Chane, this session): ClientFund/ClientFundTransaction is canonical.**
+  ⚠️ The PRIOR recommendation in this entry was BACKWARDS — re-derived from code (untrust-the-audit paid off):
+  - **ClientFund/ClientFundTransaction = the working, tested, GL-posting trust store.** `ClientFundController@addTransaction`
+    (app/Http/Controllers/Operations/ClientFundController.php:156) → `ClientFundTransactionObserver@created` →
+    `PostClientFundJournalJob` → `ClientFundJournalService::postClientFundJournal` posts a BALANCED journal to segregated
+    trust accounts (deposit DR 1010 Bank-Trust / CR 2500 Client Trust Funds; withdrawal reversed), idempotent on
+    `journal_id`. `ClientFundJournalDispatchTest` genuinely asserts the 1010/2500 lines + one-journal-per-txn (NOT a stub).
+  - **ClientLedgerEntry = DORMANT.** Modelled + observed (would GL-post via ProcessFinancialEventJob) + READ by
+    `ClientLedgerService` + `ClientController.php:806` — but a full `app/` grep finds ZERO `ClientLedgerEntry::create`/
+    `->create`/`new`. Nothing writes it → the client-profile "ledger entries" it feeds is always empty; the M6-2
+    segregation fix guards an empty store.
+  - **Both tables EMPTY in dev DB (0/0/0)** → NO data migration; purely architectural + low-risk.
+  **IMPLEMENTATION (per Chane = ClientFund canonical), staged sub-batches:**
+  (C4-A) build /finance/funding hub SHELL — finance PageHero + FinanceTabs footer (5 tabs) + a collect-first
+  FundingController@index redirect; tabs point at existing surfaces (finance funding-streams + donor-funds already
+  in finance; operations/funding-claims + operations/client-funds migrated into finance behind /finance/funding with
+  NAMED Route::redirects; finance/billing = service billing).
+  **(C4-B-1 DONE — merged this session):** repointed `ClientLedgerService` (behind the finance client-financials tab,
+  insights API, and summary service) from the DORMANT empty `ClientLedgerEntry` → the canonical `ClientFundTransaction`
+  (deposits/withdrawals via `fund.client_id`), keeping the exact getLedger/summary return shape so all 3 consumers now
+  show REAL trust-fund activity + a correct personal running balance (segregation preserved — operational FinCostAllocation
+  costs shown, never move the personal balance). ClientMoneySegregationTest updated to seed ClientFundTransaction; finance
+  suite 232. ClientLedgerEntry model+observer+table left intact (reserved).
+  **(C4-B-2 DONE — merged this session):** removed the vestigial empty `ledger_entries` (ClientLedgerEntry) read from the
+  client PROFILE (ClientController.php + the operations/clients/tabs/finance.tsx "Client ledger" Card) — the profile already
+  shows ClientFund funds + recent_transactions. Pure removal (−81 lines); types/eslint/build clean; browser-verified the
+  finance tab renders Funds/Recent-fund-transactions/Purchase-requests/Discrepancies with the empty Client-ledger section
+  gone + no console errors. ClientLedgerEntry model/observer/table left intact (reserved). **✅ C4-B COMPLETE — client money
+  is fully repointed at the canonical ClientFund store.** ⚠️ C4-B touched the CLIENTS module (agreed seam — Chane approved).
+  Then: Client-Money Transaction modal (deposit/withdrawal via the working ClientFund trust path, receipt upload, audited)
+  + funder remittance reconciliation. Client money never nets against operational accounts (segregation preserved:
+  trust liability 2500, not operational revenue).
+- **[~] C5 — Payroll residuals — RE-DERIVED FROM CODE (audit was optimistic; the FINANCE GL bridge is already SOUND).**
+  `PayrollJournalService::postPayrollJournal` (app/Domain/Finance/Services/PayrollJournalService.php) posts a BALANCED NZ
+  journal (DR 5000 Wages / 5010 KiwiSaver-er / 5020 ACC-levy; CR 2100 PAYE / 2110 ACC-payable / 2120 KiwiSaver-payable /
+  2130 Student-loan / 2300 Accrued-wages), idempotent (journal_id + findExistingPayrollJournal), resolves each canonical
+  code via findAccountByCode + THROWS if missing (never invents a code / never posts unbalanced); `postNetPayPayment`
+  (DR 2300 / CR bank) + `buildNetPayDirectCreditCsv` work. Verdict per claim:
+  - **(a) GL-post FAILURE surfacing = REAL but CROSS-MODULE.** PostPayrollJournalJob ($tries=1) catches→logs→re-throws →
+    silent failed_jobs; the run (HrPayrollRun) has `gl_posted_at` but NO gl_status/gl_error, so a failed post looks like
+    "not posted yet". Fixing = an hr_payroll_runs column + the HR-owned payroll-run UI + a retry endpoint (dispatched from
+    HR's PayrollExportController:164) → **HR-SEAM item, not finance-in-lane.**
+  - **(b) config-drive codes = LOW value** — hardcoded-canonical-codes + throw-if-missing is the CORRECT safe pattern
+    (same as ClientFundJournalService 1010/2500), not a bug. Skip.
+  - **(c) preflight** — the service already throws on missing accounts + (via JournalPostingService.post) closed period;
+    surfacing it before dispatch is part of (a)'s HR-side UI work.
+  - **(d) reconcile** run.total_gross vs Σpayslip gross — a real integrity guard, but also lands on the HR run.
+  - **(e) ESCT** = HR-OWNED (hr_payslips + NzPayrollCalculatorService compute it).
+  - **(f) forecast double-count = MOOT** — CashFlowForecastService has ZERO payroll references (no payroll outflow in the
+    forecast at all), so nothing to double-count. (Payroll-in-forecast would be a NEW feature, not a bug fix.)
+  **⇒ C5's finance-side is essentially done (GL bridge sound). Remaining residuals (a/c/d/e) are HR-SEAM/HR-owned — do
+  them WITH HR (hr_payroll_runs column + run UI + calculator), not as a finance fork.** (3) payday-filing action = M5-5
+  (route exists), can ship finance-side later.
+- **[~] C6 — Budgets + approvals. ✅ CHANE DECIDED: "Keep both + non-destructive cleanup"** (2nd/last reserved decision).
+  RE-DERIVED FROM CODE — the "duplicate budget backend" was a MISDIAGNOSIS (untrust-the-audit again):
+  - Finance `SiteBudgetLine` = per-SITE, per-MONTH OPERATIONAL budget (managers plan by category; actuals live from
+    fin_cost_allocations); used by BudgetForecastApiController + BudgetVarianceService + FinancialForecast/InsightsService.
+  - Governance `Budget`/`BudgetLineItem` = board-approved ANNUAL ORG budget; its budget-vs-actuals report reads actuals
+    LIVE from the GL (BudgetActualsService.php:91, bypassing the denormalised actual_amount cache → always accurate).
+  - Roadmap `InitiativeBudget` = roadmap initiatives (separate domain, not competing).
+  → NOT duplicate stores — DIFFERENT budgeting levels, both GL-backed. All 4 tables EMPTY (0 rows) → purely architectural,
+  NO migration. `BudgetSyncInterface` = ORPHANED (no impl/binding). Genuine DOUBLE-SYNC: SyncBudgetActualsJob (console.php
+  hourly) + `governance:update-budget-variances` (hourlyAt(10)) BOTH called BudgetActualsService::syncActuals.
+  **DECISION = keep both levels; non-destructive cleanup:**
+  - **[x] C6-1 double-sync fixed** — removed the redundant `governance:update-budget-variances` hourly schedule
+    (SyncBudgetActualsJob already runs syncActuals + variance alerts hourly; the command stays for manual use).
+    schedule:list confirms one budget sync; php -l clean.
+  - **[x] C6-2 retired the orphaned BudgetSyncInterface** — a full grep (app/ tests/ config/ routes/) found the ONLY
+    reference was its own definition file (no impl, no binding, no type-hint, no test). Deleted
+    app/Domain/Governance/Contracts/BudgetSyncInterface.php (zero blast radius). Did NOT implement FinanceBudgetSync —
+    both budgets read live GL directly, so the governance-pulls-from-finance contract was unnecessary; the audit's
+    "implement it" was wrong.
+  - **[x] C6-3 SpendApproval threshold** — SHIPPED. Audit premise was CORRECT this time (rare): the
+    `fin_bills.spend_approval_id` column existed but nothing wired it. Built, all finance-side, reading the
+    governance-owned `SpendApproval` (never forking/creating one):
+    - `FinBill::spendApproval()` belongsTo on the existing column; `spend_approval_id` in `$fillable`;
+      `StoreBillRequest`/`UpdateBillRequest` accept `nullable|exists:spend_approvals,id`;
+      `AccountsPayableService::createBill`/`updateBill` persist it.
+    - Config-gated gate `config('finance.spend_approval')` = `enforce` (env `FINANCE_SPEND_APPROVAL_ENFORCE`, **off by
+      default** so existing AP flows are unaffected) + `threshold` (default 10000). New private
+      `AccountsPayableService::assertSpendApprovalSatisfied()` runs at the top of `approveBill` **before** the journal
+      posts: a bill at/above threshold can only be approved if linked to a SpendApproval that is `approved` AND whose
+      `amount` covers the full bill total — else throws `InvalidArgumentException` (surfaced by `approve()`'s existing
+      catch → `back()->withErrors(['bill'])`, not a silent block). One-directional: approving a bill never creates a
+      SpendApproval or a bill.
+    - Picker: `BillController@index` passes `spendApprovals` (approved + still-valid, `linkableSpendApprovals()`,
+      single-tenant so un-scoped); `new-bill-dialog.tsx` gains an optional "Spend approval" SelectInput on the Details
+      step (NONE sentinel — Radix can't take an empty-string item value) + a Review row; `Index.tsx` threads it to both
+      New + Edit dialogs; edit prefills from `bill.spend_approval_id`.
+    - Test `tests/Feature/Finance/BillSpendApprovalGateTest.php` (6/6, helpers `sag_*` unique): blocks over-threshold w/o
+      approval / with under-covering approval / with not-yet-approved approval; approves with covering approval (balanced
+      $15k journal); doesn't gate under threshold; doesn't gate when enforcement off.
+- **[~] C7 — Capture-at-source** (in-lane, post through canonical paths, no new ledgers). RE-DERIVED from code via
+  Explore agent (verified — prior audits were optimistic). Wiring scorecard + build order:
+  - **[x] C7b Catering shopping-complete → HouseLedger groceries — SHIPPED.** The mechanism was fully built
+    (`HouseLedgerService::addEntry()` + `HouseLedgerEntryObserver` → `ProcessFinancialEventJob` → GL DR 6431 Groceries /
+    CR 1000) but `SiteMealShoppingListController::markReceived()` never triggered it. Wired: sum received grocery cost
+    (product `cost_per_unit_cents` × received_qty, fallback line `estimated_cost_cents`) → post ONE house-ledger expense
+    via a new private `captureGrocerySpend()`, idempotent on reference `shopping-list:{id}`, failure logged not fatal. No
+    double-post risk (previously posted nothing). Test `ShoppingListGrocerySpendCaptureTest` 4/4.
+  - **[x] C7-FOUNDATION Demo chart completion — SHIPPED (the real blocker C7 verification exposed).** Browser-verifying
+    the grocery journal revealed the demo operational org (**org 1**) had only **8 of the 83 canonical accounts** — the
+    full chart lived under **org 0** (FinanceSeeder default) but deploy runs only `FinanceDemoSeeder`, which hardcoded 8.
+    Since `FinancialEventService::resolveAccount` is strictly per-org and throws on a missing code, EVERY observer GL
+    posting (house-ledger, fuel 6200, maintenance 6300, funding claims 1100) has been silently failing on demo. Fix:
+    `FinanceDemoSeeder` now calls `FinanceSeeder::run(1)` (idempotent `updateOrInsert`) BEFORE the demo-doc guard, so
+    redeploys repair already-seeded demos. Verified: org 1 → 84 accounts incl 6431; `record()`+job `handle()` post a
+    balanced DR 6431 / CR 1000 journal on real demo data. Test added to `FinanceDemoSeederTest`.
+    ⚠️ **Separate pre-existing finding (flagged, NOT fixed here): `ProcessFinancialEventJob::dispatch()` does not execute
+    inline under sync queue in this env** (job `handle()` works when called directly; likely its unusual `queue()`
+    method) — so observer-dispatched GL jobs may not post without a running queue worker. App-wide (house-ledger/fuel/
+    maintenance), not C7-specific. Spawned as its own task.
+  - **[ ] C7a Sites damage/repair → FinBill(AP) + optional insurance FinInvoice(AR) — MISSING.** Seam =
+    `SiteDamageController::update()` when status→'repaired' + `actual_cost`. AP side clean via `AccountsPayableService::
+    createBill`; insurance AR side harder (⚠️ no `createInvoice` service — see C7-blocker).
+  - **[ ] C7d Asset/Fleet purchase → FinFixedAsset capitalisation — WIRED in finance, no ops trigger.**
+    `FixedAssetService::createAsset()` + `postAcquisitionJournal()` work; missing = an `App\Models\Asset::created`
+    observer (fixed-asset categories) dispatching to it. `FinFixedAsset.linked_asset_id` FK already exists.
+  - **[ ] C7e Operational spend → FinBill + FinVendor — ⚠️ DOUBLE-POST RISK.** `FleetFuelLogObserver` +
+    `AssetMaintenanceLogObserver` ALREADY post GL via `FinancialEventService` (DR 6200/6300 / CR AP 2000). Naively adding
+    `createBill` would double-count (approveBill re-posts DR expense/CR AP). Needs a rethink (bill REPLACES the direct GL
+    post, or stays GL-only). `SiteVendor` has NO `fin_vendor_id` column → migration needed. LOW priority / careful.
+  - **[ ] C7c Respite booking-confirmed → FinInvoice vs funder + funding drawdown — MISSING + HARDEST.** Seam =
+    `RespiteBookingController::confirm()` (already fires `RespiteEvent('respite.booking.confirmed')`). ⚠️ blocked on the
+    missing AR `createInvoice` service + funding-drawdown logic (TBD). Defer.
+  - **⚠️ C7-blocker: `AccountsReceivableService` has NO `createInvoice()`** — only `allocatePayment()`. AR-side captures
+    (C7a insurance, C7c respite) need a canonical invoice-creation path first (add `createInvoice` or use `FinInvoice::
+    create` + manual journal). Build the AP/asset/ledger flows first; AR flows after the service gap is closed.
+- **[ ] C8 — Final parity pass.** Whole module vs Rostering side-by-side in browser; FinanceDemoSeeder v2
+  (marker-based guard + funding/client-money/payroll rows); route:list clean; ledger 100% green; axe clean;
+  plan-doc DoD re-ticked with screenshots; memory updated.
+
+### Deploy runbook deltas (C-series)
+- C4 introduces funding-hub permissions → extend `FinancePermissionsSeeder` + `db:seed --force` on deploy.
+- C5 adds `hr_payslips.esct` + `fin_payment_runs.type` + GL-mapping table migrations (additive, reversible).
+- C8 reseeds `FinanceDemoSeeder` (new guard marker).
+
+---
+
 ## Verification gates (every milestone, before merge to main)
 
 `npm run types` (0 errors) · `npm run build` (clean) · `npm run lint` (clean on touched) ·

@@ -72,6 +72,40 @@ class BankTransactionController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) bank-transaction list as a sanitised CSV. Honours the
+     * same account/status/date filters as the index so "Export" respects the view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinBankTransaction::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $rows = FinBankTransaction::forOrganization($orgId)
+            ->when($request->bank_account_id, fn ($q, $bankAccountId) => $q->where('bank_account_id', $bankAccountId))
+            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
+            ->when($request->start_date, fn ($q, $start) => $q->where('transaction_date', '>=', $start))
+            ->when($request->end_date, fn ($q, $end) => $q->where('transaction_date', '<=', $end))
+            ->orderByDesc('transaction_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (FinBankTransaction $t) => [
+                optional($t->transaction_date)->format('Y-m-d'),
+                $t->description,
+                $t->reference,
+                number_format((float) $t->amount, 2, '.', ''),
+                (float) $t->amount >= 0 ? 'credit' : 'debit',
+                $t->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'bank-transactions-'.now()->format('Y-m-d').'.csv',
+            ['Date', 'Description', 'Reference', 'Amount', 'Type', 'Status'],
+            $rows,
+        );
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', FinBankTransaction::class);

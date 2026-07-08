@@ -1,13 +1,16 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, PettyCashFundDialog, formatMoney, useRowContextMenu, type RowCtxItem, type UserOption } from '@/components/finance';
+import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wallet, Coins } from 'lucide-react';
+import { EmptyList } from '@/components/ui/empty-state';
+import { Plus, Wallet, Coins, Download, Eye } from 'lucide-react';
+import { useState } from 'react';
 
 interface Fund {
     id: number;
@@ -21,20 +24,27 @@ interface Fund {
 
 interface Props extends PageProps {
     funds: Fund[];
+    canManage: boolean;
+    accounts: AccountOption[];
+    users: UserOption[];
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Petty Cash', href: '/finance/petty-cash' },
 ];
 
-export default function PettyCashIndex({ funds }: Props) {
+export default function PettyCashIndex({ funds, canManage = false, accounts = [], users = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
     const activeCount = funds.filter((f) => f.is_active).length;
     const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
     const totalBalance = funds.reduce((s, f) => s + f.current_balance, 0);
+
+    // Right-click row menu — mirrors the card's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (fund: Fund): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/petty-cash/${fund.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -49,16 +59,24 @@ export default function PettyCashIndex({ funds }: Props) {
                         stats={[
                             { label: 'Funds', value: funds.length },
                             { label: 'Active', value: activeCount },
-                            { label: 'Total float', value: formatCurrency(totalFloat) },
-                            { label: 'Total balance', value: formatCurrency(totalBalance) },
+                            { label: 'Total float', value: formatMoney(totalFloat) },
+                            { label: 'Total balance', value: formatMoney(totalBalance) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href={'/finance/petty-cash/create'}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Fund
-                                </Link>
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href="/finance/petty-cash/export">
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Fund
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<BankingTabsFooter active="petty-cash" />}
                     />
@@ -66,10 +84,21 @@ export default function PettyCashIndex({ funds }: Props) {
             >
                 {funds.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <Wallet className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">No petty cash funds yet.</p>
-                            <p className="text-sm text-muted-foreground">Create your first fund to get started.</p>
+                        <CardContent className="p-0">
+                            <EmptyList
+                                icon={Wallet}
+                                itemName="petty cash fund"
+                                title="No petty cash funds yet"
+                                description="Create your first fund to get started."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            New fund
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         </CardContent>
                     </Card>
                 ) : (
@@ -78,7 +107,10 @@ export default function PettyCashIndex({ funds }: Props) {
                             const variance = fund.current_balance - fund.float_amount;
                             return (
                                 <Link key={fund.id} href={`/finance/petty-cash/${fund.id}`}>
-                                    <Card className="transition-shadow hover:shadow-md">
+                                    <Card
+                                        className="transition-shadow hover:shadow-md"
+                                        onContextMenu={rowMenu.open(rowMenuItems(fund))}
+                                    >
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                                             <CardTitle className="text-lg">{fund.name}</CardTitle>
                                             {fund.is_active ? (
@@ -94,13 +126,13 @@ export default function PettyCashIndex({ funds }: Props) {
                                                 <div>
                                                     <p className="text-muted-foreground">Float</p>
                                                     <p className="font-semibold">
-                                                        {formatCurrency(fund.float_amount)}
+                                                        {formatMoney(fund.float_amount)}
                                                     </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-muted-foreground">Current Balance</p>
                                                     <p className="font-semibold">
-                                                        {formatCurrency(fund.current_balance)}
+                                                        {formatMoney(fund.current_balance)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -112,7 +144,7 @@ export default function PettyCashIndex({ funds }: Props) {
                                                             variance < 0 ? 'font-medium text-destructive' : 'text-status-success'
                                                         }
                                                     >
-                                                        {formatCurrency(variance)}
+                                                        {formatMoney(variance)}
                                                     </span>
                                                 </div>
                                             )}
@@ -135,6 +167,17 @@ export default function PettyCashIndex({ funds }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            {rowMenu.element}
+
+            {canManage && (
+                <PettyCashFundDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    accounts={accounts}
+                    users={users}
+                />
+            )}
         </AppLayout>
     );
 }

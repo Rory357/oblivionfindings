@@ -17,6 +17,7 @@ class BankAccountController extends Controller
         $this->authorize('viewAny', FinBankAccount::class);
 
         $orgId = $request->user()->organization_id;
+        $canManage = (bool) $request->user()->canDo('finance.bank.manage');
 
         $bankAccounts = FinBankAccount::forOrganization($orgId)
             ->with('glAccount:id,code,name')
@@ -29,7 +30,10 @@ class BankAccountController extends Controller
                 'id' => $account->id,
                 'name' => $account->name,
                 'bank_name' => $account->bank_name,
+                // Prefill for the edit modal — managers only (encrypted at rest).
+                'account_number' => $canManage ? $account->account_number : null,
                 'account_type' => $account->account_type,
+                'gl_account_id' => $account->gl_account_id,
                 'current_balance' => (float) $account->current_balance,
                 'is_primary' => $account->is_primary,
                 'is_active' => $account->is_active,
@@ -43,23 +47,9 @@ class BankAccountController extends Controller
 
         return Inertia::render('finance/bank-accounts/Index', [
             'bankAccounts' => $bankAccounts,
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinBankAccount::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $glAccounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->where('sub_type', 'bank')
-            ->orderBy('code')
-            ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/bank-accounts/Create', [
-            'glAccounts' => $glAccounts,
+            'canManage' => $canManage,
+            // Bank-type GL accounts for the add/edit modal.
+            'glAccounts' => $canManage ? $this->bankGlAccounts($orgId) : [],
         ]);
     }
 
@@ -123,12 +113,17 @@ class BankAccountController extends Controller
             ->take(30)
             ->toArray();
 
+        $canManage = (bool) $request->user()->canDo('finance.bank.manage');
+
         return Inertia::render('finance/bank-accounts/Show', [
             'bankAccount' => [
                 'id' => $bankAccount->id,
                 'name' => $bankAccount->name,
                 'bank_name' => $bankAccount->bank_name,
+                // Prefill for the edit modal — managers only (encrypted at rest).
+                'account_number' => $canManage ? $bankAccount->account_number : null,
                 'account_type' => $bankAccount->account_type,
+                'gl_account_id' => $bankAccount->gl_account_id,
                 'opening_balance' => (float) $bankAccount->opening_balance,
                 'current_balance' => (float) $bankAccount->current_balance,
                 'is_primary' => $bankAccount->is_primary,
@@ -142,28 +137,20 @@ class BankAccountController extends Controller
             'transactions' => $transactions,
             'reconciliations' => $reconciliations,
             'balanceHistory' => $balanceHistory,
+            'canManage' => $canManage,
+            // Bank-type GL accounts for the edit modal.
+            'glAccounts' => $canManage ? $this->bankGlAccounts($request->user()->organization_id) : [],
         ]);
     }
 
-    public function edit(Request $request, FinBankAccount $bankAccount)
+    /** Active `bank` sub-type GL accounts — options for the add/edit modal. */
+    private function bankGlAccounts(?int $orgId)
     {
-        $this->authorize('update', $bankAccount);
-
-        $orgId = $request->user()->organization_id;
-
-        $glAccounts = FinAccount::forOrganization($orgId)
+        return FinAccount::forOrganization($orgId)
             ->active()
             ->where('sub_type', 'bank')
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/bank-accounts/Edit', [
-            'bankAccount' => $bankAccount->only([
-                'id', 'name', 'bank_name', 'account_number', 'account_type',
-                'gl_account_id', 'opening_balance', 'is_primary', 'is_active',
-            ]),
-            'glAccounts' => $glAccounts,
-        ]);
     }
 
     public function update(UpdateBankAccountRequest $request, FinBankAccount $bankAccount)

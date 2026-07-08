@@ -3,14 +3,15 @@ import { type PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewVendorDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewVendorDialog, PayablesTabsFooter, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2 } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { Plus, Search, Building2, Download, Eye } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
 interface Vendor {
@@ -63,7 +64,7 @@ const vendorTypeColors: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Vendors', href: '/finance/vendors' },
 ];
 
@@ -95,7 +96,23 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
         [handleSearch],
     );
 
+    const clearFilters = useCallback(() => {
+        setSearch('');
+        router.get('/finance/vendors', {}, { preserveState: true, preserveScroll: true });
+    }, []);
+
+    const hasFilters = Boolean(filters.search || filters.vendor_type || filters.is_active);
+
     const activeCount = vendors.data.filter((v) => v.is_active).length;
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (vendor: Vendor): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/vendors/${vendor.id}`) },
+        ];
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -112,12 +129,20 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                             { label: 'Active (this page)', value: activeCount },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewVendorOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    Add Vendor
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/vendors/export?${new URLSearchParams(Object.entries({ search, vendor_type: filters.vendor_type, is_active: filters.is_active }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewVendorOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        Add Vendor
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="vendors" />}
                     />
@@ -145,7 +170,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                     applyFilters({ vendor_type: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by type">
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -163,7 +188,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                     applyFilters({ is_active: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by active state">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -183,19 +208,28 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                 <Card>
                     <CardContent className="p-0">
                         {vendors.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                                <h3 className="text-lg font-medium mb-1">No vendors found</h3>
-                                <p className="text-muted-foreground mb-4">
-                                    Get started by adding your first vendor.
-                                </p>
-                                {canManage && (
-                                    <Button onClick={() => setNewVendorOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Vendor
-                                    </Button>
-                                )}
-                            </div>
+                            hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No vendors match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={Building2}
+                                    itemName="vendor"
+                                    title="No vendors yet"
+                                    description="Add your first supplier or contractor to get started."
+                                    className="border-0"
+                                    action={
+                                        canManage ? (
+                                            <Button size="sm" onClick={() => setNewVendorOpen(true)}>
+                                                New vendor
+                                            </Button>
+                                        ) : undefined
+                                    }
+                                />
+                            )
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -211,7 +245,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                 </TableHeader>
                                 <TableBody>
                                     {vendors.data.map((vendor) => (
-                                        <TableRow key={vendor.id}>
+                                        <TableRow key={vendor.id} onContextMenu={rowMenu.open(rowMenuItems(vendor))}>
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/vendors/${vendor.id}`}
@@ -282,6 +316,8 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                         </div>
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

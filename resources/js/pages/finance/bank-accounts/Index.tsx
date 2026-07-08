@@ -1,23 +1,32 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import {
+    BankAccountDialog,
+    BankingTabsFooter,
+    formatMoney,
+    useRowContextMenu,
+    type AccountOption,
+    type EditableBankAccount,
+    type RowCtxItem,
+} from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, AlertCircle, DollarSign, Landmark, Star, Banknote } from 'lucide-react';
+import { EmptyList } from '@/components/ui/empty-state';
+import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
-import { useMemo } from 'react';
-
-const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+import { useMemo, useState } from 'react';
 
 interface BankAccount {
     id: number;
     name: string;
     bank_name: string;
+    account_number: string | null;
     account_type: string;
+    gl_account_id: number | null;
     current_balance: number;
     is_primary: boolean;
     is_active: boolean;
@@ -27,6 +36,8 @@ interface BankAccount {
 
 interface Props {
     bankAccounts: BankAccount[];
+    canManage: boolean;
+    glAccounts: AccountOption[];
 }
 
 const accountTypeLabels: Record<string, string> = {
@@ -36,11 +47,38 @@ const accountTypeLabels: Record<string, string> = {
     credit_card: 'Credit Card',
 };
 
-export default function BankAccountsIndex({ bankAccounts }: Props) {
+export default function BankAccountsIndex({ bankAccounts, canManage = false, glAccounts = [] }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editAccount, setEditAccount] = useState<EditableBankAccount | null>(null);
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Accounts', href: '/finance/bank-accounts' },
     ];
+
+    const openEdit = (account: BankAccount) =>
+        setEditAccount({
+            id: account.id,
+            name: account.name,
+            bank_name: account.bank_name,
+            account_number: account.account_number,
+            account_type: account.account_type,
+            gl_account_id: account.gl_account_id ?? account.gl_account?.id ?? null,
+            is_primary: account.is_primary,
+            is_active: account.is_active,
+        });
+
+    // Right-click row menu — mirrors the card's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (account: BankAccount): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/bank-accounts/${account.id}`) },
+        ];
+        if (canManage) {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(account) });
+        }
+        return items;
+    };
 
     const totalCash = useMemo(() => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0), [bankAccounts]);
     const primaryAccount = useMemo(() => bankAccounts.find((a) => a.is_primary), [bankAccounts]);
@@ -74,12 +112,12 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             { label: 'Unreconciled', value: unreconciledTotal },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href={'/finance/bank-accounts/create'}>
+                            canManage && (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     Add Bank Account
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<BankingTabsFooter active="accounts" />}
                     />
@@ -87,18 +125,21 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
             >
                 {bankAccounts.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Building2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                            <h3 className="text-lg font-medium text-foreground mb-1">No bank accounts</h3>
-                            <p className="text-muted-foreground mb-4">
-                                Get started by adding your first bank account.
-                            </p>
-                            <Button asChild>
-                                <Link href={'/finance/bank-accounts/create'}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Bank Account
-                                </Link>
-                            </Button>
+                        <CardContent className="p-0">
+                            <EmptyList
+                                icon={Building2}
+                                itemName="bank account"
+                                title="No bank accounts yet"
+                                description="Get started by adding your first bank account."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            Add bank account
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         </CardContent>
                     </Card>
                 ) : (
@@ -114,7 +155,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                         <div>
                                             <p className="text-sm text-muted-foreground">Total Cash</p>
                                             <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {formatCurrency(totalCash)}
+                                                {formatMoney(totalCash)}
                                             </p>
                                         </div>
                                     </div>
@@ -144,7 +185,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                         <div>
                                             <p className="text-sm text-muted-foreground">Primary Account</p>
                                             <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {primaryAccount ? formatCurrency(primaryAccount.current_balance) : 'N/A'}
+                                                {primaryAccount ? formatMoney(primaryAccount.current_balance) : 'N/A'}
                                             </p>
                                         </div>
                                     </div>
@@ -174,10 +215,10 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                     label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                                 >
                                                     {pieData.map((_entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                        <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Balance']} />
+                                                <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Balance']} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -188,24 +229,44 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         {/* Account Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {bankAccounts.map((account) => (
-                                <Link
+                                <Card
                                     key={account.id}
-                                    href={`/finance/bank-accounts/${account.id}`}
-                                    className="block"
+                                    role="link"
+                                    tabIndex={0}
+                                    aria-label={`Open ${account.name}`}
+                                    onClick={() => router.visit(`/finance/bank-accounts/${account.id}`)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') router.visit(`/finance/bank-accounts/${account.id}`);
+                                    }}
+                                    onContextMenu={rowMenu.open(rowMenuItems(account))}
+                                    className="hover:shadow-md transition-shadow cursor-pointer h-full"
                                 >
-                                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                                         <CardHeader className="pb-3">
                                             <div className="flex items-start justify-between">
                                                 <div>
                                                     <CardTitle className="text-lg">{account.name}</CardTitle>
                                                     <p className="text-sm text-muted-foreground mt-1">{account.bank_name}</p>
                                                 </div>
-                                                <div className="flex gap-1">
+                                                <div className="flex items-center gap-1">
                                                     {account.is_primary && (
                                                         <Badge variant="default" className="bg-status-info-bg text-status-info border-status-info/30">Primary</Badge>
                                                     )}
                                                     {!account.is_active && (
                                                         <Badge variant="secondary">Inactive</Badge>
+                                                    )}
+                                                    {canManage && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 p-0"
+                                                            aria-label={`Edit ${account.name}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openEdit(account);
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </div>
@@ -222,7 +283,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-muted-foreground">Current Balance</span>
                                                     <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatCurrency(account.current_balance)}
+                                                        {formatMoney(account.current_balance)}
                                                     </span>
                                                 </div>
 
@@ -243,13 +304,32 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                 )}
                                             </div>
                                         </CardContent>
-                                    </Card>
-                                </Link>
+                                </Card>
                             ))}
                         </div>
                     </>
                 )}
             </PageLayout>
+
+            {rowMenu.element}
+
+            {canManage && (
+                <BankAccountDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    glAccounts={glAccounts}
+                />
+            )}
+
+            {canManage && editAccount && (
+                <BankAccountDialog
+                    key={editAccount.id}
+                    open
+                    bankAccount={editAccount}
+                    onClose={() => setEditAccount(null)}
+                    glAccounts={glAccounts}
+                />
+            )}
         </AppLayout>
     );
 }

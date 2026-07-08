@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -140,6 +141,14 @@ class HandleInertiaRequests extends Middleware
                 ? url('/calendar/feed/'.$user->calendar_feed_token.'.ics')
                 : null,
 
+            // Count badges for the finance hub tab strips (the number beside each
+            // tab). Lazy Closure gated to finance routes → non-finance pages and
+            // Inertia partial-reloads never invoke it; every *TabsFooter reads its
+            // own hub's slice from `financeHubCounts[hub]`.
+            'financeHubCounts' => $user && str_starts_with((string) $request->route()?->getName(), 'finance.')
+                ? fn () => app(FinanceHubCountsService::class)->forOrganization($user->organization_id)
+                : null,
+
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,
@@ -238,6 +247,9 @@ class HandleInertiaRequests extends Middleware
                 'info' => session('info'),
                 'clock_out_blockers' => session('clock_out_blockers'),
                 'rostering_report_link' => session('rostering_report_link'),
+                // Raise-a-ticket success pane reads the new ticket's
+                // reference from here once props refresh.
+                'it_ticket' => session('it_ticket'),
                 // /my-day's "Today's timesheet" find-or-create flow uses this
                 // to tell the front-end which draft to open in the review
                 // popup once props refresh.
@@ -324,7 +336,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v3';
+    protected const PERMISSIONS_CACHE_VERSION = 'v4';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -800,6 +812,7 @@ class HandleInertiaRequests extends Middleware
             'it' => [
                 'view' => $user->canDo('it.view'),
                 'manage' => $user->canDo('it.manage'),
+                'request' => $user->canDo('it.request'),
             ],
 
             'governance' => [

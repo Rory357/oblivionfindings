@@ -729,6 +729,12 @@ const METHODOLOGIES = [
     { value: 'taproot', label: 'TapRooT' },
     { value: 'other', label: 'Other' },
 ];
+
+function methodologyLabel(value: string | null | undefined): string | null {
+    if (!value) return null;
+    return METHODOLOGIES.find((m) => m.value === value)?.label ?? value.replace(/_/g, ' ');
+}
+
 const PRIORITY_OPTS = ['low', 'medium', 'high', 'critical'];
 
 function StaffSelect({
@@ -1499,7 +1505,7 @@ function InvestigationSection({ d, canAct, onPane }: { d: EventDetail; canAct: b
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                             {inv.lead_investigator_name ? <span><UserIcon className="mr-0.5 inline h-3 w-3" />{inv.lead_investigator_name}</span> : null}
-                            {inv.methodology ? <span>{inv.methodology.replace(/_/g, '-')}</span> : null}
+                            {inv.methodology ? <span>{methodologyLabel(inv.methodology)}</span> : null}
                             {inv.target_completion_date ? <span>Due {formatDateTime(inv.target_completion_date)}</span> : null}
                         </div>
                     </div>

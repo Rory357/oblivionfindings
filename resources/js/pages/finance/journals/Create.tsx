@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { cn } from '@/lib/utils';
 
 interface Account {
@@ -63,9 +64,6 @@ interface Props extends PageProps {
     fundingStreams: FundingStream[];
     taxRates: TaxRate[];
 }
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const emptyLine = (): JournalLine => ({
     account_id: '',
@@ -128,7 +126,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Journals', href: '/finance/journals' },
                 { title: 'Create', href: '/finance/journals/create' },
             ]}
@@ -353,10 +351,10 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                             Totals
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
-                                            {formatNZD(totalDebits)}
+                                            {formatMoney(totalDebits)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
-                                            {formatNZD(totalCredits)}
+                                            {formatMoney(totalCredits)}
                                         </TableCell>
                                         <TableCell colSpan={3} />
                                     </TableRow>
@@ -371,7 +369,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                 difference !== 0 ? 'text-status-critical' : 'text-status-success',
                                             )}
                                         >
-                                            {formatNZD(Math.abs(difference))}
+                                            {formatMoney(Math.abs(difference))}
                                             {difference !== 0 && (
                                                 <span className="ml-2 text-xs">
                                                     ({difference > 0 ? 'Debits exceed' : 'Credits exceed'})

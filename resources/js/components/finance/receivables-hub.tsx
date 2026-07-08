@@ -10,7 +10,12 @@ import {
     RefreshCw,
 } from 'lucide-react';
 
-import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
+import {
+    FinanceTabs,
+    tabCountBadge,
+    type FinanceHubCounts,
+    type FinanceTabItem,
+} from './finance-tabs';
 
 /**
  * Canonical Sales & Receivables hub tabs. Each sub-area keeps its own route +
@@ -64,6 +69,9 @@ export const RECEIVABLES_TABS: ReceivablesTabDef[] = [
 export function ReceivablesTabsFooter({ active }: { active: ReceivablesTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
+    const counts =
+        (page.props as { financeHubCounts?: FinanceHubCounts | null })
+            .financeHubCounts?.['receivables'] ?? {};
 
     const visible = RECEIVABLES_TABS.filter((t) => t.id === active || t.requires(can));
 
@@ -84,6 +92,7 @@ export function ReceivablesTabsFooter({ active }: { active: ReceivablesTabId }) 
                 label: t.label,
                 icon: t.icon,
                 tone: t.tone,
+                badge: tabCountBadge(counts[t.id]),
             }))}
             ariaLabel="Sales and receivables views"
         />

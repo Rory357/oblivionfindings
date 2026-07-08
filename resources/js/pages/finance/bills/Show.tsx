@@ -3,12 +3,15 @@ import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Edit, XCircle, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface BillLine {
     id: number;
@@ -55,23 +58,11 @@ interface Props extends PageProps {
     bill: Bill;
 }
 
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (date: string | null) =>
     date ? new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
 const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
 
 export default function BillShow({ auth, bill }: Props) {
     const isOverdue = bill.status !== 'paid' && bill.status !== 'cancelled' && new Date(bill.due_date) < new Date();
@@ -79,21 +70,26 @@ export default function BillShow({ auth, bill }: Props) {
     const canCancel = bill.status === 'draft' || bill.status === 'awaiting_approval';
     const amountDue = Number(bill.total_amount) - Number(bill.amount_paid);
 
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+
     const handleApprove = () => {
         router.post(`/finance/bills/${bill.id}/approve`);
     };
 
-    const handleCancel = () => {
-        if (confirm('Are you sure you want to cancel this bill?')) {
-            router.post(`/finance/bills/${bill.id}/cancel`);
-        }
+    const confirmCancel = () => {
+        router.post(`/finance/bills/${bill.id}/cancel`, {}, {
+            onStart: () => setCancelling(true),
+            onFinish: () => setCancelling(false),
+            onSuccess: () => setCancelOpen(false),
+        });
     };
 
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Bills', href: '/finance/bills' },
                 { title: bill.bill_number, href: `/finance/bills/${bill.id}` },
             ]}
@@ -108,9 +104,7 @@ export default function BillShow({ auth, bill }: Props) {
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {bill.bill_number}
-                                <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
-                                    {statusConfig[bill.status]?.label ?? bill.status}
-                                </Badge>
+                                <StatusBadge status={bill.status} />
                                 {isOverdue && (
                                     <Badge className="bg-status-critical-bg text-status-critical">
                                         <AlertTriangle className="w-3 h-3 mr-1" />
@@ -142,7 +136,7 @@ export default function BillShow({ auth, bill }: Props) {
                                     </>
                                 )}
                                 {canCancel && (
-                                    <Button variant="destructive" onClick={handleCancel}>
+                                    <Button variant="destructive" onClick={() => setCancelOpen(true)}>
                                         <XCircle className="w-4 h-4 mr-2" />
                                         Cancel
                                     </Button>
@@ -206,25 +200,25 @@ export default function BillShow({ auth, bill }: Props) {
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(bill.subtotal)}</span>
+                                <span>{formatMoney(bill.subtotal)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">GST</span>
-                                <span>{formatCurrency(bill.gst_amount)}</span>
+                                <span>{formatMoney(bill.gst_amount)}</span>
                             </div>
                             <Separator />
                             <div className="flex justify-between font-bold">
                                 <span>Total</span>
-                                <span>{formatCurrency(bill.total_amount)}</span>
+                                <span>{formatMoney(bill.total_amount)}</span>
                             </div>
                             <div className="flex justify-between text-status-success">
                                 <span>Paid</span>
-                                <span>{formatCurrency(bill.amount_paid)}</span>
+                                <span>{formatMoney(bill.amount_paid)}</span>
                             </div>
                             <Separator />
                             <div className={cn('flex justify-between font-bold', amountDue > 0 ? 'text-status-critical' : 'text-status-success')}>
                                 <span>Amount Due</span>
-                                <span>{formatCurrency(amountDue)}</span>
+                                <span>{formatMoney(amountDue)}</span>
                             </div>
                         </CardContent>
                     </Card>
@@ -288,7 +282,7 @@ export default function BillShow({ auth, bill }: Props) {
                                 <TableRow key={line.id}>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.unit_price)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
                                     <TableCell className="text-right">{Number(line.gst_rate).toFixed(2)}%</TableCell>
                                     <TableCell className="text-sm">
                                         {line.account ? `${line.account.code} - ${line.account.name}` : '-'}
@@ -299,8 +293,8 @@ export default function BillShow({ auth, bill }: Props) {
                                     <TableCell className="text-sm">
                                         {line.funding_stream ? `${line.funding_stream.code} - ${line.funding_stream.name}` : '-'}
                                     </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.gst_amount)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(line.line_total)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatMoney(line.line_total)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -325,7 +319,7 @@ export default function BillShow({ auth, bill }: Props) {
                                 {bill.payment_allocations.map((payment) => (
                                     <TableRow key={payment.id}>
                                         <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                                        <TableCell className="text-right font-medium">{formatCurrency(payment.amount)}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatMoney(payment.amount)}</TableCell>
                                         <TableCell className="text-muted-foreground">{payment.notes ?? '-'}</TableCell>
                                     </TableRow>
                                 ))}
@@ -334,6 +328,24 @@ export default function BillShow({ auth, bill }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={cancelOpen}
+                onOpenChange={setCancelOpen}
+                title="Cancel this bill?"
+                description={
+                    <>
+                        This cancels bill{' '}
+                        <span className="font-medium text-foreground">{bill.bill_number}</span>. A
+                        cancelled bill can&rsquo;t be approved or paid.
+                    </>
+                }
+                confirmLabel="Cancel bill"
+                cancelLabel="Keep bill"
+                variant="destructive"
+                processing={cancelling}
+                onConfirm={confirmCancel}
+            />
         </AppLayout>
     );
 }

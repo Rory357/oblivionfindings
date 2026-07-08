@@ -152,12 +152,12 @@ const deviceStatusConfig: Record<
     },
     decommissioned: {
         label: 'Retired',
-        className: 'bg-muted-foreground/80/10 text-muted-foreground border-border/20',
+        className: 'bg-muted-foreground/10 text-muted-foreground border-border/20',
         icon: Ban,
     },
     in_stock: {
         label: 'In Stock',
-        className: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+        className: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
         icon: HelpCircle,
     },
     lost: {
@@ -171,7 +171,7 @@ function getDeviceStatus(status: string) {
     return (
         deviceStatusConfig[status as DeviceStatusKey] ?? {
             label: status || 'Unknown',
-            className: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+            className: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
             icon: HelpCircle,
         }
     );
@@ -486,7 +486,7 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-muted-foreground/80/10 p-2">
+                            <div className="rounded-lg bg-muted-foreground/10 p-2">
                                 <Cpu className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>

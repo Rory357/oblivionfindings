@@ -319,7 +319,7 @@ export default function LeaveBalances({
                                         openLedger(row);
                                     }
                                 }}
-                                onContextMenu={openCtx(rowMenu(row))}
+                                onContextMenu={(e) => openCtx(rowMenu(row))(e)}
                                 className="grid cursor-pointer grid-cols-[1.6fr_1.1fr_1.1fr_1fr_1fr] items-center gap-2 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 hover:bg-muted"
                             >
                                 <div className="flex min-w-0 items-center gap-2.5">

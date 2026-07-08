@@ -1,6 +1,6 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,14 +12,23 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import {
+    formatMoney,
+    QuoteDialog,
+    ReceivablesTabsFooter,
+    useRowContextMenu,
+    type EditableQuote,
+    type QuoteClientOption,
+    type QuotePriceBook,
+    type RowCtxItem,
+} from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
+import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Download, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { useState } from 'react';
 
 const ANY = '__ANY__';
-
-const nzd = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' });
 
 type Quote = {
     id: number;
@@ -31,6 +40,11 @@ type Quote = {
     client: { id: number; first_name: string; last_name: string } | null;
     creator: { id: number; name: string } | null;
     items_count: number;
+    // Raw header + lines for prefilling the edit modal (draft rows only).
+    client_id: number | null;
+    title: string;
+    notes: string | null;
+    lines: Array<{ description: string; quantity: number | string; unit_price: number | string }>;
 };
 
 type Props = {
@@ -51,14 +65,9 @@ type Props = {
         accepted: number;
         converted: number;
     };
-};
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    draft: 'outline',
-    sent: 'secondary',
-    accepted: 'default',
-    declined: 'destructive',
-    converted: 'default',
+    canManage: boolean;
+    clients: QuoteClientOption[];
+    priceBooks: QuotePriceBook[];
 };
 
 function formatDate(d: string | null): string {
@@ -66,9 +75,47 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function QuotesIndex({ quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function QuotesIndex({
+    quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    filters = {} as any,
+    stats = {} as any,
+    canManage = false,
+    clients = [],
+    priceBooks = [],
+}: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editQuote, setEditQuote] = useState<EditableQuote | null>(null);
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/finance/quotes', { ...filters, [key]: value }, { preserveState: true, replace: true });
+    };
+
+    const clearFilters = () => {
+        router.get('/finance/quotes', {}, { preserveState: true, replace: true });
+    };
+
+    const hasFilters = Boolean(filters?.q || (filters?.status && filters.status !== ANY));
+
+    const openEdit = (quote: Quote) =>
+        setEditQuote({
+            id: quote.id,
+            client_id: quote.client_id,
+            title: quote.title,
+            valid_until: quote.valid_until,
+            notes: quote.notes,
+            lines: quote.lines,
+        });
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (quote: Quote): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/quotes/${quote.id}`) },
+        ];
+        if (canManage && quote.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(quote) });
+        }
+        return items;
     };
 
     return (
@@ -84,6 +131,14 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                     { label: 'Accepted', value: stats?.accepted ?? 0 },
                     { label: 'Converted', value: stats?.converted ?? 0 },
                 ]}
+                actions={
+                    <Button size="sm" variant="outline" asChild>
+                        <a href={`/finance/quotes/export?${new URLSearchParams(Object.entries({ status: filters?.status ?? '' }).filter(([, v]) => v)).toString()}`}>
+                            <Download className="mr-1.5 h-4 w-4" />
+                            Export CSV
+                        </a>
+                    </Button>
+                }
                 footer={<ReceivablesTabsFooter active="quotes" />}
             />
             <PageShell>
@@ -107,7 +162,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                         />
                     </div>
                     <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[130px] text-xs">
+                        <SelectTrigger className="h-9 w-[130px] text-xs" aria-label="Filter by status">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -119,30 +174,48 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                             <SelectItem value="converted">Converted</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/finance/quotes/create">
+                    {canManage && (
+                        <Button size="sm" onClick={() => setCreateOpen(true)}>
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
                             New Quote
-                        </Link>
-                    </Button>
+                        </Button>
+                    )}
                 </div>
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
                     {(quotes?.data ?? []).length === 0 && (
                         <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">No Quotes Found</h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first quote to get started.</p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/finance/quotes/create">Create Quote</Link>
-                                </Button>
-                            </CardContent>
+                            {hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No quotes match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={FileText}
+                                    itemName="quote"
+                                    title="No quotes yet"
+                                    description="Create your first quote to get started."
+                                    className="border-0"
+                                    action={
+                                        canManage ? (
+                                            <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                New quote
+                                            </Button>
+                                        ) : undefined
+                                    }
+                                />
+                            )}
                         </Card>
                     )}
                     {(quotes?.data ?? []).map((quote) => (
-                        <Card key={quote.id} className="transition-all hover:border-border hover:shadow-sm">
+                        <Card
+                            key={quote.id}
+                            className="transition-all hover:border-border hover:shadow-sm"
+                            onContextMenu={rowMenu.open(rowMenuItems(quote))}
+                        >
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
                                     <FileText className="h-5 w-5" />
@@ -152,11 +225,9 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                         <Link href={`/finance/quotes/${quote.id}`} className="text-sm font-semibold hover:underline">
                                             {quote.reference}
                                         </Link>
-                                        <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
-                                            {quote.status}
-                                        </Badge>
+                                        <StatusBadge status={quote.status} size="sm" />
                                         <span className="text-sm font-semibold text-status-success dark:text-status-success">
-                                            {nzd.format(quote.total_amount)}
+                                            {formatMoney(quote.total_amount)}
                                         </span>
                                     </div>
                                     <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -173,21 +244,22 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 gap-1">
-                                    {quote.status === 'draft' && (
-                                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                                            <Send className="mr-1 h-3 w-3" /> Send
-                                        </Button>
-                                    )}
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/quotes/${quote.id}`}>
+                                        <Link href={`/finance/quotes/${quote.id}`} aria-label={`View ${quote.reference}`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/finance/quotes/${quote.id}/edit`}>
+                                    {canManage && quote.status === 'draft' && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            aria-label={`Edit ${quote.reference}`}
+                                            onClick={() => openEdit(quote)}
+                                        >
                                             <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -210,7 +282,29 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                         ))}
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageShell>
+
+            {canManage && (
+                <QuoteDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    clients={clients}
+                    priceBooks={priceBooks}
+                />
+            )}
+
+            {canManage && editQuote && (
+                <QuoteDialog
+                    key={editQuote.id}
+                    open
+                    quote={editQuote}
+                    onClose={() => setEditQuote(null)}
+                    clients={clients}
+                    priceBooks={priceBooks}
+                />
+            )}
         </AppLayout>
     );
 }

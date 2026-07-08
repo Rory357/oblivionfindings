@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type Account = { id: number; code: string; name: string };
@@ -44,23 +46,6 @@ type PurchaseOrder = {
     bills: Bill[];
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
-    sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
-    partially_received: { label: 'Partially Received', className: 'bg-status-warning-bg text-status-warning' },
-    received: { label: 'Received', className: 'bg-status-success-bg text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
-
-function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, className: 'bg-muted text-foreground' };
-    return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
-}
-
 export default function PurchaseOrderShow() {
     const { purchaseOrder } = usePage().props as unknown as { purchaseOrder: PurchaseOrder };
     const po = purchaseOrder;
@@ -68,21 +53,27 @@ export default function PurchaseOrderShow() {
     const canApprove = po.status === 'draft';
     const canEdit = po.status === 'draft';
     const canConvert = ['approved', 'partially_received', 'received'].includes(po.status);
+    const [confirmAction, setConfirmAction] = useState<'approve' | 'convert' | null>(null);
+    const [processing, setProcessing] = useState(false);
 
     function handleApprove() {
-        if (confirm('Are you sure you want to approve this purchase order?')) {
-            router.post(`/finance/purchase-orders/${po.id}/approve`);
-        }
+        router.post(`/finance/purchase-orders/${po.id}/approve`, {}, {
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => setConfirmAction(null),
+        });
     }
 
     function handleConvertToBill() {
-        if (confirm('Convert this purchase order to a bill?')) {
-            router.post(`/finance/purchase-orders/${po.id}/convert-to-bill`);
-        }
+        router.post(`/finance/purchase-orders/${po.id}/convert-to-bill`, {}, {
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => setConfirmAction(null),
+        });
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
             <Head title={`PO ${po.po_number}`} />
             <PageLayout
                 hero={
@@ -104,10 +95,10 @@ export default function PurchaseOrderShow() {
                                     </Link>
                                 )}
                                 {canApprove && (
-                                    <Button onClick={handleApprove}>Approve</Button>
+                                    <Button onClick={() => setConfirmAction('approve')}>Approve</Button>
                                 )}
                                 {canConvert && (
-                                    <Button variant="outline" onClick={handleConvertToBill}>Convert to Bill</Button>
+                                    <Button variant="outline" onClick={() => setConfirmAction('convert')}>Convert to Bill</Button>
                                 )}
                             </>
                         }
@@ -174,10 +165,10 @@ export default function PurchaseOrderShow() {
                                     <TableRow key={line.id}>
                                         <TableCell>{line.description}</TableCell>
                                         <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.unit_price)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
                                         <TableCell className="text-right">{(Number(line.gst_rate) * 100).toFixed(0)}%</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.gst_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.line_total)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.line_total)}</TableCell>
                                         <TableCell>{line.account ? `${line.account.code} - ${line.account.name}` : '—'}</TableCell>
                                     </TableRow>
                                 ))}
@@ -189,15 +180,15 @@ export default function PurchaseOrderShow() {
                                 <div className="w-64 space-y-1 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Subtotal</span>
-                                        <span>{formatNZD(po.subtotal)}</span>
+                                        <span>{formatMoney(po.subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">GST</span>
-                                        <span>{formatNZD(po.gst_amount)}</span>
+                                        <span>{formatMoney(po.gst_amount)}</span>
                                     </div>
                                     <div className="flex justify-between border-t pt-1 font-semibold">
                                         <span>Total</span>
-                                        <span>{formatNZD(po.total_amount)}</span>
+                                        <span>{formatMoney(po.total_amount)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -232,7 +223,7 @@ export default function PurchaseOrderShow() {
                                                 </Link>
                                             </TableCell>
                                             <TableCell>{bill.bill_date}</TableCell>
-                                            <TableCell className="text-right">{formatNZD(bill.total_amount)}</TableCell>
+                                            <TableCell className="text-right">{formatMoney(bill.total_amount)}</TableCell>
                                             <TableCell>
                                                 <StatusBadge status={bill.status} />
                                             </TableCell>
@@ -244,6 +235,25 @@ export default function PurchaseOrderShow() {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmAction === 'approve'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Approve purchase order?"
+                description={`This approves ${po.po_number} so it can be received and converted to a bill.`}
+                confirmLabel="Approve PO"
+                processing={processing}
+                onConfirm={handleApprove}
+            />
+            <ConfirmDialog
+                open={confirmAction === 'convert'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Convert to bill?"
+                description={`This creates a draft supplier bill from ${po.po_number}. You can review and edit the bill before approving it.`}
+                confirmLabel="Convert to bill"
+                processing={processing}
+                onConfirm={handleConvertToBill}
+            />
         </AppLayout>
     );
 }

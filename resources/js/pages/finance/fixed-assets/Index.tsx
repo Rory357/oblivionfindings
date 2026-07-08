@@ -1,10 +1,19 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import {
+    FixedAssetDialog,
+    LedgerTabsFooter,
+    formatMoney,
+    useRowContextMenu,
+    type EditableFixedAsset,
+    type FixedAssetGlAccount,
+    type RowCtxItem,
+} from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,7 +41,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash } from 'lucide-react';
+import { EmptyList } from '@/components/ui/empty-state';
+import { Eye, Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
 interface FixedAsset {
@@ -47,6 +57,11 @@ interface FixedAsset {
     useful_life_months: number;
     depreciation_method: string;
     status: string;
+    gl_asset_account_id: number | null;
+    gl_depreciation_account_id: number | null;
+    gl_expense_account_id: number | null;
+    notes: string | null;
+    has_depreciations: boolean;
 }
 
 interface PaginatedAssets {
@@ -76,10 +91,10 @@ interface Props {
     assets: PaginatedAssets;
     summary: Summary;
     filters: Filters;
+    canManage: boolean;
+    assetAccounts: FixedAssetGlAccount[];
+    expenseAccounts: FixedAssetGlAccount[];
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const categoryLabels: Record<string, string> = {
     vehicle: 'Vehicle',
@@ -99,26 +114,34 @@ const categoryColors: Record<string, string> = {
     land: 'bg-status-success-bg text-status-success',
 };
 
-const statusLabels: Record<string, string> = {
-    active: 'Active',
-    fully_depreciated: 'Fully Depreciated',
-    disposed: 'Disposed',
-};
-
-const statusColors: Record<string, string> = {
-    active: 'bg-status-success-bg text-status-success',
-    fully_depreciated: 'bg-status-warning-bg text-status-warning',
-    disposed: 'bg-muted text-muted-foreground',
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Fixed Assets', href: '/finance/fixed-assets' },
 ];
 
-export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
+export default function FixedAssetsIndex({ assets, summary, filters, canManage = false, assetAccounts = [], expenseAccounts = [] }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [depModalOpen, setDepModalOpen] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editAsset, setEditAsset] = useState<EditableFixedAsset | null>(null);
+
+    const openEdit = (asset: FixedAsset) =>
+        setEditAsset({
+            id: asset.id,
+            asset_name: asset.asset_name,
+            asset_tag: asset.asset_tag,
+            category: asset.category,
+            purchase_date: asset.purchase_date,
+            purchase_cost: asset.purchase_cost,
+            residual_value: asset.residual_value,
+            useful_life_months: asset.useful_life_months,
+            depreciation_method: asset.depreciation_method,
+            gl_asset_account_id: asset.gl_asset_account_id,
+            gl_depreciation_account_id: asset.gl_depreciation_account_id,
+            gl_expense_account_id: asset.gl_expense_account_id,
+            notes: asset.notes,
+            has_depreciations: asset.has_depreciations,
+        });
 
     const depForm = useForm({
         depreciation_date: new Date().toISOString().split('T')[0],
@@ -155,6 +178,18 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
         });
     }
 
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (asset: FixedAsset): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/fixed-assets/${asset.id}`) },
+        ];
+        if (canManage && asset.status !== 'disposed') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(asset) });
+        }
+        return items;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Fixed Assets" />
@@ -168,12 +203,18 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                         description="Manage your organisation's fixed asset register"
                         stats={[
                             { label: 'Total assets', value: summary.total_count },
-                            { label: 'Total cost', value: formatNZD(summary.total_cost) },
-                            { label: 'Depreciation', value: formatNZD(summary.total_depreciation) },
-                            { label: 'Book value', value: formatNZD(summary.net_book_value) },
+                            { label: 'Total cost', value: formatMoney(summary.total_cost) },
+                            { label: 'Depreciation', value: formatMoney(summary.total_depreciation) },
+                            { label: 'Book value', value: formatMoney(summary.net_book_value) },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <a href={`/finance/fixed-assets/export?${new URLSearchParams(Object.entries({ category: filters.category ?? '', status: filters.status ?? '', search: filters.search ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
                                 <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
                                     <DialogTrigger asChild>
                                         <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
@@ -215,12 +256,12 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                         </form>
                                     </DialogContent>
                                 </Dialog>
-                                <Link href={'/finance/fixed-assets/create'}>
-                                    <Button size="sm">
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Add Asset
                                     </Button>
-                                </Link>
+                                )}
                             </div>
                         }
                     />
@@ -250,7 +291,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Cost</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_cost)}
+                                        {formatMoney(summary.total_cost)}
                                     </p>
                                 </div>
                             </div>
@@ -265,7 +306,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Depreciation</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_depreciation)}
+                                        {formatMoney(summary.total_depreciation)}
                                     </p>
                                 </div>
                             </div>
@@ -280,7 +321,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Book Value</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.net_book_value)}
+                                        {formatMoney(summary.net_book_value)}
                                     </p>
                                 </div>
                             </div>
@@ -310,7 +351,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                     applyFilters({ category: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by category">
                                     <SelectValue placeholder="All Categories" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -329,7 +370,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                     applyFilters({ status: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -350,19 +391,20 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                 <Card>
                     <CardContent className="p-0">
                         {assets.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Package className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                                <h3 className="text-lg font-medium mb-1">No fixed assets found</h3>
-                                <p className="text-muted-foreground mb-4">
-                                    Get started by adding your first fixed asset.
-                                </p>
-                                <Link href={'/finance/fixed-assets/create'}>
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add Asset
-                                    </Button>
-                                </Link>
-                            </div>
+                            <EmptyList
+                                icon={Package}
+                                itemName="fixed asset"
+                                title="No fixed assets yet"
+                                description="Get started by adding your first fixed asset."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            Add asset
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -375,13 +417,14 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                         <TableHead className="text-right">Accum. Depr.</TableHead>
                                         <TableHead className="text-right">Book Value</TableHead>
                                         <TableHead>Status</TableHead>
+                                        {canManage && <TableHead className="w-12 text-right" />}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {assets.data.map((asset) => {
                                         const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
                                         return (
-                                            <TableRow key={asset.id}>
+                                            <TableRow key={asset.id} onContextMenu={rowMenu.open(rowMenuItems(asset))}>
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/fixed-assets/${asset.id}`}
@@ -405,22 +448,32 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                                     {new Date(asset.purchase_date).toLocaleDateString('en-NZ')}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatNZD(asset.purchase_cost)}
+                                                    {formatMoney(asset.purchase_cost)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatNZD(asset.accumulated_depreciation)}
+                                                    {formatMoney(asset.accumulated_depreciation)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                    {formatNZD(bookValue)}
+                                                    {formatMoney(bookValue)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className={statusColors[asset.status] || ''}
-                                                    >
-                                                        {statusLabels[asset.status] || asset.status}
-                                                    </Badge>
+                                                    <StatusBadge status={asset.status} />
                                                 </TableCell>
+                                                {canManage && (
+                                                    <TableCell className="text-right">
+                                                        {asset.status !== 'disposed' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0"
+                                                                aria-label={`Edit ${asset.asset_name}`}
+                                                                onClick={() => openEdit(asset)}
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         );
                                     })}
@@ -452,7 +505,29 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                         </div>
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageLayout>
+
+            {canManage && (
+                <FixedAssetDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    assetAccounts={assetAccounts}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
+
+            {canManage && editAsset && (
+                <FixedAssetDialog
+                    key={editAsset.id}
+                    open
+                    asset={editAsset}
+                    onClose={() => setEditAsset(null)}
+                    assetAccounts={assetAccounts}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
         </AppLayout>
     );
 }

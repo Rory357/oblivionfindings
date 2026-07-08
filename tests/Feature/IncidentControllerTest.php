@@ -1265,6 +1265,91 @@ class IncidentControllerTest extends TestCase
             ->assertSessionHasErrors(['closed_outcome']);
     }
 
+    // ── High-severity close guardrail ↔ H&S investigation seam ──
+
+    public function test_high_severity_close_blocked_without_completed_investigation(): void
+    {
+        $this->mockNotificationService();
+
+        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Attempted close'])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('reviewed', $incident->fresh()->status);
+    }
+
+    public function test_completing_the_hs_investigation_unlocks_high_severity_close(): void
+    {
+        $this->mockNotificationService();
+
+        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
+        $hsEvent = \App\Models\HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->first();
+        $this->assertNotNull($hsEvent, 'Expected the observer to record an HsEvent for the incident.');
+
+        // Run the investigation to completion through the real service.
+        $this->actingAs($this->admin);
+        $service = app(\App\Services\HealthSafety\HsInvestigationService::class);
+        $investigation = $service->create($hsEvent, [
+            'methodology' => '5_whys',
+            'lead_investigator_id' => $this->admin->id,
+        ]);
+        $service->start($investigation, $this->admin->id);
+        $service->recordFindings($investigation, [
+            'findings_summary' => 'Root cause established.',
+            'recommendations' => [['description' => 'Refresh the support plan']],
+        ]);
+        $service->submitForReview($investigation);
+        $service->complete($investigation, ['approved_by_id' => $this->admin->id]);
+
+        // The lifecycle sync mirrors completion onto the incident column.
+        $this->assertSame('completed', $incident->fresh()->investigation_status);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Investigated and resolved'])
+            ->assertRedirect()
+            ->assertSessionMissing('error');
+
+        $this->assertSame('closed', $incident->fresh()->status);
+    }
+
+    public function test_pre_sync_completed_hs_investigation_also_unlocks_close(): void
+    {
+        // Simulates rows written before the status sync existed: the H&S
+        // investigation is completed but the incident column was never mirrored.
+        $this->mockNotificationService();
+
+        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'critical']);
+        $hsEvent = \App\Models\HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->first();
+        $this->assertNotNull($hsEvent);
+
+        \App\Models\HsInvestigation::create([
+            'hs_event_id' => $hsEvent->id,
+            'organization_id' => $hsEvent->organization_id,
+            'reference_number' => \App\Models\HsInvestigation::generateReferenceNumber(),
+            'investigation_type' => 'standard',
+            'status' => \App\Models\HsInvestigation::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ]);
+
+        $this->assertNull($incident->fresh()->investigation_status);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Historic record closed'])
+            ->assertRedirect()
+            ->assertSessionMissing('error');
+
+        $this->assertSame('closed', $incident->fresh()->status);
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  20. Cannot close non-reviewed incidents
     // ──────────────────────────────────────────────────────────────

@@ -36,7 +36,6 @@ use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
 use App\Models\ClientLeaveRequest;
-use App\Models\ClientLedgerEntry;
 use App\Models\ClientMealLog;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -801,22 +800,6 @@ class ClientController extends Controller
                         'transaction_date' => $tx->transaction_date?->toDateString(),
                         'recorder' => $tx->recorder?->name,
                         'reference' => $tx->reference,
-                    ])
-                    ->values(),
-                'ledger_entries' => ClientLedgerEntry::query()
-                    ->where('client_id', $client->id)
-                    ->orderByDesc('entry_date')
-                    ->limit(25)
-                    ->get()
-                    ->map(fn ($entry) => [
-                        'id' => $entry->id,
-                        'type' => $entry->type,
-                        'category' => $entry->category,
-                        'direction' => $entry->direction,
-                        'amount' => (float) $entry->amount,
-                        'description' => $entry->description,
-                        'entry_date' => $entry->entry_date?->toDateString(),
-                        'approved_at' => $entry->approved_at?->toISOString(),
                     ])
                     ->values(),
                 'purchase_requests' => ClientPurchaseRequest::query()

@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Head } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -13,10 +14,9 @@ import {
 } from '@/components/ui/table';
 import { BarChart3, DollarSign, TrendingDown, TrendingUp, Building2, Minus, ArrowLeftRight, Activity } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatMoney } from '@/components/finance/money';
+import { chartColor } from '@/components/finance/chart-palette';
 import { type BreadcrumbItem } from '@/types';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 type AccountDetail = {
     entity_id: number;
@@ -67,15 +67,8 @@ type PageProps = {
     run: Run;
 };
 
-const statusColors: Record<string, string> = {
-    draft: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
-    processing: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed: 'bg-status-success-bg text-status-success border-status-success/30',
-    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-};
-
 function formatCurrencyStr(value: string | number, currency: string = 'NZD'): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(value));
+    return formatMoney(value, { currency });
 }
 
 function SummaryCard({ title, value, icon: Icon, currency, colorClass }: { title: string; value: string; icon: any; currency: string; colorClass?: string }) {
@@ -94,7 +87,7 @@ function SummaryCard({ title, value, icon: Icon, currency, colorClass }: { title
 
 export default function RunResults({ group, run }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
         { title: `Run #${run.id}`, href: `/finance/consolidation/${group.id}/runs/${run.id}` },
@@ -122,11 +115,11 @@ export default function RunResults({ group, run }: PageProps) {
 
     // Bar chart data for financial totals
     const barChartData = [
-        { name: 'Revenue', value: Number(run.total_revenue), fill: '#10b981' },
-        { name: 'Expenses', value: Number(run.total_expenses), fill: '#ef4444' },
-        { name: 'Assets', value: Number(run.total_assets), fill: '#3b82f6' },
-        { name: 'Liabilities', value: Number(run.total_liabilities), fill: '#f59e0b' },
-        { name: 'Equity', value: Number(run.total_equity), fill: '#8b5cf6' },
+        { name: 'Revenue', value: Number(run.total_revenue), fill: 'var(--status-success)' },
+        { name: 'Expenses', value: Number(run.total_expenses), fill: 'var(--status-critical)' },
+        { name: 'Assets', value: Number(run.total_assets), fill: chartColor(0) },
+        { name: 'Liabilities', value: Number(run.total_liabilities), fill: chartColor(2) },
+        { name: 'Equity', value: Number(run.total_equity), fill: chartColor(4) },
     ];
 
     // Pie chart data - composition by entity
@@ -154,9 +147,7 @@ export default function RunResults({ group, run }: PageProps) {
                         title={`Consolidation Run #${run.id}`}
                         description={`${run.period_from} to ${run.period_to}${run.created_by ? ` | Run by ${run.created_by}` : ''}`}
                         actions={
-                            <Badge variant="outline" className={statusColors[run.status]}>
-                                {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                            </Badge>
+                            <StatusBadge status={run.status} />
                         }
                     />
                 }
@@ -222,7 +213,7 @@ export default function RunResults({ group, run }: PageProps) {
                                                 return `$${value}`;
                                             }}
                                         />
-                                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                        <Tooltip formatter={(value) => formatMoney(Number(value))} />
                                         <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
                                             {barChartData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -256,10 +247,10 @@ export default function RunResults({ group, run }: PageProps) {
                                                 labelLine={true}
                                             >
                                                 {pieChartData.map((_entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                    <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                            <Tooltip formatter={(value) => formatMoney(Number(value))} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 ) : (

@@ -163,7 +163,7 @@ export default function ClientAssignments({
                                 {assignedWorkers.map((w) => (
                                     <Card
                                         key={w.id}
-                                        className="bg-primary/10/30 border-primary transition-all hover:shadow-sm"
+                                        className="bg-primary/10 border-primary transition-all hover:shadow-sm"
                                     >
                                         <CardContent className="flex items-center justify-between p-3">
                                             <div className="flex items-center gap-3">

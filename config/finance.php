@@ -114,6 +114,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fixed-asset disposal
+    |--------------------------------------------------------------------------
+    |
+    | The balancing (gain or loss) leg of a fixed-asset disposal journal posts
+    | to this account. It MUST be a dedicated account — `8100` was historically
+    | hardcoded in FixedAssetService but the seeded chart uses `8100` for Bank
+    | Fees, so a disposal at a gain/loss either mis-posted (real orgs) or silently
+    | dropped the balancing line and rolled the whole disposal back (demo/unseeded).
+    |
+    */
+
+    'fixed_asset' => [
+        'gain_loss_account' => '8400',   // Gain/Loss on Asset Disposal
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Account Name Assertions (config-driven name-parity check)
     |--------------------------------------------------------------------------
     |
@@ -373,6 +390,25 @@ return [
     'audit_exports' => [
         'disk' => env('FINANCE_AUDIT_EXPORT_DISK', 'local'),
         'retention_years' => env('FINANCE_AUDIT_EXPORT_RETENTION_YEARS', 7),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Spend Approval Gate (governance sign-off on large bills)
+    |--------------------------------------------------------------------------
+    |
+    | When `enforce` is on, an accounts-payable bill whose total is at or above
+    | `threshold` cannot be approved (and its GL journal posted) unless it is
+    | linked to a governance SpendApproval that is APPROVED and covers the full
+    | bill amount. Opt-in: enforcement is off by default so existing AP flows
+    | are unaffected until an org turns it on. Linking a spend approval to a
+    | bill (spend_approval_id) is always permitted regardless of this setting.
+    |
+    */
+
+    'spend_approval' => [
+        'enforce' => env('FINANCE_SPEND_APPROVAL_ENFORCE', false),
+        'threshold' => env('FINANCE_SPEND_APPROVAL_THRESHOLD', 10000),
     ],
 
 ];

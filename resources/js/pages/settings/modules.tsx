@@ -153,7 +153,7 @@ export default function Modules({
                             {modules.map((mod) => {
                                 const Icon = mod.icon;
                                 return (
-                                    <Card key={mod.id} className={`border transition-colors ${mod.enabled ? 'border-primary bg-primary/10/30' : 'border-muted'}`}>
+                                    <Card key={mod.id} className={`border transition-colors ${mod.enabled ? 'border-primary bg-primary/10' : 'border-muted'}`}>
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex items-start gap-3">

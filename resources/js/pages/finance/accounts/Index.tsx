@@ -1,4 +1,4 @@
-import { LedgerTabsFooter, NewAccountDialog } from '@/components/finance';
+import { LedgerTabsFooter, NewAccountDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,9 +8,11 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Plus, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronRight, DollarSign, Download, Eye, Plus, Search, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -46,12 +48,6 @@ type PageProps = {
     fundingStreams?: RefItem[];
 };
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(amount);
-
 const typeLabels: Record<string, string> = {
     asset: 'Assets',
     liability: 'Liabilities',
@@ -74,9 +70,11 @@ const typeColors: Record<string, string> = {
 function AccountRow({
     account,
     depth = 0,
+    onRowContextMenu,
 }: {
     account: Account;
     depth?: number;
+    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
     const hasChildren = account.children.length > 0;
@@ -87,6 +85,7 @@ function AccountRow({
                 className="group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted/50"
                 style={{ paddingLeft: `${depth * 24 + 12}px` }}
                 onClick={() => router.visit(`/finance/accounts/${account.id}`)}
+                onContextMenu={onRowContextMenu(account)}
             >
                 {hasChildren ? (
                     <Button
@@ -127,7 +126,7 @@ function AccountRow({
                     </Badge>
                 )}
                 <span className="w-32 text-right font-mono text-sm tabular-nums">
-                    {formatNZD(account.balance)}
+                    {formatMoney(account.balance)}
                 </span>
             </div>
             {hasChildren && isOpen && (
@@ -137,6 +136,7 @@ function AccountRow({
                             key={child.id}
                             account={child}
                             depth={depth + 1}
+                            onRowContextMenu={onRowContextMenu}
                         />
                     ))}
                 </div>
@@ -148,9 +148,11 @@ function AccountRow({
 function AccountTypeSection({
     type,
     accounts,
+    onRowContextMenu,
 }: {
     type: string;
     accounts: Account[];
+    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
 
@@ -181,19 +183,53 @@ function AccountTypeSection({
                         </span>
                     </div>
                     <span className="font-mono text-sm font-semibold tabular-nums">
-                        {formatNZD(totalBalance)}
+                        {formatMoney(totalBalance)}
                     </span>
                 </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
                 <div className="mt-1 ml-2">
                     {accounts.map((account) => (
-                        <AccountRow key={account.id} account={account} />
+                        <AccountRow
+                            key={account.id}
+                            account={account}
+                            onRowContextMenu={onRowContextMenu}
+                        />
                     ))}
                 </div>
             </CollapsibleContent>
         </Collapsible>
     );
+}
+
+type ActiveFilter = 'all' | 'active' | 'inactive';
+
+/**
+ * Prune the account tree to rows matching the search text (code or name) and the
+ * active filter, keeping any ancestor of a match so the hierarchy stays intact.
+ * Runs client-side — the whole chart is already loaded, so a tree filter is the
+ * right idiom (you never paginate a chart of accounts).
+ */
+function filterAccounts(nodes: Account[], q: string, active: ActiveFilter): Account[] {
+    const needle = q.trim().toLowerCase();
+    const matches = (a: Account) => {
+        const activeOk =
+            active === 'all' || (active === 'active' ? a.is_active : !a.is_active);
+        const textOk =
+            needle === '' ||
+            a.code.toLowerCase().includes(needle) ||
+            a.name.toLowerCase().includes(needle);
+        return activeOk && textOk;
+    };
+    const walk = (list: Account[]): Account[] =>
+        list.reduce<Account[]>((acc, node) => {
+            const children = walk(node.children);
+            if (matches(node) || children.length > 0) {
+                acc.push({ ...node, children });
+            }
+            return acc;
+        }, []);
+    return walk(nodes);
 }
 
 export default function AccountsIndex({
@@ -205,16 +241,37 @@ export default function AccountsIndex({
     fundingStreams = [],
 }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Chart of Accounts', href: '/finance/accounts' },
     ];
 
+    const TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+
     const countTree = (nodes: Account[]): number =>
         nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
-    const totalAccounts = (
-        ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
-    ).reduce((sum, type) => sum + countTree(accountTree[type] || []), 0);
+    const totalAccounts = TYPES.reduce(
+        (sum, type) => sum + countTree(accountTree[type] || []),
+        0,
+    );
+
+    const hasFilters = search.trim() !== '' || activeFilter !== 'all';
+    const filteredTree = TYPES.reduce((acc, type) => {
+        acc[type] = filterAccounts(accountTree[type] || [], search, activeFilter);
+        return acc;
+    }, {} as AccountTree);
+    const visibleCount = TYPES.reduce(
+        (sum, type) => sum + countTree(filteredTree[type]),
+        0,
+    );
+
+    // Right-click row menu — mirrors the account row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (account: Account): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/accounts/${account.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -232,40 +289,73 @@ export default function AccountsIndex({
                             { label: 'Account types', value: accountTypes.length },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Account
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href="/finance/accounts/export">
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Account
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<LedgerTabsFooter active="accounts" />}
                     />
                 }
             >
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="gap-4">
                         <div className="flex items-center gap-2">
                             <DollarSign className="h-5 w-5 text-muted-foreground" />
                             <CardTitle>Account Tree</CardTitle>
                         </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search code or name..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <Select
+                                value={activeFilter}
+                                onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
+                            >
+                                <SelectTrigger className="sm:w-44" aria-label="Filter by active state">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All accounts</SelectItem>
+                                    <SelectItem value="active">Active only</SelectItem>
+                                    <SelectItem value="inactive">Inactive only</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {(
-                            [
-                                'asset',
-                                'liability',
-                                'equity',
-                                'revenue',
-                                'expense',
-                            ] as const
-                        ).map((type) => (
-                            <AccountTypeSection
-                                key={type}
-                                type={type}
-                                accounts={accountTree[type] || []}
-                            />
-                        ))}
+                        {visibleCount === 0 ? (
+                            <div className="py-12 text-center text-sm text-muted-foreground">
+                                No accounts match your search.
+                            </div>
+                        ) : (
+                            TYPES.filter(
+                                (type) => !hasFilters || filteredTree[type].length > 0,
+                            ).map((type) => (
+                                <AccountTypeSection
+                                    key={type}
+                                    type={type}
+                                    accounts={filteredTree[type]}
+                                    onRowContextMenu={(account) => rowMenu.open(rowMenuItems(account))}
+                                />
+                            ))
+                        )}
                     </CardContent>
                 </Card>
 
@@ -278,6 +368,8 @@ export default function AccountsIndex({
                         fundingStreams={fundingStreams}
                     />
                 )}
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

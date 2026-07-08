@@ -1,10 +1,13 @@
-import { PageHero } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
+import { OverviewTabsFooter } from '@/components/finance/overview-hub';
+import { PageHero, PageLayout } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { formatCurrency } from '@/lib/fleet-utils';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -57,7 +60,7 @@ type Props = {
     filters: { from: string; to: string };
 };
 
-const $ = (v: string | number) => formatCurrency(Number(v));
+const $ = (v: string | number) => formatMoney(Number(v));
 const pct = (v: string | number) => `${Number(v).toFixed(1)}%`;
 
 const severityColor: Record<string, string> = {
@@ -67,8 +70,8 @@ const severityColor: Record<string, string> = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
-    { title: 'Executive Dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Executive' },
 ];
 
 export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummaries, filters }: Props) {
@@ -79,47 +82,39 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Executive Financial Dashboard" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Hero */}
-                <PageHero category="finance"
-                    title="Executive Financial Dashboard"
-                    description="Organisation-wide financial overview and risk indicators"
-                    icon={<BarChart3 className="h-7 w-7 text-white" />}
-                    stats={[
-                        { label: 'Sites', value: site_kpis.sites_ranked.length },
-                        { label: 'Clients', value: client_kpis.client_count },
-                    ]}
-                />
-
-                {/* Hero Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <PageLayout
+                width="wide"
+                hero={
+                    <PageHero
+                        category="finance"
+                        title="Executive Financial Dashboard"
+                        description={`Organisation-wide cost, funding and staffing risk across ${site_kpis.sites_ranked.length} ${site_kpis.sites_ranked.length === 1 ? 'site' : 'sites'} and ${client_kpis.client_count} ${client_kpis.client_count === 1 ? 'client' : 'clients'}.`}
+                        icon={<BarChart3 className="h-7 w-7 text-white" />}
+                        stats={[
+                            { label: 'Total cost', value: $(site_kpis.total_cost) },
+                            { label: 'Underfunded clients', value: client_kpis.underfunded_count, tone: client_kpis.underfunded_count > 0 ? 'critical' : undefined },
+                            { label: 'Over-budget sites', value: overBudgetCount, tone: overBudgetCount > 0 ? 'warning' : undefined },
+                            { label: 'Staffing cost', value: $(staffing_kpis.total_staffing_cost) },
+                        ]}
+                        footer={<OverviewTabsFooter active="executive" />}
+                    />
+                }
+            >
+                {/* Cost-trend context under the hero stats */}
+                <div className="grid gap-4 sm:grid-cols-2">
                     <FleetStatCard
-                        label="Total Cost"
-                        value={$(site_kpis.total_cost)}
+                        label="Cost trend"
+                        value={pct(site_kpis.cost_trend_pct)}
                         icon={DollarSign}
                         color="purple"
-                        subtitle={`${pct(site_kpis.cost_trend_pct)} vs previous`}
+                        subtitle="vs previous period"
                     />
                     <FleetStatCard
-                        label="Underfunded Clients"
-                        value={client_kpis.underfunded_count}
-                        icon={client_kpis.underfunded_count > 0 ? AlertTriangle : Users}
-                        color={client_kpis.underfunded_count > 0 ? 'red' : 'cyan'}
-                        subtitle={`of ${client_kpis.client_count} total`}
-                    />
-                    <FleetStatCard
-                        label="Over-Budget Sites"
-                        value={overBudgetCount}
-                        icon={overBudgetCount > 0 ? AlertTriangle : Building2}
-                        color={overBudgetCount > 0 ? 'amber' : 'blue'}
-                        subtitle={`of ${site_kpis.sites_ranked.length} sites`}
-                    />
-                    <FleetStatCard
-                        label="Total Staffing"
-                        value={$(staffing_kpis.total_staffing_cost)}
+                        label="Staffing share"
+                        value={pct(staffing_kpis.staffing_pct_of_total_cost)}
                         icon={TrendingDown}
                         color="cyan"
-                        subtitle={`${pct(staffing_kpis.staffing_pct_of_total_cost)} of total`}
+                        subtitle={`oncosts ${pct(staffing_kpis.oncost_pct_of_wages)} of wages`}
                     />
                 </div>
 
@@ -132,9 +127,12 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
                                 <div key={i} className={`flex items-start gap-3 rounded-lg border p-3 ${severityColor[insight.severity] || severityColor.info}`}>
                                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                     <span className="text-sm">{insight.message}</span>
-                                    <Badge variant={insight.severity === 'critical' ? 'destructive' : 'secondary'} className="ml-auto shrink-0 text-[10px]">
-                                        {insight.severity}
-                                    </Badge>
+                                    <StatusBadge
+                                        size="sm"
+                                        variant={insight.severity === 'critical' ? 'critical' : insight.severity === 'warning' ? 'warning' : 'info'}
+                                        label={insight.severity}
+                                        className="ml-auto shrink-0"
+                                    />
                                 </div>
                             ))}
                         </div>
@@ -173,10 +171,12 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
                                     </TableBody>
                                 </Table>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
-                                    <Building2 className="h-8 w-8 text-muted-foreground/40" />
-                                    <p className="mt-2">No site cost data</p>
-                                </div>
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Building2}
+                                    heading="No site cost data"
+                                    description="Costs appear here once journals post against site cost centres for the period."
+                                />
                             )}
                         </CardContent>
                     </Card>
@@ -216,15 +216,17 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
                                     </TableBody>
                                 </Table>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
-                                    <Users className="h-8 w-8 text-muted-foreground/40" />
-                                    <p className="mt-2">No client cost data</p>
-                                </div>
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Users}
+                                    heading="No client cost data"
+                                    description="Client cost outliers appear once allocated costs post for the period."
+                                />
                             )}
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

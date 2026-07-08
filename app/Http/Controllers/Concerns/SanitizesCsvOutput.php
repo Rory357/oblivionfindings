@@ -33,6 +33,36 @@ trait SanitizesCsvOutput
     }
 
     /**
+     * Stream a sanitised CSV download. The canonical list-export helper: pass a
+     * filename, a header row, and the data rows (each an ordered array matching
+     * the header). Every cell is neutralised against CSV formula injection.
+     *
+     * NB the name is `streamSanitizedCsv`, NOT `streamCsv`/`exportCsv`: several
+     * controllers already define a `private streamCsv`/`exportCsv`, and a
+     * `protected` trait method of the same name inherited via the base Controller
+     * would be an illegal visibility reduction (PHP fatal). This name avoids it.
+     *
+     * @param  array<int, string>  $header
+     * @param  iterable<int, array<int, mixed>>  $rows
+     */
+    protected function streamSanitizedCsv(string $filename, array $header, iterable $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->streamDownload(function () use ($header, $rows) {
+            $handle = fopen('php://output', 'w');
+            // BOM so Excel opens UTF-8 (macrons in NZ names) correctly.
+            fwrite($handle, "\xEF\xBB\xBF");
+            $this->putCsv($handle, $header);
+            foreach ($rows as $row) {
+                $this->putCsv($handle, $row);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache',
+        ]);
+    }
+
+    /**
      * Neutralise a single cell value.
      */
     protected function sanitizeCsvCell(mixed $value): mixed

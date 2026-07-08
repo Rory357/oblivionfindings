@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeftRight, Plus, TrendingUp, TrendingDown, Globe } from 'lucide-react';
+import { useState } from 'react';
 
 type Revaluation = {
     id: number;
@@ -31,27 +32,24 @@ type PageProps = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
 ];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    posted: { label: 'Posted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    reversed: { label: 'Reversed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-};
-
 export default function FxRevaluationsIndex({ revaluations }: PageProps) {
-    function handlePost(id: number) {
-        if (confirm('Are you sure you want to post this revaluation to the General Ledger? This will create a journal entry.')) {
-            router.post(`/finance/fx-revaluations/${id}/post`);
-        }
+    const [postTarget, setPostTarget] = useState<Revaluation | null>(null);
+    const [posting, setPosting] = useState(false);
+
+    function confirmPost() {
+        if (!postTarget) return;
+        router.post(`/finance/fx-revaluations/${postTarget.id}/post`, {}, {
+            onStart: () => setPosting(true),
+            onFinish: () => setPosting(false),
+            onSuccess: () => setPostTarget(null),
+        });
     }
 
     // Compute KPI: total gain/loss across all revaluations on current page
@@ -60,6 +58,16 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
     const isLoss = totalGainLoss < 0;
 
     const postedCount = revaluations.data.filter((r) => r.status === 'posted').length;
+
+    // Right-click row menu — mirrors the row's existing inline action (same guard).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (reval: Revaluation): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (reval.status === 'draft') {
+            items.push({ kind: 'item', label: 'Post to GL', icon: ArrowLeftRight, onSelect: () => setPostTarget(reval) });
+        }
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -75,7 +83,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         stats={[
                             { label: 'Revaluations', value: revaluations.data.length },
                             { label: 'Posted', value: postedCount },
-                            { label: 'Net gain/loss', value: formatCurrency(totalGainLoss) },
+                            { label: 'Net gain/loss', value: formatMoney(totalGainLoss) },
                         ]}
                         actions={
                             <Link href="/finance/fx-revaluations/create">
@@ -106,7 +114,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                     Total Unrealised {isGain ? 'Gain' : isLoss ? 'Loss' : 'Gain/Loss'}
                                 </p>
                                 <p className={`text-2xl font-bold font-mono tabular-nums ${isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'}`}>
-                                    {isLoss ? '(' : ''}{formatCurrency(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
+                                    {isLoss ? '(' : ''}{formatMoney(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
                                 </p>
                             </div>
                         </CardContent>
@@ -146,10 +154,14 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                             const gainLoss = Number(reval.total_gain_loss);
                                             const rowIsGain = gainLoss > 0;
                                             const rowIsLoss = gainLoss < 0;
-                                            const status = statusConfig[reval.status] ?? statusConfig.draft;
+                                            const menuItems = rowMenuItems(reval);
 
                                             return (
-                                                <tr key={reval.id} className="border-b last:border-0 hover:bg-muted/50">
+                                                <tr
+                                                    key={reval.id}
+                                                    className="border-b last:border-0 hover:bg-muted/50"
+                                                    onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
+                                                >
                                                     <td className="py-3 pr-4 font-medium">
                                                         {formatDate(reval.revaluation_date)}
                                                     </td>
@@ -163,13 +175,11 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                         }`}
                                                     >
                                                         {rowIsLoss ? '(' : ''}
-                                                        {formatCurrency(Math.abs(gainLoss))}
+                                                        {formatMoney(Math.abs(gainLoss))}
                                                         {rowIsLoss ? ')' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={reval.status} />
                                                     </td>
                                                     <td className="py-3 pr-4 font-mono text-sm text-muted-foreground">
                                                         {reval.journal_number ?? '-'}
@@ -185,7 +195,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => handlePost(reval.id)}
+                                                                onClick={() => setPostTarget(reval)}
                                                             >
                                                                 Post to GL
                                                             </Button>
@@ -215,7 +225,28 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!postTarget}
+                onOpenChange={(open) => !open && setPostTarget(null)}
+                title="Post revaluation to the General Ledger?"
+                description={
+                    <>
+                        This posts the FX revaluation dated{' '}
+                        <span className="font-medium text-foreground">
+                            {postTarget ? formatDate(postTarget.revaluation_date) : ''}
+                        </span>{' '}
+                        and creates the journal entry for the unrealised gain/loss. Once posted it
+                        can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Post to GL"
+                processing={posting}
+                onConfirm={confirmPost}
+            />
         </AppLayout>
     );
 }

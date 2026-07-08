@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Governance\Models\SpendApproval;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,7 @@ class AccountsPayableService
                 'organization_id' => $orgId,
                 'vendor_id' => $data['vendor_id'],
                 'purchase_order_id' => $data['purchase_order_id'] ?? null,
+                'spend_approval_id' => $data['spend_approval_id'] ?? null,
                 'bill_number' => $billNumber,
                 'vendor_reference' => $data['vendor_reference'] ?? null,
                 'status' => 'draft',
@@ -100,6 +102,7 @@ class AccountsPayableService
                 'bill_date' => $data['bill_date'],
                 'due_date' => $data['due_date'],
                 'purchase_order_id' => $data['purchase_order_id'] ?? null,
+                'spend_approval_id' => $data['spend_approval_id'] ?? null,
                 'notes' => $data['notes'] ?? null,
             ]);
 
@@ -156,6 +159,8 @@ class AccountsPayableService
             throw new InvalidArgumentException('Only draft or awaiting approval bills can be approved.');
         }
 
+        $this->assertSpendApprovalSatisfied($bill);
+
         return DB::transaction(function () use ($bill, $userId) {
             $bill->loadMissing('lines');
 
@@ -202,6 +207,42 @@ class AccountsPayableService
 
             return $bill->refresh();
         });
+    }
+
+    /**
+     * Governance spend-approval gate. When enforcement is enabled (config
+     * finance.spend_approval.enforce), a bill at/above the configured threshold
+     * can only be approved once it is linked to a SpendApproval that is APPROVED
+     * and whose amount covers the full bill total. Off by default, so existing
+     * AP flows are unaffected until an org opts in. Surfaced as an
+     * InvalidArgumentException (the approve action catches it → flash error);
+     * this NEVER creates a SpendApproval — the link is one-directional.
+     */
+    private function assertSpendApprovalSatisfied(FinBill $bill): void
+    {
+        if (! config('finance.spend_approval.enforce', false)) {
+            return;
+        }
+
+        $threshold = (float) config('finance.spend_approval.threshold', 10000);
+        $total = (float) $bill->total_amount;
+
+        if ($total < $threshold) {
+            return;
+        }
+
+        $approval = $bill->spendApproval;
+        $satisfied = $approval
+            && $approval->status === SpendApproval::STATUS_APPROVED
+            && (float) $approval->amount >= $total;
+
+        if (! $satisfied) {
+            throw new InvalidArgumentException(sprintf(
+                'This bill (NZD %s) is at or above the NZD %s spend-approval threshold. Link an approved spend approval covering the full amount before approving it.',
+                number_format($total, 2),
+                number_format($threshold, 2),
+            ));
+        }
     }
 
     /**

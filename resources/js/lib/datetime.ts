@@ -103,6 +103,29 @@ export function formatDateTimeLong(value: DateInput, fallback: string = DEFAULT_
 }
 
 /**
+ * "2026-07-07T22:00" — a UTC instant expressed as NZ wall time for a
+ * `<input type="datetime-local">`. Prefill counterpart of servers that parse
+ * datetime-local strings in the worker timezone before storing UTC; slicing
+ * the raw ISO string instead shows UTC wall time (12 hours out).
+ */
+export function toDatetimeLocal(value: DateInput): string {
+    const d = toDate(value);
+    if (!d) return '';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: WORKER_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(d);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    const hour = get('hour') === '24' ? '00' : get('hour');
+    return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+}
+
+/**
  * "12m ago" / "in 15m" / "2h ago" / "3d ago" — calm relative phrasing for
  * freshness chips, alert rows, handover submitted, draft saved.
  *

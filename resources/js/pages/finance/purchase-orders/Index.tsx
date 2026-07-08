@@ -2,14 +2,16 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewPoDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewPoDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingCart } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { Plus, ShoppingCart, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 type Vendor = { id: number; name: string };
@@ -26,25 +28,8 @@ type PurchaseOrder = {
 
 type PaginationLink = { url: string | null; label: string; active: boolean };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
-    sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
-    partially_received: { label: 'Partially Received', className: 'bg-status-warning-bg text-status-warning' },
-    received: { label: 'Received', className: 'bg-status-success-bg text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
-};
-
-function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, className: 'bg-muted text-foreground' };
-    return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
-}
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Purchase Orders', href: '/finance/purchase-orders' },
 ];
 
@@ -66,6 +51,18 @@ export default function PurchaseOrderIndex() {
         router.get('/finance/purchase-orders', { ...current, ...next }, { preserveState: true, preserveScroll: true });
     }
 
+    function clearFilters() {
+        router.get('/finance/purchase-orders', {}, { preserveState: true, preserveScroll: true });
+    }
+
+    const hasFilters = Boolean(current.search || current.status || current.vendor_id);
+
+    // Right-click row menu — mirrors the row's existing inline action (the PO-number link to the show route).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (po: PurchaseOrder): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/purchase-orders/${po.id}`) },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Purchase Orders" />
@@ -79,12 +76,20 @@ export default function PurchaseOrderIndex() {
                             { label: 'Total', value: purchaseOrders?.total ?? rows.length },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewPoOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Purchase Order
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/purchase-orders/export?${new URLSearchParams(Object.entries({ status: current.status, vendor_id: current.vendor_id, search: current.search }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewPoOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Purchase Order
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="purchase-orders" />}
                     />
@@ -101,7 +106,7 @@ export default function PurchaseOrderIndex() {
                                 value={current.status || 'all'}
                                 onValueChange={(v) => apply({ status: v === 'all' ? '' : v })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -122,7 +127,7 @@ export default function PurchaseOrderIndex() {
                                 value={current.vendor_id ? String(current.vendor_id) : 'all'}
                                 onValueChange={(v) => apply({ vendor_id: v === 'all' ? '' : v })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by vendor">
                                     <SelectValue placeholder="All vendors" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -163,13 +168,34 @@ export default function PurchaseOrderIndex() {
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                                            No purchase orders found.
+                                        <TableCell colSpan={6} className="p-0">
+                                            {hasFilters ? (
+                                                <EmptySearch
+                                                    onClear={clearFilters}
+                                                    title="No purchase orders match your filters"
+                                                    className="border-0"
+                                                />
+                                            ) : (
+                                                <EmptyList
+                                                    icon={ShoppingCart}
+                                                    itemName="purchase order"
+                                                    title="No purchase orders yet"
+                                                    description="Create your first purchase order to get started."
+                                                    className="border-0"
+                                                    action={
+                                                        canManage ? (
+                                                            <Button size="sm" onClick={() => setNewPoOpen(true)}>
+                                                                New purchase order
+                                                            </Button>
+                                                        ) : undefined
+                                                    }
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     rows.map((po) => (
-                                        <TableRow key={po.id}>
+                                        <TableRow key={po.id} onContextMenu={rowMenu.open(rowMenuItems(po))}>
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/purchase-orders/${po.id}`}
@@ -181,7 +207,7 @@ export default function PurchaseOrderIndex() {
                                             <TableCell>{po.vendor?.name ?? '-'}</TableCell>
                                             <TableCell>{po.order_date}</TableCell>
                                             <TableCell>{po.expected_date ?? '-'}</TableCell>
-                                            <TableCell className="text-right">{formatNZD(po.total_amount)}</TableCell>
+                                            <TableCell className="text-right">{formatMoney(po.total_amount)}</TableCell>
                                             <TableCell>
                                                 <StatusBadge status={po.status} />
                                             </TableCell>
@@ -207,6 +233,8 @@ export default function PurchaseOrderIndex() {
                         ))}
                     </div>
                 ) : null}
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

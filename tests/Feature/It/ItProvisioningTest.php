@@ -50,13 +50,33 @@ beforeEach(function () {
     $this->svc = app(OnboardingService::class);
 });
 
-test('the /it hub is gated on it.view', function () {
+test('the /it hub is gated on it permissions', function () {
+    // No role at all → no it.request/it.view → no page.
+    $outsider = User::factory()->create(['approved_at' => now()]);
+    $this->actingAs($outsider)->get('/it')->assertForbidden();
+
+    // Self-service: support workers hold it.request and get the requester
+    // view — their own tickets only, never the agent queues.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
 
-    $this->actingAs($worker)->get('/it')->assertForbidden();
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('it/index')
+            ->has('myTickets')
+            ->has('summary.my')
+            ->missing('requests')
+            ->missing('tickets')
+            ->missing('summary.tickets')
+            ->missing('summary.provisioning')
+            ->missing('assignees')
+            ->where('can.view', false)
+            ->where('can.manage', false)
+            ->where('can.request', true));
 
     $this->actingAs($this->hr)
         ->get('/it')
@@ -65,7 +85,10 @@ test('the /it hub is gated on it.view', function () {
             ->component('it/index')
             ->has('requests')
             ->has('tickets')
-            ->has('stats')
+            ->has('summary.tickets')
+            ->has('summary.provisioning')
+            ->has('myTickets')
+            ->where('can.view', true)
             ->has('can.manage'));
 });
 
@@ -180,23 +203,214 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
     expect($ticket->priority)->toBe('high');
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve")
+        ->post("/it/tickets/{$ticket->id}/resolve", [
+            'note' => 'Power-cycled the Kyocera and cleared the queue.',
+        ])
         ->assertRedirect();
 
     $ticket->refresh();
     expect($ticket->status)->toBe('resolved');
     expect($ticket->resolved_at)->not->toBeNull();
 
-    // Mutations are gated on it.manage.
+    // Triage mutations stay gated on it.manage — a requester can raise
+    // tickets (self-service) but never work the queue.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)
+        ->patch("/it/tickets/{$ticket->id}", ['status' => 'open'])
+        ->assertForbidden();
+    $this->actingAs($worker)
+        ->post("/it/tickets/{$ticket->id}/resolve")
+        ->assertForbidden();
+});
+
+test('provisioning assign, fulfil and cancel each write an activity event', function () {
+    $profile = itProfile();
+    $agent = User::factory()->create();
+
+    $request = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'account',
+        'item' => 'Email account',
+        'status' => 'pending',
+    ]);
+
+    // Assigning moves pending → in_progress and records an `assigned` event.
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$request->id}/assign", ['assigned_to_user_id' => $agent->id])
+        ->assertRedirect();
+    expect($request->refresh()->status)->toBe('in_progress');
+    expect($request->events()->where('type', 'assigned')->count())->toBe(1);
+
+    // Fulfilling records a `fulfilled` event (no onboarding task to complete here).
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$request->id}/fulfil", ['notes' => 'Provisioned'])
+        ->assertRedirect();
+    expect($request->events()->where('type', 'fulfilled')->count())->toBe(1);
+
+    // Cancelling a fresh request records a `cancelled` event with the reason.
+    $toCancel = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'access',
+        'item' => 'VPN access',
+        'status' => 'pending',
+    ]);
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$toCancel->id}/cancel", ['reason' => 'Duplicate'])
+        ->assertRedirect();
+    $cancelled = $toCancel->events()->where('type', 'cancelled')->first();
+    expect($cancelled)->not->toBeNull();
+    expect($cancelled->payload['reason'] ?? null)->toBe('Duplicate');
+});
+
+test('an agent raises a manual provisioning request; requesters cannot', function () {
+    $profile = itProfile();
+    $agent = User::factory()->create();
+
+    // Assigned manual request → in_progress, with a `created` event.
+    $this->actingAs($this->hr)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'equipment',
+            'item' => 'Replacement laptop',
+            'assigned_to_user_id' => $agent->id,
+            'priority' => 'high',
+            'due_date' => now()->addDays(3)->toDateString(),
+            'notes' => 'Old one cracked',
+        ])
+        ->assertRedirect();
+
+    $req = ItProvisioningRequest::query()->firstWhere('item', 'Replacement laptop');
+    expect($req)->not->toBeNull();
+    expect($req->status)->toBe('in_progress');
+    expect($req->priority)->toBe('high');
+    expect((int) $req->assigned_to_user_id)->toBe($agent->id);
+    expect($req->events()->where('type', 'created')->count())->toBe(1);
+
+    // Unassigned manual request stays pending.
+    $this->actingAs($this->hr)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'account',
+            'item' => 'Email setup',
+            'priority' => 'normal',
+        ])
+        ->assertRedirect();
+    expect(ItProvisioningRequest::query()->firstWhere('item', 'Email setup')->status)->toBe('pending');
+
+    // Self-service requesters (no it.manage) cannot raise provisioning requests.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $profile->id,
+            'type' => 'account',
+            'item' => 'Nope',
+            'priority' => 'normal',
+        ])
+        ->assertForbidden();
+});
+
+test('an agent raises a ticket linked to a provisioning request; requesters cannot link', function () {
+    $profile = itProfile();
+    $req = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'equipment',
+        'item' => 'Laptop',
+        'status' => 'done',
+    ]);
+
+    // Agent links the ticket both ways.
+    $this->actingAs($this->hr)
+        ->post('/it/tickets', [
+            'title' => 'Laptop arrived cracked',
+            'category' => 'hardware',
+            'priority' => 'high',
+            'provisioning_request_id' => $req->id,
+        ])
+        ->assertRedirect();
+
+    $ticket = ItTicket::query()->firstWhere('title', 'Laptop arrived cracked');
+    expect((int) $ticket->provisioning_request_id)->toBe($req->id);
+    expect($req->linkedTickets()->whereKey($ticket->id)->exists())->toBeTrue();
+
+    // Self-service requesters can raise tickets but never attach a provisioning
+    // link — the agent-only field is dropped server-side.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
     $this->actingAs($worker)
         ->post('/it/tickets', [
-            'title' => 'Nope',
-            'category' => 'other',
-            'priority' => 'low',
+            'title' => 'Requester link attempt',
+            'category' => 'hardware',
+            'priority' => 'normal',
+            'provisioning_request_id' => $req->id,
         ])
-        ->assertForbidden();
+        ->assertRedirect();
+    expect(ItTicket::query()->firstWhere('title', 'Requester link attempt')->provisioning_request_id)->toBeNull();
+});
+
+test('an agent exports the provisioning queue as CSV; requesters cannot', function () {
+    $profile = itProfile();
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Email account', 'status' => 'pending', 'priority' => 'high',
+    ]);
+    // A CSV formula-injection payload in a user-controlled field is neutralised.
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'other', 'item' => '=cmd|calc', 'status' => 'pending',
+    ]);
+    // A foreign-tenant row never leaks into the export.
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 2, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Foreign-tenant secret', 'status' => 'pending',
+    ]);
+
+    $response = $this->actingAs($this->hr)->get('/it/provisioning/export');
+    $response->assertOk();
+    $response->assertDownload();
+    $csv = $response->streamedContent();
+
+    expect($csv)->toContain('Employee', 'Item', 'Status');
+    expect($csv)->toContain('Email account');
+    // Formula-injection guard: the leading `=` is prefixed with an apostrophe.
+    expect($csv)->toContain("'=cmd|calc");
+    expect($csv)->not->toContain(',=cmd|calc');
+    // Tenant scope holds.
+    expect($csv)->not->toContain('Foreign-tenant secret');
+
+    // Self-service requesters (no it.view) cannot export the agent queue.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)->get('/it/provisioning/export')->assertForbidden();
+});
+
+test('the provisioning export respects the status filter', function () {
+    $profile = itProfile();
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Pending item', 'status' => 'pending',
+    ]);
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Done item', 'status' => 'done',
+    ]);
+
+    $csv = $this->actingAs($this->hr)
+        ->get('/it/provisioning/export?status=pending')
+        ->streamedContent();
+
+    expect($csv)->toContain('Pending item');
+    expect($csv)->not->toContain('Done item');
 });

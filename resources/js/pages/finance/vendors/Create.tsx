@@ -96,7 +96,7 @@ export default function VendorsCreate({ expenseAccounts }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
+                { title: 'Finance', href: '/finance' },
                 { title: 'Vendors', href: '/finance/vendors' },
                 { title: 'Add Vendor', href: '/finance/vendors/create' },
             ]}

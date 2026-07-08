@@ -90,7 +90,76 @@ class BillController extends Controller
                     ->orderBy('code')
                     ->get(['id', 'code', 'name'])
                 : [],
+            // Approved, still-valid governance spend approvals available to link on
+            // the bill modal (for the spend-approval gate). Governance-owned; the
+            // link is one-directional (a bill points at one, never creates one).
+            'spendApprovals' => $canManage ? $this->linkableSpendApprovals() : [],
         ]);
+    }
+
+    /**
+     * Governance spend approvals a bill can be linked to: APPROVED and not past
+     * their validity window. Shaped for the New Bill modal's picker. Single-tenant,
+     * so not org-scoped (spend_approvals has no organization_id).
+     */
+    private function linkableSpendApprovals()
+    {
+        return \App\Domain\Governance\Models\SpendApproval::query()
+            ->where('status', \App\Domain\Governance\Models\SpendApproval::STATUS_APPROVED)
+            ->where(fn ($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', now()->toDateString()))
+            ->orderByDesc('decided_at')
+            ->limit(200)
+            ->get(['id', 'reference', 'title', 'amount', 'category']);
+    }
+
+    /**
+     * Stream the (filtered) bill list as a sanitised CSV. Mirrors the index's
+     * status/vendor/search/date filters so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinBill::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinBill::forOrganization($orgId)
+            ->with('vendor:id,name')
+            ->orderBy('bill_date', 'desc');
+
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+        if ($request->filled('vendor_id')) {
+            $query->where('vendor_id', $request->input('vendor_id'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('bill_number', 'like', "%{$search}%")
+                ->orWhere('vendor_reference', 'like', "%{$search}%"));
+        }
+        if ($request->filled('date_from')) {
+            $query->where('bill_date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('bill_date', '<=', $request->input('date_to'));
+        }
+
+        $rows = $query->get()->map(fn (FinBill $b) => [
+            $b->bill_number,
+            optional($b->vendor)->name,
+            optional($b->bill_date)->format('Y-m-d'),
+            optional($b->due_date)->format('Y-m-d'),
+            number_format((float) $b->subtotal, 2, '.', ''),
+            number_format((float) $b->gst_amount, 2, '.', ''),
+            number_format((float) $b->total_amount, 2, '.', ''),
+            $b->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'bills-'.now()->format('Y-m-d').'.csv',
+            ['Bill #', 'Vendor', 'Bill Date', 'Due Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
     }
 
     public function create(Request $request)

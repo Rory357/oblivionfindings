@@ -34,33 +34,39 @@ class FinanceDemoSeeder extends Seeder
 
     public function run(): void
     {
+        // Ensure the operational demo org always has the COMPLETE canonical chart of
+        // accounts (+ tax rates + currencies), idempotently. GL posting resolves
+        // accounts STRICTLY per-org (FinancialEventService::resolveAccount throws on a
+        // missing code), so a partial chart silently drops journals. Seeded BEFORE the
+        // demo-doc guard so redeploys repair already-seeded demos too — previously only
+        // 8 accounts existed for this org, so house-ledger (64xx), fuel/maintenance
+        // (62xx/63xx) and other capture-at-source postings never reached the GL.
+        app(FinanceSeeder::class)->run(self::ORG_ID);
+
         if (FinInvoice::where('organization_id', self::ORG_ID)->exists()) {
             return;
-        }
-
-        // ── Ledger: a small chart of accounts + a couple of posted journals ──
-        $accounts = [
-            ['code' => '1000', 'name' => 'Bank', 'type' => 'asset'],
-            ['code' => '1100', 'name' => 'Accounts Receivable', 'type' => 'asset'],
-            ['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability'],
-            ['code' => '2100', 'name' => 'GST Payable', 'type' => 'liability'],
-            ['code' => '4000', 'name' => 'Funding Revenue', 'type' => 'revenue'],
-            ['code' => '5000', 'name' => 'Wages', 'type' => 'expense'],
-            ['code' => '6000', 'name' => 'Supplies', 'type' => 'expense'],
-        ];
-        foreach ($accounts as $account) {
-            FinAccount::factory()->create([
-                'organization_id' => self::ORG_ID,
-                'code' => $account['code'],
-                'name' => $account['name'],
-                'type' => $account['type'],
-            ]);
         }
 
         FinJournal::factory()->count(3)->create([
             'organization_id' => self::ORG_ID,
             'status' => 'posted',
         ]);
+
+        // An OPEN fiscal period covering "now" so the journal-posting modals
+        // (donor receipt/expenditure, asset disposal, petty-cash top-up, …) can
+        // actually post — JournalPostingService rejects any date without an open
+        // period, so without this every posting modal dead-ends on a fresh seed.
+        \App\Domain\Finance\Models\FinFiscalPeriod::firstOrCreate(
+            [
+                'organization_id' => self::ORG_ID,
+                'start_date' => Carbon::now()->startOfYear()->toDateString(),
+            ],
+            [
+                'name' => 'FY'.Carbon::now()->year,
+                'end_date' => Carbon::now()->endOfYear()->toDateString(),
+                'status' => 'open',
+            ]
+        );
 
         // ── Banking ──────────────────────────────────────────────────────────
         FinBankAccount::factory()->count(2)->create(['organization_id' => self::ORG_ID]);
@@ -128,7 +134,23 @@ class FinanceDemoSeeder extends Seeder
         ]);
 
         // ── Extras so the remaining tabs aren't bare ─────────────────────────
-        FinFixedAsset::factory()->create(['organization_id' => self::ORG_ID]);
-        FinDonorFund::factory()->create(['organization_id' => self::ORG_ID]);
+        // Wire GL accounts so the disposal / donor-transaction modals can post a
+        // real balanced journal on demo data (an unwired asset/fund posts nothing
+        // — the modals correctly warn, but then the happy path is unreachable).
+        $bankId = FinAccount::where('organization_id', self::ORG_ID)->where('code', '1000')->value('id');
+        $assetGlId = FinAccount::where('organization_id', self::ORG_ID)->where('code', '1100')->value('id');
+        $expenseGlId = FinAccount::where('organization_id', self::ORG_ID)->where('code', '6000')->value('id');
+        $revenueGlId = FinAccount::where('organization_id', self::ORG_ID)->where('code', '4000')->value('id');
+
+        FinFixedAsset::factory()->create([
+            'organization_id' => self::ORG_ID,
+            'status' => 'active',
+            'gl_asset_account_id' => $assetGlId,
+            'gl_depreciation_account_id' => $expenseGlId,
+        ]);
+        FinDonorFund::factory()->create([
+            'organization_id' => self::ORG_ID,
+            'gl_account_id' => $revenueGlId,
+        ]);
     }
 }

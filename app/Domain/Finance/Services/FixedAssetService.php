@@ -240,28 +240,39 @@ class FixedAssetService
                     'credit' => $purchaseCost,
                 ];
 
-                // DR/CR Gain or Loss on Disposal
+                // DR/CR Gain or Loss on Disposal — the balancing leg. This MUST
+                // post whenever there is a gain/loss, or the journal is out of
+                // balance and JournalPostingService rejects it (rolling the whole
+                // disposal back). Resolve the account from config (a dedicated
+                // 8400 — NOT the old hardcoded 8100, which the chart uses for Bank
+                // Fees) and fail loudly if it is missing rather than dropping the
+                // line and silently posting an unbalanced journal.
                 $balancingAmount = $purchaseCost - $proceeds - $accumulated;
                 if (round($balancingAmount, 2) != 0) {
-                    $gainLossAccountId = $this->getDefaultAccountId($orgId, '8100');
-                    if ($gainLossAccountId) {
-                        if ($balancingAmount > 0) {
-                            // Loss: debit
-                            $lines[] = [
-                                'account_id' => $gainLossAccountId,
-                                'description' => "Loss on disposal: {$asset->asset_name}",
-                                'debit' => round(abs($balancingAmount), 2),
-                                'credit' => 0,
-                            ];
-                        } else {
-                            // Gain: credit
-                            $lines[] = [
-                                'account_id' => $gainLossAccountId,
-                                'description' => "Gain on disposal: {$asset->asset_name}",
-                                'debit' => 0,
-                                'credit' => round(abs($balancingAmount), 2),
-                            ];
-                        }
+                    $gainLossCode = config('finance.fixed_asset.gain_loss_account', '8400');
+                    $gainLossAccountId = $this->getDefaultAccountId($orgId, $gainLossCode);
+                    if (! $gainLossAccountId) {
+                        throw new \InvalidArgumentException(
+                            "Gain/Loss on Asset Disposal account ({$gainLossCode}) is not configured for this organisation — "
+                            .'cannot post a balanced disposal journal for a gain or loss. Add the account to the chart, then retry.'
+                        );
+                    }
+                    if ($balancingAmount > 0) {
+                        // Loss: debit
+                        $lines[] = [
+                            'account_id' => $gainLossAccountId,
+                            'description' => "Loss on disposal: {$asset->asset_name}",
+                            'debit' => round(abs($balancingAmount), 2),
+                            'credit' => 0,
+                        ];
+                    } else {
+                        // Gain: credit
+                        $lines[] = [
+                            'account_id' => $gainLossAccountId,
+                            'description' => "Gain on disposal: {$asset->asset_name}",
+                            'debit' => 0,
+                            'credit' => round(abs($balancingAmount), 2),
+                        ];
                     }
                 }
 

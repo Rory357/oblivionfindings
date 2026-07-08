@@ -945,7 +945,7 @@ export default function ClientDocuments({
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         {/* Drop zone */}
-                        <label className="bg-primary/10/50 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary p-8 transition-colors hover:bg-primary/10">
+                        <label className="bg-primary/5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary p-8 transition-colors hover:bg-primary/10">
                             <Upload className="mb-2 h-8 w-8 text-primary" />
                             <p className="text-sm font-medium text-primary">
                                 {uploadForm.data.file

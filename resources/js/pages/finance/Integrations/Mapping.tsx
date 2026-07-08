@@ -57,7 +57,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
     const externalIdLabel = integration.provider === 'xero' ? 'Xero Account ID' : 'MYOB Account UID';
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Finance', href: '/finance' },
         { title: 'Integrations', href: '/finance/integrations' },
         { title: `${providerName} Mapping`, href: `/finance/integrations/${integration.id}/mapping` },
     ];

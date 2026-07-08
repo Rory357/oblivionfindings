@@ -2,14 +2,15 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { TaxTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark } from 'lucide-react';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 type Filing = {
@@ -61,12 +62,9 @@ type PageProps = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'IRD Filings', href: '/finance/ird-filings' },
 ];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -89,15 +87,6 @@ const filingTypeLabels: Record<string, string> = {
     ir3: 'IR3',
     ir4: 'IR4',
     ir7: 'IR7',
-};
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
-    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
-    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
-    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
-    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 export default function IrdFilingsIndex({ filings, availableGstReturns, availablePayrollRuns, filters }: PageProps) {
@@ -130,6 +119,14 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
         router.get('/finance/ird-filings', params, { preserveState: true });
     }
 
+    const clearFilters = () => {
+        router.get('/finance/ird-filings', {}, { preserveState: true });
+    };
+
+    const hasFilters = Boolean(
+        (filters.filing_type && filters.filing_type !== 'all') || (filters.status && filters.status !== 'all'),
+    );
+
     function handleCreateFiling(e: React.FormEvent) {
         e.preventDefault();
         if (!selectedGstReturn) return;
@@ -141,6 +138,12 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
         if (!selectedPayrollRun) return;
         paydayForm.post(`/finance/ird-filings/from-payroll/${selectedPayrollRun}`);
     }
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (filing: Filing): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/ird-filings/${filing.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -155,13 +158,21 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                         stats={[
                             { label: 'Filed', value: filedCount },
                             { label: 'Pending', value: pendingCount },
-                            { label: 'Total filed', value: formatCurrency(totalFiledAmount) },
+                            { label: 'Total filed', value: formatMoney(totalFiledAmount) },
                         ]}
                         actions={
-                            <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
-                                <Send className="mr-1.5 h-4 w-4" />
-                                New Filing
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/ird-filings/export?${new URLSearchParams(Object.entries({ filing_type: filters.filing_type ?? '', status: filters.status ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
+                                <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
+                                    <Send className="mr-1.5 h-4 w-4" />
+                                    New Filing
+                                </Button>
+                            </div>
                         }
                         footer={<TaxTabsFooter active="ird-filings" />}
                     />
@@ -198,7 +209,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Filed Amount</p>
-                                <p className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(totalFiledAmount)}</p>
+                                <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(totalFiledAmount)}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -226,7 +237,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                 {availableGstReturns.map((ret) => (
                                                     <SelectItem key={ret.id} value={String(ret.id)}>
                                                         Period {ret.ird_period}: {formatDate(ret.period_start)} &ndash;{' '}
-                                                        {formatDate(ret.period_end)} ({formatCurrency(Number(ret.gst_payable))})
+                                                        {formatDate(ret.period_end)} ({formatMoney(Number(ret.gst_payable))})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -292,7 +303,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                     <SelectItem key={run.id} value={String(run.id)}>
                                                         {formatDate(run.period_start)} &ndash; {formatDate(run.period_end)}
                                                         {run.total_gross != null
-                                                            ? ` (${formatCurrency(Number(run.total_gross))})`
+                                                            ? ` (${formatMoney(Number(run.total_gross))})`
                                                             : ''}
                                                     </SelectItem>
                                                 ))}
@@ -339,7 +350,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                     value={filters.filing_type ?? 'all'}
                                     onValueChange={(v) => applyFilter('filing_type', v)}
                                 >
-                                    <SelectTrigger className="w-[150px]">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by type">
                                         <SelectValue placeholder="Type" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -352,7 +363,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                     value={filters.status ?? 'all'}
                                     onValueChange={(v) => applyFilter('status', v)}
                                 >
-                                    <SelectTrigger className="w-[150px]">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by status">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -385,13 +396,31 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                 <tbody>
                                     {filings.data.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                                                No filings yet. Create a filing from a GST return to get started.
+                                            <td colSpan={7} className="p-0">
+                                                {hasFilters ? (
+                                                    <EmptySearch
+                                                        onClear={clearFilters}
+                                                        title="No filings match your filters"
+                                                        className="border-0"
+                                                    />
+                                                ) : (
+                                                    <EmptyList
+                                                        icon={Landmark}
+                                                        itemName="filing"
+                                                        title="No filings yet"
+                                                        description="Create a filing from a GST return to get started."
+                                                        className="border-0"
+                                                        action={
+                                                            <Button size="sm" onClick={() => setShowCreateForm(true)}>
+                                                                New filing
+                                                            </Button>
+                                                        }
+                                                    />
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (
                                         filings.data.map((filing) => {
-                                            const status = statusConfig[filing.status] ?? statusConfig.draft;
                                             const amount = Number(filing.total_amount);
 
                                             return (
@@ -399,6 +428,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                     key={filing.id}
                                                     className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
                                                     onClick={() => router.visit(`/finance/ird-filings/${filing.id}`)}
+                                                    onContextMenu={rowMenu.open(rowMenuItems(filing))}
                                                 >
                                                     <td className="py-3 pr-4">
                                                         {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
@@ -408,13 +438,11 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                         {formatDate(filing.period_to)}
                                                     </td>
                                                     <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-status-critical' : 'text-status-success'}`}>
-                                                        {formatCurrency(Math.abs(amount))}
+                                                        {formatMoney(Math.abs(amount))}
                                                         {amount < 0 ? ' (Refund)' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        <Badge variant="outline" className={status.className}>
-                                                            {status.label}
-                                                        </Badge>
+                                                        <StatusBadge status={filing.status} />
                                                     </td>
                                                     <td className="py-3 pr-4 font-mono text-xs">
                                                         {filing.ird_reference ?? '-'}
@@ -451,6 +479,8 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

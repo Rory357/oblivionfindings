@@ -125,6 +125,10 @@ class ControlRoomWatcherController extends Controller
             ->first();
 
         if (! $watcher) {
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors(['alert' => 'That person is not watching this alert.']);
+            }
+
             return response()->json(['message' => 'Watcher not found.'], 404);
         }
 
@@ -136,6 +140,6 @@ class ControlRoomWatcherController extends Controller
             'watcher_user_id' => $userId,
         ]);
 
-        return response()->json(['message' => 'Watcher removed.']);
+        return $this->inertiaOrJson($request, 'Watcher removed.');
     }
 }

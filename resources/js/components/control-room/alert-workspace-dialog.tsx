@@ -3,12 +3,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
     ArrowUpCircle,
+    Bell,
+    BellOff,
     BookOpen,
     Check,
     CheckCircle2,
@@ -18,6 +20,7 @@ import {
     ExternalLink,
     Eye,
     FileText,
+    GripVertical,
     LinkIcon,
     ListTodo,
     MapPin,
@@ -39,8 +42,26 @@ import {
     User,
     UserCheck,
     UserMinus,
+    UserPlus,
     X,
 } from 'lucide-react';
+import {
+    DndContext,
+    type DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    closestCenter,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    arrayMove,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useRef, useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +102,9 @@ export type WorkspaceAlert = {
     due_at: string | null;
     category: string | null;
     resolution_code: string | null;
+    is_snoozed: boolean;
+    snoozed_until: string | null;
+    snoozed_by: UserRef | null;
     created_at: string | null;
     updated_at: string | null;
 };
@@ -102,7 +126,7 @@ export type AlertWorkspaceDetail = {
         title: string;
         status: string;
         item_count: number;
-        items: Array<{ id: number; type: string; title: string; file_path: string | null; created_at: string | null }>;
+        items: Array<{ id: number; type: string; title: string; description: string | null; download_url: string | null; created_at: string | null }>;
     }>;
     communications: Array<{
         id: number;
@@ -184,6 +208,7 @@ type ActionKey =
     | 'close'
     | 'escalate'
     | 'assign'
+    | 'snooze'
     | 'confirm_sensor'
     | 'dismiss_sensor'
     | 'edit_meta'
@@ -389,6 +414,7 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
         close: 'Close alert',
         escalate: 'Escalate alert',
         assign: a.assigned_to ? 'Reassign alert' : 'Assign alert',
+        snooze: 'Snooze alert',
         confirm_sensor: 'Confirm sensor detection',
         dismiss_sensor: 'Dismiss as false positive',
         edit_meta: 'Edit alert details',
@@ -444,6 +470,11 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
                     <User className="mr-1.5 h-4 w-4" /> {a.assigned_to ? 'Reassign' : 'Assign'}
                 </Button>
             ) : null}
+            {d.can.manage && isActionable && a.severity !== 'critical' && !a.is_snoozed ? (
+                <Button size="sm" variant="outline" onClick={() => setAction('snooze')}>
+                    <BellOff className="mr-1.5 h-4 w-4" /> Snooze
+                </Button>
+            ) : null}
         </div>
     );
 
@@ -458,9 +489,7 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
         </div>
     );
 
-    const railExtra = (
-        <WatchToggle alertId={a.id} watching={d.is_watching} watchers={d.watchers} />
-    );
+    const railExtra = <WatchToggle d={d} />;
 
     return (
         <WizardShell
@@ -485,6 +514,7 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
             {action === 'close' ? <ClosePane d={d} onDone={closePane} /> : null}
             {action === 'escalate' ? <EscalatePane d={d} onDone={closePane} /> : null}
             {action === 'assign' ? <AssignPane d={d} onDone={closePane} /> : null}
+            {action === 'snooze' ? <SnoozePane d={d} onDone={closePane} /> : null}
             {action === 'confirm_sensor' ? <SensorConfirmPane d={d} onDone={closePane} /> : null}
             {action === 'dismiss_sensor' ? <SensorDismissPane d={d} onDone={closePane} /> : null}
             {action === 'edit_meta' ? <EditMetaPane d={d} onDone={closePane} /> : null}
@@ -508,16 +538,38 @@ export function AlertWorkspaceDialog({ detail, open, onClose }: { detail: AlertW
 /*  Watch toggle (rail)                                                */
 /* ------------------------------------------------------------------ */
 
-function WatchToggle({ alertId, watching, watchers }: { alertId: number; watching: boolean; watchers: AlertWorkspaceDetail['watchers'] }) {
+function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
+    const a = d.alert;
     const [busy, setBusy] = useState(false);
+    const [adding, setAdding] = useState(false);
+    const [pick, setPick] = useState('');
+
+    const watcherIds = new Set(d.watchers.map((w) => w.user_id));
+    const addable = d.staff.filter((s) => !watcherIds.has(s.id));
+
     const toggle = () => {
         setBusy(true);
-        router.post(`/control-room/alerts/${alertId}/watchers/toggle`, {}, {
+        router.post(`/control-room/alerts/${a.id}/watchers/toggle`, {}, {
             preserveScroll: true,
             preserveState: true,
             onFinish: () => setBusy(false),
         });
     };
+    const addWatcher = () => {
+        if (!pick) return;
+        router.post(`/control-room/alerts/${a.id}/watchers`, { user_id: Number(pick) }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setPick('');
+                setAdding(false);
+            },
+        });
+    };
+    const removeWatcher = (userId: number) => {
+        router.delete(`/control-room/alerts/${a.id}/watchers/${userId}`, { preserveScroll: true, preserveState: true });
+    };
+
     return (
         <div className="rounded-lg border border-sidebar-border bg-background/40 p-2.5">
             <button
@@ -526,11 +578,59 @@ function WatchToggle({ alertId, watching, watchers }: { alertId: number; watchin
                 disabled={busy}
                 className="flex w-full items-center gap-2 text-left text-[12px] font-semibold text-foreground hover:text-primary"
             >
-                <Eye className={`h-3.5 w-3.5 ${watching ? 'text-primary' : 'text-muted-foreground'}`} />
-                {watching ? 'Watching' : 'Watch this alert'}
+                <Eye className={`h-3.5 w-3.5 ${d.is_watching ? 'text-primary' : 'text-muted-foreground'}`} />
+                {d.is_watching ? 'Watching' : 'Watch this alert'}
             </button>
-            {watchers.length ? (
-                <p className="mt-1 truncate text-[11px] text-muted-foreground">{watchers.map((w) => w.user_name).join(', ')}</p>
+
+            {d.watchers.length ? (
+                <ul className="mt-2 flex flex-col gap-1">
+                    {d.watchers.map((w) => (
+                        <li key={w.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <span className="min-w-0 flex-1 truncate">{w.user_name}</span>
+                            {d.can.manage ? (
+                                <button
+                                    type="button"
+                                    onClick={() => removeWatcher(w.user_id)}
+                                    className="text-muted-foreground/60 hover:text-status-critical"
+                                    aria-label={`Remove ${w.user_name}`}
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="mt-2 text-[11px] text-muted-foreground">No watchers yet.</p>
+            )}
+
+            {d.can.manage ? (
+                adding ? (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                        <SelectInput
+                            value={pick}
+                            onChange={setPick}
+                            placeholder="Add a colleague…"
+                            options={addable.map((s) => ({ value: String(s.id), label: s.name }))}
+                        />
+                        <div className="flex items-center gap-1.5">
+                            <Button type="button" size="sm" className="h-7 flex-1 text-xs" onClick={addWatcher} disabled={!pick}>
+                                Add watcher
+                            </Button>
+                            <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setAdding(false); setPick(''); }}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : addable.length ? (
+                    <button
+                        type="button"
+                        onClick={() => setAdding(true)}
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                    >
+                        <UserPlus className="h-3 w-3" /> Add watcher
+                    </button>
+                ) : null
             ) : null}
         </div>
     );
@@ -754,6 +854,65 @@ function AssignPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void
     );
 }
 
+const SNOOZE_WINDOWS: ReadonlyArray<{ value: string; label: string; hint: string }> = [
+    { value: '15m', label: '15 minutes', hint: 'Quick set-aside' },
+    { value: '1h', label: '1 hour', hint: 'Come back this shift' },
+    { value: 'shift', label: 'End of day', hint: 'Until tonight' },
+    { value: 'custom', label: 'Custom time', hint: 'Pick a date & time' },
+];
+
+function SnoozePane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void }) {
+    const a = d.alert;
+    const form = useForm<{ window: string; snoozed_until: string; note: string }>({ window: '15m', snoozed_until: '', note: '' });
+    const needsCustom = form.data.window === 'custom';
+    const submit = () => {
+        form.transform((data) => ({
+            window: data.window,
+            snoozed_until: data.window === 'custom' ? data.snoozed_until || null : null,
+            note: data.note || null,
+        }));
+        form.post(`/control-room/alerts/${a.id}/snooze`, { preserveScroll: true, onSuccess: onPaneSuccess(onDone) });
+    };
+    return (
+        <div className="flex flex-col gap-4">
+            <StepHead
+                icon={BellOff}
+                title="Snooze alert"
+                blurb="Set this alert aside for a while. It stays open and its SLA keeps running — it just drops off the worklist until the time's up, then returns on its own. Find it anytime under the Snoozed tab."
+            />
+            <PaneError message={serverError(form.errors)} />
+            <ContextCard d={d} />
+            <Field label="Snooze for" required error={form.errors.window}>
+                <div className="grid grid-cols-2 gap-2">
+                    {SNOOZE_WINDOWS.map((w) => {
+                        const active = form.data.window === w.value;
+                        return (
+                            <button
+                                key={w.value}
+                                type="button"
+                                onClick={() => form.setData('window', w.value)}
+                                className={`rounded-lg border p-3 text-left transition-colors ${active ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:bg-muted/50'}`}
+                            >
+                                <p className="text-sm font-medium text-foreground">{w.label}</p>
+                                <p className="text-xs text-muted-foreground">{w.hint}</p>
+                            </button>
+                        );
+                    })}
+                </div>
+            </Field>
+            {needsCustom ? (
+                <Field label="Snooze until" required error={form.errors.snoozed_until}>
+                    <Input type="datetime-local" value={form.data.snoozed_until} onChange={(e) => form.setData('snoozed_until', e.target.value)} />
+                </Field>
+            ) : null}
+            <Field label="Note" hint="Optional — why you're snoozing (kept on the audit trail)">
+                <Input value={form.data.note} onChange={(e) => form.setData('note', e.target.value)} placeholder="e.g. Waiting on the family to call back" />
+            </Field>
+            <PaneNav onCancel={onDone} onSubmit={submit} submitLabel="Snooze alert" processing={form.processing} submitDisabled={needsCustom && !form.data.snoozed_until} />
+        </div>
+    );
+}
+
 const INCIDENT_TYPE_OPTIONS = [
     { value: 'fall', label: 'Fall' },
     { value: 'injury', label: 'Injury' },
@@ -878,7 +1037,7 @@ function EditMetaPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => vo
     const form = useForm<{ priority: string; category: string; due_at: string; resolution_code: string }>({
         priority: a.priority ?? '',
         category: a.category ?? '',
-        due_at: a.due_at ? a.due_at.slice(0, 16) : '',
+        due_at: a.due_at ? toDatetimeLocal(a.due_at) : '',
         resolution_code: a.resolution_code ?? '',
     });
     const submit = () => {
@@ -1020,6 +1179,35 @@ function StatusFlow({ a }: { a: WorkspaceAlert }) {
     );
 }
 
+function SnoozeBanner({ d }: { d: AlertWorkspaceDetail }) {
+    const a = d.alert;
+    const [busy, setBusy] = useState(false);
+    const unsnooze = () => {
+        setBusy(true);
+        router.post(`/control-room/alerts/${a.id}/unsnooze`, {}, { preserveScroll: true, onFinish: () => setBusy(false) });
+    };
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3">
+            <div className="flex items-start gap-2.5">
+                <BellOff className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                <div>
+                    <p className="text-sm font-medium text-foreground">
+                        Snoozed until {a.snoozed_until ? formatDateTime(a.snoozed_until) : '—'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Off the worklist{a.snoozed_by ? ` · snoozed by ${a.snoozed_by.name}` : ''} — it returns automatically, or bring it back now.
+                    </p>
+                </div>
+            </div>
+            {d.can.manage ? (
+                <Button size="sm" variant="outline" onClick={unsnooze} disabled={busy}>
+                    <Bell className="mr-1.5 h-3.5 w-3.5" /> Unsnooze
+                </Button>
+            ) : null}
+        </div>
+    );
+}
+
 function OverviewSection({ d, onEditMeta }: { d: AlertWorkspaceDetail; onEditMeta: () => void }) {
     const a = d.alert;
     const ctx = (a.context ?? {}) as Record<string, any>;
@@ -1030,6 +1218,12 @@ function OverviewSection({ d, onEditMeta }: { d: AlertWorkspaceDetail; onEditMet
             <div className="sm:col-span-2">
                 <StatusFlow a={a} />
             </div>
+
+            {a.is_snoozed && a.snoozed_until ? (
+                <div className="sm:col-span-2">
+                    <SnoozeBanner d={d} />
+                </div>
+            ) : null}
 
             {incidentId ? (
                 <div className="sm:col-span-2">
@@ -1348,6 +1542,13 @@ function CreatePackForm({ alertId, onDone }: { alertId: number; onDone: () => vo
     );
 }
 
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+    note: 'Note',
+    photo: 'Photo',
+    document: 'Document',
+    cctv_bookmark: 'CCTV bookmark',
+};
+
 function EvidencePackCard({ pack, canManage }: { pack: AlertWorkspaceDetail['evidence_packs'][number]; canManage: boolean }) {
     const [adding, setAdding] = useState<'file' | 'note' | 'cctv' | null>(null);
     const [completing, setCompleting] = useState(false);
@@ -1398,18 +1599,31 @@ function EvidencePackCard({ pack, canManage }: { pack: AlertWorkspaceDetail['evi
                 <div className="flex flex-col gap-2 p-3">
                     {pack.items.length ? (
                         pack.items.map((item) => (
-                            <div key={item.id} className="flex items-center gap-2.5 rounded-lg border border-border/70 px-2.5 py-2">
+                            <div key={item.id} className="flex items-start gap-2.5 rounded-lg border border-border/70 px-2.5 py-2">
                                 {item.type === 'note' ? (
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 ) : item.type === 'cctv_bookmark' ? (
-                                    <Eye className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <Eye className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 ) : (
-                                    <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 )}
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm text-foreground">{item.title}</p>
+                                    {item.download_url ? (
+                                        <a
+                                            href={item.download_url}
+                                            className="block truncate text-sm font-medium text-primary hover:underline"
+                                            title="Download this file"
+                                        >
+                                            {item.title}
+                                        </a>
+                                    ) : (
+                                        <p className="truncate text-sm text-foreground">{item.title}</p>
+                                    )}
+                                    {item.description ? (
+                                        <p className="mt-0.5 text-xs whitespace-pre-wrap text-foreground/80">{item.description}</p>
+                                    ) : null}
                                     <p className="text-xs text-muted-foreground">
-                                        {titleCase(item.type)}
+                                        {EVIDENCE_TYPE_LABELS[item.type] ?? titleCase(item.type)}
                                         {item.created_at ? ` · ${formatDateTime(item.created_at)}` : ''}
                                     </p>
                                 </div>
@@ -1537,6 +1751,38 @@ const TASK_STATUS_TONE: Record<string, string> = {
 
 function TasksSection({ d }: { d: AlertWorkspaceDetail }) {
     const [adding, setAdding] = useState(false);
+    // Optimistic order while a reorder POST is in flight; cleared once the
+    // reloaded `detail` prop reflects the saved sort_order.
+    const [localOrder, setLocalOrder] = useState<number[] | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
+
+    const baseIds = d.tasks.map((t) => t.id);
+    const orderedIds = localOrder ?? baseIds;
+    const orderedTasks = orderedIds
+        .map((id) => d.tasks.find((t) => t.id === id))
+        .filter((t): t is AlertWorkspaceDetail['tasks'][number] => Boolean(t));
+    const canReorder = d.can.manage && d.tasks.length > 1;
+
+    const handleDragEnd = (e: DragEndEvent) => {
+        const { active, over } = e;
+        if (!over || active.id === over.id) return;
+        const oldIndex = orderedIds.indexOf(Number(active.id));
+        const newIndex = orderedIds.indexOf(Number(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+        const next = arrayMove(orderedIds, oldIndex, newIndex);
+        setLocalOrder(next);
+        router.post(`/control-room/alerts/${d.alert.id}/tasks/reorder`, { task_ids: next }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setLocalOrder(null),
+            onError: () => setLocalOrder(null),
+        });
+    };
+
     return (
         <div className="flex flex-col gap-3">
             {d.can.manage ? (
@@ -1549,12 +1795,28 @@ function TasksSection({ d }: { d: AlertWorkspaceDetail }) {
                 )
             ) : null}
 
+            {canReorder ? (
+                <p className="text-xs text-muted-foreground">Drag the handle to reorder how tasks are worked.</p>
+            ) : null}
+
             {d.tasks.length ? (
-                <div className="flex flex-col gap-2">
-                    {d.tasks.map((t) => (
-                        <TaskRow key={t.id} d={d} t={t} />
-                    ))}
-                </div>
+                canReorder ? (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+                            <div className="flex flex-col gap-2">
+                                {orderedTasks.map((t) => (
+                                    <SortableTaskRow key={t.id} d={d} t={t} />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                ) : (
+                    <div className="flex flex-col gap-2">
+                        {orderedTasks.map((t) => (
+                            <TaskRow key={t.id} d={d} t={t} />
+                        ))}
+                    </div>
+                )
             ) : (
                 <div className="rounded-xl border border-dashed border-border py-10 text-center">
                     <ListTodo className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
@@ -1565,14 +1827,36 @@ function TasksSection({ d }: { d: AlertWorkspaceDetail }) {
     );
 }
 
-function TaskRow({ d, t }: { d: AlertWorkspaceDetail; t: AlertWorkspaceDetail['tasks'][number] }) {
+function SortableTaskRow({ d, t }: { d: AlertWorkspaceDetail; t: AlertWorkspaceDetail['tasks'][number] }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+    const handle = (
+        <button
+            type="button"
+            className="mt-0.5 shrink-0 cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+            aria-label="Drag to reorder"
+            {...attributes}
+            {...listeners}
+        >
+            <GripVertical className="h-4 w-4" />
+        </button>
+    );
+    return (
+        <div ref={setNodeRef} style={style}>
+            <TaskRow d={d} t={t} dragHandle={handle} />
+        </div>
+    );
+}
+
+function TaskRow({ d, t, dragHandle }: { d: AlertWorkspaceDetail; t: AlertWorkspaceDetail['tasks'][number]; dragHandle?: ReactNode }) {
     const [editing, setEditing] = useState(false);
     const [addingSub, setAddingSub] = useState(false);
     const live = t.status !== 'completed' && t.status !== 'cancelled';
 
     return (
         <div className="rounded-lg border border-border p-3">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2">
+                {dragHandle ?? null}
                 <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${TASK_STATUS_TONE[t.status] ?? 'text-muted-foreground'}`} />
                 <div className="min-w-0 flex-1">
                     <p className={`text-sm text-foreground ${t.status === 'completed' ? 'line-through opacity-70' : ''}`}>{t.title}</p>
@@ -2080,6 +2364,16 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
 
     if (incidentId) {
         rows.push(<LinkedRow key="inc" icon={ShieldAlert} title="Incident record" sub={`INC-${incidentId} · system of record`} href={`/incidents?incident=${incidentId}`} />);
+    } else {
+        rows.push(
+            <EmptyLinkedRow key="inc-none" icon={ShieldAlert} title="No linked incident">
+                If this alert needs a formal record, use{' '}
+                <Link href="/control-room/incidents" className="font-medium text-primary hover:underline">
+                    Flag incident on the Incident Tracker
+                </Link>{' '}
+                — the incident becomes the system of record and links back here.
+            </EmptyLinkedRow>,
+        );
     }
     if (hs) {
         rows.push(
@@ -2090,6 +2384,12 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
                 sub={`${hs.reference_number} · ${titleCase(hs.status)}${hs.investigation ? ` · investigation ${titleCase(hs.investigation.status)}` : ''}`}
                 href={`/health-safety/events/${hs.id}`}
             />,
+        );
+    } else {
+        rows.push(
+            <EmptyLinkedRow key="hs-none" icon={Activity} title="No Health & Safety event">
+                One is opened automatically when an incident is flagged, so investigations and corrective actions have a governed home.
+            </EmptyLinkedRow>,
         );
     }
     if (d.client) {
@@ -2102,6 +2402,20 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
     return (
         <div className="flex flex-col gap-2">
             {rows.length ? rows : <p className="text-sm text-muted-foreground">No linked records.</p>}
+        </div>
+    );
+}
+
+function EmptyLinkedRow({ icon: Icon, title, children }: { icon: ComponentType<{ className?: string }>; title: string; children: ReactNode }) {
+    return (
+        <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60">
+                <Icon className="h-4 w-4 text-muted-foreground/70" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground/80">{children}</p>
+            </div>
         </div>
     );
 }

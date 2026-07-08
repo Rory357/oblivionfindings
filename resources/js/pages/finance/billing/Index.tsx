@@ -1,6 +1,7 @@
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, DollarSign, FileText, Receipt, Search } from 'lucide-react';
@@ -58,17 +59,6 @@ const STATUS_COLORS: Record<string, string> = {
     paid: OPS_COLORS.success,
 };
 
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    pending: 'outline',
-    approved: 'secondary',
-    billed: 'default',
-    paid: 'default',
-};
-
-function formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
-}
-
 function formatDate(d: string): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -88,9 +78,9 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                 title="Billing"
                 description="Manage billing entries, revenue tracking, and payment status."
                 stats={[
-                    { label: 'Billed this month', value: formatCurrency(s.billed_this_month) },
-                    { label: 'Outstanding', value: formatCurrency(s.outstanding) },
-                    { label: 'Paid this month', value: formatCurrency(s.paid_this_month) },
+                    { label: 'Billed this month', value: formatMoney(s.billed_this_month) },
+                    { label: 'Outstanding', value: formatMoney(s.outstanding) },
+                    { label: 'Paid this month', value: formatMoney(s.paid_this_month) },
                     { label: 'Pending', value: s.pending_count },
                 ]}
                 footer={<ReceivablesTabsFooter active="billing" />}
@@ -98,9 +88,9 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard label="Billed This Month" value={formatCurrency(s.billed_this_month)} icon={DollarSign} color="indigo" />
-                    <OpsStatCard label="Outstanding" value={formatCurrency(s.outstanding)} icon={Receipt} color="amber" />
-                    <OpsStatCard label="Paid This Month" value={formatCurrency(s.paid_this_month)} icon={DollarSign} color="emerald" />
+                    <OpsStatCard label="Billed This Month" value={formatMoney(s.billed_this_month)} icon={DollarSign} color="indigo" />
+                    <OpsStatCard label="Outstanding" value={formatMoney(s.outstanding)} icon={Receipt} color="amber" />
+                    <OpsStatCard label="Paid This Month" value={formatMoney(s.paid_this_month)} icon={DollarSign} color="emerald" />
                     <OpsStatCard label="Pending Entries" value={s.pending_count} icon={FileText} color="blue" href="/finance/billing?status=pending" />
                 </div>
 
@@ -169,16 +159,16 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-medium">{entry.client ? `${entry.client.first_name} ${entry.client.last_name}` : 'Unknown'}</span>
-                                                <Badge variant={STATUS_VARIANTS[entry.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{entry.status}</Badge>
+                                                <StatusBadge status={entry.status} size="sm" />
                                                 <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">{entry.rate_type}</Badge>
                                             </div>
                                             <div className="mt-0.5 flex items-center gap-3 text-[10px] text-muted-foreground">
                                                 <span>{formatDate(entry.service_date)}</span>
-                                                <span>{entry.hours}h @ {formatCurrency(entry.rate)}/h</span>
+                                                <span>{entry.hours}h @ {formatMoney(entry.rate)}/h</span>
                                                 {entry.staff && <span>{entry.staff.name}</span>}
                                             </div>
                                         </div>
-                                        <span className="text-sm font-semibold tabular-nums">{formatCurrency(entry.amount)}</span>
+                                        <span className="text-sm font-semibold tabular-nums">{formatMoney(entry.amount)}</span>
                                     </div>
                                 ))}
                             </div>

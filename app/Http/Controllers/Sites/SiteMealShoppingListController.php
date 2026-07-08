@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Models\HouseLedgerEntry;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
 use App\Models\SiteMealShoppingList;
@@ -11,8 +12,10 @@ use App\Models\SiteMealShoppingListItem;
 use App\Services\Catering\DietaryConflictChecker;
 use App\Services\Catering\InventoryMovementRecorder;
 use App\Services\Catering\ShoppingListGenerator;
+use App\Services\Sites\HouseLedgerService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class SiteMealShoppingListController extends Controller
 {
@@ -22,6 +25,7 @@ class SiteMealShoppingListController extends Controller
         private ShoppingListGenerator $generator,
         private InventoryMovementRecorder $recorder,
         private DietaryConflictChecker $conflictChecker,
+        private HouseLedgerService $houseLedger,
     ) {}
 
     public function index(Site $site)
@@ -179,18 +183,20 @@ class SiteMealShoppingListController extends Controller
         ]);
 
         $items = $list->items()->with('product')->get()->keyBy('id');
+        $receivedCents = 0;
         foreach ($data['items'] ?? [] as $row) {
             $item = $items->get((int) $row['id']);
             if (!$item || $item->list_id !== $list->id) {
                 continue;
             }
+            $qty = (float) $row['received_qty'];
             $item->update(['received_qty' => $row['received_qty'], 'is_checked' => true]);
 
-            if ($item->product_id && (float) $row['received_qty'] > 0) {
+            if ($item->product_id && $qty > 0) {
                 $this->recorder->record(
                     site: $site,
                     productId: $item->product_id,
-                    delta: (float) $row['received_qty'],
+                    delta: $qty,
                     unit: $item->unit,
                     reason: 'delivery',
                     referenceType: SiteMealShoppingList::class,
@@ -198,11 +204,56 @@ class SiteMealShoppingListController extends Controller
                     note: "Received from shopping list #{$list->id}",
                 );
             }
+
+            // Actual grocery cost = product unit cost × received qty, falling back
+            // to the line's estimate when the product has no unit cost.
+            if ($qty > 0) {
+                $receivedCents += $item->product?->cost_per_unit_cents
+                    ? (int) round((float) $item->product->cost_per_unit_cents * $qty)
+                    : (int) ($item->estimated_cost_cents ?? 0);
+            }
         }
 
         $list->update(['status' => 'received', 'received_at' => now()]);
 
+        $this->captureGrocerySpend($site, $list, $receivedCents);
+
         return $this->inertiaOrJson($request, 'Shopping list received and inventory updated');
+    }
+
+    /**
+     * Capture-at-source: post the received grocery spend to the site's house
+     * ledger exactly once. The HouseLedgerEntryObserver bridges the entry into
+     * the GL (DR 6431 House Groceries / CR 1000 Bank). A stable reference makes
+     * this idempotent — repeated markReceived submits never double-post. Failure
+     * is logged, never allowed to break the operational receipt.
+     */
+    private function captureGrocerySpend(Site $site, SiteMealShoppingList $list, int $receivedCents): void
+    {
+        if ($receivedCents <= 0) {
+            return;
+        }
+
+        $reference = "shopping-list:{$list->id}";
+        if (HouseLedgerEntry::where('reference', $reference)->exists()) {
+            return;
+        }
+
+        try {
+            $ledger = $this->houseLedger->getOrCreateLedger($site);
+            $this->houseLedger->addEntry($ledger, [
+                'entry_type' => 'expense',
+                'category' => 'groceries',
+                'description' => "Groceries received — shopping list #{$list->id}",
+                'reference' => $reference,
+                'amount' => $receivedCents / 100,
+                'entry_date' => now()->toDateString(),
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+            ], (int) auth()->id());
+        } catch (\Throwable $e) {
+            Log::error("Grocery house-ledger capture failed for shopping list #{$list->id}: {$e->getMessage()}");
+        }
     }
 
     public function destroy(Request $request, Site $site, SiteMealShoppingList $list)

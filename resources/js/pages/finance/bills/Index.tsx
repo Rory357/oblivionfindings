@@ -2,15 +2,16 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewBillDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem, type SpendApprovalOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine } from 'lucide-react';
+import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -40,6 +41,7 @@ interface Bill {
     amount_paid: string;
     status: string;
     notes: string | null;
+    spend_approval_id: number | null;
     lines: BillLine[];
 }
 
@@ -71,29 +73,18 @@ interface Props extends PageProps {
     summary: Summary;
     canManage: boolean;
     accounts: AccountOption[];
+    spendApprovals: SpendApprovalOption[];
 }
-
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
-    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
-    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
-    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Finance', href: '/finance' },
     { title: 'Bills', href: '/finance/bills' },
 ];
 
-export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts }: Props) {
+export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts, spendApprovals }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
@@ -122,9 +113,23 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
         router.get('/finance/bills', {}, { preserveState: true });
     };
 
+    const hasFilters = Boolean(search || (status && status !== 'all') || (vendorId && vendorId !== 'all') || dateFrom || dateTo);
+
     const isOverdue = (bill: Bill) => {
         if (bill.status === 'paid' || bill.status === 'cancelled') return false;
         return new Date(bill.due_date) < new Date();
+    };
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (bill: Bill): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/bills/${bill.id}`) },
+        ];
+        if (canManage && bill.status === 'draft') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditBill(bill) });
+        }
+        return items;
     };
 
     return (
@@ -138,17 +143,25 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         title="Bills"
                         description="Manage accounts payable"
                         stats={[
-                            { label: 'Total unpaid', value: formatCurrency(summary.total_unpaid) },
-                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
-                            { label: 'Due this week', value: formatCurrency(summary.due_this_week) },
+                            { label: 'Total unpaid', value: formatMoney(summary.total_unpaid) },
+                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
+                            { label: 'Due this week', value: formatMoney(summary.due_this_week) },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewBillOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Bill
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/bills/export?${new URLSearchParams(Object.entries({ status, vendor_id: vendorId, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewBillOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Bill
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="bills" />}
                     />
@@ -156,9 +169,9 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatCurrency(summary.total_unpaid)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
-                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatCurrency(summary.due_this_week)} />
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatMoney(summary.total_unpaid)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatMoney(summary.due_this_week)} />
                 </div>
 
                 {/* Filters */}
@@ -176,7 +189,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 />
                             </div>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -190,7 +203,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 </SelectContent>
                             </Select>
                             <Select value={vendorId} onValueChange={setVendorId}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by vendor">
                                     <SelectValue placeholder="All Vendors" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -243,8 +256,29 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground py-8">
-                                        No bills found.
+                                    <TableCell colSpan={canManage ? 9 : 8} className="p-0">
+                                        {hasFilters ? (
+                                            <EmptySearch
+                                                onClear={clearFilters}
+                                                title="No bills match your filters"
+                                                className="border-0"
+                                            />
+                                        ) : (
+                                            <EmptyList
+                                                icon={ArrowDownToLine}
+                                                itemName="bill"
+                                                title="No bills yet"
+                                                description="Record your first supplier bill to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setNewBillOpen(true)}>
+                                                            New bill
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -256,6 +290,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                             isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/bills/${bill.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(bill))}
                                     >
                                         <TableCell className="font-medium">
                                             <Link href={`/finance/bills/${bill.id}`} className="text-primary hover:underline">
@@ -273,12 +308,10 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                                 </span>
                                             </span>
                                         </TableCell>
-                                        <TableCell className="text-right font-medium">{formatCurrency(bill.total_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(bill.amount_paid)}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatMoney(bill.total_amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(bill.amount_paid)}</TableCell>
                                         <TableCell>
-                                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
-                                                {statusConfig[bill.status]?.label ?? bill.status}
-                                            </Badge>
+                                            <StatusBadge status={bill.status} />
                                         </TableCell>
                                         {canManage && (
                                             <TableCell className="text-right">
@@ -318,6 +351,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         </div>
                     )}
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (
@@ -326,6 +361,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                     onClose={() => setNewBillOpen(false)}
                     vendors={vendors}
                     accounts={accounts}
+                    spendApprovals={spendApprovals}
                 />
             )}
 
@@ -337,6 +373,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                     onClose={() => setEditBill(null)}
                     vendors={vendors}
                     accounts={accounts}
+                    spendApprovals={spendApprovals}
                 />
             )}
         </AppLayout>

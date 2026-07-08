@@ -9,6 +9,7 @@ use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -26,11 +27,13 @@ class DonorFundController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $funds = FinDonorFund::forOrganization($orgId)
+        $query = FinDonorFund::forOrganization($orgId)
             ->with('glAccount:id,code,name', 'fundingStream:id,name')
-            ->orderBy('fund_name')
-            ->get()
-            ->map(fn (FinDonorFund $fund) => [
+            ->orderBy('fund_name');
+
+        $this->applyFundFilters($query, $request);
+
+        $funds = $query->paginate(20)->withQueryString()->through(fn (FinDonorFund $fund) => [
                 'id' => $fund->id,
                 'fund_code' => $fund->fund_code,
                 'fund_name' => $fund->fund_name,
@@ -51,34 +54,92 @@ class DonorFundController extends Controller
 
         $summary = $this->donorFundService->getFundsSummary($orgId);
 
+        // The store route is gated by finance.admin — mirror that so the create
+        // modal (and its reference data) only appears for users who can post.
+        $canManage = (bool) $request->user()->canDo('finance.admin');
+
         return Inertia::render('finance/donor-funds/Index', [
             'funds' => $funds,
+            'filters' => $request->only(['search', 'status', 'restricted']),
             'summary' => $summary,
+            'canManage' => $canManage,
+            'glAccounts' => $canManage ? $this->fundGlAccounts($orgId) : [],
+            'fundingStreams' => $canManage ? $this->fundFundingStreams($orgId) : [],
         ]);
     }
 
     /**
-     * Show the create fund form.
+     * Stream the donor-fund list as a sanitised CSV. Honours the same
+     * search / status / restricted filters as the index so "Export" respects the
+     * current view.
      */
-    public function create(Request $request)
+    public function export(Request $request)
     {
         $orgId = $request->user()->organization_id;
 
-        $glAccounts = FinAccount::forOrganization($orgId)
+        $query = FinDonorFund::forOrganization($orgId)->orderBy('fund_name');
+        $this->applyFundFilters($query, $request);
+
+        $rows = $query->get()->map(fn (FinDonorFund $fund) => [
+                $fund->fund_code,
+                $fund->fund_name,
+                $fund->donor_name,
+                number_format((float) $fund->total_received, 2, '.', ''),
+                number_format((float) $fund->total_spent, 2, '.', ''),
+                number_format((float) $fund->available_balance, 2, '.', ''),
+                $fund->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'donor-funds-'.now()->format('Y-m-d').'.csv',
+            ['Fund Code', 'Name', 'Donor', 'Total Received', 'Total Spent', 'Balance', 'Status'],
+            $rows,
+        );
+    }
+
+    /**
+     * Apply the shared donor-fund list filters (search / status / restricted) so the
+     * index list and the CSV export always show the same rows for a given query string.
+     *
+     * @param  Builder<FinDonorFund>  $query
+     */
+    private function applyFundFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('fund_name', 'like', "%{$search}%")
+                    ->orWhere('fund_code', 'like', "%{$search}%")
+                    ->orWhere('donor_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('restricted')) {
+            $query->where('is_restricted', $request->input('restricted') === 'restricted');
+        }
+    }
+
+    /** Active liability/equity GL accounts for the donor-fund modal. */
+    private function fundGlAccounts(?int $orgId)
+    {
+        return FinAccount::forOrganization($orgId)
             ->active()
             ->whereIn('type', ['liability', 'equity'])
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
+    }
 
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
+    /** Active funding streams for the donor-fund modal. */
+    private function fundFundingStreams(?int $orgId)
+    {
+        return FinFundingStream::forOrganization($orgId)
             ->active()
             ->orderBy('name')
             ->get(['id', 'name']);
-
-        return Inertia::render('finance/donor-funds/Create', [
-            'glAccounts' => $glAccounts,
-            'fundingStreams' => $fundingStreams,
-        ]);
     }
 
     /**
@@ -193,6 +254,8 @@ class DonorFundController extends Controller
                 'status' => $fund->status,
                 'is_restricted' => $fund->is_restricted,
                 'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
+                // Structured GL account so the transaction modal can render the trust-journal preview.
+                'gl_account' => $fund->glAccount ? ['code' => $fund->glAccount->code, 'name' => $fund->glAccount->name] : null,
                 'funding_stream_name' => $fund->fundingStream?->name,
                 'created_by' => $fund->createdBy?->name,
             ],
@@ -200,6 +263,8 @@ class DonorFundController extends Controller
             'reports' => $reports,
             'expenseAccounts' => $expenseAccounts,
             'bankAccounts' => $bankAccounts,
+            // Receipts/expenditure post under finance.admin — gate the modals to match.
+            'canManage' => (bool) $request->user()->canDo('finance.admin'),
         ]);
     }
 

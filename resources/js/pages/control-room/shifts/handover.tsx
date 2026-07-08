@@ -436,7 +436,7 @@ export default function ShiftHandover({
                             <CardContent className="space-y-4">
                                 <div>
                                     <Label htmlFor="handover-notes">
-                                        Handover Narrative
+                                        Handover Narrative <span className="font-normal text-muted-foreground">(optional)</span>
                                     </Label>
                                     <Textarea
                                         id="handover-notes"

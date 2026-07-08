@@ -720,6 +720,15 @@ function AddFollowupForm({ d }: { d: IncidentDetail }) {
     );
 }
 
+const METHODOLOGY_LABELS: Record<string, string> = {
+    '5_whys': '5 Whys',
+    fishbone: 'Fishbone (Ishikawa)',
+    bow_tie: 'Bow-tie',
+    icam: 'ICAM',
+    taproot: 'TapRooT',
+    other: 'Other',
+};
+
 function InvestigationSection({ d }: { d: IncidentDetail }) {
     if (!d.hs_event) {
         return (
@@ -746,7 +755,7 @@ function InvestigationSection({ d }: { d: IncidentDetail }) {
             {inv ? (
                 <ReviewCard icon={Search} title={`Investigation ${inv.reference_number}`} span>
                     <ReviewRow label="Status" value={titleCase(inv.status)} />
-                    <ReviewRow label="Methodology" value={inv.methodology ? inv.methodology.replace(/_/g, '-') : undefined} />
+                    <ReviewRow label="Methodology" value={inv.methodology ? (METHODOLOGY_LABELS[inv.methodology] ?? inv.methodology.replace(/_/g, ' ')) : undefined} />
                     {inv.root_causes?.length ? <ReviewRow label="Root causes" value={inv.root_causes.map((c) => c.description).filter(Boolean).join('; ')} /> : null}
                     {inv.recommendations?.length ? <ReviewRow label="Recommendations" value={inv.recommendations.map((r) => r.description).filter(Boolean).join('; ')} /> : null}
                     {inv.lessons_learned ? <ReviewRow label="Lessons learned" value={inv.lessons_learned} /> : null}

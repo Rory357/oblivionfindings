@@ -548,7 +548,7 @@ export default function VehicleShow({
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                <div className="rounded-lg border bg-primary/10/50 p-3 dark:bg-primary/20">
+                                <div className="rounded-lg border bg-primary/10 p-3 dark:bg-primary/20">
                                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Est. Next Service</p>
                                     <p className={`text-lg font-bold ${
                                         service_prediction.predicted_days != null && service_prediction.predicted_days <= 7 ? 'text-status-critical' :
@@ -642,7 +642,7 @@ export default function VehicleShow({
                                     key={item.key}
                                     className={`flex items-center justify-between rounded-xl border-2 p-3 transition-all ${
                                         (vehicle as Record<string, unknown>)[item.key]
-                                            ? 'border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/10'
+                                            ? 'border-primary bg-primary/5 dark:border-primary/30 dark:bg-primary/10'
                                             : 'border-muted bg-muted/20'
                                     }`}
                                 >

@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { useState, useMemo } from 'react';
-
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+import { formatMoney } from '@/components/finance/money';
 
 interface BankTransaction {
     id: number;
@@ -242,7 +241,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Starting Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatCurrency(reconciliation.starting_balance)}
+                                {formatMoney(reconciliation.starting_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -250,7 +249,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Statement Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatCurrency(reconciliation.statement_balance)}
+                                {formatMoney(reconciliation.statement_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -258,7 +257,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Calculated Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatCurrency(calculatedBalance)}
+                                {formatMoney(calculatedBalance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -266,7 +265,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Difference</p>
                             <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-status-success' : 'text-status-warning'}`}>
-                                {formatCurrency(difference)}
+                                {formatMoney(difference)}
                             </p>
                         </CardContent>
                     </Card>
@@ -356,7 +355,7 @@ export default function Reconcile({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium truncate">{txn.description}</span>
                                                     <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatCurrency(txn.amount)}
+                                                        {formatMoney(txn.amount)}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">{txn.transaction_date}</span>
                                                 </div>
@@ -366,7 +365,7 @@ export default function Reconcile({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium truncate">{jl.description || jl.journal_description}</span>
                                                     <span className="font-mono tabular-nums text-sm">
-                                                        {jl.debit > 0 ? formatCurrency(jl.debit) : formatCurrency(-jl.credit)}
+                                                        {jl.debit > 0 ? formatMoney(jl.debit) : formatMoney(-jl.credit)}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">#{jl.journal_number}</span>
                                                 </div>
@@ -444,7 +443,7 @@ export default function Reconcile({
                                                         {txn.transaction_date}
                                                     </TableCell>
                                                     <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatCurrency(txn.amount)}
+                                                        {formatMoney(txn.amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
                                                         {txn.description}
@@ -505,7 +504,7 @@ export default function Reconcile({
                                                         {line.journal_date}
                                                     </TableCell>
                                                     <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatCurrency(amount)}
+                                                        {formatMoney(amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
                                                         {line.description || line.journal_description || '-'}
@@ -558,7 +557,7 @@ export default function Reconcile({
                                                 </div>
                                             </TableCell>
                                             <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {line.bank_transaction ? formatCurrency(line.bank_transaction.amount) : '-'}
+                                                {line.bank_transaction ? formatMoney(line.bank_transaction.amount) : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {line.journal_line ? (
@@ -576,7 +575,7 @@ export default function Reconcile({
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
                                                 {line.journal_line
-                                                    ? formatCurrency(line.journal_line.debit > 0 ? line.journal_line.debit : -line.journal_line.credit)
+                                                    ? formatMoney(line.journal_line.debit > 0 ? line.journal_line.debit : -line.journal_line.credit)
                                                     : '-'}
                                             </TableCell>
                                             {!isCompleted && (

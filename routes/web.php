@@ -3,7 +3,10 @@
 use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
+use App\Http\Controllers\It\ItReportsController;
+use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\TodayDashboardController;
@@ -139,18 +142,68 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
-// IT & Provisioning — onboarding-driven provisioning queue + helpdesk
-// tickets. Built from docs/IT_PROVISIONING_WIREFRAME.md.
-Route::middleware(['auth', 'permission:it.view'])->group(function () {
+// IT & Provisioning — self-service helpdesk (everyone on staff raises and
+// tracks their own tickets) + the agent provisioning/ticket queues. Built
+// from docs/IT_PROVISIONING_WIREFRAME.md; ticketing per
+// docs/IT_TICKETING_GAP_ANALYSIS.md.
+Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    // Self-service: raising a ticket needs it.request (or it.manage for
+    // agents logging on behalf of others) — enforced via ItTicketPolicy.
+    Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
+    // The workspace: agents see every ticket, requesters their own
+    // (ItTicketPolicy; internal notes stripped server-side).
+    Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
+    Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
+    Route::get('/it/attachments/{attachment}', [ItTicketController::class, 'downloadAttachment'])->name('it.attachments.download');
+    // Reopen: agents anytime, the requester within 7 days of resolution
+    // (ItTicketPolicy::reopen owns the window).
+    Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
+    // CSAT: the requester rates their own resolved ticket (ItTicketPolicy::csat
+    // owns the who/when — agents 403, editable until the ticket closes).
+    Route::post('/it/tickets/{ticket}/csat', [ItTicketController::class, 'csat'])->name('it.tickets.csat');
+
+    // Provisioning-queue CSV export — a read any agent (it.view) can run over
+    // what the queue shows them; requesters (it.request only) are refused.
+    Route::get('/it/provisioning/export', [ItProvisioningController::class, 'exportProvisioning'])
+        ->middleware('permission:it.view')
+        ->name('it.provisioning.export');
+
+    // Reports (§L) — server-computed analytics as JSON; any agent (it.view)
+    // reads, requesters (it.request only) are refused.
+    Route::get('/it/reports/data', [ItReportsController::class, 'data'])
+        ->middleware('permission:it.view')
+        ->name('it.reports.data');
+    // Per-card CSV export of the same aggregates (injection-guarded stream).
+    Route::get('/it/reports/export', [ItReportsController::class, 'export'])
+        ->middleware('permission:it.view')
+        ->name('it.reports.export');
+
+    // Knowledge base browse — anyone who can reach /it (it.request or it.view)
+    // reads published articles and votes; the controller guards published + tenant.
+    Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
+    Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
 
     Route::middleware('permission:it.manage')->group(function () {
+        Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
+        // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits
+        // above the {provisioning} routes so it is never bound as an id.
+        Route::post('/it/provisioning/bulk', [ItProvisioningController::class, 'bulkProvisioning'])->name('it.provisioning.bulk');
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
-        Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
+        Route::post('/it/tickets/bulk', [ItTicketController::class, 'bulk'])->name('it.tickets.bulk');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
+        Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
+        Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
+        Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
+        // SLA target grid — admin-only on top of it.manage (FormRequest authorize).
+        Route::put('/it/sla-policies', [ItProvisioningController::class, 'updateSlaPolicies'])->name('it.sla.update');
+        // Knowledge base authoring (§I) — agents create/edit/publish/delete.
+        Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
+        Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
+        Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
     });
 });
 
