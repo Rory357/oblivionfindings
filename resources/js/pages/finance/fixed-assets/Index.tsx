@@ -351,7 +351,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     applyFilters({ category: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by category">
                                     <SelectValue placeholder="All Categories" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -370,7 +370,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     applyFilters({ status: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>

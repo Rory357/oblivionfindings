@@ -683,10 +683,21 @@ vendor, receipt) — the mould for C2.
       (validated every create-trigger/clearFilters ref), eslint 0, build clean, suite 232 (no PHP); browser-verified
       invoices EmptySearch renders ("No invoices match your filters" + Clear), no console errors. ⚠️ DEFERRED (low-value,
       rarely-empty pure-config lists): cost-centres / fiscal-periods / currencies / fx-revaluations keep hand-rolled empties.
-    - **[ ] C3e-2 — skeletons** (JUDGE: finance lists load synchronously → skeleton only helps Inertia::defer/async;
-      likely N/A for most, note per-page; do NOT add stub skeletons).
-    - **[ ] C3e-3 — axe no-criticals** per hub (inject axe-core, FIX criticals not just report).
-    - **[ ] C3e-4 — responsive** per hub (tablet/mobile; web-only desktop app → ≥tablet graceful, no horizontal body scroll).
+    - **[x] C3e-2 — skeletons: N/A (code-confirmed).** No finance controller uses `Inertia::defer` and no finance
+      list does a client-side fetch — every list loads synchronously, so a loading skeleton would never render.
+      Deliberately shipped none (no stub skeletons). Revisit only if a future finance surface adds a deferred prop.
+    - **[x] C3e-3 — axe no-criticals.** Ran real axe-core (served temporarily from public/, deleted after) on the
+      hubs + list pages. Finance was nearly clean; the ONE critical was `button-name` on the shadcn filter
+      `<SelectTrigger>` comboboxes (visible placeholder, no accessible name) → added a descriptive `aria-label` to
+      all 26 filter-toolbar Selects across 16 list pages (modal/form Selects left alone — labelled via their own
+      Label). Browser-verified 0 `button-name` (and 0 criticals) on invoices + bills. NOTE: `color-contrast`
+      (serious, NOT critical) remains on the shared status-badge tokens (status-info-bg/text) + sidebar chrome —
+      app-wide design-token/chrome concern, out of finance scope, not fixed here.
+    - **[x] C3e-4 — responsive: finance is clean.** Finance list tables ride the shadcn `<Table>` wrapper
+      (`relative w-full overflow-x-auto`), so wide tables scroll in their own container with ZERO body overflow at
+      tablet (verified invoices 775px table @ 753px viewport, no horizontal body scroll). Only /finance overview has
+      a minor ~34px overflow from the SHARED PageHero decoration circle (`-right-16`, all modules) + a recharts SVG —
+      not finance-authored, minor, desktop-first app → left as acceptable. No finance code changes needed.
     - **[ ] C3e-5 — fold Intercompany under a Consolidation tab** (named Route::redirect the old URL; update links).
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +

@@ -188,7 +188,7 @@ export default function JournalsIndex({
                             </div>
 
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -199,7 +199,7 @@ export default function JournalsIndex({
                             </Select>
 
                             <Select value={type} onValueChange={setType}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by type">
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>

@@ -268,7 +268,7 @@ export default function DonorFundsIndex({ funds, filters, summary, canManage = f
                                 />
                             </div>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -280,7 +280,7 @@ export default function DonorFundsIndex({ funds, filters, summary, canManage = f
                                 </SelectContent>
                             </Select>
                             <Select value={restricted} onValueChange={setRestricted}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by restriction">
                                     <SelectValue placeholder="All funds" />
                                 </SelectTrigger>
                                 <SelectContent>

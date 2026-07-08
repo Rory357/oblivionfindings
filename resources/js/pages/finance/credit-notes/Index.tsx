@@ -162,7 +162,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                 />
                             </div>
                             <Select value={type} onValueChange={setType}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by type">
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -172,7 +172,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                 </SelectContent>
                             </Select>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>

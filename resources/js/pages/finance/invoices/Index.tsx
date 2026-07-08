@@ -194,7 +194,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                 />
                             </div>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>

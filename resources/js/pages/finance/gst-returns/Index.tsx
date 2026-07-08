@@ -206,7 +206,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     value={filters.status ?? 'all'}
                                     onValueChange={(v) => applyFilter('status', v)}
                                 >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-[140px]" aria-label="Filter by status">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -220,7 +220,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     value={filters.year ?? 'all'}
                                     onValueChange={(v) => applyFilter('year', v)}
                                 >
-                                    <SelectTrigger className="w-[120px]">
+                                    <SelectTrigger className="w-[120px]" aria-label="Filter by year">
                                         <SelectValue placeholder="Year" />
                                     </SelectTrigger>
                                     <SelectContent>

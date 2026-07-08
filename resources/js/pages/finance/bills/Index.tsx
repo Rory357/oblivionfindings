@@ -187,7 +187,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 />
                             </div>
                             <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -201,7 +201,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 </SelectContent>
                             </Select>
                             <Select value={vendorId} onValueChange={setVendorId}>
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by vendor">
                                     <SelectValue placeholder="All Vendors" />
                                 </SelectTrigger>
                                 <SelectContent>

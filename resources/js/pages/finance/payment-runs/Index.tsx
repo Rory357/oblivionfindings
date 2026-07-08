@@ -115,7 +115,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                 value={filters.status || 'all'}
                                 onValueChange={handleStatusFilter}
                             >
-                                <SelectTrigger className="w-[160px]">
+                                <SelectTrigger className="w-[160px]" aria-label="Filter by status">
                                     <SelectValue placeholder="Filter by status" />
                                 </SelectTrigger>
                                 <SelectContent>

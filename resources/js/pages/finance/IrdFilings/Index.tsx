@@ -350,7 +350,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                     value={filters.filing_type ?? 'all'}
                                     onValueChange={(v) => applyFilter('filing_type', v)}
                                 >
-                                    <SelectTrigger className="w-[150px]">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by type">
                                         <SelectValue placeholder="Type" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -363,7 +363,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                     value={filters.status ?? 'all'}
                                     onValueChange={(v) => applyFilter('status', v)}
                                 >
-                                    <SelectTrigger className="w-[150px]">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by status">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>

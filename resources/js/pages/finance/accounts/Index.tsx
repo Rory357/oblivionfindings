@@ -328,7 +328,7 @@ export default function AccountsIndex({
                                 value={activeFilter}
                                 onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
                             >
-                                <SelectTrigger className="sm:w-44">
+                                <SelectTrigger className="sm:w-44" aria-label="Filter by active state">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

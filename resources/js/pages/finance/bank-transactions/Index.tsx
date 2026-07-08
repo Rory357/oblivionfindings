@@ -411,7 +411,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                         applyFilters({ bank_account_id: value === ALL ? '' : value })
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter by bank account">
                                         <SelectValue placeholder="All accounts" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -431,7 +431,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                     value={filters.status || ALL}
                                     onValueChange={(value) => applyFilters({ status: value === ALL ? '' : value })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter by status">
                                         <SelectValue placeholder="All statuses" />
                                     </SelectTrigger>
                                     <SelectContent>

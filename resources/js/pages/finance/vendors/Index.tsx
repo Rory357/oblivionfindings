@@ -170,7 +170,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                     applyFilters({ vendor_type: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by type">
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -188,7 +188,7 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                                     applyFilters({ is_active: value === 'all' ? '' : value })
                                 }
                             >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[180px]" aria-label="Filter by active state">
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>

@@ -106,7 +106,7 @@ export default function PurchaseOrderIndex() {
                                 value={current.status || 'all'}
                                 onValueChange={(v) => apply({ status: v === 'all' ? '' : v })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by status">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -127,7 +127,7 @@ export default function PurchaseOrderIndex() {
                                 value={current.vendor_id ? String(current.vendor_id) : 'all'}
                                 onValueChange={(v) => apply({ vendor_id: v === 'all' ? '' : v })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label="Filter by vendor">
                                     <SelectValue placeholder="All vendors" />
                                 </SelectTrigger>
                                 <SelectContent>

@@ -162,7 +162,7 @@ export default function QuotesIndex({
                         />
                     </div>
                     <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[130px] text-xs">
+                        <SelectTrigger className="h-9 w-[130px] text-xs" aria-label="Filter by status">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
