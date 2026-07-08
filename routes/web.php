@@ -158,6 +158,12 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // (ItTicketPolicy::reopen owns the window).
     Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
 
+    // Provisioning-queue CSV export — a read any agent (it.view) can run over
+    // what the queue shows them; requesters (it.request only) are refused.
+    Route::get('/it/provisioning/export', [ItProvisioningController::class, 'exportProvisioning'])
+        ->middleware('permission:it.view')
+        ->name('it.provisioning.export');
+
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits

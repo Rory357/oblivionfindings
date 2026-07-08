@@ -357,3 +357,60 @@ test('an agent raises a ticket linked to a provisioning request; requesters cann
         ->assertRedirect();
     expect(ItTicket::query()->firstWhere('title', 'Requester link attempt')->provisioning_request_id)->toBeNull();
 });
+
+test('an agent exports the provisioning queue as CSV; requesters cannot', function () {
+    $profile = itProfile();
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Email account', 'status' => 'pending', 'priority' => 'high',
+    ]);
+    // A CSV formula-injection payload in a user-controlled field is neutralised.
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'other', 'item' => '=cmd|calc', 'status' => 'pending',
+    ]);
+    // A foreign-tenant row never leaks into the export.
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 2, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Foreign-tenant secret', 'status' => 'pending',
+    ]);
+
+    $response = $this->actingAs($this->hr)->get('/it/provisioning/export');
+    $response->assertOk();
+    $response->assertDownload();
+    $csv = $response->streamedContent();
+
+    expect($csv)->toContain('Employee', 'Item', 'Status');
+    expect($csv)->toContain('Email account');
+    // Formula-injection guard: the leading `=` is prefixed with an apostrophe.
+    expect($csv)->toContain("'=cmd|calc");
+    expect($csv)->not->toContain(',=cmd|calc');
+    // Tenant scope holds.
+    expect($csv)->not->toContain('Foreign-tenant secret');
+
+    // Self-service requesters (no it.view) cannot export the agent queue.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)->get('/it/provisioning/export')->assertForbidden();
+});
+
+test('the provisioning export respects the status filter', function () {
+    $profile = itProfile();
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Pending item', 'status' => 'pending',
+    ]);
+    ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'type' => 'account', 'item' => 'Done item', 'status' => 'done',
+    ]);
+
+    $csv = $this->actingAs($this->hr)
+        ->get('/it/provisioning/export?status=pending')
+        ->streamedContent();
+
+    expect($csv)->toContain('Pending item');
+    expect($csv)->not->toContain('Done item');
+});

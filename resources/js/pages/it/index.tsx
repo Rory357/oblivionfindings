@@ -46,6 +46,7 @@ import {
     ChevronDown,
     ChevronsUpDown,
     ChevronUp,
+    Download,
     Inbox,
     KeyRound,
     Laptop,
@@ -413,6 +414,17 @@ export default function ItIndex({
     const runProvisioningBulk = (payload: Record<string, unknown>) =>
         runBulkTo('/it/provisioning/bulk', reqSel, payload);
 
+    /** CSV export of the provisioning queue, carrying the active filters so the
+     *  download matches what the agent is looking at (streamed, agent-only). */
+    const provisioningExportUrl = () => {
+        const params = new URLSearchParams();
+        if (filters?.status) params.set('status', filters.status);
+        if (filters?.type) params.set('type', filters.type);
+        if (filters?.assignee != null) params.set('assignee', String(filters.assignee));
+        const qs = params.toString();
+        return `/it/provisioning/export${qs ? `?${qs}` : ''}`;
+    };
+
     // Bulk select is agent-only (it.manage) — the checkbox column and action
     // bar only exist for people who can mutate. Each grid gains a leading
     // 36px checkbox track when it does.
@@ -664,16 +676,25 @@ export default function ItIndex({
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
-                            {can.manage ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="ml-auto"
-                                    onClick={() => setModal({ type: 'new-request' })}
-                                >
-                                    <Plus className="h-3.5 w-3.5" /> New request
+                            <div className="ml-auto flex items-center gap-2">
+                                <Button asChild size="sm" variant="outline">
+                                    <a
+                                        href={provisioningExportUrl()}
+                                        aria-label="Export the provisioning queue as CSV"
+                                    >
+                                        <Download className="h-3.5 w-3.5" /> Export CSV
+                                    </a>
                                 </Button>
-                            ) : null}
+                                {can.manage ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setModal({ type: 'new-request' })}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> New request
+                                    </Button>
+                                ) : null}
+                            </div>
                         </div>
 
                         {/* Bulk action bar — appears when requests are selected */}

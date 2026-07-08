@@ -467,6 +467,67 @@ class ItProvisioningController extends Controller
         return true;
     }
 
+    /**
+     * §H provisioning-queue CSV export — the current filtered view (status /
+     * type / assignee), all matching rows (not just the page), tenant-scoped.
+     * Any agent (it.view) can export what the queue shows them; every cell
+     * goes through the base Controller's `putCsv()` so a formula-injection
+     * payload in a user-controlled field (item, employee name, external ref)
+     * can never execute on open.
+     */
+    public function exportProvisioning(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('it.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $status = $this->cleanFilter($request->query('status'), ItProvisioningRequest::STATUSES);
+        $type = $this->cleanFilter($request->query('type'), ItProvisioningRequest::TYPES);
+        $assignee = is_numeric($request->query('assignee')) ? (int) $request->query('assignee') : null;
+
+        $rows = ItProvisioningRequest::query()
+            ->forTenant($tenantId)
+            ->with([
+                'employeeProfile:id,user_id,position_title,position_role',
+                'employeeProfile.user:id,name',
+                'assignee:id,name',
+            ])
+            ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->when($type, fn ($q, $t) => $q->where('type', $t))
+            ->when($assignee, fn ($q, $a) => $q->where('assigned_to_user_id', $a))
+            ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'done' THEN 2 ELSE 3 END")
+            ->orderByDesc('created_at')
+            ->get();
+
+        $tz = config('app.worker_timezone', 'Pacific/Auckland');
+        $human = fn (?string $v) => $v ? ucfirst(str_replace('_', ' ', $v)) : '';
+        $filename = 'provisioning-requests-'.now()->timezone($tz)->format('Y-m-d').'.csv';
+
+        $headers = ['Employee', 'Role', 'Item', 'Type', 'Status', 'Priority', 'Assignee', 'Due date', 'Source', 'External ref', 'Raised', 'Fulfilled'];
+
+        return response()->streamDownload(function () use ($rows, $headers, $tz, $human) {
+            $out = fopen('php://output', 'w');
+            $this->putCsv($out, $headers);
+            foreach ($rows as $r) {
+                $this->putCsv($out, [
+                    $r->employeeProfile?->user?->name ?? 'Unknown',
+                    $r->employeeProfile?->position_title ?? $r->employeeProfile?->position_role ?? '',
+                    $r->item,
+                    $human($r->type),
+                    $human($r->status),
+                    $human($r->priority),
+                    $r->assignee?->name ?? '',
+                    $r->due_date?->format('Y-m-d') ?? '',
+                    $r->onboarding_task_id ? 'Onboarding' : 'Manual',
+                    $r->external_ref ?? '',
+                    $r->created_at?->timezone($tz)->format('Y-m-d H:i') ?? '',
+                    $r->fulfilled_at?->timezone($tz)->format('Y-m-d H:i') ?? '',
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
     /* ================================================================== */
     /*  Helpdesk tickets */
     /* ================================================================== */
