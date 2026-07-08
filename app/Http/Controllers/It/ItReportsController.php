@@ -32,6 +32,104 @@ class ItReportsController extends Controller
     }
 
     /**
+     * Per-card CSV export (§L) — the same tenant-scoped, range-bound datasets
+     * the Reports tab charts, streamed as a download. Every cell goes through
+     * the base Controller's putCsv() so a formula-injection payload in a
+     * user-controlled field (a requester or assignee name) can never execute
+     * on open. Agent-only (route gated `permission:it.view`).
+     */
+    public function export(Request $request)
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        [$from, $to] = $this->range($request);
+        $card = is_string($request->query('card')) ? $request->query('card') : 'trend';
+
+        [$filename, $headers, $rows] = $this->exportCard($tenantId, $from, $to, $card);
+
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $out = fopen('php://output', 'w');
+            $this->putCsv($out, $headers);
+            foreach ($rows as $row) {
+                $this->putCsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Map a card key to [filename, header row, data rows]. An unknown card
+     * falls back to the trend export rather than erroring.
+     *
+     * @return array{0: string, 1: array<int, string>, 2: array<int, array<int, string|int|float>>}
+     */
+    private function exportCard(int $tenantId, Carbon $from, Carbon $to, string $card): array
+    {
+        $ready = Schema::hasTable('it_tickets');
+        $reqReady = Schema::hasTable('it_provisioning_requests');
+        $stamp = "{$from->toDateString()}_{$to->toDateString()}";
+
+        return match ($card) {
+            'summary' => [
+                "it-report-summary_{$stamp}.csv",
+                ['Metric', 'Value'],
+                $this->summaryRows(
+                    $ready ? $this->kpis($tenantId, $from, $to) : $this->emptyKpis(),
+                    $reqReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
+                ),
+            ],
+            'by_priority' => [
+                "it-open-by-priority_{$stamp}.csv",
+                ['Priority', 'Open tickets'],
+                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy($tenantId, 'priority', ItTicket::PRIORITIES)) : [],
+            ],
+            'by_category' => [
+                "it-open-by-category_{$stamp}.csv",
+                ['Category', 'Open tickets'],
+                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy($tenantId, 'category', ItTicket::CATEGORIES)) : [],
+            ],
+            'top_requesters' => [
+                "it-top-requesters_{$stamp}.csv",
+                ['Requester', 'Tickets raised'],
+                $ready ? array_map(fn ($r) => [$r['name'], $r['count']], $this->topRequesters($tenantId, $from, $to)) : [],
+            ],
+            'agent_workload' => [
+                "it-agent-workload_{$stamp}.csv",
+                ['Assignee', 'Open tickets'],
+                $ready ? array_map(fn ($r) => [$r['name'], $r['open']], $this->agentWorkload($tenantId)) : [],
+            ],
+            default => [
+                "it-created-vs-resolved_{$stamp}.csv",
+                ['Date', 'Created', 'Resolved'],
+                $ready ? array_map(fn ($r) => [$r['date'], $r['created'], $r['resolved']], $this->trend($tenantId, $from, $to)) : [],
+            ],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $k
+     * @param  array<string, mixed>  $p
+     * @return array<int, array<int, string|int|float>>
+     */
+    private function summaryRows(array $k, array $p): array
+    {
+        return [
+            ['Open', $k['open']],
+            ['Unassigned', $k['unassigned']],
+            ['SLA at risk', $k['breaching']],
+            ['SLA breached', $k['breached']],
+            ['Resolved in range', $k['resolved']],
+            ['Avg first response (mins)', $k['avg_first_response_mins'] ?? ''],
+            ['Avg resolution (mins)', $k['avg_resolution_mins'] ?? ''],
+            ['SLA compliance (%)', $k['sla_compliance'] ?? ''],
+            ['CSAT average', $k['csat_avg'] ?? ''],
+            ['CSAT response rate (%)', $k['csat_response_rate'] ?? ''],
+            ['Provisioning raised', $p['raised']],
+            ['Provisioning fulfilled', $p['fulfilled']],
+            ['Avg days to fulfil', $p['avg_days'] ?? ''],
+        ];
+    }
+
+    /**
      * Clamp the requested window to a sane span; default the last 30 days.
      * A hostile `?from=1900-01-01` can't scan the whole table — capped at 365d.
      *

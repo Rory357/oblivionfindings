@@ -174,6 +174,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/reports/data', [ItReportsController::class, 'data'])
         ->middleware('permission:it.view')
         ->name('it.reports.data');
+    // Per-card CSV export of the same aggregates (injection-guarded stream).
+    Route::get('/it/reports/export', [ItReportsController::class, 'export'])
+        ->middleware('permission:it.view')
+        ->name('it.reports.export');
 
     // Knowledge base browse — anyone who can reach /it (it.request or it.view)
     // reads published articles and votes; the controller guards published + tenant.

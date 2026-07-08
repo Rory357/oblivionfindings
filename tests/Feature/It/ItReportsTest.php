@@ -126,3 +126,37 @@ test('the report aggregates tickets and provisioning across the range', function
     expect($json['provisioning']['fulfilled'])->toBe(1);
     expect($json['provisioning']['avg_days'])->toEqual(2.0);
 });
+
+test('per-card CSV export is agent-only, correct and injection-guarded', function () {
+    // A self-service requester never reaches the export.
+    $this->actingAs($this->worker)->get('/it/reports/export?card=trend')->assertForbidden();
+
+    // A requester whose name is a spreadsheet-formula payload.
+    $evil = reportsUser('support_worker');
+    $evil->forceFill(['name' => '=cmd|calc'])->save();
+    ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'requester_user_id' => $evil->id,
+        'status' => 'open',
+        'priority' => 'high',
+    ]);
+
+    // Top-requesters export: streamed CSV, and the formula cell is neutralised.
+    $res = $this->actingAs($this->agent)->get('/it/reports/export?card=top_requesters');
+    $res->assertOk();
+    expect($res->headers->get('content-type'))->toContain('text/csv');
+    $body = $res->streamedContent();
+    expect($body)->toContain('Requester'); // header present (space-containing cells get CSV-quoted)
+    expect($body)->toContain("'=cmd|calc"); // apostrophe-prefixed by SanitizesCsvOutput
+
+    // By-priority export lists the canonical rows with the live count.
+    $priority = $this->actingAs($this->agent)->get('/it/reports/export?card=by_priority')->streamedContent();
+    expect($priority)->toContain('High,1');
+
+    // The summary export dumps the KPI metric/value grid.
+    $summary = $this->actingAs($this->agent)->get('/it/reports/export?card=summary')->streamedContent();
+    expect($summary)->toContain('Open,1');
+
+    // An unknown card falls back to the trend export rather than erroring.
+    $this->actingAs($this->agent)->get('/it/reports/export?card=bogus')->assertOk();
+});

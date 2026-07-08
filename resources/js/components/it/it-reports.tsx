@@ -7,7 +7,7 @@
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import axios from 'axios';
-import { BarChart3, Clock, Inbox, Server, Star, TriangleAlert, Users } from 'lucide-react';
+import { BarChart3, Clock, Download, Inbox, Server, Star, TriangleAlert, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
     Area,
@@ -108,6 +108,16 @@ export function ItReports() {
         load();
     }, [load]);
 
+    /** CSV download URL for a card, carrying the active window. */
+    const exportUrl = (card: string) => {
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - (days - 1));
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const params = new URLSearchParams({ card, from: fmt(from), to: fmt(to) });
+        return `/it/reports/export?${params.toString()}`;
+    };
+
     const k = data?.kpis;
     const hasAnything =
         !!data &&
@@ -124,19 +134,28 @@ export function ItReports() {
                 <p className="text-[12.5px] text-muted-foreground">
                     Helpdesk analytics — {data ? `${shortDate(data.range.from)} → ${shortDate(data.range.to)}` : 'loading…'}
                 </p>
-                <div className="ml-auto inline-flex gap-1 rounded-lg bg-muted p-1">
-                    {RANGES.map((r) => (
-                        <Button
-                            key={r.days}
-                            size="sm"
-                            variant={days === r.days ? 'default' : 'ghost'}
-                            className="h-7"
-                            onClick={() => setDays(r.days)}
-                            aria-pressed={days === r.days}
-                        >
-                            {r.label}
+                <div className="ml-auto flex items-center gap-2">
+                    <div className="inline-flex gap-1 rounded-lg bg-muted p-1">
+                        {RANGES.map((r) => (
+                            <Button
+                                key={r.days}
+                                size="sm"
+                                variant={days === r.days ? 'default' : 'ghost'}
+                                className="h-7"
+                                onClick={() => setDays(r.days)}
+                                aria-pressed={days === r.days}
+                            >
+                                {r.label}
+                            </Button>
+                        ))}
+                    </div>
+                    {data && hasAnything ? (
+                        <Button asChild size="sm" variant="outline" className="h-7">
+                            <a href={exportUrl('summary')}>
+                                <Download className="h-3.5 w-3.5" /> Export
+                            </a>
                         </Button>
-                    ))}
+                    ) : null}
                 </div>
             </div>
 
@@ -204,7 +223,7 @@ export function ItReports() {
                         </div>
 
                         {/* Trend — created vs resolved */}
-                        <Card title="Created vs resolved">
+                        <Card title="Created vs resolved" exportHref={exportUrl('trend')}>
                             <ResponsiveContainer width="100%" height={240}>
                                 <AreaChart data={data.trend} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -242,16 +261,16 @@ export function ItReports() {
 
                         {/* Donuts + readouts */}
                         <div className="grid gap-3 lg:grid-cols-2">
-                            <Card title="Open by priority">
+                            <Card title="Open by priority" exportHref={exportUrl('by_priority')}>
                                 <Donut data={data.by_priority} colorFor={(n) => PRIORITY_COLOR[n] ?? 'var(--muted-foreground)'} />
                             </Card>
-                            <Card title="Open by category">
+                            <Card title="Open by category" exportHref={exportUrl('by_category')}>
                                 <Donut data={data.by_category} colorFor={(n, i) => CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]} />
                             </Card>
-                            <Card title="Top requesters" icon={Users}>
+                            <Card title="Top requesters" icon={Users} exportHref={exportUrl('top_requesters')}>
                                 <BarList rows={data.top_requesters.map((r) => ({ name: r.name, value: r.count }))} />
                             </Card>
-                            <Card title="Agent workload (open)" icon={Users}>
+                            <Card title="Agent workload (open)" icon={Users} exportHref={exportUrl('agent_workload')}>
                                 <BarList rows={data.agent_workload.map((r) => ({ name: r.name, value: r.open }))} />
                             </Card>
                         </div>
@@ -298,10 +317,12 @@ function Stat({
 function Card({
     title,
     icon: Icon,
+    exportHref,
     children,
 }: {
     title: string;
     icon?: React.ComponentType<{ className?: string }>;
+    exportHref?: string;
     children: React.ReactNode;
 }) {
     return (
@@ -309,6 +330,15 @@ function Card({
             <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                 {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                 {title}
+                {exportHref ? (
+                    <a
+                        href={exportHref}
+                        title="Download this card as CSV"
+                        className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground normal-case hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                    >
+                        <Download className="h-3 w-3" /> CSV
+                    </a>
+                ) : null}
             </div>
             {children}
         </div>
