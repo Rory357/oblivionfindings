@@ -160,6 +160,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
+        // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits
+        // above the {provisioning} routes so it is never bound as an id.
+        Route::post('/it/provisioning/bulk', [ItProvisioningController::class, 'bulkProvisioning'])->name('it.provisioning.bulk');
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');

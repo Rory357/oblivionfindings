@@ -8,6 +8,7 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\It\BulkProvisioningActionRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
 use App\Models\ItProvisioningRequest;
@@ -352,6 +353,118 @@ class ItProvisioningController extends Controller
                 'name' => $p->user?->name ?? $p->position_title ?? "Employee #{$p->id}",
             ])
             ->all();
+    }
+
+    /**
+     * §H one action over many provisioning requests: assign to an agent, or
+     * fulfil. Foreign-tenant ids silently drop out of the tenant-scoped fetch;
+     * settled requests (done/cancelled) are skipped rather than mutated — the
+     * flash reports both as "unchanged". One event row per actual change with
+     * `via=bulk`; fulfil completes each linked onboarding task through the same
+     * bridge as the single route, in its own transaction so one blocked task
+     * can't sink the batch.
+     */
+    public function bulkProvisioning(BulkProvisioningActionRequest $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $validated = $request->validated();
+        $action = (string) $validated['action'];
+
+        $assignee = null;
+        if ($action === 'assign') {
+            $assignee = User::query()->find((int) $validated['assigned_to_user_id']);
+            // Same foreign-tenant guard as assign/storeProvisioning: reject a
+            // recipient whose HR profile sits in a different organisation.
+            $inOtherTenant = $assignee && HrEmployeeProfile::query()
+                ->where('user_id', $assignee->id)
+                ->whereNotNull('tenant_id')
+                ->where('tenant_id', '!=', $tenantId)
+                ->exists();
+            if ($inOtherTenant) {
+                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
+            }
+        }
+
+        $requests = ItProvisioningRequest::query()
+            ->forTenant($tenantId)
+            ->with('onboardingTask')
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $updated = 0;
+        $skipped = count($validated['ids']) - $requests->count();
+
+        foreach ($requests as $provisioning) {
+            $changed = match ($action) {
+                'assign' => $this->bulkAssignProvisioning($provisioning, $assignee, $user),
+                'fulfil' => $this->bulkFulfilProvisioning($provisioning, $user),
+                default => false,
+            };
+            $changed ? $updated++ : $skipped++;
+        }
+
+        $label = $action === 'assign' ? 'assigned' : 'fulfilled';
+
+        return redirect()->back()->with(
+            'success',
+            "{$updated} request(s) {$label}".($skipped > 0 ? " · {$skipped} unchanged" : '').'.',
+        );
+    }
+
+    private function bulkAssignProvisioning(ItProvisioningRequest $provisioning, ?User $assignee, User $actor): bool
+    {
+        if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
+            return false; // settled requests keep their history
+        }
+        $newId = $assignee?->id;
+        if ((int) $provisioning->assigned_to_user_id === (int) $newId) {
+            return false;
+        }
+
+        $provisioning->update([
+            'assigned_to_user_id' => $newId,
+            'status' => $provisioning->status === 'pending' ? 'in_progress' : $provisioning->status,
+        ]);
+
+        ItTicketEvent::record($provisioning, 'assigned', $actor->id, [
+            'to' => $newId,
+            'via' => 'bulk',
+        ]);
+
+        return true;
+    }
+
+    private function bulkFulfilProvisioning(ItProvisioningRequest $provisioning, User $actor): bool
+    {
+        if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
+            return false;
+        }
+
+        try {
+            DB::transaction(function () use ($provisioning, $actor) {
+                $provisioning->update([
+                    'status' => 'done',
+                    'fulfilled_at' => now(),
+                    'fulfilled_by' => $actor->id,
+                ]);
+
+                // Cross-loop: fulfilment completes the source onboarding task,
+                // exactly as the single fulfil route does (dependency/rollup all fire).
+                $task = $provisioning->onboardingTask;
+                if ($task && $task->status !== 'completed') {
+                    $this->onboardingService->completeTask($task, $actor->id, array_filter([
+                        'signed_off_by' => $task->sign_off_required ? $actor->id : null,
+                    ], fn ($v) => $v !== null));
+                }
+
+                ItTicketEvent::record($provisioning, 'fulfilled', $actor->id, ['via' => 'bulk']);
+            });
+        } catch (\LogicException) {
+            return false; // a blocked task can't complete — leave the request untouched
+        }
+
+        return true;
     }
 
     /* ================================================================== */

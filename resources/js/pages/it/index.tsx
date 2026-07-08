@@ -374,42 +374,27 @@ export default function ItIndex({
         router.get('/it', { tab: 'tickets' }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
-    /* ---------------- bulk selection (§F2) ---------------- */
+    /* ---------------- bulk selection (§F2 tickets · §H provisioning) ---------------- */
+    // Both queues share one per-page selection hook (useRowSelection, below).
+    // Only one tab is visible at a time, so the busy flag is shared.
 
-    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const ticketSel = useRowSelection((tickets?.data ?? []).map((t) => t.id));
+    const reqSel = useRowSelection((requests?.data ?? []).map((r) => r.id));
     const [confirmBulkClose, setConfirmBulkClose] = useState(false);
+    const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
     const [bulkBusy, setBulkBusy] = useState(false);
-    const pageTicketIds = (tickets?.data ?? []).map((t) => t.id);
 
-    // The selection is per-view — drop it whenever the visible page changes
-    // (filter, sort, page or a bulk action that reshuffles rows).
-    const pageIdsKey = pageTicketIds.join(',');
-    useEffect(() => {
-        setSelected(new Set());
-    }, [pageIdsKey]);
-
-    const toggleRow = (id: number, on: boolean) =>
-        setSelected((prev) => {
-            const next = new Set(prev);
-            if (on) next.add(id);
-            else next.delete(id);
-            return next;
-        });
-
-    const toggleAllOnPage = (on: boolean) =>
-        setSelected((prev) => {
-            const next = new Set(prev);
-            pageTicketIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
-            return next;
-        });
-
-    /** POST the selection through `it.tickets.bulk`; flash → toast, then clear. */
-    const runBulk = (payload: Record<string, unknown>) => {
-        if (selected.size === 0) return;
+    /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
+    const runBulkTo = (
+        url: string,
+        sel: ReturnType<typeof useRowSelection>,
+        payload: Record<string, unknown>,
+    ) => {
+        if (sel.selected.size === 0) return;
         setBulkBusy(true);
         router.post(
-            '/it/tickets/bulk',
-            { ids: [...selected], ...payload },
+            url,
+            { ids: [...sel.selected], ...payload },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -417,21 +402,26 @@ export default function ItIndex({
                     const flash = page.props.flash as { error?: string; success?: string } | undefined;
                     if (flash?.error) toast.error(flash.error);
                     else if (flash?.success) toast.success(flash.success);
-                    setSelected(new Set());
+                    sel.clear();
                 },
                 onFinish: () => setBulkBusy(false),
             },
         );
     };
 
+    const runBulk = (payload: Record<string, unknown>) => runBulkTo('/it/tickets/bulk', ticketSel, payload);
+    const runProvisioningBulk = (payload: Record<string, unknown>) =>
+        runBulkTo('/it/provisioning/bulk', reqSel, payload);
+
     // Bulk select is agent-only (it.manage) — the checkbox column and action
-    // bar only exist for people who can mutate. The grid gains a leading
+    // bar only exist for people who can mutate. Each grid gains a leading
     // 36px checkbox track when it does.
     const ticketGridCols = can.manage
         ? 'grid-cols-[36px_3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]'
         : 'grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]';
-    const allOnPageSelected = pageTicketIds.length > 0 && pageTicketIds.every((id) => selected.has(id));
-    const someOnPageSelected = pageTicketIds.some((id) => selected.has(id));
+    const reqGridCols = can.manage
+        ? 'grid-cols-[36px_1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]'
+        : 'grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]';
 
     /** Direct row action — surfaces the redirect flash as a toast. */
     const act = (method: 'post' | 'patch', url: string, data: Record<string, string> = {}) => {
@@ -593,7 +583,7 @@ export default function ItIndex({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Close {selected.size} ticket{selected.size === 1 ? '' : 's'}?
+                            Close {ticketSel.selected.size} ticket{ticketSel.selected.size === 1 ? '' : 's'}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Closed tickets leave the working queue. Requesters can still reopen within seven days.
@@ -603,6 +593,25 @@ export default function ItIndex({
                         <AlertDialogCancel>Keep open</AlertDialogCancel>
                         <AlertDialogAction onClick={() => runBulk({ action: 'close' })}>
                             Close tickets
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={confirmBulkFulfil} onOpenChange={setConfirmBulkFulfil}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Fulfil {reqSel.selected.size} request{reqSel.selected.size === 1 ? '' : 's'}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Each request is marked done and any linked onboarding task is completed. This can’t be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => runProvisioningBulk({ action: 'fulfil' })}>
+                            Fulfil requests
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -667,8 +676,66 @@ export default function ItIndex({
                             ) : null}
                         </div>
 
+                        {/* Bulk action bar — appears when requests are selected */}
+                        {can.manage && reqSel.selected.size > 0 ? (
+                            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
+                                <span className="text-[12.5px] font-semibold text-foreground">
+                                    {reqSel.selected.size} selected
+                                </span>
+                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                                <Select
+                                    value=""
+                                    onValueChange={(v) =>
+                                        runProvisioningBulk({ action: 'assign', assigned_to_user_id: Number(v) })
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-[160px]" aria-label="Assign selected requests to">
+                                        <SelectValue placeholder="Assign to…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {assignees.map((a) => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={bulkBusy}
+                                    onClick={() => setConfirmBulkFulfil(true)}
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Fulfil
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="ml-auto"
+                                    onClick={() => reqSel.clear()}
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                        ) : null}
+
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                            <div className="grid grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <div className={`grid ${reqGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}>
+                                {can.manage ? (
+                                    <span className="flex items-center">
+                                        <Checkbox
+                                            checked={
+                                                reqSel.allOnPage
+                                                    ? true
+                                                    : reqSel.someOnPage
+                                                      ? 'indeterminate'
+                                                      : false
+                                            }
+                                            onCheckedChange={(v) => reqSel.toggleAll(v === true)}
+                                            aria-label="Select all requests on this page"
+                                        />
+                                    </span>
+                                ) : null}
                                 <span>Employee</span>
                                 <span>Item</span>
                                 <span>Assignee</span>
@@ -690,8 +757,17 @@ export default function ItIndex({
                                     <div
                                         key={r.id}
                                         onContextMenu={can.manage ? requestMenu(r) : undefined}
-                                        className={`grid grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
+                                        className={`grid ${reqGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${reqSel.selected.has(r.id) ? 'bg-primary/5' : overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
                                     >
+                                        {can.manage ? (
+                                            <span className="flex items-center">
+                                                <Checkbox
+                                                    checked={reqSel.selected.has(r.id)}
+                                                    onCheckedChange={(v) => reqSel.toggle(r.id, v === true)}
+                                                    aria-label={`Select ${r.item}`}
+                                                />
+                                            </span>
+                                        ) : null}
                                         <div className="min-w-0">
                                             <div className="truncate text-[13.5px] font-semibold">
                                                 {r.employee.name}
@@ -912,10 +988,10 @@ export default function ItIndex({
                         </div>
 
                         {/* Bulk action bar — appears when rows are selected */}
-                        {can.manage && selected.size > 0 ? (
+                        {can.manage && ticketSel.selected.size > 0 ? (
                             <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
                                 <span className="text-[12.5px] font-semibold text-foreground">
-                                    {selected.size} selected
+                                    {ticketSel.selected.size} selected
                                 </span>
                                 <span className="mx-1 h-5 w-px bg-border" aria-hidden />
                                 <Select
@@ -975,7 +1051,7 @@ export default function ItIndex({
                                     size="sm"
                                     variant="ghost"
                                     className="ml-auto"
-                                    onClick={() => setSelected(new Set())}
+                                    onClick={() => ticketSel.clear()}
                                 >
                                     Clear
                                 </Button>
@@ -988,13 +1064,13 @@ export default function ItIndex({
                                     <span className="flex items-center">
                                         <Checkbox
                                             checked={
-                                                allOnPageSelected
+                                                ticketSel.allOnPage
                                                     ? true
-                                                    : someOnPageSelected
+                                                    : ticketSel.someOnPage
                                                       ? 'indeterminate'
                                                       : false
                                             }
-                                            onCheckedChange={(v) => toggleAllOnPage(v === true)}
+                                            onCheckedChange={(v) => ticketSel.toggleAll(v === true)}
                                             aria-label="Select all tickets on this page"
                                         />
                                     </span>
@@ -1014,13 +1090,13 @@ export default function ItIndex({
                                     onContextMenu={can.manage ? ticketMenu(t) : undefined}
                                     onClick={(e) => openTicket(t.id, e)}
                                     onDoubleClick={() => router.visit(`/it/tickets/${t.id}`)}
-                                    className={`grid cursor-pointer ${ticketGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40 ${selected.has(t.id) ? 'bg-primary/5' : ''}`}
+                                    className={`grid cursor-pointer ${ticketGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40 ${ticketSel.selected.has(t.id) ? 'bg-primary/5' : ''}`}
                                 >
                                     {can.manage ? (
                                         <span className="flex items-center">
                                             <Checkbox
-                                                checked={selected.has(t.id)}
-                                                onCheckedChange={(v) => toggleRow(t.id, v === true)}
+                                                checked={ticketSel.selected.has(t.id)}
+                                                onCheckedChange={(v) => ticketSel.toggle(t.id, v === true)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 aria-label={`Select ${t.reference ?? t.title}`}
                                             />
@@ -1198,6 +1274,41 @@ export default function ItIndex({
 /* ------------------------------------------------------------------ */
 /*  Bits                                                               */
 /* ------------------------------------------------------------------ */
+
+/** Per-page row selection for the bulk-action queues (tickets & provisioning).
+ *  The selection is per-view: it clears whenever the visible page changes
+ *  (filter, sort, page, or a bulk action that reshuffles rows). */
+function useRowSelection(pageIds: number[]) {
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const key = pageIds.join(',');
+    useEffect(() => {
+        setSelected(new Set());
+    }, [key]);
+
+    const toggle = (id: number, on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (on) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+
+    const toggleAll = (on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            pageIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            return next;
+        });
+
+    return {
+        selected,
+        clear: () => setSelected(new Set()),
+        toggle,
+        toggleAll,
+        allOnPage: pageIds.length > 0 && pageIds.every((id) => selected.has(id)),
+        someOnPage: pageIds.some((id) => selected.has(id)),
+    };
+}
 
 function FilterSelect({
     ariaLabel,
