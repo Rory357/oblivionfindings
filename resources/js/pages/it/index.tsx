@@ -289,7 +289,23 @@ export default function ItIndex({
     summary,
     can,
 }: Props) {
-    const [tab, setTab] = useHrTab(can.view ? 'overview' : 'my-tickets');
+    // Default landing tab (§O): a right-click "Set as default view" persists to
+    // localStorage; a `?tab=` deep link always wins over it. Validate the stored
+    // id against what this user can actually see before trusting it.
+    const capabilityDefault = can.view ? 'overview' : 'my-tickets';
+    const tabIsAllowed = (id: string | null): id is string => {
+        if (!id) return false;
+        if (id === 'my-tickets') return can.request;
+        if (id === 'knowledge') return can.view || can.request;
+        return can.view; // overview / tickets / provisioning / reports
+    };
+    const [storedDefault] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const v = window.localStorage.getItem('it.defaultTab');
+        return tabIsAllowed(v) ? v : null;
+    });
+    const [defaultTab, setDefaultTab] = useState<string | null>(storedDefault);
+    const [tab, setTab] = useHrTab(storedDefault ?? capabilityDefault);
     const [modal, setModal] = useState<ItModal | null>(null);
     const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
@@ -360,6 +376,41 @@ export default function ItIndex({
               ] as HrTabItem[])
             : []),
     ];
+
+    /** Tab-strip right-click (§O): pin the default landing view for next time. */
+    const tabMenu = (id: string, e: React.MouseEvent) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: defaultTab === id ? 'Default view (current)' : 'Set as default view',
+                icon: Star,
+                onSelect: () => {
+                    if (typeof window !== 'undefined') window.localStorage.setItem('it.defaultTab', id);
+                    setDefaultTab(id);
+                    const name = tabItems.find((t) => t.id === id)?.label ?? id;
+                    toast.success(`${name} is now your default view.`);
+                },
+            },
+            {
+                kind: 'item' as const,
+                label: 'Open',
+                icon: LayoutDashboard,
+                onSelect: () => setTab(id),
+            },
+        ])(e);
+
+    /** A gold star marks the pinned default tab. */
+    const tabDecorations = defaultTab
+        ? {
+              [defaultTab]: (
+                  <Star
+                      className="h-3 w-3"
+                      style={{ color: 'var(--status-warning)', fill: 'var(--status-warning)' }}
+                      aria-hidden
+                  />
+              ),
+          }
+        : undefined;
 
     /** Merge a param patch onto the current filters and reload the queue. A
      *  filter change drops the page cursor (not in `filters`) → back to page 1. */
@@ -925,7 +976,14 @@ export default function ItIndex({
                     onLog={() => setModal({ type: 'ticket' })}
                 />
 
-                <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
+                <HrTabs
+                    value={tab}
+                    onChange={setTab}
+                    items={tabItems}
+                    ariaLabel="IT views"
+                    onItemContextMenu={tabMenu}
+                    decorations={tabDecorations}
+                />
 
                 {/* ── Overview (agents) ── */}
                 {can.view && tab === 'overview' && overview && summary.tickets && (
