@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
+use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\SignatureRequestedNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -177,8 +178,32 @@ class ESignatureService
      */
     public function nudge(HrDocumentSignature $signature): void
     {
-        if ($signature->status === 'pending') {
-            $signature->update(['reminder_sent_at' => now()]);
+        if ($signature->status !== 'pending') {
+            return;
+        }
+
+        $signature->update(['reminder_sent_at' => now()]);
+
+        // Actually deliver the reminder. Previously nudge() only stamped the
+        // timestamp, so the controller's "Reminder sent to signer" flash was a
+        // no-op and SignatureReminderNotification had no caller at all.
+        $signer = $signature->signer ?? User::find($signature->signer_user_id);
+        if (! $signer) {
+            return;
+        }
+
+        try {
+            $signer->notify(new SignatureReminderNotification([
+                'signature_id' => $signature->id,
+                'document_title' => $signature->document?->title ?? 'a document',
+                'due_at' => $signature->due_at?->toDateString(),
+            ]));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send signature reminder notification', [
+                'signature_id' => $signature->id,
+                'signer_user_id' => $signature->signer_user_id,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 
@@ -197,7 +222,30 @@ class ESignatureService
             'reminder_sent_at' => null,
         ]);
 
-        return $signature->fresh();
+        $fresh = $signature->fresh();
+
+        // Re-notify the signer that the document is waiting again. resend() was
+        // previously a silent status flip, so the "Signature request resent"
+        // flash reached no one.
+        $signer = $fresh->signer ?? User::find($fresh->signer_user_id);
+        if ($signer) {
+            try {
+                $signer->notify(new SignatureRequestedNotification([
+                    'signature_id' => $fresh->id,
+                    'document_title' => $fresh->document?->title ?? 'a document',
+                    'due_at' => $fresh->due_at?->toDateString(),
+                    'message' => $fresh->message,
+                ]));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send signature resend notification', [
+                    'signature_id' => $fresh->id,
+                    'signer_user_id' => $fresh->signer_user_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $fresh;
     }
 
     /**
