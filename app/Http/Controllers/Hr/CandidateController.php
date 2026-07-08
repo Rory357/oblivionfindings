@@ -1710,6 +1710,10 @@ class CandidateController extends Controller
                     ]);
 
                     $this->notifyHiringManagerOfHire($application, $candidate);
+                    // Welcome the new hire on the auto-accept path too — not only
+                    // via the manual Convert action, or the primary flow (accept →
+                    // auto-convert) would provision + onboard them but never say hello.
+                    $this->sendNewHireWelcome($candidate, $offer);
 
                     return redirect()->back()->with('success', 'Offer accepted — employee profile created and onboarding started.');
                 } catch (\Throwable $exception) {

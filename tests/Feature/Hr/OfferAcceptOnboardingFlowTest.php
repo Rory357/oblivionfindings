@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Role;
 use App\Models\Site;
@@ -130,4 +131,55 @@ test('accepting an offer still succeeds when no onboarding template matches', fu
     expect(
         HrOnboardingChecklist::query()->where('employee_profile_id', $profile->id)->count()
     )->toBe(0);
+});
+
+/*
+ * Seam S12 — Recruitment → Onboarding. The profile + onboarding-checklist halves
+ * of the auto-convert chain are proven above; these close the remaining two
+ * downstream effects the seam contract promises ("provision the employee +
+ * start onboarding + welcome them"):
+ *   (a) a User login is minted for the new hire (EmployeeIntakeService::intake), and
+ *   (d) the branded NewHireWelcomeNotification reaches the candidate's personal
+ *       inbox on the AUTO-ACCEPT path — the primary flow — not only via the manual
+ *       Convert action (F-77: sendNewHireWelcome was wired into CandidateController
+ *       ::convertToEmployee but not the respondOffer accept branch, so an accepted
+ *       candidate was provisioned + onboarded but never welcomed).
+ */
+test('accepting an offer mints the new-hire user login (User door of the intake seam)', function () {
+    seedOnboardingTemplate($this->hr->id);
+    $email = 'flow.userlogin@example.test';
+    $offer = makeSentOffer($this->hr, $this->site, $email);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/recruitment/offers/{$offer->id}/respond", ['response' => 'accepted'])
+        ->assertSessionHas('success');
+
+    // The work email defaults to the candidate's personal email (offer carries no
+    // work_email), so the provisioned login is keyed on it.
+    $user = User::query()->where('email', $email)->first();
+    expect($user)->not->toBeNull();
+    expect($user->role)->toBe('support_worker');
+    expect($user->approved_at)->not->toBeNull();
+
+    // …and the profile links back to that very user (one intake, one login).
+    $profile = HrEmployeeProfile::query()->where('candidate_id', $offer->application->candidate_id)->firstOrFail();
+    expect($profile->user_id)->toBe($user->id);
+});
+
+test('accepting an offer sends the branded new-hire welcome on the auto-accept path (F-77)', function () {
+    seedOnboardingTemplate($this->hr->id);
+    $email = 'flow.welcome@example.test';
+    $offer = makeSentOffer($this->hr, $this->site, $email);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/recruitment/offers/{$offer->id}/respond", ['response' => 'accepted'])
+        ->assertSessionHas('success');
+
+    // The welcome is an on-demand mail notification routed to the candidate's
+    // personal inbox — proven sent from the accept branch itself, not the manual
+    // Convert action (which the auto-accept flow never reaches).
+    Notification::assertSentOnDemand(
+        NewHireWelcomeNotification::class,
+        fn ($notification, $channels, $notifiable) => ($notifiable->routes['mail'] ?? null) === $email,
+    );
 });
