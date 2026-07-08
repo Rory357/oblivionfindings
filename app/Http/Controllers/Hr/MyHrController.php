@@ -700,6 +700,7 @@ class MyHrController extends Controller
             ->get()
             ->map(fn (HrCourseAssignment $a) => [
                 'id' => $a->id,
+                'course_id' => $a->course?->id,
                 'course_title' => $a->course?->title ?? 'Training course',
                 'course_category' => $a->course?->category,
                 'delivery_method' => $a->course?->delivery_method,
@@ -721,6 +722,7 @@ class MyHrController extends Controller
             ->get()
             ->map(fn (HrCourseEnrollment $e) => [
                 'id' => $e->id,
+                'course_id' => $e->course?->id,
                 'course_title' => $e->course?->title ?? 'Training course',
                 'course_category' => $e->course?->category,
                 'delivery_method' => $e->course?->delivery_method,

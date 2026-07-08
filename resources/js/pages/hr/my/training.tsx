@@ -43,6 +43,7 @@ interface ComplianceStatus {
 
 interface TrainingAssignment {
     id: number;
+    course_id: number | null;
     course_title: string;
     course_category: string | null;
     delivery_method: string | null;
@@ -54,6 +55,7 @@ interface TrainingAssignment {
 
 interface TrainingEnrolment {
     id: number;
+    course_id: number | null;
     course_title: string;
     course_category: string | null;
     delivery_method: string | null;
@@ -198,11 +200,9 @@ export default function MyTraining({
                         </p>
                     </div>
                     <div className="space-y-3">
-                        {assignments.map((a) => (
-                            <Card
-                                key={`assignment-${a.id}`}
-                                className="overflow-hidden transition-all hover:shadow-sm"
-                            >
+                        {assignments.map((a) => {
+                            const body = (
+                            <Card className="overflow-hidden transition-all hover:shadow-sm">
                                 <div
                                     className="h-0.5"
                                     style={{
@@ -268,12 +268,22 @@ export default function MyTraining({
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
-                        {enrolments.map((e) => (
-                            <Card
-                                key={`enrolment-${e.id}`}
-                                className="overflow-hidden transition-all hover:shadow-sm"
-                            >
+                            );
+                            return can.viewCatalog && a.course_id ? (
+                                <Link
+                                    key={`assignment-${a.id}`}
+                                    href={`/hr/training/courses/${a.course_id}`}
+                                    className="block rounded-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                    {body}
+                                </Link>
+                            ) : (
+                                <div key={`assignment-${a.id}`}>{body}</div>
+                            );
+                        })}
+                        {enrolments.map((e) => {
+                            const body = (
+                            <Card className="overflow-hidden transition-all hover:shadow-sm">
                                 <div
                                     className="h-0.5"
                                     style={{ backgroundColor: 'var(--primary)' }}
@@ -322,7 +332,19 @@ export default function MyTraining({
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
+                            );
+                            return can.viewCatalog && e.course_id ? (
+                                <Link
+                                    key={`enrolment-${e.id}`}
+                                    href={`/hr/training/courses/${e.course_id}`}
+                                    className="block rounded-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                    {body}
+                                </Link>
+                            ) : (
+                                <div key={`enrolment-${e.id}`}>{body}</div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
