@@ -6,6 +6,7 @@ import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import {
     ItWizard,
+    KbPreview,
     type AssetOption,
     type AssigneeOption,
     type EmployeeOption,
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
@@ -62,6 +64,8 @@ import {
     RotateCcw,
     Search,
     Server,
+    ThumbsDown,
+    ThumbsUp,
     Ticket,
     Timer,
     UserCog,
@@ -145,6 +149,18 @@ interface MyTicketRow {
     resolved: string | null;
 }
 
+/** A published KB article as browsed by a requester (§I). */
+interface KbPublishedRow {
+    id: number;
+    title: string;
+    category: string;
+    body: string | null;
+    views: number;
+    helpful_yes: number;
+    helpful_no: number;
+    helpful_percent: number | null;
+}
+
 interface Props {
     /** Agent-only props — absent from self-service (requester) payloads. */
     requests?: Paginated<RequestRow> | null;
@@ -163,6 +179,8 @@ interface Props {
     slaPolicies?: SlaPolicyGrid | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
+    /** Published KB articles for a requester's browse tab (§I). */
+    kbPublished?: KbPublishedRow[];
     summary: Summary;
     can: { view: boolean; manage: boolean; request: boolean; edit_sla?: boolean };
 }
@@ -257,6 +275,7 @@ export default function ItIndex({
     overview,
     slaPolicies,
     myTickets,
+    kbPublished = [],
     summary,
     can,
 }: Props) {
@@ -317,6 +336,11 @@ export default function ItIndex({
                       tone: 'success',
                       badge: summary.my.waiting,
                   },
+                  // Requester-only Knowledge browse — agents get the manage
+                  // version in their own (can.view) Knowledge tab above.
+                  ...(!can.view
+                      ? [{ id: 'knowledge', label: 'Knowledge', icon: BookOpen, tone: 'primary' as const }]
+                      : []),
               ] as HrTabItem[])
             : []),
     ];
@@ -402,6 +426,57 @@ export default function ItIndex({
     const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
     const [bulkBusy, setBulkBusy] = useState(false);
     const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
+
+    /* ---------------- requester KB browse (§I) ---------------- */
+    const [readerArticle, setReaderArticle] = useState<KbPublishedRow | null>(null);
+    const [kbSearch, setKbSearch] = useState('');
+    const [kbCategory, setKbCategory] = useState<string>(ALL);
+    // One-vote-per-article guard is client-side (localStorage), fine for v1.
+    const [votedKb, setVotedKb] = useState<Set<number>>(() => {
+        try {
+            return new Set<number>(JSON.parse(localStorage.getItem('it.kb.voted') ?? '[]'));
+        } catch {
+            return new Set<number>();
+        }
+    });
+
+    const filteredKb = kbPublished.filter((a) => {
+        const q = kbSearch.trim().toLowerCase();
+        return (
+            (kbCategory === ALL || a.category === kbCategory) &&
+            (q === '' || a.title.toLowerCase().includes(q) || (a.body ?? '').toLowerCase().includes(q))
+        );
+    });
+
+    /** Open the reader and count the read (server guards published + tenant). */
+    const openArticle = (a: KbPublishedRow) => {
+        setReaderArticle(a);
+        router.post(`/it/kb/${a.id}/view`, {}, { preserveScroll: true, preserveState: true, only: ['kbPublished'] });
+    };
+
+    const voteHelpful = (a: KbPublishedRow, helpful: boolean) => {
+        if (votedKb.has(a.id)) return;
+        router.post(
+            `/it/kb/${a.id}/helpful`,
+            { helpful },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['kbPublished'],
+                onSuccess: (page) => {
+                    const flash = page.props.flash as { success?: string } | undefined;
+                    if (flash?.success) toast.success(flash.success);
+                },
+            },
+        );
+        const next = new Set(votedKb).add(a.id);
+        setVotedKb(next);
+        try {
+            localStorage.setItem('it.kb.voted', JSON.stringify([...next]));
+        } catch {
+            /* private mode — best effort */
+        }
+    };
 
     /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
     const runBulkTo = (
@@ -654,6 +729,50 @@ export default function ItIndex({
                 onClose={() => setModal(null)}
             />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
+
+            {/* KB reader (requester browse) */}
+            <Dialog open={readerArticle !== null} onOpenChange={(open) => !open && setReaderArticle(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{readerArticle?.title}</DialogTitle>
+                    </DialogHeader>
+                    {readerArticle ? (
+                        <div className="space-y-4">
+                            <StatusBadge variant="info" size="sm">
+                                {label(readerArticle.category)}
+                            </StatusBadge>
+                            <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/30 p-4">
+                                <KbPreview body={readerArticle.body ?? ''} />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                <span className="text-[13px] font-medium">Was this helpful?</span>
+                                {votedKb.has(readerArticle.id) ? (
+                                    <span className="text-[13px] text-muted-foreground">
+                                        Thanks — that helps us tune the knowledge base.
+                                    </span>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => voteHelpful(readerArticle, true)}
+                                        >
+                                            <ThumbsUp className="h-3.5 w-3.5" /> Yes
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => voteHelpful(readerArticle, false)}
+                                        >
+                                            <ThumbsDown className="h-3.5 w-3.5" /> No
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog open={confirmBulkClose} onOpenChange={setConfirmBulkClose}>
                 <AlertDialogContent>
@@ -1469,6 +1588,73 @@ export default function ItIndex({
                                 />
                             ) : null}
                         </div>
+                    </>
+                )}
+
+                {/* ── Knowledge browse (requesters) ── */}
+                {!can.view && can.request && tab === 'knowledge' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="search"
+                                    value={kbSearch}
+                                    onChange={(e) => setKbSearch(e.target.value)}
+                                    placeholder="Search the knowledge base…"
+                                    aria-label="Search articles"
+                                    className="h-8 w-[260px] rounded-md border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                            </div>
+                            <FilterSelect
+                                ariaLabel="Filter by category"
+                                value={kbCategory}
+                                onChange={setKbCategory}
+                                allLabel="All categories"
+                                options={TICKET_CATEGORIES}
+                            />
+                        </div>
+
+                        {filteredKb.length === 0 ? (
+                            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title={kbPublished.length === 0 ? 'No articles yet' : 'No matches'}
+                                    blurb={
+                                        kbPublished.length === 0
+                                            ? 'IT will publish fixes here — check back, or raise a ticket and they’ll sort it.'
+                                            : 'Nothing matches your search. Try a different word or category.'
+                                    }
+                                />
+                            </div>
+                        ) : (
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {filteredKb.map((a) => (
+                                    <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => openArticle(a)}
+                                        className="flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
+                                    >
+                                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-primary">
+                                            <BookOpen className="h-4 w-4" />
+                                        </span>
+                                        <span className="mt-2 text-[14px] font-semibold">{a.title}</span>
+                                        <span className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
+                                            {(a.body ?? '').replace(/[#>*\-\n]+/g, ' ').trim()}
+                                        </span>
+                                        <span className="mt-3 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                                            <StatusBadge variant="info" size="sm">
+                                                {label(a.category)}
+                                            </StatusBadge>
+                                            {a.helpful_percent != null ? (
+                                                <span>{a.helpful_percent}% helpful</span>
+                                            ) : null}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </>
                 )}
             </div>

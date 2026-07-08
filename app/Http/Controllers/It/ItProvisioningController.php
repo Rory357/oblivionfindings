@@ -93,6 +93,9 @@ class ItProvisioningController extends Controller
         return Inertia::render('it/index', [
             ...$agentProps,
             'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user->id) : [],
+            // Requester KB browse (§I) — pure requesters only; agents browse the
+            // full catalogue in their Knowledge tab.
+            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId) : [],
             'summary' => $this->summary($tenantId, $user->id, $isAgent),
             'can' => [
                 'view' => $isAgent,
@@ -1266,6 +1269,38 @@ class ItProvisioningController extends Controller
                 'helpful_percent' => $a->helpfulPercent(),
                 'author' => $a->author?->name,
                 'updated' => $a->updated_at?->diffForHumans(short: true),
+            ])
+            ->all();
+    }
+
+    /**
+     * §I published knowledge-base articles for the requester browse tab —
+     * published only, with the body so the reader renders without a fetch.
+     * Guarded so a pre-migration read renders an empty browse.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function kbPublished(int $tenantId): array
+    {
+        if (! Schema::hasTable('it_kb_articles')) {
+            return [];
+        }
+
+        return ItKbArticle::query()
+            ->forTenant($tenantId)
+            ->published()
+            ->orderByDesc('updated_at')
+            ->limit(200)
+            ->get()
+            ->map(fn (ItKbArticle $a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'category' => $a->category,
+                'body' => $a->body,
+                'views' => (int) $a->view_count,
+                'helpful_yes' => (int) $a->helpful_yes,
+                'helpful_no' => (int) $a->helpful_no,
+                'helpful_percent' => $a->helpfulPercent(),
             ])
             ->all();
     }

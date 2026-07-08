@@ -165,6 +165,11 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->middleware('permission:it.view')
         ->name('it.provisioning.export');
 
+    // Knowledge base browse — anyone who can reach /it (it.request or it.view)
+    // reads published articles and votes; the controller guards published + tenant.
+    Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
+    Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
+
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits

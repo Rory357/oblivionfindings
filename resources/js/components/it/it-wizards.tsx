@@ -1373,7 +1373,7 @@ const KB_STATUS_OPTIONS = [
 
 /** A safe, block-level markdown preview: `#`/`##`/`###` headings, `-`/`*`
  *  bullets, blank-line paragraphs. No inline HTML / no dangerouslySetInnerHTML. */
-function KbPreview({ body }: { body: string }) {
+export function KbPreview({ body }: { body: string }) {
     return (
         <div className="space-y-1.5 text-[13px] leading-relaxed">
             {body.split('\n').map((raw, i) => {

@@ -110,3 +110,44 @@ test('the knowledge catalogue reaches agents but never a self-service payload', 
         ->assertOk()
         ->assertInertia(fn ($page) => $page->missing('kbArticles'));
 });
+
+test('pure requesters browse only published articles; agents get the full catalogue instead', function () {
+    ItKbArticle::factory()->published()->create(['title' => 'Reset your password']);
+    ItKbArticle::factory()->create(['title' => 'Secret draft']); // draft — never browsed
+
+    $worker = kbUser('support_worker');
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('kbPublished', 1)->missing('kbArticles'));
+
+    // Agents get the management catalogue (both), not the requester browse list.
+    $this->actingAs($this->hr)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('kbArticles', 2)->has('kbPublished', 0));
+});
+
+test('a requester reads and votes on a published article; the tallies climb', function () {
+    $article = ItKbArticle::factory()->published()->create();
+    $worker = kbUser('support_worker');
+
+    $this->actingAs($worker)->post("/it/kb/{$article->id}/view")->assertRedirect();
+    expect($article->fresh()->view_count)->toBe(1);
+
+    $this->actingAs($worker)->post("/it/kb/{$article->id}/helpful", ['helpful' => true])->assertRedirect();
+    $this->actingAs($worker)->post("/it/kb/{$article->id}/helpful", ['helpful' => false])->assertRedirect();
+    $article->refresh();
+    expect($article->helpful_yes)->toBe(1);
+    expect($article->helpful_no)->toBe(1);
+});
+
+test('browse endpoints never touch a draft article', function () {
+    $draft = ItKbArticle::factory()->create(); // draft
+    $worker = kbUser('support_worker');
+
+    $this->actingAs($worker)->post("/it/kb/{$draft->id}/view")->assertNotFound();
+    $this->actingAs($worker)->post("/it/kb/{$draft->id}/helpful", ['helpful' => true])->assertNotFound();
+    expect($draft->fresh()->view_count)->toBe(0);
+    expect($draft->fresh()->helpful_yes)->toBe(0);
+});
