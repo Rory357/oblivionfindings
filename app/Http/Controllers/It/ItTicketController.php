@@ -162,6 +162,10 @@ class ItTicketController extends Controller
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
             'assetOptions' => $canManage ? $this->assetOptions() : [],
+            // §I composer deflection: published articles an agent can reference
+            // as they type a reply. Agents (it.view) only — requesters already
+            // met the KB at raise time and their payload stays lean.
+            'kbSuggestions' => $isAgent ? $this->kbSuggestions($tenantId) : [],
             'can' => [
                 'manage' => $canManage,
                 'view' => $isAgent,

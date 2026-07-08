@@ -10,7 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
 import {
     Activity,
+    BookOpen,
     Flag,
+    Lightbulb,
     Lock,
     MessageSquare,
     Paperclip,
@@ -49,6 +51,13 @@ export interface ThreadEvent {
     actor: string | null;
     at: string | null;
     at_human: string | null;
+}
+
+/** A published article the composer can suggest to an agent (§I, agents only). */
+export interface ThreadKbHint {
+    id: number;
+    title: string;
+    category: string;
 }
 
 const label = (raw: string) =>
@@ -134,6 +143,7 @@ export function TicketThread({
     comments,
     events,
     canInternal,
+    kbSuggestions = [],
     compact = false,
     onPosted,
 }: {
@@ -145,6 +155,8 @@ export function TicketThread({
     comments: ThreadComment[];
     events: ThreadEvent[];
     canInternal: boolean;
+    /** Published articles for the composer's "Suggest from Knowledge" (agents only). */
+    kbSuggestions?: ThreadKbHint[];
     compact?: boolean;
     /** Drawer hosts pass a refetch — their snapshot doesn't refresh via Inertia props. */
     onPosted?: () => void;
@@ -156,6 +168,31 @@ export function TicketThread({
         is_internal: false,
         attachments: [],
     });
+
+    // §I deflection: as the agent types, match published articles on the words
+    // they're using (≥3-letter tokens) and surface the closest few for
+    // insertion. Empty for requesters — the server never sends them the list.
+    const bodyTokens = form.data.body.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
+    const kbHints = bodyTokens.length
+        ? kbSuggestions
+              .map((a) => ({
+                  a,
+                  score: bodyTokens.filter((t) => a.title.toLowerCase().includes(t)).length,
+              }))
+              .filter((x) => x.score > 0)
+              .sort((x, y) => y.score - x.score)
+              .slice(0, 3)
+              .map((x) => x.a)
+        : [];
+
+    /** Drop a plain-text reference to a guide into the reply — no dead link. */
+    const insertArticle = (title: string) => {
+        const ref = `Related guide: "${title}" — search it in the Knowledge tab.`;
+        if (form.data.body.includes(ref)) return;
+        const base = form.data.body.trimEnd();
+        form.setData('body', base ? `${base}\n\n${ref}` : ref);
+        toast.success(`Referenced "${title}".`);
+    };
 
     const send = () => {
         if (!form.data.body.trim()) return;
@@ -303,6 +340,28 @@ export function TicketThread({
                             }
                             rows={compact ? 2 : 3}
                         />
+                        {kbHints.length ? (
+                            <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-2">
+                                <div className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-primary uppercase">
+                                    <Lightbulb className="h-3 w-3" /> Suggest from Knowledge
+                                </div>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {kbHints.map((a) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- KB suggestion chip, inserts a reference; not button chrome
+                                        <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() => insertArticle(a.title)}
+                                            title={`Insert a reference to "${a.title}"`}
+                                            className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-[11.5px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                                        >
+                                            <BookOpen className="h-3 w-3 flex-none" />
+                                            <span className="min-w-0 truncate">{a.title}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
                         {form.data.attachments.length ? (
                             <div className="mt-2 flex flex-col gap-1.5">
                                 {form.data.attachments.map((file, i) => (

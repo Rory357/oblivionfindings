@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ItKbArticle;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\Role;
@@ -216,6 +217,32 @@ test('the rail can retag category, subcategory and linked asset', function () {
     $this->actingAs($this->worker)
         ->get("/it/tickets/{$ticket->id}")
         ->assertInertia(fn ($page) => $page->has('assetOptions', 0));
+});
+
+test('the composer carries published KB to agents for suggestion, never to requesters', function () {
+    ItKbArticle::factory()->published()->create(['title' => 'Reset your password']);
+    ItKbArticle::factory()->create(['title' => 'Secret runbook']); // draft — never suggested
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+
+    // Agent: the workspace payload carries published articles (drafts excluded).
+    $this->actingAs($this->hr)
+        ->get("/it/tickets/{$ticket->id}")
+        ->assertInertia(fn ($page) => $page
+            ->has('kbSuggestions', 1)
+            ->where('kbSuggestions.0.title', 'Reset your password')
+            ->missing('kbSuggestions.0.body')); // lean — title/category only, never body
+
+    // The requester on their own ticket never receives the suggestion list.
+    $this->actingAs($this->worker)
+        ->get("/it/tickets/{$ticket->id}")
+        ->assertInertia(fn ($page) => $page->has('kbSuggestions', 0));
+
+    // The JSON (drawer) branch mirrors the agent payload.
+    $this->actingAs($this->hr)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'kbSuggestions')
+        ->assertJsonPath('kbSuggestions.0.title', 'Reset your password');
 });
 
 test('watch and unwatch are agent actions recorded on the trail', function () {

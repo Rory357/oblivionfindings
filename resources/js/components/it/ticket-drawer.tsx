@@ -8,6 +8,7 @@ import {
     type ThreadAttachment,
     type ThreadComment,
     type ThreadEvent,
+    type ThreadKbHint,
 } from '@/components/it/ticket-thread';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +41,7 @@ interface PeekPayload {
     };
     comments: ThreadComment[];
     events: ThreadEvent[];
+    kbSuggestions?: ThreadKbHint[];
     can: { internal: boolean };
 }
 
@@ -154,6 +156,7 @@ export function TicketDrawer({
                         comments={data.comments}
                         events={data.events}
                         canInternal={data.can.internal}
+                        kbSuggestions={data.kbSuggestions}
                         compact
                         onPosted={fetchTicket}
                     />

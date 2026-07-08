@@ -11,6 +11,7 @@ import {
     type ThreadAttachment,
     type ThreadComment,
     type ThreadEvent,
+    type ThreadKbHint,
 } from '@/components/it/ticket-thread';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,7 @@ interface Props {
     events: ThreadEvent[];
     assignees: { id: number; name: string }[];
     assetOptions: { id: number; name: string; tag: string | null }[];
+    kbSuggestions: ThreadKbHint[];
     can: {
         manage: boolean;
         view: boolean;
@@ -121,6 +123,7 @@ export default function ItTicketShow({
     events,
     assignees,
     assetOptions,
+    kbSuggestions,
     can,
 }: Props) {
     const page = usePage<{ auth?: { user?: { id?: number } } }>();
@@ -294,6 +297,7 @@ export default function ItTicketShow({
                         comments={comments}
                         events={events}
                         canInternal={can.internal}
+                        kbSuggestions={kbSuggestions}
                     />
 
                     {/* Properties rail */}
