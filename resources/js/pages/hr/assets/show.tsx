@@ -20,7 +20,7 @@ import {
     UserCheck,
     Wrench,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { createElement, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -40,6 +40,16 @@ import {
     type EditableAsset,
 } from '@/components/hr/asset-wizards';
 import PageShell from '@/components/page-shell';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -160,7 +170,6 @@ export default function AssetShow({ asset, staff, categories, fleetIncidents, ca
 
     const [tab, setTab] = useState<DetailTab>('details');
     const [modal, setModal] = useState<AssetModal | null>(null);
-    const Icon = categoryIcon(asset.category);
 
     const editable: EditableAsset = {
         id: asset.id,
@@ -205,7 +214,7 @@ export default function AssetShow({ asset, staff, categories, fleetIncidents, ca
                     </button>
                     <div className="flex flex-wrap items-start gap-4">
                         <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl border border-primary-foreground/20 bg-primary-foreground/15">
-                            <Icon className="h-7 w-7" />
+                            {createElement(categoryIcon(asset.category), { className: 'h-7 w-7' })}
                         </span>
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2.5">
@@ -515,6 +524,8 @@ function DocumentsTab({ asset, canManage }: { asset: AssetDetail; canManage: boo
         });
     };
 
+    const [confirmDoc, setConfirmDoc] = useState<{ id: number; title: string } | null>(null);
+
     const remove = (id: number) =>
         router.delete(`/hr/assets/documents/${id}`, { preserveScroll: true });
 
@@ -571,7 +582,7 @@ function DocumentsTab({ asset, canManage }: { asset: AssetDetail; canManage: boo
                                 </div>
                                 <a href={`/hr/assets/documents/${d.id}/download`} className="rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold hover:bg-accent">Download</a>
                                 {canManage ? (
-                                    <button type="button" onClick={() => remove(d.id)} aria-label="Remove document" className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical">
+                                    <button type="button" onClick={() => setConfirmDoc({ id: d.id, title: d.title })} aria-label="Remove document" className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical">
                                         <Trash2 className="h-4 w-4" />
                                     </button>
                                 ) : null}
@@ -580,6 +591,30 @@ function DocumentsTab({ asset, canManage }: { asset: AssetDetail; canManage: boo
                     </div>
                 )}
             </Panel>
+
+            <AlertDialog open={confirmDoc !== null} onOpenChange={(open) => !open && setConfirmDoc(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove this document?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {confirmDoc
+                                ? `“${confirmDoc.title}” will be permanently deleted, including the stored file. This can’t be undone.`
+                                : ''}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (confirmDoc) remove(confirmDoc.id);
+                                setConfirmDoc(null);
+                            }}
+                        >
+                            Remove document
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

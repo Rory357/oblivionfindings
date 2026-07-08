@@ -343,7 +343,7 @@ function OverviewTab({
         { label: 'Available', value: hero.available, sub: 'ready to issue', icon: CheckCircle2, tone: 'var(--status-success)', bg: 'var(--status-success-bg)' },
         { label: 'In maintenance', value: hero.maintenance, sub: 'open jobs', icon: Wrench, tone: 'var(--status-warning)', bg: 'var(--status-warning-bg)' },
         { label: 'HR-owned value', value: nzd(hero.owned_value), sub: 'purchase cost', icon: FileText, tone: 'var(--category-fleet)', bg: 'color-mix(in oklch, var(--category-fleet) 12%, transparent)' },
-        { label: 'Warranties ≤30d', value: hero.warranties_30d, sub: `${hero.warranties_90d} within 90 days`, icon: AlertTriangle, tone: 'oklch(0.7 0.15 70)', bg: 'color-mix(in oklch, oklch(0.82 0.145 88) 18%, transparent)' },
+        { label: 'Warranties ≤30d', value: hero.warranties_30d, sub: `${hero.warranties_90d} within 90 days`, icon: AlertTriangle, tone: 'var(--status-warning)', bg: 'var(--status-warning-bg)' },
     ];
 
     const catEntries = Object.entries(hero.category_mix).sort((a, b) => b[1] - a[1]);
