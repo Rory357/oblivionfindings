@@ -197,7 +197,8 @@ export default function ItTicketShow({
                                         type="button"
                                         onClick={copyReference}
                                         title="Copy reference"
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[13px] font-bold tracking-wide text-white/90 hover:bg-white/20"
+                                        aria-label={`Copy reference ${ticket.reference}`}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[13px] font-bold tracking-wide text-white/90 hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none"
                                     >
                                         {ticket.reference}
                                         <Copy className="h-3 w-3" />
@@ -529,7 +530,7 @@ export default function ItTicketShow({
                                         .writeText(window.location.href)
                                         .then(() => toast.success('Link copied.'));
                                 }}
-                                className="text-[12px] font-semibold text-primary hover:underline"
+                                className="rounded text-[12px] font-semibold text-primary hover:underline focus-visible:underline focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                             >
                                 Copy link to this ticket
                             </button>
