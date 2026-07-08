@@ -35,6 +35,7 @@ type ApprovalInstance = {
 type Props = {
     instances: {
         data: ApprovalInstance[];
+        total: number;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     can: { manage: boolean };
@@ -96,7 +97,7 @@ export default function PendingApprovals({ instances, can }: Props) {
                         title="Pending Approvals"
                         description="Review and action pending approval requests."
                         stats={[
-                            { label: 'Pending', value: instances.data.length },
+                            { label: 'Pending', value: instances.total },
                         ]}
                         actions={
                             can.manage ? (

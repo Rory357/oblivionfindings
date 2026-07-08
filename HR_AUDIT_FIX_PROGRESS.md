@@ -58,7 +58,7 @@
 | 19 | Wellbeing | `/hr/wellbeing` | ✅ | §7.5 STALE (loop fully wired: triage+EAP+check-in+plans, self-auditing). F-65 fixed: action-plan owner now notified at assignment. Redesign-scoped items deferred ↗ |
 | 20 | Cases | `/hr/cases` | ✅ | F-66 fixed: dead `HrCaseUpdateNotification` wired — case assignee now notified on assignment/reassignment. Model has AuditableChanges; pages clean (no native dialogs) |
 | 21 | Assets | `/hr/assets` | ✅ | Gold-std service/controller (guarded transitions, Fleet federation, wired notifications). F-67 fixed: doc-delete now confirms (was 1-click unrecoverable); F-68: raw oklch tile→status-warning token; + incidental react-hooks/static-components lint fixed |
-| 22 | Approvals inbox | `/hr/approvals` | ⬜ | |
+| 22 | Approvals inbox | `/hr/approvals` | ✅ | F-69 fixed: hero "Pending" count was current-page length (lied >20) → server `total`. `action` catches LogicException→flash. Spine gap = D-1 (Chane); deep-link + polish noted |
 | 23 | Signatures | `/hr/signatures` | ⬜ | |
 | 24 | Analytics/reports/headcount/succession/import-export | various | ⬜ | |
 | 25 | Settings + audit log | `/hr/settings/*` | ⬜ | |
@@ -327,6 +327,17 @@
 - **Incidental (fixed, per fix-incidental-issues): `react-hooks/static-components` lint error** in `show.tsx` — the pre-existing detail header did `const Icon = categoryIcon(asset.category)` + `<Icon/>` (the rule flags a PascalCase component bound in render). Surfaced because this is the first slice to touch the file. Fixed with the codebase's own established idiom (`createElement(categoryIcon(...), { className })`, mirroring `checklists/primitives.tsx:277`), not a disable.
 
 **Run 21 gates:** types ✅ 0 errors · eslint ✅ 0 errors (2 files) · build ✅ exit 0 (2m48s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly** (my-day ×4, app-sidebar ×1, resident-tracking ×1, behaviour-abc-tab ×2), zero new failures, none in assets pages. **pest N/A — zero PHP files changed** (frontend-only slice; PHP suite byte-identical to the Run 20 green baseline).
+
+## Run 22 findings (Slice 22 — Approvals inbox `/hr/approvals`)
+
+- **F-69 🟠 fixed — the hero "Pending" KPI counted only the current page, not the true total.** `pending.tsx` set `stats={[{ label: 'Pending', value: instances.data.length }]}` — `instances.data` is the `paginate(20)` page (≤20 rows), so with >20 pending the hero silently under-reported (the exact page-only-count bug the `AssetService::aggregates` comment calls out). §4A: counts must be server-side and must not lie. Fix: read the paginator's server-side `total` (`instances.total`) — already emitted by Laravel's `LengthAwarePaginator` and read the same way elsewhere (`leave/index.tsx:652`, `offboarding/index.tsx`). Typed `total: number` on the `instances` prop. Frontend-only, 2-line diff.
+- **Verified green:** `ApprovalController::action` wraps `ApprovalWorkflowService::processAction` in `try/catch (\LogicException) → back()->with('error')` (graceful, no 500); approve/reject/escalate all validated + reachable; chains CRUD is `hr.approvals.manage`-gated and tenant-scoped; the action UI uses an inline review panel (notes textarea + Approve/Reject/Cancel), no native `confirm()`.
+- **Deferred ↗ D-1 (the S14 spine decision — Chane's call, do NOT migrate unilaterally):**
+  - The pending inbox lists **only** `HrApprovalInstance` rows, and `storeChain`/`chains` only offer `process_type ∈ {leave, expense, timesheet, document}`. Leave→`HrLeaveApprovalChain`, expenses→inline service, recruitment offers/jobs→recruitment-local notify flows — none create `HrApprovalInstance`, so **the inbox is architecturally near-empty in practice**. This is D-1's core; the fix is the migration decision, not a UI patch.
+  - **Dead-end (blocked on D-1):** the "Item" column renders bare `{approvable_type} #{id}` text with **no deep-link** to the underlying leave/expense/document record — an approver actions blind. Building the type→route deep-link only makes sense once the spine actually populates the inbox (per D-1), so it's coupled to that decision, not fixed here.
+- **Noted 🟡 (not fixed — below the smallest-honest-fix bar / redesign-adjacent):** `initiated_at` renders as a raw `Y-m-d H:i:s` string (not en-NZ formatted — parsing that non-ISO format client-side is browser-flaky, wants a controller-side ISO/format change); the empty state is bare centred text ("No pending approvals.") rather than a designed icon+CTA; the page uses generic `PageHero` (`category="hr"`) rather than a specialised `ApprovalsHero`.
+
+**Run 22 gates:** types ✅ 0 errors · eslint ✅ 0 errors · build ✅ exit 0 (2m46s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly**, zero new failures. **pest N/A — zero PHP files changed** (frontend-only slice).
 
 ## Decisions needed (Chane)
 
