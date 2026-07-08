@@ -5,6 +5,7 @@
  * reviewed modal ending in a success pane. */
 import { router, useForm } from '@inertiajs/react';
 import {
+    BookOpen,
     CheckCircle2,
     ClipboardCheck,
     FileText,
@@ -117,6 +118,22 @@ export interface EmployeeOption {
     name: string;
 }
 
+/** A knowledge-base article row for the agent Knowledge tab (§I). */
+export interface KbRow {
+    id: number;
+    title: string;
+    slug: string;
+    category: string;
+    status: string;
+    body: string | null;
+    views: number;
+    helpful_yes: number;
+    helpful_no: number;
+    helpful_percent: number | null;
+    author: string | null;
+    updated: string | null;
+}
+
 export type ItModal =
     | { type: 'ticket'; provisioning?: { id: number; item: string } }
     | { type: 'raise' }
@@ -125,6 +142,7 @@ export type ItModal =
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow }
     | { type: 'new-request' }
+    | { type: 'kb'; article?: KbRow }
     | { type: 'sla' };
 
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
@@ -177,6 +195,8 @@ export function ItWizard({
                     onClose={onClose}
                 />
             );
+        case 'kb':
+            return <KbArticleDialog article={modal.article} onClose={onClose} />;
         case 'raise':
             return <RaiseTicketDialog onClose={onClose} />;
         case 'sla':
@@ -1332,6 +1352,261 @@ export function SlaPolicyDialog({
                     </InfoCard>
                 </div>
             </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  KB article (agent, 3 steps: Basics → Content → Review)            */
+/* ================================================================== */
+
+const KB_STEPS: readonly WizardStep[] = [
+    { key: 'basics', label: 'Basics', blurb: 'Title & category', icon: FileText },
+    { key: 'content', label: 'Content', blurb: 'Write & preview', icon: BookOpen },
+    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+];
+
+const KB_STATUS_OPTIONS = [
+    { value: 'draft', label: 'Draft — only agents see it' },
+    { value: 'published', label: 'Published — staff can find it' },
+];
+
+/** A safe, block-level markdown preview: `#`/`##`/`###` headings, `-`/`*`
+ *  bullets, blank-line paragraphs. No inline HTML / no dangerouslySetInnerHTML. */
+function KbPreview({ body }: { body: string }) {
+    return (
+        <div className="space-y-1.5 text-[13px] leading-relaxed">
+            {body.split('\n').map((raw, i) => {
+                const line = raw.trim();
+                if (line === '') return <div key={i} className="h-1.5" aria-hidden />;
+                if (line.startsWith('### ')) return <div key={i} className="text-[13px] font-bold">{line.slice(4)}</div>;
+                if (line.startsWith('## ')) return <div key={i} className="text-[14px] font-bold">{line.slice(3)}</div>;
+                if (line.startsWith('# ')) return <div key={i} className="text-[15px] font-bold">{line.slice(2)}</div>;
+                if (/^[-*]\s/.test(line)) {
+                    return (
+                        <div key={i} className="flex gap-2">
+                            <span aria-hidden className="text-muted-foreground">•</span>
+                            <span>{line.replace(/^[-*]\s/, '')}</span>
+                        </div>
+                    );
+                }
+                return <p key={i}>{line}</p>;
+            })}
+        </div>
+    );
+}
+
+function KbArticleDialog({ article, onClose }: { article?: KbRow; onClose: () => void }) {
+    const editing = Boolean(article);
+    const wizard = useWizard(KB_STEPS.length);
+    const [done, setDone] = useState(false);
+
+    const form = useForm({
+        title: article?.title ?? '',
+        category: article?.category ?? 'hardware',
+        status: article?.status ?? 'draft',
+        body: article?.body ?? '',
+    });
+
+    const basicsValid = form.data.title.trim().length > 0;
+    const contentValid = form.data.body.trim().length > 0;
+
+    const afterSave = (addAnother: boolean) => {
+        toast.success(
+            editing
+                ? 'Article updated.'
+                : form.data.status === 'published'
+                  ? 'Article published.'
+                  : 'Draft saved.',
+        );
+        if (addAnother && !editing) {
+            form.reset();
+            wizard.goTo(0);
+        } else {
+            setDone(true);
+        }
+    };
+
+    const submit = (addAnother = false) => {
+        if (editing) {
+            form.patch(`/it/kb/${article!.id}`, {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const err = pageFlashError(page);
+                    if (err) {
+                        toast.error(err);
+                        return;
+                    }
+                    afterSave(addAnother);
+                },
+            });
+        } else {
+            form.post('/it/kb', {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const err = pageFlashError(page);
+                    if (err) {
+                        toast.error(err);
+                        return;
+                    }
+                    afterSave(addAnother);
+                },
+            });
+        }
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title={editing ? 'Edit article' : 'New KB article'}
+            description="Write it once, deflect the ticket every time after."
+            railIcon={BookOpen}
+            railTitle="Knowledge"
+            railSub="IT helpdesk"
+            steps={KB_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title={editing ? 'Article saved' : form.data.status === 'published' ? 'Article published' : 'Draft saved'}
+                        blurb={
+                            <>
+                                “{form.data.title}” is in the knowledge base
+                                {form.data.status === 'published' ? ' and staff can find it now' : ' as a draft'}.
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={
+                wizard.isFirst ? null : (
+                    <Button variant="outline" onClick={wizard.back}>
+                        Back
+                    </Button>
+                )
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    {wizard.isLast ? (
+                        <>
+                            {!editing ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => submit(true)}
+                                    disabled={form.processing || !basicsValid || !contentValid}
+                                >
+                                    Save & add another
+                                </Button>
+                            ) : null}
+                            <Button
+                                onClick={() => submit(false)}
+                                disabled={form.processing || !basicsValid || !contentValid}
+                            >
+                                {form.processing
+                                    ? 'Saving…'
+                                    : editing
+                                      ? 'Save changes'
+                                      : form.data.status === 'published'
+                                        ? 'Publish'
+                                        : 'Save draft'}
+                            </Button>
+                        </>
+                    ) : (
+                        <Button
+                            onClick={wizard.next}
+                            disabled={(wizard.index === 0 && !basicsValid) || (wizard.index === 1 && !contentValid)}
+                        >
+                            Continue
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {wizard.index === 0 && (
+                <WizardStepPane>
+                    <StepHead icon={FileText} title="Basics" blurb="What’s it about, and is it ready to publish?" />
+                    <div className="grid gap-3.5">
+                        <Field label="Title" required error={form.errors.title}>
+                            <Input
+                                value={form.data.title}
+                                onChange={(e) => form.setData('title', e.target.value)}
+                                placeholder="e.g. Reset your work password"
+                                maxLength={255}
+                            />
+                        </Field>
+                        <Field label="Category" error={form.errors.category}>
+                            <TilePicker
+                                value={form.data.category}
+                                onChange={(v) => form.setData('category', v)}
+                                options={[...CATEGORY_OPTIONS]}
+                            />
+                        </Field>
+                        <Field label="Status" error={form.errors.status}>
+                            <SelectInput
+                                value={form.data.status}
+                                onChange={(v) => form.setData('status', v)}
+                                placeholder="Choose a status"
+                                options={KB_STATUS_OPTIONS}
+                            />
+                        </Field>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 1 && (
+                <WizardStepPane>
+                    <StepHead icon={BookOpen} title="Content" blurb="Markdown on the left, live preview on the right." />
+                    <div className="grid gap-3 lg:grid-cols-2">
+                        <Field label="Article (markdown)" required error={form.errors.body}>
+                            <Textarea
+                                value={form.data.body}
+                                onChange={(e) => form.setData('body', e.target.value)}
+                                placeholder={'# Steps\n1. Open the portal\n2. Click Forgot password\n\n- Check spam for the reset email'}
+                                rows={14}
+                                className="font-mono text-[12.5px]"
+                            />
+                        </Field>
+                        <div>
+                            <div className="mb-1.5 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                Preview
+                            </div>
+                            <div className="min-h-[20rem] rounded-xl border border-border bg-muted/30 p-3.5">
+                                {form.data.body.trim() ? (
+                                    <KbPreview body={form.data.body} />
+                                ) : (
+                                    <p className="text-[13px] text-muted-foreground">Nothing to preview yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 2 && (
+                <WizardStepPane>
+                    <StepHead icon={ClipboardCheck} title="Review & save" blurb="A quick check before it lands in the knowledge base." />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <ReviewCard icon={FileText} title="Basics" onEdit={() => wizard.goTo(0)}>
+                            <ReviewRow label="Title" value={form.data.title} />
+                            <ReviewRow
+                                label="Category"
+                                value={CATEGORY_OPTIONS.find((c) => c.key === form.data.category)?.label}
+                            />
+                            <ReviewRow label="Status" value={form.data.status === 'published' ? 'Published' : 'Draft'} />
+                        </ReviewCard>
+                        <ReviewCard icon={BookOpen} title="Content" onEdit={() => wizard.goTo(1)}>
+                            <ReviewRow label="Length" value={`${form.data.body.trim().length} characters`} />
+                        </ReviewCard>
+                    </div>
+                </WizardStepPane>
+            )}
         </WizardShell>
     );
 }

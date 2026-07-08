@@ -11,6 +11,7 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\BulkProvisioningActionRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
+use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
@@ -86,6 +87,7 @@ class ItProvisioningController extends Controller
             // editing them is admin-gated (can.edit_sla drives the editor button).
             'slaPolicies' => $this->slaPolicyGrid($tenantId),
             'overview' => $this->overview($tenantId),
+            'kbArticles' => $this->kbArticles($tenantId),
         ] : [];
 
         return Inertia::render('it/index', [
@@ -1228,6 +1230,43 @@ class ItProvisioningController extends Controller
                 'at' => $e->created_at?->diffForHumans(short: true),
             ])
             ->values()
+            ->all();
+    }
+
+    /**
+     * §I knowledge-base articles for the agent Knowledge tab — the whole
+     * catalogue (drafts included), newest-edited first. Guarded so a
+     * pre-migration read renders an empty tab. Carries the body so the edit
+     * modal prefills without a second fetch (KB volume is low).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function kbArticles(int $tenantId): array
+    {
+        if (! Schema::hasTable('it_kb_articles')) {
+            return [];
+        }
+
+        return ItKbArticle::query()
+            ->forTenant($tenantId)
+            ->with('author:id,name')
+            ->orderByDesc('updated_at')
+            ->limit(200)
+            ->get()
+            ->map(fn (ItKbArticle $a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'slug' => $a->slug,
+                'category' => $a->category,
+                'status' => $a->status,
+                'body' => $a->body,
+                'views' => (int) $a->view_count,
+                'helpful_yes' => (int) $a->helpful_yes,
+                'helpful_no' => (int) $a->helpful_no,
+                'helpful_percent' => $a->helpfulPercent(),
+                'author' => $a->author?->name,
+                'updated' => $a->updated_at?->diffForHumans(short: true),
+            ])
             ->all();
     }
 

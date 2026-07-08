@@ -94,3 +94,19 @@ test('KB authoring is agent-only and tenant-scoped', function () {
     $this->actingAs($this->hr)->delete("/it/kb/{$mine->id}")->assertRedirect();
     expect(ItKbArticle::query()->find($mine->id))->toBeNull();
 });
+
+test('the knowledge catalogue reaches agents but never a self-service payload', function () {
+    ItKbArticle::factory()->create(['status' => 'published']);
+
+    $this->actingAs($this->hr)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('kbArticles', 1));
+
+    // A self-service requester never receives the agent Knowledge catalogue.
+    $worker = kbUser('support_worker');
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->missing('kbArticles'));
+});

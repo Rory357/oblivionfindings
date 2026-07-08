@@ -10,6 +10,7 @@ import {
     type AssigneeOption,
     type EmployeeOption,
     type ItModal,
+    type KbRow,
     type RequestRow,
     type SlaPolicyGrid,
     type TicketRow,
@@ -43,6 +44,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
+    BookOpen,
     CheckCircle2,
     ChevronDown,
     ChevronsUpDown,
@@ -54,6 +56,7 @@ import {
     LayoutDashboard,
     Mail,
     MoreHorizontal,
+    Pencil,
     Play,
     Plus,
     RotateCcw,
@@ -151,6 +154,8 @@ interface Props {
     employeeOptions?: EmployeeOption[];
     /** Active assets register entries for the Log & triage asset-link picker. */
     assetOptions?: AssetOption[];
+    /** Knowledge-base catalogue for the agent Knowledge tab (§I). */
+    kbArticles?: KbRow[];
     filters?: Filters;
     /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
     overview?: OverviewPayload;
@@ -247,6 +252,7 @@ export default function ItIndex({
     assignees = [],
     employeeOptions = [],
     assetOptions = [],
+    kbArticles = [],
     filters,
     overview,
     slaPolicies,
@@ -292,6 +298,13 @@ export default function ItIndex({
                       badge:
                           (summary.provisioning?.pending ?? 0) +
                           (summary.provisioning?.in_progress ?? 0),
+                  },
+                  {
+                      id: 'knowledge',
+                      label: 'Knowledge',
+                      icon: BookOpen,
+                      tone: 'primary',
+                      badge: kbArticles.length,
                   },
               ] as HrTabItem[])
             : []),
@@ -388,6 +401,7 @@ export default function ItIndex({
     const [confirmBulkClose, setConfirmBulkClose] = useState(false);
     const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
     const [bulkBusy, setBulkBusy] = useState(false);
+    const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
 
     /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
     const runBulkTo = (
@@ -450,6 +464,51 @@ export default function ItIndex({
             },
         });
     };
+
+    /** Delete a KB article (router.delete has no data arg — its own helper). */
+    const runKbDelete = (a: KbRow) => {
+        router.delete(`/it/kb/${a.id}`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const flash = page.props.flash as { error?: string; success?: string } | undefined;
+                if (flash?.error) toast.error(flash.error);
+                else if (flash?.success) toast.success(flash.success);
+            },
+        });
+        setConfirmKbDelete(null);
+    };
+
+    const kbMenu = (a: KbRow) =>
+        ctx.open([
+            {
+                kind: 'item' as const,
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => setModal({ type: 'kb', article: a }),
+            },
+            a.status === 'published'
+                ? {
+                      kind: 'item' as const,
+                      label: 'Unpublish',
+                      icon: RotateCcw,
+                      onSelect: () => act('patch', `/it/kb/${a.id}`, { status: 'draft' }),
+                  }
+                : {
+                      kind: 'item' as const,
+                      label: 'Publish',
+                      icon: CheckCircle2,
+                      tone: 'success' as const,
+                      onSelect: () => act('patch', `/it/kb/${a.id}`, { status: 'published' }),
+                  },
+            { kind: 'divider' as const },
+            {
+                kind: 'item' as const,
+                label: 'Delete',
+                icon: XCircle,
+                tone: 'critical' as const,
+                onSelect: () => setConfirmKbDelete(a),
+            },
+        ]);
 
     /* ---------------- row context menus ---------------- */
 
@@ -629,6 +688,26 @@ export default function ItIndex({
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={() => runProvisioningBulk({ action: 'fulfil' })}>
                             Fulfil requests
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={confirmKbDelete !== null}
+                onOpenChange={(open) => !open && setConfirmKbDelete(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete “{confirmKbDelete?.title}”?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This removes the article from the knowledge base. This can’t be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep it</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => confirmKbDelete && runKbDelete(confirmKbDelete)}>
+                            Delete article
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1287,6 +1366,106 @@ export default function ItIndex({
                                     icon={Inbox}
                                     title="No tickets yet"
                                     blurb="Broken phone? Locked out? Raise it here — IT sees it instantly and you can track progress on this tab."
+                                />
+                            ) : null}
+                        </div>
+                    </>
+                )}
+
+                {/* ── Knowledge base (agents) ── */}
+                {can.view && tab === 'knowledge' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[12.5px] text-muted-foreground">
+                                Articles that deflect repeat tickets — publish the fixes people keep asking for.
+                            </p>
+                            {can.manage ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="ml-auto"
+                                    onClick={() => setModal({ type: 'kb' })}
+                                >
+                                    <BookOpen className="h-3.5 w-3.5" /> New KB article
+                                </Button>
+                            ) : null}
+                        </div>
+
+                        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                            <div className="grid grid-cols-[3fr_1fr_1fr_0.7fr_0.9fr_1fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <span>Title</span>
+                                <span>Category</span>
+                                <span>Status</span>
+                                <span>Views</span>
+                                <span>Helpful</span>
+                                <span>Updated</span>
+                                <span />
+                            </div>
+                            {kbArticles.map((a) => (
+                                <div
+                                    key={a.id}
+                                    onContextMenu={can.manage ? kbMenu(a) : undefined}
+                                    className="grid grid-cols-[3fr_1fr_1fr_0.7fr_0.9fr_1fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                                >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                            <BookOpen className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-[13px] font-semibold">{a.title}</span>
+                                            {a.author ? (
+                                                <span className="block truncate text-[11px] text-muted-foreground">
+                                                    by {a.author}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    </div>
+                                    <span className="truncate text-[12.5px] text-muted-foreground">
+                                        {label(a.category)}
+                                    </span>
+                                    <span>
+                                        <StatusBadge
+                                            variant={a.status === 'published' ? 'success' : 'neutral'}
+                                            size="sm"
+                                        >
+                                            {label(a.status)}
+                                        </StatusBadge>
+                                    </span>
+                                    <span className="text-[12.5px] text-muted-foreground tabular-nums">
+                                        {a.views}
+                                    </span>
+                                    <span className="text-[12.5px] text-muted-foreground tabular-nums">
+                                        {a.helpful_percent != null ? `${a.helpful_percent}%` : '—'}
+                                    </span>
+                                    <span className="text-[12px] text-muted-foreground">{a.updated ?? '—'}</span>
+                                    <span className="flex justify-end">
+                                        {can.manage ? (
+                                            <button
+                                                type="button"
+                                                aria-label={`Actions for ${a.title}`}
+                                                onClick={kbMenu(a)}
+                                                className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </button>
+                                        ) : null}
+                                    </span>
+                                </div>
+                            ))}
+                            {kbArticles.length === 0 ? (
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title="No articles yet"
+                                    blurb={
+                                        can.manage
+                                            ? 'Write the first fix people keep asking for — it deflects the ticket every time after.'
+                                            : 'The knowledge base is empty.'
+                                    }
+                                    action={
+                                        can.manage
+                                            ? { label: 'New KB article', onClick: () => setModal({ type: 'kb' }) }
+                                            : undefined
+                                    }
                                 />
                             ) : null}
                         </div>
