@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,6 +74,10 @@ export default function SavedReports({ reports, sources }: Props) {
         data: Record<string, string>[];
         fields: string[];
     } | null>(null);
+    const [deleteReport, setDeleteReport] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
 
     const handleRun = async (report: SavedReport) => {
         setRunningId(report.id);
@@ -99,10 +113,13 @@ export default function SavedReports({ reports, sources }: Props) {
         window.location.href = `/hr/reports/saved/${reportId}/export`;
     };
 
-    const handleDelete = (reportId: number) => {
-        if (!confirm('Are you sure you want to delete this saved report?'))
-            return;
-        router.delete(`/hr/reports/saved/${reportId}`);
+    const confirmDelete = () => {
+        if (deleteReport) {
+            router.delete(`/hr/reports/saved/${deleteReport.id}`, {
+                preserveScroll: true,
+            });
+        }
+        setDeleteReport(null);
     };
 
     const formatLabel = (field: string) =>
@@ -217,7 +234,10 @@ export default function SavedReports({ reports, sources }: Props) {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() =>
-                                                        handleDelete(report.id)
+                                                        setDeleteReport({
+                                                            id: report.id,
+                                                            name: report.name,
+                                                        })
                                                     }
                                                     className="text-status-critical hover:text-status-critical"
                                                 >
@@ -299,6 +319,30 @@ export default function SavedReports({ reports, sources }: Props) {
                 {reports.last_page > 1 && (
                     <LaravelPagination links={reports.links} />
                 )}
+
+                <AlertDialog
+                    open={deleteReport !== null}
+                    onOpenChange={(open) => !open && setDeleteReport(null)}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Delete this saved report?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {deleteReport
+                                    ? `“${deleteReport.name}” will be permanently removed. This can’t be undone.`
+                                    : ''}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDelete}>
+                                Delete report
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageLayout>
         </AppLayout>
     );

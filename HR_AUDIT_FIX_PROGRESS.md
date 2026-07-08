@@ -60,7 +60,7 @@
 | 21 | Assets | `/hr/assets` | ✅ | Gold-std service/controller (guarded transitions, Fleet federation, wired notifications). F-67 fixed: doc-delete now confirms (was 1-click unrecoverable); F-68: raw oklch tile→status-warning token; + incidental react-hooks/static-components lint fixed |
 | 22 | Approvals inbox | `/hr/approvals` | ✅ | F-69 fixed: hero "Pending" count was current-page length (lied >20) → server `total`. `action` catches LogicException→flash. Spine gap = D-1 (Chane); deep-link + polish noted |
 | 23 | Signatures | `/hr/signatures` | ✅ | F-70 fixed: manual "nudge" stamped reminder_sent_at without sending → lied AND suppressed the auto-sweep (dedup on whereNull); now sends. F-71: "resend" was a silent flip → now re-notifies signer. sign/decline→requester noted |
-| 24 | Analytics/reports/headcount/succession/import-export | various | ⬜ | |
+| 24 | Analytics/reports/headcount/succession/import-export | various | 🔶 | Analytics ✅ clean (server-side KPIs). Reports ✅ F-72 fixed (native confirm→kit AlertDialog on saved-report delete). PENDING: Headcount, Succession, Import/export |
 | 25 | Settings + audit log | `/hr/settings/*` | ⬜ | |
 
 ## §6 Seams
@@ -347,6 +347,16 @@
 - **Noted 🟠 (deferred — needs NEW notification classes, beyond smallest-honest-fix):** neither `sign` nor `decline` notifies the **requester** (`requested_by`) — the person waiting on the outcome is never told the document was signed or declined (a decline especially needs follow-up). Wiring this needs new `SignatureSigned`/`SignatureDeclined` notification classes to the requester (the reverse-direction counterpart to the signer-facing ones); logged as a follow-up, not built this slice to keep it focused. `requested_at`/`signed_at` also render as raw `Y-m-d H:i:s` strings (🟡 en-NZ formatting).
 
 **Run 23 gates:** php -l ✅ (ESignatureService) · pest ✅ **694 passed / 0 failed** (4292 assertions, 752s) — the existing "manager can nudge, resend and cancel" + "signature-due reminder sweep" tests both stay green (neither asserts notification counts on the manual path, and the sweep test uses a fresh sig). Frontend gates N/A — zero `.ts/.tsx` files changed.
+
+## Run 24 findings (Slice 24 — Analytics & reports CLUSTER, part 1: Analytics + Reports)
+
+Cluster row → `🔶 partial`. This run cleared **Analytics** and **Reports**; **Headcount, Succession, Import/export** still pending (next Slice-24 firings).
+
+- **Analytics (`/hr/analytics`) — audited CLEAN (source-verified).** `AnalyticsDashboardController::index` pulls every figure server-side from `WorkforceAnalyticsService` (headcount trend, turnover, tenure brackets, compliance score, leave utilisation, department breakdown); `currentHeadcount` = the trend's last server point, `avgTenure` computed server-side from brackets. No pagination, no client-derived KPI, no export affordance to be dead, permission-gated (`hr.analytics.view`). Only 🟡 note: generic `PageHero` (a specialised `AnalyticsHero` is redesign-scope, not a smallest-honest-fix).
+- **F-72 🟠 fixed (Reports `/hr/reports/saved`) — native `confirm()` guarding a destructive delete.** `saved.tsx` `handleDelete` did `if (!confirm('Are you sure you want to delete this saved report?')) return; router.delete(...)` — a §4B native-dialog violation (same class as Run 12 Documents + F-67 Assets). Replaced with the kit `AlertDialog`: a `deleteReport` state, the trash button opens a "Delete this saved report?" dialog naming the report, and only its action fires `router.delete`. Kit-first, tokens intact. (Hero stat already uses `reports.total`, not page length — no KPI-that-lies here; export/download links are wired GET routes; run-result `.data.length` counts the actual result set, not a page.)
+- **Noted for later cluster runs:** Reports also has `HrReportController` (generate/export/exports/subscriptions) + `ReportBuilderController` (builder/preview/run/schedule/destroy) — the `saved` delete was the standout; a fuller reports-backend pass can ride a later firing if the remaining sub-surfaces surface nothing bigger.
+
+**Run 24 (part 1) gates:** types ✅ 0 errors · eslint ✅ 0 errors · build ✅ exit 0 (2m49s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly**, zero new failures. **pest N/A — zero PHP files changed** (frontend-only slice).
 
 ## Decisions needed (Chane)
 
