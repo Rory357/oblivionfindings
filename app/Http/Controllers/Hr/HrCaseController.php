@@ -359,6 +359,11 @@ class HrCaseController extends Controller
             'linked_incident_ids.*' => ['integer'],
         ]);
 
+        // hr_cases.description is NOT NULL with no default; a description-less case
+        // (description is nullable in validation, and an empty field arrives as null
+        // via ConvertEmptyStringsToNull) would otherwise 500 on insert. Coerce to ''.
+        $data['description'] = $data['description'] ?? '';
+
         $case = HrCase::create([
             'tenant_id' => $tenantId,
             'case_number' => app(\App\Services\References\ReferenceNumberGenerator::class)->nextGlobal('HR', 5),
@@ -398,6 +403,12 @@ class HrCaseController extends Controller
             'linked_incident_ids' => ['nullable', 'array'],
             'linked_incident_ids.*' => ['integer'],
         ]);
+
+        // Coerce a null description (empty field → null via ConvertEmptyStringsToNull)
+        // back to '' — hr_cases.description is NOT NULL.
+        if (array_key_exists('description', $data) && $data['description'] === null) {
+            $data['description'] = '';
+        }
 
         $data['updated_by'] = $user->id;
 
