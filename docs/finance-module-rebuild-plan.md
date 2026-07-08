@@ -766,12 +766,26 @@ vendor, receipt) — the mould for C2.
   **⇒ C5's finance-side is essentially done (GL bridge sound). Remaining residuals (a/c/d/e) are HR-SEAM/HR-owned — do
   them WITH HR (hr_payroll_runs column + run UI + calculator), not as a finance fork.** (3) payday-filing action = M5-5
   (route exists), can ship finance-side later.
-- **[ ] C6 — Budgets + approvals.** Implement `FinanceBudgetSync : BudgetSyncInterface` + container binding;
-  Governance consumes through it; category-vocab mapping registry; slim `syncActuals` to alert-freshness only
-  (report already live); **⚠️ PAUSE-AND-ASK Chane** before any store retirement/migration. SpendApproval: add
-  `FinBill→spendApproval` relation on the existing `fin_bills.spend_approval_id`, link picker on bill
-  create/edit + threshold enforcement (bill over category threshold requires linked approval — config-gated);
-  approve() never creates bills. Cash-flow payroll outflow ships with C5's typed runs.
+- **[~] C6 — Budgets + approvals. ✅ CHANE DECIDED: "Keep both + non-destructive cleanup"** (2nd/last reserved decision).
+  RE-DERIVED FROM CODE — the "duplicate budget backend" was a MISDIAGNOSIS (untrust-the-audit again):
+  - Finance `SiteBudgetLine` = per-SITE, per-MONTH OPERATIONAL budget (managers plan by category; actuals live from
+    fin_cost_allocations); used by BudgetForecastApiController + BudgetVarianceService + FinancialForecast/InsightsService.
+  - Governance `Budget`/`BudgetLineItem` = board-approved ANNUAL ORG budget; its budget-vs-actuals report reads actuals
+    LIVE from the GL (BudgetActualsService.php:91, bypassing the denormalised actual_amount cache → always accurate).
+  - Roadmap `InitiativeBudget` = roadmap initiatives (separate domain, not competing).
+  → NOT duplicate stores — DIFFERENT budgeting levels, both GL-backed. All 4 tables EMPTY (0 rows) → purely architectural,
+  NO migration. `BudgetSyncInterface` = ORPHANED (no impl/binding). Genuine DOUBLE-SYNC: SyncBudgetActualsJob (console.php
+  hourly) + `governance:update-budget-variances` (hourlyAt(10)) BOTH called BudgetActualsService::syncActuals.
+  **DECISION = keep both levels; non-destructive cleanup:**
+  - **[x] C6-1 double-sync fixed** — removed the redundant `governance:update-budget-variances` hourly schedule
+    (SyncBudgetActualsJob already runs syncActuals + variance alerts hourly; the command stays for manual use).
+    schedule:list confirms one budget sync; php -l clean.
+  - **[ ] C6-2 retire the orphaned BudgetSyncInterface** — both budgets read live GL directly, so the
+    governance-pulls-from-finance contract is unnecessary dead code (grep consumers first; remove the interface +
+    any references; do NOT implement FinanceBudgetSync — the audit's "implement it" was wrong).
+  - **[ ] C6-3 SpendApproval threshold** — FinBill→spendApproval relation on the existing `fin_bills.spend_approval_id`
+    + a link picker on bill create/edit + config-gated threshold enforcement (bill over category threshold requires a
+    linked approval); approve() NEVER creates bills.
 - **[ ] C7 — Capture-at-source** (in-lane embedded modals posting through canonical paths, no new ledgers):
   Sites damage/repair → FinBill (+optional insurance AR); Catering shopping-complete → HouseLedger groceries;
   Respite booking-confirmed → AR invoice vs funder + funding drawdown; Asset/Fleet purchase → FinFixedAsset

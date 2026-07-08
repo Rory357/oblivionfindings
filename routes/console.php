@@ -593,16 +593,16 @@ app(Schedule::class)
     ->dailyAt('07:45')
     ->withoutOverlapping();
 
+// Single hourly budget-actuals sync (C6). SyncBudgetActualsJob refreshes each
+// budget line item's actual_amount from posted GL journals — the model's saving
+// event recomputes variance — and fires variance alerts. The separate hourly
+// `governance:update-budget-variances` schedule was a REDUNDANT second call to the
+// same BudgetActualsService::syncActuals (a double-write of the cache every hour) —
+// removed. The command still exists for manual/on-demand recompute.
 app(Schedule::class)
     ->job(new SyncBudgetActualsJob)
     ->timezone('Pacific/Auckland')
     ->hourly()
-    ->withoutOverlapping();
-
-app(Schedule::class)
-    ->command('governance:update-budget-variances')
-    ->timezone('Pacific/Auckland')
-    ->hourlyAt(10)
     ->withoutOverlapping();
 
 app(Schedule::class)
