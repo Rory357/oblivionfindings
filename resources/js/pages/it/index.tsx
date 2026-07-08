@@ -726,6 +726,14 @@ export default function ItIndex({
                 employeeOptions={employeeOptions}
                 assetOptions={assetOptions}
                 slaPolicies={slaPolicies}
+                kbSuggestions={kbPublished}
+                onOpenArticle={(id) => {
+                    const a = kbPublished.find((x) => x.id === id);
+                    if (a) {
+                        setModal(null);
+                        openArticle(a);
+                    }
+                }}
                 onClose={() => setModal(null)}
             />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />

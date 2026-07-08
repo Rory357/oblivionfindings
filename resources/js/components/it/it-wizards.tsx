@@ -134,6 +134,13 @@ export interface KbRow {
     updated: string | null;
 }
 
+/** A published-article suggestion for raise-time deflection (§I). */
+export interface KbSuggestion {
+    id: number;
+    title: string;
+    category: string;
+}
+
 export type ItModal =
     | { type: 'ticket'; provisioning?: { id: number; item: string } }
     | { type: 'raise' }
@@ -166,6 +173,8 @@ export function ItWizard({
     employeeOptions = [],
     assetOptions = [],
     slaPolicies,
+    kbSuggestions = [],
+    onOpenArticle,
     onClose,
 }: {
     modal: ItModal | null;
@@ -173,6 +182,8 @@ export function ItWizard({
     employeeOptions?: EmployeeOption[];
     assetOptions?: AssetOption[];
     slaPolicies?: SlaPolicyGrid | null;
+    kbSuggestions?: KbSuggestion[];
+    onOpenArticle?: (id: number) => void;
     onClose: () => void;
 }) {
     if (!modal) return null;
@@ -198,7 +209,13 @@ export function ItWizard({
         case 'kb':
             return <KbArticleDialog article={modal.article} onClose={onClose} />;
         case 'raise':
-            return <RaiseTicketDialog onClose={onClose} />;
+            return (
+                <RaiseTicketDialog
+                    kbSuggestions={kbSuggestions}
+                    onOpenArticle={onOpenArticle}
+                    onClose={onClose}
+                />
+            );
         case 'sla':
             return slaPolicies ? <SlaPolicyDialog policies={slaPolicies} onClose={onClose} /> : null;
         case 'resolve':
@@ -872,7 +889,15 @@ const URGENCY_OPTIONS: { value: string; label: string }[] = [
     { value: 'low', label: 'Whenever' },
 ];
 
-function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
+function RaiseTicketDialog({
+    kbSuggestions = [],
+    onOpenArticle,
+    onClose,
+}: {
+    kbSuggestions?: KbSuggestion[];
+    onOpenArticle?: (id: number) => void;
+    onClose: () => void;
+}) {
     const wizard = useWizard(RAISE_STEPS.length);
     const [done, setDone] = useState(false);
     const [moreDetails, setMoreDetails] = useState(false);
@@ -893,6 +918,13 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
     });
 
     const valid = form.data.title.trim().length > 0;
+
+    // Deflection (§I): live-match published article titles as the requester types.
+    const query = form.data.title.trim().toLowerCase();
+    const kbMatches =
+        onOpenArticle && query.length >= 3
+            ? kbSuggestions.filter((s) => s.title.toLowerCase().includes(query)).slice(0, 3)
+            : [];
 
     const submit = () => {
         form.post('/it/tickets', {
@@ -983,6 +1015,27 @@ function RaiseTicketDialog({ onClose }: { onClose: () => void }) {
                             options={URGENCY_OPTIONS}
                         />
                     </Field>
+                    {kbMatches.length > 0 ? (
+                        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
+                                <BookOpen className="h-3.5 w-3.5" /> These might fix it now
+                            </div>
+                            <div className="mt-1.5 flex flex-col gap-1">
+                                {kbMatches.map((s) => (
+                                    // eslint-disable-next-line no-restricted-syntax -- KB suggestion link, not button chrome
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => onOpenArticle?.(s.id)}
+                                        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-primary/10"
+                                    >
+                                        <span className="truncate font-medium">{s.title}</span>
+                                        <span className="flex-none text-[11px] text-muted-foreground">Read →</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
                     {moreDetails ? (
                         <>
                             <Field label="More details" hint="optional" error={form.errors.description}>
