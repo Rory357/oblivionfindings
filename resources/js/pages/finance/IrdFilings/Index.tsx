@@ -2,14 +2,14 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter, formatMoney } from '@/components/finance';
+import { TaxTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark, Download } from 'lucide-react';
+import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 type Filing = {
@@ -129,6 +129,12 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
         if (!selectedPayrollRun) return;
         paydayForm.post(`/finance/ird-filings/from-payroll/${selectedPayrollRun}`);
     }
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (filing: Filing): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/ird-filings/${filing.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -394,6 +400,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                     key={filing.id}
                                                     className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
                                                     onClick={() => router.visit(`/finance/ird-filings/${filing.id}`)}
+                                                    onContextMenu={rowMenu.open(rowMenuItems(filing))}
                                                 >
                                                     <td className="py-3 pr-4">
                                                         {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
@@ -444,6 +451,8 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

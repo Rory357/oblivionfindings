@@ -5,8 +5,10 @@ import {
     FixedAssetDialog,
     LedgerTabsFooter,
     formatMoney,
+    useRowContextMenu,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
+    type RowCtxItem,
 } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -39,7 +41,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
+import { Eye, Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
 interface FixedAsset {
@@ -174,6 +176,18 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
             onSuccess: () => setDepModalOpen(false),
         });
     }
+
+    // Right-click row menu — mirrors the row's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (asset: FixedAsset): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/fixed-assets/${asset.id}`) },
+        ];
+        if (canManage && asset.status !== 'disposed') {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(asset) });
+        }
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -408,7 +422,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                     {assets.data.map((asset) => {
                                         const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
                                         return (
-                                            <TableRow key={asset.id}>
+                                            <TableRow key={asset.id} onContextMenu={rowMenu.open(rowMenuItems(asset))}>
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/fixed-assets/${asset.id}`}
@@ -489,6 +503,8 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                         </div>
                     </div>
                 )}
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { LedgerTabsFooter, NewJournalDialog, formatMoney } from '@/components/finance';
+import { LedgerTabsFooter, NewJournalDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, BookOpen, Download } from 'lucide-react';
+import { Plus, Search, BookOpen, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -121,6 +121,12 @@ export default function JournalsIndex({
 
     const postedCount = journals.data.filter((j) => j.status === 'posted').length;
     const draftCount = journals.data.filter((j) => j.status === 'draft').length;
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (journal: Journal): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/journals/${journal.id}`) },
+    ];
 
     return (
         <AppLayout
@@ -253,6 +259,7 @@ export default function JournalsIndex({
                                         key={journal.id}
                                         className="cursor-pointer hover:bg-muted"
                                         onClick={() => router.visit(`/finance/journals/${journal.id}`)}
+                                        onContextMenu={rowMenu.open(rowMenuItems(journal))}
                                     >
                                         <TableCell className="font-medium">{journal.journal_number}</TableCell>
                                         <TableCell>{new Date(journal.journal_date).toLocaleDateString('en-NZ')}</TableCell>
@@ -307,6 +314,8 @@ export default function JournalsIndex({
                         fundingStreams={fundingStreams}
                     />
                 )}
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

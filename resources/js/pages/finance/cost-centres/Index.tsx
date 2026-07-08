@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -226,6 +226,12 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
 
     const activeCount = costCentres.filter((c) => c.is_active).length;
 
+    // Right-click row menu — mirrors the row's existing inline action.
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (cc: CostCentre): RowCtxItem[] => [
+        { kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(cc) },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cost Centres" />
@@ -272,7 +278,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                                     </TableRow>
                                 ) : (
                                     costCentres.map((cc) => (
-                                        <TableRow key={cc.id}>
+                                        <TableRow key={cc.id} onContextMenu={rowMenu.open(rowMenuItems(cc))}>
                                             <TableCell className="font-mono text-sm">{cc.code}</TableCell>
                                             <TableCell className="font-medium">{cc.name}</TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
@@ -310,6 +316,8 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             <ConfirmDialog

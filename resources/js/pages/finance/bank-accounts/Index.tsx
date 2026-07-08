@@ -5,14 +5,16 @@ import {
     BankAccountDialog,
     BankingTabsFooter,
     formatMoney,
+    useRowContextMenu,
     type AccountOption,
     type EditableBankAccount,
+    type RowCtxItem,
 } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote } from 'lucide-react';
+import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
 import { useMemo, useState } from 'react';
@@ -64,6 +66,18 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
             is_primary: account.is_primary,
             is_active: account.is_active,
         });
+
+    // Right-click row menu — mirrors the card's existing inline actions (Open first).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (account: BankAccount): RowCtxItem[] => {
+        const items: RowCtxItem[] = [
+            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/bank-accounts/${account.id}`) },
+        ];
+        if (canManage) {
+            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(account) });
+        }
+        return items;
+    };
 
     const totalCash = useMemo(() => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0), [bankAccounts]);
     const primaryAccount = useMemo(() => bankAccounts.find((a) => a.is_primary), [bankAccounts]);
@@ -220,6 +234,7 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') router.visit(`/finance/bank-accounts/${account.id}`);
                                     }}
+                                    onContextMenu={rowMenu.open(rowMenuItems(account))}
                                     className="hover:shadow-md transition-shadow cursor-pointer h-full"
                                 >
                                         <CardHeader className="pb-3">
@@ -291,6 +306,8 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                     </>
                 )}
             </PageLayout>
+
+            {rowMenu.element}
 
             {canManage && (
                 <BankAccountDialog

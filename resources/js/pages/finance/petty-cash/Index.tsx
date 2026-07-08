@@ -1,14 +1,14 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter, PettyCashFundDialog, formatMoney, type UserOption } from '@/components/finance';
+import { BankingTabsFooter, PettyCashFundDialog, formatMoney, useRowContextMenu, type RowCtxItem, type UserOption } from '@/components/finance';
 import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wallet, Coins, Download } from 'lucide-react';
+import { Plus, Wallet, Coins, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 interface Fund {
@@ -38,6 +38,12 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
     const activeCount = funds.filter((f) => f.is_active).length;
     const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
     const totalBalance = funds.reduce((s, f) => s + f.current_balance, 0);
+
+    // Right-click row menu — mirrors the card's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (fund: Fund): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/petty-cash/${fund.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -95,7 +101,10 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                             const variance = fund.current_balance - fund.float_amount;
                             return (
                                 <Link key={fund.id} href={`/finance/petty-cash/${fund.id}`}>
-                                    <Card className="transition-shadow hover:shadow-md">
+                                    <Card
+                                        className="transition-shadow hover:shadow-md"
+                                        onContextMenu={rowMenu.open(rowMenuItems(fund))}
+                                    >
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                                             <CardTitle className="text-lg">{fund.name}</CardTitle>
                                             {fund.is_active ? (
@@ -152,6 +161,8 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                     </div>
                 )}
             </PageLayout>
+
+            {rowMenu.element}
 
             {canManage && (
                 <PettyCashFundDialog

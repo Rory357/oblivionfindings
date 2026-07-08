@@ -652,7 +652,7 @@ vendor, receipt) — the mould for C2.
       had status/year + pagination → left as-is. No clickable column sort (the golden template has none — adding it to
       only these would break consistency; defer a uniform sort). Gates: types 0, eslint 0, suite 232, browser-verified
       (donor-funds `?search=` round-trips + hydrates; accounts tree 8→1 on "bank"; credit-notes bar renders), no console errors.
-    - **[~] C3d-menus — right-click context menus** on list rows. Reused HR's generic `useRowContextMenu()`
+    - **[x] C3d-menus — right-click context menus** on list rows. Reused HR's generic `useRowContextMenu()`
       (portal, cursor-positioned, token-styled, keyboard-nav; `RowCtxItem[]` API) — re-exported via the finance
       barrel alongside the existing StatusBadge HR re-export (no fork, zero HR files touched). Each row's menu
       MIRRORS that page's existing inline actions (Open first), same guards + same handlers — never an invented
@@ -661,9 +661,17 @@ vendor, receipt) — the mould for C2.
       Record-receipt), bills (Open/Edit-draft), purchase-orders (Open), quotes (Open/Edit-draft), vendors (Open),
       credit-notes (Open), payment-runs (Open). Gates: types 0, eslint 0, build clean, suite 232 (no PHP touched);
       browser-verified the menu opens per-row with the right guarded items (invoices Paid→Open, Sent→Open+Record
-      receipt), no console errors. **Follow-up batch**: ledger/banking/tax list rows (journals, accounts-tree,
-      fixed-assets, cost-centres, fiscal-periods, currencies, fx-revaluations, bank-transactions, petty-cash,
-      gst-returns, ird-filings, audit-exports) get the same treatment next.
+      receipt), no console errors. **Follow-up batch MERGED — 12 ledger/banking/tax lists** (4 parallel agents,
+      every diff verified additive + grep + types): journals/accounts-tree/gst-returns/ird-filings/bank-accounts/
+      petty-cash → Open; fixed-assets → Open+Edit; bank-accounts → Open+Edit; audit-exports → Download+Delete
+      (via ConfirmDialog); cost-centres → Delete; currencies → Delete (non-base); fiscal-periods → Close (open);
+      fx-revaluations → Post-to-GL (draft) — all through the page's own setState/confirm handler with the same
+      guard, `onContextMenu` attached only when a row has an applicable action (no empty menus). accounts-tree
+      threads `onRowContextMenu` down the recursive AccountRow (element stays at page level). **bank-transactions
+      N/A** — plain rows with no navigation and no inline actions (menu would be empty), correctly skipped. Gates:
+      types 0, eslint 0, build clean, suite 232 (no PHP); browser-verified fixed-assets (Open+Edit / Open by status)
+      + audit-exports (Download+Delete), no console errors. **C3d-menus is now DONE across every finance list that
+      has a navigable row or an inline action.**
   - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +

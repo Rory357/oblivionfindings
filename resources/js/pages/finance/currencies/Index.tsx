@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -319,6 +319,16 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
         });
     }
 
+    // Right-click row menu — mirrors the row's existing inline action (same guard).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (currency: Currency): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (!currency.is_base) {
+            items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(currency) });
+        }
+        return items;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Currencies" />
@@ -393,8 +403,13 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    currencies.map((currency) => (
-                                        <TableRow key={currency.id}>
+                                    currencies.map((currency) => {
+                                        const menuItems = rowMenuItems(currency);
+                                        return (
+                                        <TableRow
+                                            key={currency.id}
+                                            onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
+                                        >
                                             <TableCell className="font-mono text-sm font-semibold">
                                                 {currency.code}
                                                 {currency.is_base && (
@@ -439,12 +454,15 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             <ConfirmDialog

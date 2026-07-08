@@ -1,4 +1,4 @@
-import { LedgerTabsFooter, NewAccountDialog, formatMoney } from '@/components/finance';
+import { LedgerTabsFooter, NewAccountDialog, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Download, Plus, Search, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronRight, DollarSign, Download, Eye, Plus, Search, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -70,9 +70,11 @@ const typeColors: Record<string, string> = {
 function AccountRow({
     account,
     depth = 0,
+    onRowContextMenu,
 }: {
     account: Account;
     depth?: number;
+    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
     const hasChildren = account.children.length > 0;
@@ -83,6 +85,7 @@ function AccountRow({
                 className="group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted/50"
                 style={{ paddingLeft: `${depth * 24 + 12}px` }}
                 onClick={() => router.visit(`/finance/accounts/${account.id}`)}
+                onContextMenu={onRowContextMenu(account)}
             >
                 {hasChildren ? (
                     <Button
@@ -133,6 +136,7 @@ function AccountRow({
                             key={child.id}
                             account={child}
                             depth={depth + 1}
+                            onRowContextMenu={onRowContextMenu}
                         />
                     ))}
                 </div>
@@ -144,9 +148,11 @@ function AccountRow({
 function AccountTypeSection({
     type,
     accounts,
+    onRowContextMenu,
 }: {
     type: string;
     accounts: Account[];
+    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
 
@@ -184,7 +190,11 @@ function AccountTypeSection({
             <CollapsibleContent>
                 <div className="mt-1 ml-2">
                     {accounts.map((account) => (
-                        <AccountRow key={account.id} account={account} />
+                        <AccountRow
+                            key={account.id}
+                            account={account}
+                            onRowContextMenu={onRowContextMenu}
+                        />
                     ))}
                 </div>
             </CollapsibleContent>
@@ -256,6 +266,12 @@ export default function AccountsIndex({
         (sum, type) => sum + countTree(filteredTree[type]),
         0,
     );
+
+    // Right-click row menu — mirrors the account row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (account: Account): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/accounts/${account.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -336,6 +352,7 @@ export default function AccountsIndex({
                                     key={type}
                                     type={type}
                                     accounts={filteredTree[type]}
+                                    onRowContextMenu={(account) => rowMenu.open(rowMenuItems(account))}
                                 />
                             ))
                         )}
@@ -351,6 +368,8 @@ export default function AccountsIndex({
                         fundingStreams={fundingStreams}
                     />
                 )}
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

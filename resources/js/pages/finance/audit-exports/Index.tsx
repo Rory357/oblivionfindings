@@ -2,7 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { AuditExportDialog, ConfirmDialog, TaxTabsFooter } from '@/components/finance';
+import { AuditExportDialog, ConfirmDialog, TaxTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -90,6 +90,25 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
         });
     };
 
+    // Right-click row menu — mirrors the row's existing inline actions (no row navigation, so no Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (exp: AuditExport): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (exp.status === 'completed') {
+            items.push({
+                kind: 'item',
+                label: 'Download',
+                icon: Download,
+                tone: 'success',
+                onSelect: () => window.location.assign(`/finance/audit-exports/${exp.id}/download`),
+            });
+        }
+        if (canManage) {
+            items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => setDeleteTarget(exp) });
+        }
+        return items;
+    };
+
     const completedCount = exportData.data.filter((e) => e.status === 'completed').length;
     const generatingCount = exportData.data.filter((e) => e.status === 'generating').length;
     const failedCount = exportData.data.filter((e) => e.status === 'failed').length;
@@ -153,7 +172,7 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                 ) : (
                                     exportData.data.map((exp) => {
                                         return (
-                                            <TableRow key={exp.id}>
+                                            <TableRow key={exp.id} onContextMenu={rowMenu.open(rowMenuItems(exp))}>
                                                 <TableCell className="font-medium">{exp.export_name}</TableCell>
                                                 <TableCell>
                                                     <span className="text-sm">
@@ -225,6 +244,8 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             {canManage && (

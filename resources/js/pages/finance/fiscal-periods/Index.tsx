@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -210,6 +210,16 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
     const closedCount = periods.filter((p) => p.status === 'closed').length;
     const lockedCount = periods.filter((p) => p.status === 'locked').length;
 
+    // Right-click row menu — mirrors the row's existing inline action (same guard).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (period: FiscalPeriod): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (period.status === 'open') {
+            items.push({ kind: 'item', label: 'Close', icon: Lock, onSelect: () => setCloseTarget(period) });
+        }
+        return items;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Fiscal Periods" />
@@ -258,8 +268,13 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    periods.map((period) => (
-                                        <TableRow key={period.id}>
+                                    periods.map((period) => {
+                                        const menuItems = rowMenuItems(period);
+                                        return (
+                                        <TableRow
+                                            key={period.id}
+                                            onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
+                                        >
                                             <TableCell className="font-medium">{period.name}</TableCell>
                                             <TableCell>{period.start_date}</TableCell>
                                             <TableCell>{period.end_date}</TableCell>
@@ -286,12 +301,15 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             <ConfirmDialog

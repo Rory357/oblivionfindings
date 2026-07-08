@@ -2,12 +2,12 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter, formatMoney } from '@/components/finance';
+import { TaxTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download } from 'lucide-react';
+import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download, Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
 type GstReturn = {
@@ -83,6 +83,12 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
         }
         router.get('/finance/gst-returns', params, { preserveState: true });
     }
+
+    // Right-click row menu — mirrors the row's existing navigation (Open).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (gstReturn: GstReturn): RowCtxItem[] => [
+        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/gst-returns/${gstReturn.id}`) },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -256,6 +262,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                             `/finance/gst-returns/${gstReturn.id}`,
                                                         )
                                                     }
+                                                    onContextMenu={rowMenu.open(rowMenuItems(gstReturn))}
                                                 >
                                                     <td className="py-3 pr-4">
                                                         <div className="font-medium">
@@ -318,6 +325,8 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
         </AppLayout>
     );

@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter, formatMoney } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -58,6 +58,16 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
     const isLoss = totalGainLoss < 0;
 
     const postedCount = revaluations.data.filter((r) => r.status === 'posted').length;
+
+    // Right-click row menu — mirrors the row's existing inline action (same guard).
+    const rowMenu = useRowContextMenu();
+    const rowMenuItems = (reval: Revaluation): RowCtxItem[] => {
+        const items: RowCtxItem[] = [];
+        if (reval.status === 'draft') {
+            items.push({ kind: 'item', label: 'Post to GL', icon: ArrowLeftRight, onSelect: () => setPostTarget(reval) });
+        }
+        return items;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -144,9 +154,14 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                             const gainLoss = Number(reval.total_gain_loss);
                                             const rowIsGain = gainLoss > 0;
                                             const rowIsLoss = gainLoss < 0;
+                                            const menuItems = rowMenuItems(reval);
 
                                             return (
-                                                <tr key={reval.id} className="border-b last:border-0 hover:bg-muted/50">
+                                                <tr
+                                                    key={reval.id}
+                                                    className="border-b last:border-0 hover:bg-muted/50"
+                                                    onContextMenu={menuItems.length ? rowMenu.open(menuItems) : undefined}
+                                                >
                                                     <td className="py-3 pr-4 font-medium">
                                                         {formatDate(reval.revaluation_date)}
                                                     </td>
@@ -210,6 +225,8 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
+
+                {rowMenu.element}
             </PageLayout>
 
             <ConfirmDialog
