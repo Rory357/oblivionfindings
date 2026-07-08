@@ -219,6 +219,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                 hero={
                     <PageHero category="finance"
                         icon={ArrowLeftRight}
+                        backHref={`/finance/consolidation/${group.id}`}
                         title="Intercompany Transactions"
                         description={`Manage transactions between entities in ${group.name}`}
                         stats={[

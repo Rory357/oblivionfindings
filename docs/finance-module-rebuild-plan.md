@@ -672,7 +672,7 @@ vendor, receipt) — the mould for C2.
       types 0, eslint 0, build clean, suite 232 (no PHP); browser-verified fixed-assets (Open+Edit / Open by status)
       + audit-exports (Download+Delete), no console errors. **C3d-menus is now DONE across every finance list that
       has a navigable row or an inline action.**
-  - **[~] C3e — empty states + axe + responsive + Intercompany fold.** Shipping per-concern sub-batches:
+  - **[x] C3e — empty states + axe + responsive + Intercompany fold. COMPLETE.** Per-concern sub-batches:
     - **[x] C3e-1 — EmptyState/EmptySearch adoption** on 16 finance list pages (invoices golden + 4 agents): each
       empty branch now renders the shared `@/components/ui/empty-state` — `EmptySearch` (filters active → "No X match
       your filters" + Clear, via the page's `clearFilters`; several pages that lacked one got a minimal `clearFilters`
@@ -698,7 +698,19 @@ vendor, receipt) — the mould for C2.
       tablet (verified invoices 775px table @ 753px viewport, no horizontal body scroll). Only /finance overview has
       a minor ~34px overflow from the SHARED PageHero decoration circle (`-right-16`, all modules) + a recharts SVG —
       not finance-authored, minor, desktop-first app → left as acceptable. No finance code changes needed.
-    - **[ ] C3e-5 — fold Intercompany under a Consolidation tab** (named Route::redirect the old URL; update links).
+    - **[x] C3e-5 — Intercompany already nested under Consolidation (verified from code — the prior "orphan" claim
+      was stale).** `intercompany.index` is `/finance/intercompany/{group}` — a PER-GROUP page, not a top-level orphan;
+      there is no standalone `/finance/intercompany` route to redirect. It's reached from the Consolidation group Show
+      page (an "Intercompany" button, Consolidation/Show.tsx:315) and its breadcrumb is already
+      `Finance › Consolidation › {group} › Intercompany` (Intercompany/Index.tsx:197-201). It can't be a TAX_TABS tab
+      because it needs a group context. So no restructure/redirect was needed. Only polish applied: added a hero
+      `backHref` to the parent group (matching the Consolidation Show hero) for consistent back-nav. types 0, eslint 0,
+      build clean. ⚠️ browser-verify of the Intercompany page is blocked by demo data (no consolidation group seeded);
+      change is type-safe + code-verified (same href as the breadcrumb).
+  - **✅ C3 COMPLETE** — one visual language across the finance module: PageHero+FinanceTabs+count badges, WizardShell
+    modals + shared ConfirmDialog, formatMoney/StatusBadge everywhere, the full command layer (export · badges ·
+    search/filter/pagination · right-click menus), shared EmptyState/EmptySearch, axe-critical-clean, responsive,
+    design-tokens-only. Next milestone: **C4 funding & client-money hub (PAUSE-AND-ASK on the canonical store).**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +
   `operations/client-funds/**` (routes/operations.php:1117-1126) in; redirects; **⚠️ PAUSE-AND-ASK Chane on the
