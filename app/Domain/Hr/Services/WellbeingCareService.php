@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrEngagementActionPlanNote;
 use App\Domain\Hr\Models\HrWellbeingCheckin;
 use App\Domain\Hr\Models\HrWellbeingFlagAction;
 use App\Domain\Hr\Models\HrWellbeingIndicator;
+use App\Domain\Hr\Notifications\EngagementActionPlanAssignedNotification;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
@@ -157,6 +158,34 @@ class WellbeingCareService
         $this->addPlanNote($plan, $actor, $this->sourceCreationLabel($sourceType), 'system');
 
         return $plan;
+    }
+
+    /**
+     * Tell an action plan's owner they've been made responsible for it — unless
+     * they created it themselves. Best-effort: a notification failure must never
+     * roll back the plan. Closes the duty-of-care loop that previously stayed
+     * silent until the plan's due date approached.
+     */
+    public function notifyOwnerAssigned(HrEngagementActionPlan $plan, User $actor): void
+    {
+        if (! $plan->owner_user_id || $plan->owner_user_id === $actor->id) {
+            return;
+        }
+
+        $owner = User::find($plan->owner_user_id);
+        if (! $owner) {
+            return;
+        }
+
+        try {
+            $owner->notify(new EngagementActionPlanAssignedNotification($plan, $actor->name));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to send action-plan-assigned notification', [
+                'plan_id' => $plan->id,
+                'owner_id' => $plan->owner_user_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function sourceCreationLabel(string $sourceType): string

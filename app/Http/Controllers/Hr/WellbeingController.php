@@ -636,6 +636,7 @@ class WellbeingController extends Controller
         ]);
 
         $this->careService->addPlanNote($plan, $user, 'Plan created from survey: ' . $survey->title . '.', 'system');
+        $this->careService->notifyOwnerAssigned($plan, $user);
 
         return redirect()->back()->with('success', 'Action plan created.');
     }
@@ -862,7 +863,8 @@ class WellbeingController extends Controller
             $this->assertHrTenantAccess($tenantId, is_numeric($surveyTenant) ? (int) $surveyTenant : null);
         }
 
-        $this->careService->createStandalonePlan($actor, $tenantId, $validated);
+        $plan = $this->careService->createStandalonePlan($actor, $tenantId, $validated);
+        $this->careService->notifyOwnerAssigned($plan, $actor);
 
         return redirect()->back()->with('success', 'Action plan created.');
     }
