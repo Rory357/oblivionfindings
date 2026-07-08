@@ -39,6 +39,8 @@ interface ReportData {
         avg_first_response_mins: number | null;
         avg_resolution_mins: number | null;
         sla_compliance: number | null;
+        sla_met: number;
+        sla_measured: number;
         csat_avg: number | null;
         csat_response_rate: number | null;
     };
@@ -196,7 +198,11 @@ export function ItReports() {
                                 icon={BarChart3}
                                 label="SLA compliance"
                                 value={pct(k.sla_compliance)}
-                                sub={`${k.resolved} resolved`}
+                                sub={
+                                    k.sla_measured > 0
+                                        ? `${k.sla_met} of ${k.sla_measured} within SLA`
+                                        : `${k.resolved} resolved`
+                                }
                                 tone={
                                     k.sla_compliance === null
                                         ? 'neutral'

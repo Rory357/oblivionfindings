@@ -104,6 +104,8 @@ test('the report aggregates tickets and provisioning across the range', function
     expect($json['kpis']['avg_resolution_mins'])->toBe(90);   // (120 + 60) / 2
     expect($json['kpis']['avg_first_response_mins'])->toBe(30); // only one responded in range
     expect($json['kpis']['sla_compliance'])->toEqual(50.0);    // 1 met of 2 measured
+    expect($json['kpis']['sla_met'])->toBe(1);
+    expect($json['kpis']['sla_measured'])->toBe(2);
     expect($json['kpis']['csat_avg'])->toEqual(3.5);           // (5 + 2) / 2
     expect($json['kpis']['csat_response_rate'])->toEqual(100.0); // 2 rated of 2 resolved
 

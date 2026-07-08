@@ -228,6 +228,9 @@ class ItReportsController extends Controller
             'avg_first_response_mins' => $avgFirst !== null ? (int) round((float) $avgFirst) : null,
             'avg_resolution_mins' => $avgResolution !== null ? (int) round((float) $avgResolution) : null,
             'sla_compliance' => $measured > 0 ? round($met / $measured * 100, 1) : null,
+            // Raw met/measured counts back the "X of Y within SLA" microcopy (§S).
+            'sla_met' => $met,
+            'sla_measured' => $measured,
             'csat_avg' => $csatAvg !== null ? round((float) $csatAvg, 2) : null,
             'csat_response_rate' => $resolvedCount > 0 ? round($csatCount / $resolvedCount * 100, 1) : null,
         ];
@@ -368,7 +371,8 @@ class ItReportsController extends Controller
         return [
             'open' => 0, 'unassigned' => 0, 'breaching' => 0, 'breached' => 0, 'resolved' => 0,
             'avg_first_response_mins' => null, 'avg_resolution_mins' => null,
-            'sla_compliance' => null, 'csat_avg' => null, 'csat_response_rate' => null,
+            'sla_compliance' => null, 'sla_met' => 0, 'sla_measured' => 0,
+            'csat_avg' => null, 'csat_response_rate' => null,
         ];
     }
 
