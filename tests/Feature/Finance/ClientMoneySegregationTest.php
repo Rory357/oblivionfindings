@@ -6,25 +6,34 @@ use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Services\ClientLedgerService;
 use App\Models\Client;
-use App\Models\ClientLedgerEntry;
+use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * A resident's personal trust balance was polluted by operational cost allocations
  * (the org's cost of supporting them), so families saw a hugely-negative personal
- * balance. The ledger now segregates: operational cost allocations are shown but
- * never move the personal running balance / totals.
+ * balance. The ledger segregates: operational cost allocations are shown but never
+ * move the personal running balance / totals. (C4: the personal source is the
+ * canonical ClientFundTransaction trust store, not the dormant ClientLedgerEntry.)
  */
 it('keeps operational cost allocations out of the personal running balance', function () {
+    Queue::fake(); // suppress the trust-fund GL-posting job — this test only reads the ledger
+
     $client = Client::factory()->create(['organization_id' => 1]);
     $user = User::factory()->create(['organization_id' => 1]);
 
-    // Personal money in: a $100 deposit (informational entry — skip the GL observer).
-    ClientLedgerEntry::create([
-        'tenant_id' => 1, 'client_id' => $client->id, 'type' => 'contribution', 'direction' => 'inflow',
-        'amount' => '100.00', 'description' => 'Personal deposit', 'entry_date' => Carbon::parse('2026-02-01'),
-        'posts_to_gl' => false, 'recorded_by' => $user->id,
+    // Personal money in: a $100 deposit into the resident's trust fund (canonical store).
+    $fund = ClientFund::create([
+        'organization_id' => 1, 'client_id' => $client->id, 'fund_name' => 'Resident Trust',
+        'fund_type' => 'trust', 'balance' => 100, 'is_active' => true,
+    ]);
+    ClientFundTransaction::create([
+        'organization_id' => 1, 'client_fund_id' => $fund->id, 'transaction_type' => 'credit',
+        'amount' => '100.00', 'running_balance' => '100.00', 'description' => 'Personal deposit',
+        'transaction_date' => Carbon::parse('2026-02-01'), 'recorded_by' => $user->id,
     ]);
 
     // Operational service cost attributed to the client (NOT their personal money).

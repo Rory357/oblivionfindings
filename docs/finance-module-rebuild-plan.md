@@ -729,10 +729,16 @@ vendor, receipt) — the mould for C2.
   (C4-A) build /finance/funding hub SHELL — finance PageHero + FinanceTabs footer (5 tabs) + a collect-first
   FundingController@index redirect; tabs point at existing surfaces (finance funding-streams + donor-funds already
   in finance; operations/funding-claims + operations/client-funds migrated into finance behind /finance/funding with
-  NAMED Route::redirects; finance/billing = service billing). (C4-B) repoint the client-profile finance tab
-  (ClientController + ClientFinancialSummaryService/ClientLedgerService, currently reading the empty ClientLedgerEntry)
-  at ClientFund/ClientFundTransaction so it shows real trust-fund activity; retire the dormant ClientLedgerEntry read
-  paths (leave the model, stop reading it — or feature-flag). ⚠️ C4-B touches the CLIENTS module (agreed seam — Chane approved).
+  NAMED Route::redirects; finance/billing = service billing).
+  **(C4-B-1 DONE — merged this session):** repointed `ClientLedgerService` (behind the finance client-financials tab,
+  insights API, and summary service) from the DORMANT empty `ClientLedgerEntry` → the canonical `ClientFundTransaction`
+  (deposits/withdrawals via `fund.client_id`), keeping the exact getLedger/summary return shape so all 3 consumers now
+  show REAL trust-fund activity + a correct personal running balance (segregation preserved — operational FinCostAllocation
+  costs shown, never move the personal balance). ClientMoneySegregationTest updated to seed ClientFundTransaction; finance
+  suite 232. ClientLedgerEntry model+observer+table left intact (reserved).
+  **(C4-B-2 remaining):** remove the vestigial empty `ledger_entries` (ClientLedgerEntry) read from the client PROFILE
+  (ClientController.php:806-821) + its frontend section — the profile already shows ClientFund funds/transactions directly.
+  ⚠️ C4-B touches the CLIENTS module (agreed seam — Chane approved).
   Then: Client-Money Transaction modal (deposit/withdrawal via the working ClientFund trust path, receipt upload, audited)
   + funder remittance reconciliation. Client money never nets against operational accounts (segregation preserved:
   trust liability 2500, not operational revenue).
