@@ -805,10 +805,42 @@ vendor, receipt) — the mould for C2.
     - Test `tests/Feature/Finance/BillSpendApprovalGateTest.php` (6/6, helpers `sag_*` unique): blocks over-threshold w/o
       approval / with under-covering approval / with not-yet-approved approval; approves with covering approval (balanced
       $15k journal); doesn't gate under threshold; doesn't gate when enforcement off.
-- **[ ] C7 — Capture-at-source** (in-lane embedded modals posting through canonical paths, no new ledgers):
-  Sites damage/repair → FinBill (+optional insurance AR); Catering shopping-complete → HouseLedger groceries;
-  Respite booking-confirmed → AR invoice vs funder + funding drawdown; Asset/Fleet purchase → FinFixedAsset
-  capitalisation journal; `SiteVendor.fin_vendor_id` FK + vendor attribution.
+- **[~] C7 — Capture-at-source** (in-lane, post through canonical paths, no new ledgers). RE-DERIVED from code via
+  Explore agent (verified — prior audits were optimistic). Wiring scorecard + build order:
+  - **[x] C7b Catering shopping-complete → HouseLedger groceries — SHIPPED.** The mechanism was fully built
+    (`HouseLedgerService::addEntry()` + `HouseLedgerEntryObserver` → `ProcessFinancialEventJob` → GL DR 6431 Groceries /
+    CR 1000) but `SiteMealShoppingListController::markReceived()` never triggered it. Wired: sum received grocery cost
+    (product `cost_per_unit_cents` × received_qty, fallback line `estimated_cost_cents`) → post ONE house-ledger expense
+    via a new private `captureGrocerySpend()`, idempotent on reference `shopping-list:{id}`, failure logged not fatal. No
+    double-post risk (previously posted nothing). Test `ShoppingListGrocerySpendCaptureTest` 4/4.
+  - **[x] C7-FOUNDATION Demo chart completion — SHIPPED (the real blocker C7 verification exposed).** Browser-verifying
+    the grocery journal revealed the demo operational org (**org 1**) had only **8 of the 83 canonical accounts** — the
+    full chart lived under **org 0** (FinanceSeeder default) but deploy runs only `FinanceDemoSeeder`, which hardcoded 8.
+    Since `FinancialEventService::resolveAccount` is strictly per-org and throws on a missing code, EVERY observer GL
+    posting (house-ledger, fuel 6200, maintenance 6300, funding claims 1100) has been silently failing on demo. Fix:
+    `FinanceDemoSeeder` now calls `FinanceSeeder::run(1)` (idempotent `updateOrInsert`) BEFORE the demo-doc guard, so
+    redeploys repair already-seeded demos. Verified: org 1 → 84 accounts incl 6431; `record()`+job `handle()` post a
+    balanced DR 6431 / CR 1000 journal on real demo data. Test added to `FinanceDemoSeederTest`.
+    ⚠️ **Separate pre-existing finding (flagged, NOT fixed here): `ProcessFinancialEventJob::dispatch()` does not execute
+    inline under sync queue in this env** (job `handle()` works when called directly; likely its unusual `queue()`
+    method) — so observer-dispatched GL jobs may not post without a running queue worker. App-wide (house-ledger/fuel/
+    maintenance), not C7-specific. Spawned as its own task.
+  - **[ ] C7a Sites damage/repair → FinBill(AP) + optional insurance FinInvoice(AR) — MISSING.** Seam =
+    `SiteDamageController::update()` when status→'repaired' + `actual_cost`. AP side clean via `AccountsPayableService::
+    createBill`; insurance AR side harder (⚠️ no `createInvoice` service — see C7-blocker).
+  - **[ ] C7d Asset/Fleet purchase → FinFixedAsset capitalisation — WIRED in finance, no ops trigger.**
+    `FixedAssetService::createAsset()` + `postAcquisitionJournal()` work; missing = an `App\Models\Asset::created`
+    observer (fixed-asset categories) dispatching to it. `FinFixedAsset.linked_asset_id` FK already exists.
+  - **[ ] C7e Operational spend → FinBill + FinVendor — ⚠️ DOUBLE-POST RISK.** `FleetFuelLogObserver` +
+    `AssetMaintenanceLogObserver` ALREADY post GL via `FinancialEventService` (DR 6200/6300 / CR AP 2000). Naively adding
+    `createBill` would double-count (approveBill re-posts DR expense/CR AP). Needs a rethink (bill REPLACES the direct GL
+    post, or stays GL-only). `SiteVendor` has NO `fin_vendor_id` column → migration needed. LOW priority / careful.
+  - **[ ] C7c Respite booking-confirmed → FinInvoice vs funder + funding drawdown — MISSING + HARDEST.** Seam =
+    `RespiteBookingController::confirm()` (already fires `RespiteEvent('respite.booking.confirmed')`). ⚠️ blocked on the
+    missing AR `createInvoice` service + funding-drawdown logic (TBD). Defer.
+  - **⚠️ C7-blocker: `AccountsReceivableService` has NO `createInvoice()`** — only `allocatePayment()`. AR-side captures
+    (C7a insurance, C7c respite) need a canonical invoice-creation path first (add `createInvoice` or use `FinInvoice::
+    create` + manual journal). Build the AP/asset/ledger flows first; AR flows after the service gap is closed.
 - **[ ] C8 — Final parity pass.** Whole module vs Rostering side-by-side in browser; FinanceDemoSeeder v2
   (marker-based guard + funding/client-money/payroll rows); route:list clean; ledger 100% green; axe clean;
   plan-doc DoD re-ticked with screenshots; memory updated.

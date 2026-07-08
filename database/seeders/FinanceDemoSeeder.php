@@ -34,35 +34,17 @@ class FinanceDemoSeeder extends Seeder
 
     public function run(): void
     {
+        // Ensure the operational demo org always has the COMPLETE canonical chart of
+        // accounts (+ tax rates + currencies), idempotently. GL posting resolves
+        // accounts STRICTLY per-org (FinancialEventService::resolveAccount throws on a
+        // missing code), so a partial chart silently drops journals. Seeded BEFORE the
+        // demo-doc guard so redeploys repair already-seeded demos too — previously only
+        // 8 accounts existed for this org, so house-ledger (64xx), fuel/maintenance
+        // (62xx/63xx) and other capture-at-source postings never reached the GL.
+        app(FinanceSeeder::class)->run(self::ORG_ID);
+
         if (FinInvoice::where('organization_id', self::ORG_ID)->exists()) {
             return;
-        }
-
-        // ── Ledger: a small chart of accounts + a couple of posted journals ──
-        // `sub_type` matters: the bank-account modal only lists `bank` sub-type GL
-        // accounts, and petty-cash likewise expects an asset GL — without a `bank`
-        // account the Add-Bank-Account modal has an empty (unsubmittable) GL picker.
-        $accounts = [
-            ['code' => '1000', 'name' => 'Bank', 'type' => 'asset', 'sub_type' => 'bank'],
-            ['code' => '1100', 'name' => 'Accounts Receivable', 'type' => 'asset', 'sub_type' => 'accounts_receivable'],
-            ['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability', 'sub_type' => 'accounts_payable'],
-            ['code' => '2100', 'name' => 'GST Payable', 'type' => 'liability', 'sub_type' => 'current_liability'],
-            ['code' => '4000', 'name' => 'Funding Revenue', 'type' => 'revenue', 'sub_type' => 'revenue'],
-            ['code' => '5000', 'name' => 'Wages', 'type' => 'expense', 'sub_type' => 'expense'],
-            ['code' => '6000', 'name' => 'Supplies', 'type' => 'expense', 'sub_type' => 'expense'],
-            // Gain/Loss on Asset Disposal — the balancing leg of a disposal journal
-            // (config finance.fixed_asset.gain_loss_account). Without it, disposing
-            // an asset at a gain/loss dead-ends server-side.
-            ['code' => '8400', 'name' => 'Gain/Loss on Asset Disposal', 'type' => 'expense', 'sub_type' => 'expense'],
-        ];
-        foreach ($accounts as $account) {
-            FinAccount::factory()->create([
-                'organization_id' => self::ORG_ID,
-                'code' => $account['code'],
-                'name' => $account['name'],
-                'type' => $account['type'],
-                'sub_type' => $account['sub_type'],
-            ]);
         }
 
         FinJournal::factory()->count(3)->create([
