@@ -60,7 +60,7 @@
 | 21 | Assets | `/hr/assets` | ✅ | Gold-std service/controller (guarded transitions, Fleet federation, wired notifications). F-67 fixed: doc-delete now confirms (was 1-click unrecoverable); F-68: raw oklch tile→status-warning token; + incidental react-hooks/static-components lint fixed |
 | 22 | Approvals inbox | `/hr/approvals` | ✅ | F-69 fixed: hero "Pending" count was current-page length (lied >20) → server `total`. `action` catches LogicException→flash. Spine gap = D-1 (Chane); deep-link + polish noted |
 | 23 | Signatures | `/hr/signatures` | ✅ | F-70 fixed: manual "nudge" stamped reminder_sent_at without sending → lied AND suppressed the auto-sweep (dedup on whereNull); now sends. F-71: "resend" was a silent flip → now re-notifies signer. sign/decline→requester noted |
-| 24 | Analytics/reports/headcount/succession/import-export | various | 🔶 | Analytics ✅ clean (server-side KPIs). Reports ✅ F-72 fixed (native confirm→kit AlertDialog on saved-report delete). PENDING: Headcount, Succession, Import/export |
+| 24 | Analytics/reports/headcount/succession/import-export | various | ✅ | Analytics/Headcount/Succession/Import-export all audited CLEAN (server-side data, guarded deletes, wired exports). Reports F-72 fixed (native confirm→kit AlertDialog). Cluster complete |
 | 25 | Settings + audit log | `/hr/settings/*` | ⬜ | |
 
 ## §6 Seams
@@ -357,6 +357,17 @@ Cluster row → `🔶 partial`. This run cleared **Analytics** and **Reports**; 
 - **Noted for later cluster runs:** Reports also has `HrReportController` (generate/export/exports/subscriptions) + `ReportBuilderController` (builder/preview/run/schedule/destroy) — the `saved` delete was the standout; a fuller reports-backend pass can ride a later firing if the remaining sub-surfaces surface nothing bigger.
 
 **Run 24 (part 1) gates:** types ✅ 0 errors · eslint ✅ 0 errors · build ✅ exit 0 (2m49s) · vitest ✅ **8 failed / 171 passed — the documented baseline exactly**, zero new failures. **pest N/A — zero PHP files changed** (frontend-only slice).
+
+## Run 24 findings (part 2 — Headcount + Succession + Import/export: all CLEAN, cluster complete)
+
+No new code fix this run — the three remaining sub-surfaces audit **genuinely clean** (source-verified, not code-reading-only assumed). Row 24 → `✅`.
+
+- **Headcount (`/hr/headcount`) — CLEAN.** `HeadcountController::index` pulls everything server-side from `HeadcountForecastService` (current headcount, 12-mo forecast, budget-vs-actual, attrition risk); `hr.analytics.view`-gated. The "Create requisition" seam correctly **federates** to the Recruitment hub (`/hr/recruitment?tab=requisitions`) and is **properly gated** — the controller emits `can.view_recruitment` and the page uses `canRecruit` at all three requisition affordances (hero action + two body CTAs), so no 403 dead-link. Only 🟡: generic `PageHero` (redesign-scope).
+- **Succession (`/hr/succession` index + show) — CLEAN.** Hero stats are server-side (`stats.total/high_risk/vacant/ready_now`) with proper tone escalation (critical/warning/success). **Both** destructive deletes (plan on index+show, candidate on show) are guarded by a kit `Dialog` confirmation naming the record + its candidate count — not native `confirm()`, not unguarded. `nominateToTalentPool` is wired end-to-end (show.tsx `nominate()` → POST `/candidates/{id}/nominate` → "Nominate as ready now" button + success toast — not the Drills disease). Candidate CRUD via `SuccessionCandidateDialog`. Only 🟡: generic `PageHero`.
+- **Import/export (`/hr/import-export`) — CLEAN.** All four routes exist (index GET, export POST, template GET, import POST) and `import-export/index.tsx` renders them via a wizard; `ImportExportController` is `hr.employees.manage`-gated with server-side stats (`exportable`=active count, `profiles`=total), streamed CSV export (+ "export selected" ids), a blank-template download, and file-validated import (`csv,txt`, max 5 MB). No dead buttons (the two `disabled` states legitimately gate on a chosen file), no native dialogs.
+- **Cluster-wide 🟡 (noted, deferred as redesign-scope):** Analytics + Headcount + Succession all sit on generic `PageHero` rather than specialised heroes — a consistent 4A gap, but building three analytics heroes is a redesign effort, not a smallest-honest-fix; logged for a future hero pass, not built.
+
+**Run 24 (part 2) gates:** N/A — ledger-only completion (no code changed; the deliverable is the source-verified clean audit + row 24 → ✅). The cluster's one code fix (F-72) shipped in part 1 (`e4f86585`), gates green there.
 
 ## Decisions needed (Chane)
 
