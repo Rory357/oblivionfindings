@@ -158,6 +158,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // Reopen: agents anytime, the requester within 7 days of resolution
     // (ItTicketPolicy::reopen owns the window).
     Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
+    // CSAT: the requester rates their own resolved ticket (ItTicketPolicy::csat
+    // owns the who/when — agents 403, editable until the ticket closes).
+    Route::post('/it/tickets/{ticket}/csat', [ItTicketController::class, 'csat'])->name('it.tickets.csat');
 
     // Provisioning-queue CSV export — a read any agent (it.view) can run over
     // what the queue shows them; requesters (it.request only) are refused.

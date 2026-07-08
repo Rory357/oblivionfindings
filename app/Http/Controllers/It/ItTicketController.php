@@ -10,6 +10,7 @@ use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
+use App\Http\Requests\It\SubmitCsatRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
@@ -55,6 +56,7 @@ class ItTicketController extends Controller
 
         $isAgent = $user->canDo('it.view');
         $canManage = $user->canDo('it.manage');
+        $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
 
         $ticket->load([
             'requester:id,name',
@@ -150,6 +152,14 @@ class ItTicketController extends Controller
                     ]
                     : null,
                 'attachments' => $ticket->attachments->map($mapAttachment)->values()->all(),
+                // CSAT result — only once submitted (§K); shown in the rail.
+                'csat' => $ticket->csat_submitted_at
+                    ? [
+                        'score' => (int) $ticket->csat_score,
+                        'comment' => $ticket->csat_comment,
+                        'submitted_at' => $ticket->csat_submitted_at->toIso8601String(),
+                    ]
+                    : null,
                 'created_at' => $ticket->created_at?->toIso8601String(),
                 'created_human' => $ticket->created_at?->diffForHumans(short: true),
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
@@ -172,6 +182,8 @@ class ItTicketController extends Controller
                 'internal' => $canManage,
                 'reopen' => $user->can('reopen', $ticket),
                 'watching' => $ticket->watchers->contains('id', $user->id),
+                // The requester may rate their own resolved ticket (§K).
+                'rate' => $isRequester && $ticket->status === 'resolved',
             ],
         ];
     }
@@ -319,6 +331,34 @@ class ItTicketController extends Controller
         }
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
+    }
+
+    /**
+     * CSAT (§K): the requester rates the resolution 1–5 (+ optional comment).
+     * One-shot in spirit — the `csat_submitted` event and stamp land on the
+     * FIRST submission — but editable while the ticket is still resolved, so a
+     * re-rate silently updates the score. Authorisation is the FormRequest's.
+     */
+    public function csat(SubmitCsatRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        $firstTime = $ticket->csat_submitted_at === null;
+        $ticket->csat_score = (int) $request->validated('score');
+        $ticket->csat_comment = $request->validated('comment') ?: null;
+        if ($firstTime) {
+            $ticket->csat_submitted_at = now();
+        }
+        $ticket->save();
+
+        // One trail entry — the first rating. Edits change the score quietly.
+        if ($firstTime) {
+            ItTicketEvent::record($ticket, 'csat_submitted', $user->id, ['score' => $ticket->csat_score]);
+        }
+
+        return redirect()->back()->with('success', 'Thanks — your feedback helps IT improve.');
     }
 
     public function watch(Request $request, ItTicket $ticket)

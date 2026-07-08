@@ -967,6 +967,10 @@ class ItProvisioningController extends Controller
                 'assignee' => $t->assignee?->name,
                 'age' => $t->created_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
+                // CSAT (§K): a resolved ticket invites a rating; once given we
+                // show the score back. Every row here is the requester's own.
+                'can_rate' => $t->status === 'resolved',
+                'csat_score' => $t->csat_submitted_at ? (int) $t->csat_score : null,
             ])
             ->values()
             ->all();

@@ -62,6 +62,16 @@ class ItTicketPolicy
         return $user->canDo('it.manage');
     }
 
+    /**
+     * Rate the resolution (CSAT). The requester's own satisfaction — agents
+     * never rate. Allowed only while the ticket is `resolved`: nothing to rate
+     * before, and a close locks it in (editable until closed, §K).
+     */
+    public function csat(User $user, ItTicket $ticket): bool
+    {
+        return $this->owns($user, $ticket) && $ticket->status === 'resolved';
+    }
+
     /** Destructive — admins only. */
     public function delete(User $user, ItTicket $ticket): bool
     {
