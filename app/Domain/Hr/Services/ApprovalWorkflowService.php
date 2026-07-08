@@ -27,15 +27,22 @@ class ApprovalWorkflowService
      */
     public function initiateApproval(Model $approvable, string $processType, User $initiator): HrApprovalInstance
     {
-        $chain = $this->getChainForProcess($processType, $initiator->tenant_id);
+        // Users carry their tenant on organization_id (there is no users.tenant_id),
+        // and the /hr/approvals inbox resolves the viewer's tenant the same way. Stamp
+        // the instance with that resolved id — using the raw (always-null) tenant_id
+        // would file every service-created instance under tenant NULL, invisible to
+        // the inbox it is meant to feed.
+        $tenantId = $initiator->tenant_id ?? $initiator->organization_id;
+
+        $chain = $this->getChainForProcess($processType, $tenantId);
 
         if (! $chain) {
             throw new \LogicException("No active approval chain found for process type '{$processType}'.");
         }
 
-        return DB::transaction(function () use ($approvable, $chain, $initiator) {
+        return DB::transaction(function () use ($approvable, $chain, $initiator, $tenantId) {
             return HrApprovalInstance::create([
-                'tenant_id' => $initiator->tenant_id,
+                'tenant_id' => $tenantId,
                 'approval_chain_id' => $chain->id,
                 'approvable_type' => get_class($approvable),
                 'approvable_id' => $approvable->getKey(),
