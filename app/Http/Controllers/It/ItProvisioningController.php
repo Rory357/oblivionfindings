@@ -79,8 +79,12 @@ class ItProvisioningController extends Controller
             'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
             'assignees' => $this->tenantUserOptions($tenantId),
             'employeeOptions' => $this->employeeOptions($tenantId),
+            'assetOptions' => $this->assetOptions(),
             'filters' => $filters,
-            'slaPolicies' => $canEditSla ? $this->slaPolicyGrid($tenantId) : null,
+            // The effective SLA targets go to every agent — the Log & triage
+            // wizard reads them for its live "resolution due …" preview. Only
+            // editing them is admin-gated (can.edit_sla drives the editor button).
+            'slaPolicies' => $this->slaPolicyGrid($tenantId),
             'overview' => $this->overview($tenantId),
         ] : [];
 
@@ -546,10 +550,21 @@ class ItProvisioningController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
             'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
+            // §N2 agent triage fields — dropped for self-service requesters below.
+            'subcategory' => ['nullable', 'string', 'max:255'],
+            // On-behalf-of: an agent logs a ticket for the person who actually
+            // hit the problem; the receipt then goes to them, not the agent.
+            'requester_user_id' => [
+                'nullable', 'integer', 'exists:users,id',
+                $this->rejectForeignTenantRecipient($tenantId),
+            ],
             'assigned_to_user_id' => [
                 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
+            'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'watchers' => ['nullable', 'array'],
+            'watchers.*' => ['integer', 'exists:users,id'],
             // §H convert/link: an agent can raise a ticket straight off a
             // provisioning request (the new laptop arrived broken).
             'provisioning_request_id' => [
@@ -559,19 +574,30 @@ class ItProvisioningController extends Controller
             ...$this->itAttachmentRules(),
         ]);
 
-        // Triage fields are agent-only: a self-service requester cannot pick
-        // an assignee or link a provisioning request, whatever the body says.
+        // Triage fields are agent-only: a self-service requester cannot log on
+        // behalf of someone else, pick an assignee, set a subcategory, link an
+        // asset/provisioning request or add watchers, whatever the body says.
+        $requesterId = $isAgent && ! empty($validated['requester_user_id'])
+            ? (int) $validated['requester_user_id']
+            : $user->id;
         $assigneeId = $isAgent ? ($validated['assigned_to_user_id'] ?? null) : null;
         $provisioningRequestId = $isAgent ? ($validated['provisioning_request_id'] ?? null) : null;
+        $subcategory = $isAgent ? ($validated['subcategory'] ?? null) : null;
+        $assetId = $isAgent ? ($validated['asset_id'] ?? null) : null;
+        $watcherIds = $isAgent && ! empty($validated['watchers'])
+            ? array_values(array_unique(array_map('intval', $validated['watchers'])))
+            : [];
 
         $ticket = ItTicket::createWithReference([
             'tenant_id' => $tenantId,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
-            'requester_user_id' => $user->id,
+            'requester_user_id' => $requesterId,
             'assigned_to_user_id' => $assigneeId,
+            'asset_id' => $assetId,
             'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
+            'subcategory' => $subcategory,
             'priority' => $validated['priority'],
             'source' => $isAgent ? 'agent' : 'portal',
             'status' => $assigneeId ? 'in_progress' : 'open',
@@ -584,15 +610,22 @@ class ItProvisioningController extends Controller
 
         $this->storeItAttachments($ticket, $request->file('attachments'), $user);
 
+        if ($watcherIds) {
+            $ticket->watchers()->syncWithoutDetaching($watcherIds);
+        }
+
         ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
             'source' => $ticket->source,
             'assigned_to_user_id' => $assigneeId,
             'provisioning_request_id' => $provisioningRequestId,
+            'on_behalf_of' => $requesterId !== $user->id ? $requesterId : null,
         ]));
 
-        // Receipt to the requester ("we've got it"), plus an urgent alert to
-        // the agents working the queue — never to the actor themselves.
-        $user->notify(new TicketCreatedNotification($ticket, 'receipt'));
+        // Receipt to the REQUESTER — the actor when self-raised, the
+        // on-behalf-of colleague when an agent logs it. Plus an urgent alert
+        // to the agents working the queue — never to the actor themselves.
+        $requester = $requesterId === $user->id ? $user : User::query()->find($requesterId);
+        $requester?->notify(new TicketCreatedNotification($ticket, 'receipt'));
         if ($ticket->priority === 'urgent') {
             $agents = ItStaffDirectory::agents($tenantId)
                 ->reject(fn (User $agent) => $agent->id === $user->id);

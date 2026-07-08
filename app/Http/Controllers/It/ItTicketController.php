@@ -161,16 +161,7 @@ class ItTicketController extends Controller
             'assignees' => $canManage ? $this->tenantUserOptions($tenantId) : [],
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
-            'assetOptions' => $canManage
-                ? \App\Models\Asset::query()
-                    ->where('status', 'active')
-                    ->orderBy('name')
-                    ->limit(200)
-                    ->get(['id', 'name', 'asset_tag'])
-                    ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name, 'tag' => $a->asset_tag])
-                    ->values()
-                    ->all()
-                : [],
+            'assetOptions' => $canManage ? $this->assetOptions() : [],
             'can' => [
                 'manage' => $canManage,
                 'view' => $isAgent,
