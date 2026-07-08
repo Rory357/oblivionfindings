@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -117,6 +118,14 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
         }
         router.get('/finance/ird-filings', params, { preserveState: true });
     }
+
+    const clearFilters = () => {
+        router.get('/finance/ird-filings', {}, { preserveState: true });
+    };
+
+    const hasFilters = Boolean(
+        (filters.filing_type && filters.filing_type !== 'all') || (filters.status && filters.status !== 'all'),
+    );
 
     function handleCreateFiling(e: React.FormEvent) {
         e.preventDefault();
@@ -387,8 +396,27 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                 <tbody>
                                     {filings.data.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                                                No filings yet. Create a filing from a GST return to get started.
+                                            <td colSpan={7} className="p-0">
+                                                {hasFilters ? (
+                                                    <EmptySearch
+                                                        onClear={clearFilters}
+                                                        title="No filings match your filters"
+                                                        className="border-0"
+                                                    />
+                                                ) : (
+                                                    <EmptyList
+                                                        icon={Landmark}
+                                                        itemName="filing"
+                                                        title="No filings yet"
+                                                        description="Create a filing from a GST return to get started."
+                                                        className="border-0"
+                                                        action={
+                                                            <Button size="sm" onClick={() => setShowCreateForm(true)}>
+                                                                New filing
+                                                            </Button>
+                                                        }
+                                                    />
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (

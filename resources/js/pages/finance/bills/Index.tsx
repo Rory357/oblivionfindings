@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -109,6 +110,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
         setDateTo('');
         router.get('/finance/bills', {}, { preserveState: true });
     };
+
+    const hasFilters = Boolean(search || (status && status !== 'all') || (vendorId && vendorId !== 'all') || dateFrom || dateTo);
 
     const isOverdue = (bill: Bill) => {
         if (bill.status === 'paid' || bill.status === 'cancelled') return false;
@@ -251,8 +254,29 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground py-8">
-                                        No bills found.
+                                    <TableCell colSpan={canManage ? 9 : 8} className="p-0">
+                                        {hasFilters ? (
+                                            <EmptySearch
+                                                onClear={clearFilters}
+                                                title="No bills match your filters"
+                                                className="border-0"
+                                            />
+                                        ) : (
+                                            <EmptyList
+                                                icon={ArrowDownToLine}
+                                                itemName="bill"
+                                                title="No bills yet"
+                                                description="Record your first supplier bill to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setNewBillOpen(true)}>
+                                                            New bill
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (

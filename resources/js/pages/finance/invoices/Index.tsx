@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download, Eye, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -111,6 +112,8 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
         setDateTo('');
         router.get('/finance/invoices', {}, { preserveState: true });
     };
+
+    const hasFilters = Boolean(search || (status && status !== 'all') || dateFrom || dateTo);
 
     const isOverdue = (invoice: Invoice) => {
         if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
@@ -246,8 +249,29 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         <TableBody>
                             {invoices.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                                        No invoices found.
+                                    <TableCell colSpan={8} className="p-0">
+                                        {hasFilters ? (
+                                            <EmptySearch
+                                                onClear={clearFilters}
+                                                title="No invoices match your filters"
+                                                className="border-0"
+                                            />
+                                        ) : (
+                                            <EmptyList
+                                                icon={Receipt}
+                                                itemName="invoice"
+                                                title="No invoices yet"
+                                                description="Create and send your first invoice to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+                                                            New invoice
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (

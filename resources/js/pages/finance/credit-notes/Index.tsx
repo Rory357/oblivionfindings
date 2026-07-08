@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FileText, Plus, FileMinus, Download, Search, Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -205,25 +206,28 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                 {/* Table */}
                 <Card>
                     {creditNotes.data.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4">
-                            <div className="rounded-full bg-muted p-4 mb-4">
-                                <FileText className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground mb-1">
-                                {hasFilters ? 'No credit notes match your filters' : 'No credit notes found'}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
-                                {hasFilters
-                                    ? 'Try adjusting or clearing the filters above.'
-                                    : 'Credit notes are used to adjust invoices or bills. Create one to get started.'}
-                            </p>
-                            {canManage && !hasFilters && (
-                                <Button onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    New Credit Note
-                                </Button>
-                            )}
-                        </div>
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No credit notes match your filters"
+                                className="border-0"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={FileText}
+                                itemName="credit note"
+                                title="No credit notes yet"
+                                description="Credit notes are used to adjust invoices or bills. Create one to get started."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            New credit note
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        )
                     ) : (
                         <>
                             <Table>

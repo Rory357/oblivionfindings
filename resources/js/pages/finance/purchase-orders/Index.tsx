@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Plus, ShoppingCart, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -49,6 +50,12 @@ export default function PurchaseOrderIndex() {
     function apply(next: Record<string, string>) {
         router.get('/finance/purchase-orders', { ...current, ...next }, { preserveState: true, preserveScroll: true });
     }
+
+    function clearFilters() {
+        router.get('/finance/purchase-orders', {}, { preserveState: true, preserveScroll: true });
+    }
+
+    const hasFilters = Boolean(current.search || current.status || current.vendor_id);
 
     // Right-click row menu — mirrors the row's existing inline action (the PO-number link to the show route).
     const rowMenu = useRowContextMenu();
@@ -161,8 +168,29 @@ export default function PurchaseOrderIndex() {
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                                            No purchase orders found.
+                                        <TableCell colSpan={6} className="p-0">
+                                            {hasFilters ? (
+                                                <EmptySearch
+                                                    onClear={clearFilters}
+                                                    title="No purchase orders match your filters"
+                                                    className="border-0"
+                                                />
+                                            ) : (
+                                                <EmptyList
+                                                    icon={ShoppingCart}
+                                                    itemName="purchase order"
+                                                    title="No purchase orders yet"
+                                                    description="Create your first purchase order to get started."
+                                                    className="border-0"
+                                                    action={
+                                                        canManage ? (
+                                                            <Button size="sm" onClick={() => setNewPoOpen(true)}>
+                                                                New purchase order
+                                                            </Button>
+                                                        ) : undefined
+                                                    }
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ) : (

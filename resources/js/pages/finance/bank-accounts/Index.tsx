@@ -14,6 +14,7 @@ import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyList } from '@/components/ui/empty-state';
 import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
@@ -124,18 +125,21 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
             >
                 {bankAccounts.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Building2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                            <h3 className="text-lg font-medium text-foreground mb-1">No bank accounts</h3>
-                            <p className="text-muted-foreground mb-4">
-                                Get started by adding your first bank account.
-                            </p>
-                            {canManage && (
-                                <Button onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Bank Account
-                                </Button>
-                            )}
+                        <CardContent className="p-0">
+                            <EmptyList
+                                icon={Building2}
+                                itemName="bank account"
+                                title="No bank accounts yet"
+                                description="Get started by adding your first bank account."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            Add bank account
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         </CardContent>
                     </Card>
                 ) : (

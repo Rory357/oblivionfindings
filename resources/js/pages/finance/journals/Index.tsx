@@ -16,6 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Plus, Search, BookOpen, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -118,6 +119,8 @@ export default function JournalsIndex({
         setDateTo('');
         router.get('/finance/journals', {}, { preserveState: true });
     };
+
+    const hasFilters = Boolean(search || status || type || dateFrom || dateTo);
 
     const postedCount = journals.data.filter((j) => j.status === 'posted').length;
     const draftCount = journals.data.filter((j) => j.status === 'draft').length;
@@ -249,8 +252,29 @@ export default function JournalsIndex({
                             <TableBody>
                                 {journals.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                            No journals found.
+                                        <TableCell colSpan={6} className="p-0">
+                                            {hasFilters ? (
+                                                <EmptySearch
+                                                    onClear={clearFilters}
+                                                    title="No journals match your search"
+                                                    className="border-0"
+                                                />
+                                            ) : (
+                                                <EmptyList
+                                                    icon={BookOpen}
+                                                    itemName="journal"
+                                                    title="No journals yet"
+                                                    description="Create your first general ledger journal entry to get started."
+                                                    className="border-0"
+                                                    action={
+                                                        canManage ? (
+                                                            <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                                New journal
+                                                            </Button>
+                                                        ) : undefined
+                                                    }
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 )}

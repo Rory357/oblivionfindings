@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyList } from '@/components/ui/empty-state';
 import { Plus, Download, Trash2, FileText, History } from 'lucide-react';
 import { useState } from 'react';
 
@@ -165,8 +166,21 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                             <TableBody>
                                 {exportData.data.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                            No audit exports found. Create one to get started.
+                                        <TableCell colSpan={7} className="p-0">
+                                            <EmptyList
+                                                icon={History}
+                                                itemName="audit export"
+                                                title="No audit exports yet"
+                                                description="Generate an audit trail report for your auditors to get started."
+                                                className="border-0"
+                                                action={
+                                                    canManage ? (
+                                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                            New audit export
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ) : (

@@ -8,6 +8,7 @@ import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyList } from '@/components/ui/empty-state';
 import { Plus, Wallet, Coins, Download, Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -83,16 +84,21 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
             >
                 {funds.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <Wallet className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">No petty cash funds yet.</p>
-                            <p className="text-sm text-muted-foreground">Create your first fund to get started.</p>
-                            {canManage && (
-                                <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Fund
-                                </Button>
-                            )}
+                        <CardContent className="p-0">
+                            <EmptyList
+                                icon={Wallet}
+                                itemName="petty cash fund"
+                                title="No petty cash funds yet"
+                                description="Create your first fund to get started."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            New fund
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         </CardContent>
                     </Card>
                 ) : (

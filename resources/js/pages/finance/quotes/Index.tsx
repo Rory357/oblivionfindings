@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import {
     formatMoney,
     QuoteDialog,
@@ -88,6 +89,12 @@ export default function QuotesIndex({
     const updateFilters = (key: string, value: string | null) => {
         router.get('/finance/quotes', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
+
+    const clearFilters = () => {
+        router.get('/finance/quotes', {}, { preserveState: true, replace: true });
+    };
+
+    const hasFilters = Boolean(filters?.q || (filters?.status && filters.status !== ANY));
 
     const openEdit = (quote: Quote) =>
         setEditQuote({
@@ -179,16 +186,28 @@ export default function QuotesIndex({
                 <div className="mt-4 space-y-2">
                     {(quotes?.data ?? []).length === 0 && (
                         <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">No Quotes Found</h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first quote to get started.</p>
-                                {canManage && (
-                                    <Button size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
-                                        Create Quote
-                                    </Button>
-                                )}
-                            </CardContent>
+                            {hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No quotes match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={FileText}
+                                    itemName="quote"
+                                    title="No quotes yet"
+                                    description="Create your first quote to get started."
+                                    className="border-0"
+                                    action={
+                                        canManage ? (
+                                            <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                                New quote
+                                            </Button>
+                                        ) : undefined
+                                    }
+                                />
+                            )}
                         </Card>
                     )}
                     {(quotes?.data ?? []).map((quote) => (

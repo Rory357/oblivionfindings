@@ -672,7 +672,22 @@ vendor, receipt) — the mould for C2.
       types 0, eslint 0, build clean, suite 232 (no PHP); browser-verified fixed-assets (Open+Edit / Open by status)
       + audit-exports (Download+Delete), no console errors. **C3d-menus is now DONE across every finance list that
       has a navigable row or an inline action.**
-  - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
+  - **[~] C3e — empty states + axe + responsive + Intercompany fold.** Shipping per-concern sub-batches:
+    - **[x] C3e-1 — EmptyState/EmptySearch adoption** on 16 finance list pages (invoices golden + 4 agents): each
+      empty branch now renders the shared `@/components/ui/empty-state` — `EmptySearch` (filters active → "No X match
+      your filters" + Clear, via the page's `clearFilters`; several pages that lacked one got a minimal `clearFilters`
+      added) vs `EmptyList` (empty → "No X yet" + a create CTA wired to the page's own existing trigger). In-table
+      empties keep the `TableRow/TableCell colSpan` wrapper (cell `p-0`, EmptyState `border-0`); Card/div empties swap
+      inner content. Pages: invoices/bills/purchase-orders/vendors/quotes/credit-notes/donor-funds/journals/fixed-assets/
+      bank-accounts/bank-transactions/petty-cash/gst-returns/ird-filings/audit-exports/payment-runs. Gates: types 0
+      (validated every create-trigger/clearFilters ref), eslint 0, build clean, suite 232 (no PHP); browser-verified
+      invoices EmptySearch renders ("No invoices match your filters" + Clear), no console errors. ⚠️ DEFERRED (low-value,
+      rarely-empty pure-config lists): cost-centres / fiscal-periods / currencies / fx-revaluations keep hand-rolled empties.
+    - **[ ] C3e-2 — skeletons** (JUDGE: finance lists load synchronously → skeleton only helps Inertia::defer/async;
+      likely N/A for most, note per-page; do NOT add stub skeletons).
+    - **[ ] C3e-3 — axe no-criticals** per hub (inject axe-core, FIX criticals not just report).
+    - **[ ] C3e-4 — responsive** per hub (tablet/mobile; web-only desktop app → ≥tablet graceful, no horizontal body scroll).
+    - **[ ] C3e-5 — fold Intercompany under a Consolidation tab** (named Route::redirect the old URL; update links).
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +
   `operations/client-funds/**` (routes/operations.php:1117-1126) in; redirects; **⚠️ PAUSE-AND-ASK Chane on the

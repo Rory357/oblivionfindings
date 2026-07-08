@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download, Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -83,6 +84,14 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
         }
         router.get('/finance/gst-returns', params, { preserveState: true });
     }
+
+    const clearFilters = () => {
+        router.get('/finance/gst-returns', {}, { preserveState: true });
+    };
+
+    const hasFilters = Boolean(
+        (filters.status && filters.status !== 'all') || (filters.year && filters.year !== 'all'),
+    );
 
     // Right-click row menu — mirrors the row's existing navigation (Open).
     const rowMenu = useRowContextMenu();
@@ -244,8 +253,27 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 <tbody>
                                     {gstReturns.data.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                                                No GST returns found. Prepare your first return to get started.
+                                            <td colSpan={8} className="p-0">
+                                                {hasFilters ? (
+                                                    <EmptySearch
+                                                        onClear={clearFilters}
+                                                        title="No GST returns match your filters"
+                                                        className="border-0"
+                                                    />
+                                                ) : (
+                                                    <EmptyList
+                                                        icon={Calculator}
+                                                        itemName="GST return"
+                                                        title="No GST returns yet"
+                                                        description="Prepare your first return to get started."
+                                                        className="border-0"
+                                                        action={
+                                                            <Link href="/finance/gst-returns/prepare">
+                                                                <Button size="sm">New GST return</Button>
+                                                            </Link>
+                                                        }
+                                                    />
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (

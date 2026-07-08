@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Head, Link, router } from '@inertiajs/react';
 import { Banknote, Plus, Send, Download, Eye } from 'lucide-react';
 
@@ -48,6 +49,12 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
             { preserveState: true, replace: true },
         );
     };
+
+    const clearFilters = () => {
+        router.get('/finance/payment-runs', {}, { preserveState: true, replace: true });
+    };
+
+    const hasFilters = Boolean(filters.status);
 
     const completedCount = paymentRuns.data.filter((r) => r.status === 'completed').length;
     const processingCount = paymentRuns.data.filter((r) => r.status === 'processing').length;
@@ -124,21 +131,26 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                     </CardHeader>
                     <CardContent>
                         {paymentRuns.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 px-4">
-                                <div className="rounded-full bg-muted p-4 mb-4">
-                                    <Banknote className="h-8 w-8 text-muted-foreground" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground mb-1">No payment runs found</h3>
-                                <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
-                                    Payment runs allow you to batch payments to vendors. Create one to get started.
-                                </p>
-                                <Link href="/finance/payment-runs/create">
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        New Payment Run
-                                    </Button>
-                                </Link>
-                            </div>
+                            hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No payment runs match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={Banknote}
+                                    itemName="payment run"
+                                    title="No payment runs yet"
+                                    description="Payment runs let you batch payments to vendors. Create one to get started."
+                                    className="border-0"
+                                    action={
+                                        <Link href="/finance/payment-runs/create">
+                                            <Button size="sm">New payment run</Button>
+                                        </Link>
+                                    }
+                                />
+                            )
                         ) : (
                             <>
                                 <Table>

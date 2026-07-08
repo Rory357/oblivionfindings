@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Plus, Search, Building2, Download, Eye } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
@@ -94,6 +95,13 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
         },
         [handleSearch],
     );
+
+    const clearFilters = useCallback(() => {
+        setSearch('');
+        router.get('/finance/vendors', {}, { preserveState: true, preserveScroll: true });
+    }, []);
+
+    const hasFilters = Boolean(filters.search || filters.vendor_type || filters.is_active);
 
     const activeCount = vendors.data.filter((v) => v.is_active).length;
 
@@ -200,19 +208,28 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                 <Card>
                     <CardContent className="p-0">
                         {vendors.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                                <h3 className="text-lg font-medium mb-1">No vendors found</h3>
-                                <p className="text-muted-foreground mb-4">
-                                    Get started by adding your first vendor.
-                                </p>
-                                {canManage && (
-                                    <Button onClick={() => setNewVendorOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Vendor
-                                    </Button>
-                                )}
-                            </div>
+                            hasFilters ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No vendors match your filters"
+                                    className="border-0"
+                                />
+                            ) : (
+                                <EmptyList
+                                    icon={Building2}
+                                    itemName="vendor"
+                                    title="No vendors yet"
+                                    description="Add your first supplier or contractor to get started."
+                                    className="border-0"
+                                    action={
+                                        canManage ? (
+                                            <Button size="sm" onClick={() => setNewVendorOpen(true)}>
+                                                New vendor
+                                            </Button>
+                                        ) : undefined
+                                    }
+                                />
+                            )
                         ) : (
                             <Table>
                                 <TableHeader>

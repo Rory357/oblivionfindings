@@ -25,6 +25,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyList } from '@/components/ui/empty-state';
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Download, Plus } from 'lucide-react';
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 
@@ -471,9 +472,13 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                     </CardHeader>
                     <CardContent>
                         {transactions.data.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                No bank transactions matched the current filters.
-                            </p>
+                            <EmptyList
+                                icon={Banknote}
+                                itemName="transaction"
+                                title="No transactions yet"
+                                description="Import a bank statement or record a manual transaction to get started."
+                                className="border-0"
+                            />
                         ) : (
                             <div className="overflow-x-auto">
                                 <Table>

@@ -41,6 +41,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { EmptyList } from '@/components/ui/empty-state';
 import { Eye, Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
@@ -390,19 +391,20 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                 <Card>
                     <CardContent className="p-0">
                         {assets.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Package className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                                <h3 className="text-lg font-medium mb-1">No fixed assets found</h3>
-                                <p className="text-muted-foreground mb-4">
-                                    Get started by adding your first fixed asset.
-                                </p>
-                                {canManage && (
-                                    <Button onClick={() => setCreateOpen(true)}>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add Asset
-                                    </Button>
-                                )}
-                            </div>
+                            <EmptyList
+                                icon={Package}
+                                itemName="fixed asset"
+                                title="No fixed assets yet"
+                                description="Get started by adding your first fixed asset."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            Add asset
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         ) : (
                             <Table>
                                 <TableHeader>

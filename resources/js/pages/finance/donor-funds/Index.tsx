@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Plus, Heart, AlertTriangle, HandHeart, Download, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
@@ -303,17 +304,28 @@ export default function DonorFundsIndex({ funds, filters, summary, canManage = f
                 {/* Funds Table */}
                 {funds.data.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <Heart className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">
-                                {hasFilters ? 'No funds match your filters.' : 'No donor funds yet.'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {hasFilters
-                                    ? 'Try adjusting or clearing the filters.'
-                                    : 'Create your first fund to start tracking donations and grants.'}
-                            </p>
-                        </CardContent>
+                        {hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No funds match your filters"
+                                className="border-0"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={Heart}
+                                itemName="donor fund"
+                                title="No donor funds yet"
+                                description="Create your first fund to start tracking donations and grants."
+                                className="border-0"
+                                action={
+                                    canManage ? (
+                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                            New fund
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        )}
                     </Card>
                 ) : (
                     <Card>
