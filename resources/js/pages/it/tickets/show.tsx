@@ -4,6 +4,7 @@
  * assignee / watchers / linked asset) — every control PATCHes a real route
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
+import { CsatRater, CsatStars } from '@/components/it/csat';
 import { ResolveTicketDialog } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import {
@@ -63,6 +64,7 @@ interface TicketPayload {
     asset: { id: number; name: string; tag: string | null } | null;
     provisioning_request: { id: number; item: string; status: string } | null;
     attachments: ThreadAttachment[];
+    csat: { score: number; comment: string | null; submitted_at: string | null } | null;
     created_at: string | null;
     created_human: string | null;
     updated_at: string | null;
@@ -83,6 +85,7 @@ interface Props {
         internal: boolean;
         reopen: boolean;
         watching: boolean;
+        rate: boolean;
     };
 }
 
@@ -479,6 +482,29 @@ export default function ItTicketShow({
                                 <p className="text-[12px] text-muted-foreground">Nobody watching yet.</p>
                             )}
                         </RailField>
+
+                        {/* CSAT (§K) — the requester rates the fix; the score reads
+                            back to everyone (agents see it, never edit it). */}
+                        {can.rate ? (
+                            <RailField label={ticket.csat ? 'Your rating' : 'Rate the fix'}>
+                                <CsatRater
+                                    ticketId={ticket.id}
+                                    score={ticket.csat?.score ?? null}
+                                    comment={ticket.csat?.comment ?? ''}
+                                />
+                            </RailField>
+                        ) : ticket.csat ? (
+                            <RailField label="Satisfaction">
+                                <div className="flex flex-col gap-1">
+                                    <CsatStars score={ticket.csat.score} />
+                                    {ticket.csat.comment ? (
+                                        <p className="text-[12px] text-muted-foreground">
+                                            “{ticket.csat.comment}”
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </RailField>
+                        ) : null}
 
                         {/* People + stamps */}
                         <div className="mt-1 border-t border-border/60 pt-3">

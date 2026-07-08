@@ -16,6 +16,7 @@ import {
     type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { CsatRater, CsatStars } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
 import { SlaChip } from '@/components/it/sla-chip';
@@ -64,6 +65,7 @@ import {
     RotateCcw,
     Search,
     Server,
+    Star,
     ThumbsDown,
     ThumbsUp,
     Ticket,
@@ -147,6 +149,9 @@ interface MyTicketRow {
     assignee: string | null;
     age: string | null;
     resolved: string | null;
+    /** §K CSAT: a resolved ticket invites a rating; the given score shows back. */
+    can_rate: boolean;
+    csat_score: number | null;
 }
 
 /** A published KB article as browsed by a requester (§I). */
@@ -1430,6 +1435,45 @@ export default function ItIndex({
                             </Button>
                         </div>
 
+                        {/* CSAT prompt (§K) — a nudge to rate freshly resolved tickets;
+                            it empties as each is rated (confetti on a perfect five). */}
+                        {myTickets.some((t) => t.can_rate && t.csat_score == null) ? (
+                            <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4.5 py-4">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-primary/10 text-primary">
+                                        <Star className="h-4 w-4" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <h3 className="text-[14px] leading-tight font-bold">How did IT do?</h3>
+                                        <p className="text-[12px] text-muted-foreground">
+                                            Rate your resolved tickets — it takes a moment and helps IT improve.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex flex-col gap-2.5">
+                                    {myTickets
+                                        .filter((t) => t.can_rate && t.csat_score == null)
+                                        .map((t) => (
+                                            <div
+                                                key={t.id}
+                                                className="rounded-xl border border-border/60 bg-card px-3.5 py-3"
+                                            >
+                                                <div className="flex flex-wrap items-baseline gap-x-2">
+                                                    <span className="text-[13px] font-semibold">{t.title}</span>
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {t.reference ?? ''}
+                                                        {t.resolved ? ` · resolved ${t.resolved}` : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2">
+                                                    <CsatRater ticketId={t.id} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
                             <div className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                                 <span>Ticket</span>
@@ -1483,6 +1527,11 @@ export default function ItIndex({
                                             {t.status === 'waiting' ? 'Waiting on you' : label(t.status)}
                                         </StatusBadge>
                                         <StatusDots status={t.status} />
+                                        {t.csat_score != null ? (
+                                            <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
+                                                You rated <CsatStars score={t.csat_score} size="h-3 w-3" />
+                                            </span>
+                                        ) : null}
                                     </span>
                                     <span className="text-[12px] text-muted-foreground">
                                         {t.age ?? '—'}
