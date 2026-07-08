@@ -27,6 +27,7 @@ class FinBill extends Model
         'organization_id',
         'vendor_id',
         'purchase_order_id',
+        'spend_approval_id',
         'bill_number',
         'vendor_reference',
         'status',
@@ -63,6 +64,18 @@ class FinBill extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(FinPurchaseOrder::class, 'purchase_order_id');
+    }
+
+    /**
+     * Optional governance sign-off linked to this bill. Finance-side link only —
+     * the SpendApproval is owned by the Governance domain; this bill never
+     * creates one. When the spend-approval gate is enforced (config
+     * finance.spend_approval), a bill at/above threshold can only be approved
+     * once this points at an APPROVED approval covering the full amount.
+     */
+    public function spendApproval(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Governance\Models\SpendApproval::class, 'spend_approval_id');
     }
 
     public function lines(): HasMany

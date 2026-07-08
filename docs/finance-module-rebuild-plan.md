@@ -785,9 +785,26 @@ vendor, receipt) — the mould for C2.
     app/Domain/Governance/Contracts/BudgetSyncInterface.php (zero blast radius). Did NOT implement FinanceBudgetSync —
     both budgets read live GL directly, so the governance-pulls-from-finance contract was unnecessary; the audit's
     "implement it" was wrong.
-  - **[ ] C6-3 SpendApproval threshold** — FinBill→spendApproval relation on the existing `fin_bills.spend_approval_id`
-    + a link picker on bill create/edit + config-gated threshold enforcement (bill over category threshold requires a
-    linked approval); approve() NEVER creates bills.
+  - **[x] C6-3 SpendApproval threshold** — SHIPPED. Audit premise was CORRECT this time (rare): the
+    `fin_bills.spend_approval_id` column existed but nothing wired it. Built, all finance-side, reading the
+    governance-owned `SpendApproval` (never forking/creating one):
+    - `FinBill::spendApproval()` belongsTo on the existing column; `spend_approval_id` in `$fillable`;
+      `StoreBillRequest`/`UpdateBillRequest` accept `nullable|exists:spend_approvals,id`;
+      `AccountsPayableService::createBill`/`updateBill` persist it.
+    - Config-gated gate `config('finance.spend_approval')` = `enforce` (env `FINANCE_SPEND_APPROVAL_ENFORCE`, **off by
+      default** so existing AP flows are unaffected) + `threshold` (default 10000). New private
+      `AccountsPayableService::assertSpendApprovalSatisfied()` runs at the top of `approveBill` **before** the journal
+      posts: a bill at/above threshold can only be approved if linked to a SpendApproval that is `approved` AND whose
+      `amount` covers the full bill total — else throws `InvalidArgumentException` (surfaced by `approve()`'s existing
+      catch → `back()->withErrors(['bill'])`, not a silent block). One-directional: approving a bill never creates a
+      SpendApproval or a bill.
+    - Picker: `BillController@index` passes `spendApprovals` (approved + still-valid, `linkableSpendApprovals()`,
+      single-tenant so un-scoped); `new-bill-dialog.tsx` gains an optional "Spend approval" SelectInput on the Details
+      step (NONE sentinel — Radix can't take an empty-string item value) + a Review row; `Index.tsx` threads it to both
+      New + Edit dialogs; edit prefills from `bill.spend_approval_id`.
+    - Test `tests/Feature/Finance/BillSpendApprovalGateTest.php` (6/6, helpers `sag_*` unique): blocks over-threshold w/o
+      approval / with under-covering approval / with not-yet-approved approval; approves with covering approval (balanced
+      $15k journal); doesn't gate under threshold; doesn't gate when enforcement off.
 - **[ ] C7 — Capture-at-source** (in-lane embedded modals posting through canonical paths, no new ledgers):
   Sites damage/repair → FinBill (+optional insurance AR); Catering shopping-complete → HouseLedger groceries;
   Respite booking-confirmed → AR invoice vs funder + funding drawdown; Asset/Fleet purchase → FinFixedAsset

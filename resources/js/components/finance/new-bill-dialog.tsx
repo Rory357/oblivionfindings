@@ -20,6 +20,14 @@ import {
 
 export type VendorOption = { id: number; name: string };
 export type AccountOption = { id: number; code: string; name: string };
+/** An approved governance spend approval this bill can be linked to. */
+export type SpendApprovalOption = {
+    id: number;
+    reference: string | null;
+    title: string | null;
+    amount: number | string;
+    category?: string | null;
+};
 
 /** An existing draft bill to prefill the wizard with (edit mode). */
 export type EditableBillLine = {
@@ -36,6 +44,7 @@ export type EditableBill = {
     bill_date: string;
     due_date: string;
     notes: string | null;
+    spend_approval_id?: number | string | null;
     lines: EditableBillLine[];
 };
 
@@ -92,12 +101,15 @@ export function NewBillDialog({
     onClose,
     vendors,
     accounts,
+    spendApprovals = [],
     bill,
 }: {
     open: boolean;
     onClose: () => void;
     vendors: VendorOption[];
     accounts: AccountOption[];
+    /** Approved governance spend approvals available to link (optional). */
+    spendApprovals?: SpendApprovalOption[];
     /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
     bill?: EditableBill | null;
 }) {
@@ -111,6 +123,7 @@ export function NewBillDialog({
         bill_date: string;
         due_date: string;
         notes: string;
+        spend_approval_id: string;
         lines: LineForm[];
     }>(bill ? {
         vendor_id: String(bill.vendor_id ?? ''),
@@ -118,6 +131,7 @@ export function NewBillDialog({
         bill_date: String(bill.bill_date).slice(0, 10),
         due_date: String(bill.due_date).slice(0, 10),
         notes: bill.notes ?? '',
+        spend_approval_id: bill.spend_approval_id != null ? String(bill.spend_approval_id) : '',
         lines: bill.lines.length ? bill.lines.map(lineFromBill) : [emptyLine()],
     } : {
         vendor_id: '',
@@ -125,6 +139,7 @@ export function NewBillDialog({
         bill_date: today(),
         due_date: plusDays(30),
         notes: '',
+        spend_approval_id: '',
         lines: [emptyLine()],
     });
     const { data, setData, processing, errors } = form;
@@ -135,6 +150,17 @@ export function NewBillDialog({
         { value: '15', label: 'GST 15%' },
         { value: '0', label: 'Zero-rated 0%' },
     ];
+    // Radix SelectItem cannot take an empty-string value, so the "clear" row uses
+    // a sentinel that maps back to '' on change.
+    const NO_APPROVAL = '__none';
+    const spendApprovalOptions = [
+        { value: NO_APPROVAL, label: 'No spend approval' },
+        ...spendApprovals.map((s) => ({
+            value: String(s.id),
+            label: `${s.reference ? `${s.reference} · ` : ''}${s.title ?? 'Spend approval'} · ${money(s.amount)}`,
+        })),
+    ];
+    const selectedApproval = spendApprovals.find((s) => String(s.id) === data.spend_approval_id);
 
     const totals = useMemo(() => {
         let subtotal = 0;
@@ -256,6 +282,24 @@ export function NewBillDialog({
                         <Field label="Notes" hint="optional" error={errors.notes}>
                             <Textarea rows={1} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
                         </Field>
+                        {spendApprovals.length > 0 && (
+                            <Field
+                                label="Spend approval"
+                                span
+                                hint="optional — link a governance sign-off"
+                                error={errors.spend_approval_id}
+                            >
+                                <SelectInput
+                                    value={data.spend_approval_id}
+                                    onChange={(v) => setData('spend_approval_id', v === NO_APPROVAL ? '' : v)}
+                                    placeholder="No spend approval"
+                                    options={spendApprovalOptions}
+                                />
+                                <p className="mt-1 text-[12px] text-muted-foreground">
+                                    Large bills may require an approved spend approval before they can be approved.
+                                </p>
+                            </Field>
+                        )}
                     </div>
                 </div>
             )}
@@ -350,6 +394,12 @@ export function NewBillDialog({
                         {data.vendor_reference && <ReviewRow label="Vendor reference" value={data.vendor_reference} />}
                         <ReviewRow label="Bill date" value={data.bill_date} />
                         <ReviewRow label="Due date" value={data.due_date} />
+                        {selectedApproval && (
+                            <ReviewRow
+                                label="Spend approval"
+                                value={`${selectedApproval.reference ? `${selectedApproval.reference} · ` : ''}${selectedApproval.title ?? 'Approval'}`}
+                            />
+                        )}
                         <ReviewRow label="Lines" value={String(data.lines.length)} />
                         <ReviewRow label="Subtotal" value={money(totals.subtotal)} />
                         <ReviewRow label="GST" value={money(totals.gst)} />

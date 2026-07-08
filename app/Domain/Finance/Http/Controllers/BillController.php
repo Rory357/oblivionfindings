@@ -90,7 +90,26 @@ class BillController extends Controller
                     ->orderBy('code')
                     ->get(['id', 'code', 'name'])
                 : [],
+            // Approved, still-valid governance spend approvals available to link on
+            // the bill modal (for the spend-approval gate). Governance-owned; the
+            // link is one-directional (a bill points at one, never creates one).
+            'spendApprovals' => $canManage ? $this->linkableSpendApprovals() : [],
         ]);
+    }
+
+    /**
+     * Governance spend approvals a bill can be linked to: APPROVED and not past
+     * their validity window. Shaped for the New Bill modal's picker. Single-tenant,
+     * so not org-scoped (spend_approvals has no organization_id).
+     */
+    private function linkableSpendApprovals()
+    {
+        return \App\Domain\Governance\Models\SpendApproval::query()
+            ->where('status', \App\Domain\Governance\Models\SpendApproval::STATUS_APPROVED)
+            ->where(fn ($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', now()->toDateString()))
+            ->orderByDesc('decided_at')
+            ->limit(200)
+            ->get(['id', 'reference', 'title', 'amount', 'category']);
     }
 
     /**

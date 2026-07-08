@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewBillDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, formatMoney, useRowContextMenu, type AccountOption, type RowCtxItem, type SpendApprovalOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ interface Bill {
     amount_paid: string;
     status: string;
     notes: string | null;
+    spend_approval_id: number | null;
     lines: BillLine[];
 }
 
@@ -72,6 +73,7 @@ interface Props extends PageProps {
     summary: Summary;
     canManage: boolean;
     accounts: AccountOption[];
+    spendApprovals: SpendApprovalOption[];
 }
 
 const formatDate = (date: string) =>
@@ -82,7 +84,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Bills', href: '/finance/bills' },
 ];
 
-export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts }: Props) {
+export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts, spendApprovals }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
@@ -359,6 +361,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                     onClose={() => setNewBillOpen(false)}
                     vendors={vendors}
                     accounts={accounts}
+                    spendApprovals={spendApprovals}
                 />
             )}
 
@@ -370,6 +373,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                     onClose={() => setEditBill(null)}
                     vendors={vendors}
                     accounts={accounts}
+                    spendApprovals={spendApprovals}
                 />
             )}
         </AppLayout>

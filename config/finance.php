@@ -392,4 +392,23 @@ return [
         'retention_years' => env('FINANCE_AUDIT_EXPORT_RETENTION_YEARS', 7),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Spend Approval Gate (governance sign-off on large bills)
+    |--------------------------------------------------------------------------
+    |
+    | When `enforce` is on, an accounts-payable bill whose total is at or above
+    | `threshold` cannot be approved (and its GL journal posted) unless it is
+    | linked to a governance SpendApproval that is APPROVED and covers the full
+    | bill amount. Opt-in: enforcement is off by default so existing AP flows
+    | are unaffected until an org turns it on. Linking a spend approval to a
+    | bill (spend_approval_id) is always permitted regardless of this setting.
+    |
+    */
+
+    'spend_approval' => [
+        'enforce' => env('FINANCE_SPEND_APPROVAL_ENFORCE', false),
+        'threshold' => env('FINANCE_SPEND_APPROVAL_THRESHOLD', 10000),
+    ],
+
 ];

@@ -21,6 +21,7 @@ class UpdateBillRequest extends FormRequest
             'due_date' => 'sometimes|required|date',
             'notes' => 'nullable|string|max:2000',
             'purchase_order_id' => 'nullable|exists:fin_purchase_orders,id',
+            'spend_approval_id' => 'nullable|exists:spend_approvals,id',
             'lines' => 'sometimes|required|array|min:1',
             'lines.*.description' => 'required|string|max:500',
             'lines.*.quantity' => 'required|numeric|min:0.01',
