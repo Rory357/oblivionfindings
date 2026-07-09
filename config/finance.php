@@ -426,6 +426,7 @@ return [
     'capture' => [
         'damage_repair_account' => env('FINANCE_CAPTURE_DAMAGE_ACCOUNT', '6420'), // Property Maintenance Expense
         'damage_repair_vendor' => env('FINANCE_CAPTURE_DAMAGE_VENDOR', 'Property Repairs'),
+        'respite_revenue_account' => env('FINANCE_CAPTURE_RESPITE_ACCOUNT', '4000'), // Funding Revenue
     ],
 
 ];
