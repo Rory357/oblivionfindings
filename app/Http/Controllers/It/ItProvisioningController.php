@@ -685,6 +685,7 @@ class ItProvisioningController extends Controller
             'asset_id' => $assetId,
             'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
+            'requires_approval' => ItTicket::categoryNeedsApproval($validated['category']),
             'subcategory' => $subcategory,
             'priority' => $validated['priority'],
             'source' => $isAgent ? 'agent' : 'portal',

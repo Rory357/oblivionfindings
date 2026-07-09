@@ -3,20 +3,25 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
+use App\Http\Requests\It\DecideApprovalRequest;
 use App\Http\Requests\It\MergeTicketRequest;
+use App\Http\Requests\It\RequestApprovalRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
+use App\Models\ItTicketApproval;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Illuminate\Http\Request;
@@ -419,6 +424,66 @@ class ItTicketController extends Controller
         return redirect()
             ->route('it.tickets.show', $target)
             ->with('success', "Merged {$ticket->reference} into {$target->reference}.");
+    }
+
+    /**
+     * Raise a sign-off request on a ticket whose category needs approval
+     * (§P-S3). Notifies the other agents (never the requester) and logs it.
+     * Authorised by ItTicketPolicy@requestApproval (RequestApprovalRequest).
+     */
+    public function requestApproval(RequestApprovalRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        $approval = $ticket->approvals()->create([
+            'tenant_id' => $ticket->tenant_id,
+            'requested_by' => $user->id,
+            'status' => 'pending',
+            'reason' => $request->validated('reason'),
+        ]);
+
+        ItTicketEvent::record($ticket, 'approval_requested', $user->id, ['approval_id' => $approval->id]);
+
+        // Every agent who could sign off, except the one who asked.
+        $approvers = ItStaffDirectory::agents($tenantId)->reject(fn (User $u) => $u->id === $user->id);
+        if ($approvers->isNotEmpty()) {
+            NotificationFacade::send($approvers, new TicketApprovalNotification($ticket, 'requested'));
+        }
+
+        return redirect()->back()->with('success', "Approval requested for {$ticket->reference}.");
+    }
+
+    /**
+     * Record a manager's verdict on a pending request (§P-S3) and tell the
+     * agent who asked. Authorised by ItTicketApprovalPolicy@decide
+     * (DecideApprovalRequest) — a different agent, pending only.
+     */
+    public function decideApproval(DecideApprovalRequest $request, ItTicketApproval $approval)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $approval->tenant_id);
+
+        $status = $request->validated('decision') === 'approve' ? 'approved' : 'rejected';
+
+        $approval->forceFill([
+            'status' => $status,
+            'approver_id' => $user->id,
+            'reason' => $request->validated('reason') ?? $approval->reason,
+            'decided_at' => now(),
+        ])->save();
+
+        $ticket = $approval->ticket;
+        ItTicketEvent::record($ticket, 'approval_'.$status, $user->id, ['approval_id' => $approval->id]);
+
+        $requester = User::find($approval->requested_by);
+        if ($requester) {
+            $requester->notify(new TicketApprovalNotification($ticket, $status));
+        }
+
+        return redirect()->back()->with('success', "Approval {$status} for {$ticket->reference}.");
     }
 
     /**
