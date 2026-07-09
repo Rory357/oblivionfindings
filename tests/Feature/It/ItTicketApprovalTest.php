@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\It\TicketApprovalNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /*
  * §P-S3 — approval authorisation. requestApproval lives on ItTicketPolicy (a
@@ -285,4 +286,40 @@ test('a ticket that does not require approval resolves normally', function () {
         ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Rebooted the access point'])
         ->assertRedirect();
     expect($ticket->refresh()->status)->toBe('resolved');
+});
+
+/* ------------------------------------------------------------------ */
+/*  §P-S3 (S10a) — the workspace exposes approval state + affordances  */
+/* ------------------------------------------------------------------ */
+
+test('the workspace exposes approval state and affordances', function () {
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'category' => 'account',
+        'requires_approval' => true,
+        'status' => 'in_progress',
+    ]);
+
+    // No request yet: an agent can raise one; nothing to decide.
+    $this->actingAs($this->agent)
+        ->get(route('it.tickets.show', $ticket))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ticket.requires_approval', true)
+            ->where('ticket.approval', null)
+            ->where('can.requestApproval', true)
+            ->where('can.decideApproval', false));
+
+    // With a pending request, a different agent can decide; the requester can't.
+    pendingApprovalFor($ticket, $this->agent);
+
+    $this->actingAs($this->manager)
+        ->get(route('it.tickets.show', $ticket))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ticket.approval.status', 'pending')
+            ->where('can.decideApproval', true)
+            ->where('can.requestApproval', false));
+
+    $this->actingAs($this->agent)
+        ->get(route('it.tickets.show', $ticket))
+        ->assertInertia(fn (Assert $page) => $page->where('can.decideApproval', false));
 });

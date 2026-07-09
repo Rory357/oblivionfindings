@@ -121,6 +121,12 @@ class ItTicketController extends Controller
             ->values()
             ->all();
 
+        // §P-S3 approval state for the rail — the latest request + who can act.
+        $latestApproval = $ticket->requires_approval
+            ? $ticket->approvals()->with('requester:id,name', 'approver:id,name')->first()
+            : null;
+        $pendingApproval = $latestApproval?->status === 'pending' ? $latestApproval : null;
+
         return [
             'ticket' => [
                 'id' => $ticket->id,
@@ -180,6 +186,17 @@ class ItTicketController extends Controller
                         'title' => $ticket->mergedInto->title,
                     ]
                     : null,
+                // §P-S3 approval — flag + the latest request, for the rail.
+                'requires_approval' => (bool) $ticket->requires_approval,
+                'approval' => $latestApproval ? [
+                    'id' => $latestApproval->id,
+                    'status' => $latestApproval->status,
+                    'requested_by_name' => $latestApproval->requester?->name,
+                    'approver_name' => $latestApproval->approver?->name,
+                    'reason' => $latestApproval->reason,
+                    'requested_at' => $latestApproval->created_at?->toIso8601String(),
+                    'decided_at' => $latestApproval->decided_at?->toIso8601String(),
+                ] : null,
             ],
             'comments' => $comments,
             'events' => $events,
@@ -221,6 +238,9 @@ class ItTicketController extends Controller
                 'rate' => $isRequester && $ticket->status === 'resolved',
                 // Fold a duplicate into another live ticket (§P-S2). Agents only.
                 'merge' => $canManage && ! $ticket->isMerged() && $ticket->status !== 'closed',
+                // Approval affordances (§P-S3).
+                'requestApproval' => (bool) $user->can('requestApproval', $ticket),
+                'decideApproval' => $pendingApproval !== null && (bool) $user->can('decide', $pendingApproval),
             ],
         ];
     }
