@@ -101,6 +101,21 @@ test('a reply carrying a ticket reference threads onto that ticket', function ()
     expect(ItTicket::query()->where('requester_user_id', $sender->id)->count())->toBe(1);
 });
 
+test('the ingestor can be driven directly — the poller contract (E1)', function () {
+    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'requester_user_id' => $sender->id]);
+
+    $inbound = app(\App\Domain\It\InboundEmailIngestor::class)->ingest([
+        'from' => 'worker@example.test',
+        'subject' => "Re: {$ticket->reference}",
+        'text' => 'Direct call, no HTTP.',
+    ]);
+
+    expect($inbound->status)->toBe('processed');
+    expect($inbound->it_ticket_id)->toBe($ticket->id);
+    expect($ticket->comments()->where('body', 'Direct call, no HTTP.')->exists())->toBeTrue();
+});
+
 test('an unknown sender is logged unmatched and never auto-ticketed', function () {
     config(['it.inbound_mail.secret' => 'top-secret']);
 
