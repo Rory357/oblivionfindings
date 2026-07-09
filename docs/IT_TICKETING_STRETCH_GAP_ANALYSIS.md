@@ -51,7 +51,7 @@ onboarding→provisioning bridge, or the SLA engine's current behaviour.
 ## Build order (⇒ the checklist; one checkbox each, split if too big)
 
 - [x] **S0. Planning** — this doc + feasibility triage + §P-S schema + questions #5/#6 (pass 0).
-- [ ] **S1.** Business-hours SLA: migration (`business_hours`,`holiday_dates`) + `App\Support\It\BusinessHours` calculator (working-minutes add/diff, holiday-aware) + unit-ish Pest. No behaviour change yet (null ⇒ 24/7).
+- [x] **S1.** Business-hours SLA: migration (`business_hours`,`holiday_dates`) + `App\Support\It\BusinessHours` calculator (working-minutes add/between, weekend+holiday aware) + `ItSlaPolicy::calendarFor()` hook + 10 Pest. Null calendar ⇒ continuous 24/7 (unchanged). Suite **98 green**.
 - [ ] **S2.** Wire the calculator into `stampSlaDueDates()` (respond/resolve due) so targets land on working time; Pest: a Fri-17:00 ticket with 8×working-hours lands next working day, and a null-calendar policy is unchanged.
 - [ ] **S3.** Teach `it:check-sla` at-risk/breach + `resolveTicket()` met-check to measure working minutes; Pest on breach timing across a weekend/holiday.
 - [ ] **S4.** Admin editor UI: business-hours + holidays on the SLA-targets surface (per-tenant, "apply to all policies"); FormRequest + policy + Pest; copy replaces the "runs 24/7" note when a calendar is set.
