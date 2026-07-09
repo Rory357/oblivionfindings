@@ -103,3 +103,11 @@ provisioning/ticket status change (POST the reference + status + minimal payload
 per-tenant configured URL, HMAC-signed) plus an inbound **status callback** to close
 the loop — no vendor lock-in. If that's acceptable I'll seed a §P-S5 and build it;
 otherwise it stays ⛔ blocked pending the target system. **No silent schema** either way.
+
+**S13 decision-pass outcome (2026-07-10):** no target system was named during the
+loop, so external fulfilment stays ⛔ **blocked** — building a signed webhook that
+fires into the void is infrastructure with no consumer (YAGNI), so I did not. This
+is the ONLY stretch item not shipped. To unblock, reply with EITHER a named system
+(procurement portal / MSP-RMM / identity provider) OR "build the generic signed
+webhook" — the latter becomes a fresh §P-S5 slice (outbound HMAC webhook on
+ticket/provisioning status change + an inbound status callback).
