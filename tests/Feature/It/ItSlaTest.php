@@ -233,3 +233,83 @@ test('SLA targets skip a public holiday', function () {
     // 540 working min: Mon 16:00->17:00 (60), skip Tue (holiday), Wed 08:00 + 8h => Wed 16:00.
     expect($ticket->resolution_due_at->equalTo($monday->addDays(2)->setTime(16, 0)))->toBeTrue();
 });
+
+/* ------------------------------------------------------------------ */
+/*  §P-S4a — the editor sets/clears a tenant business-hours calendar   */
+/* ------------------------------------------------------------------ */
+
+test('the SLA editor writes a business-hours calendar across the whole grid', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)
+        ->put('/it/sla-policies', array_merge(itSlaGrid(), [
+            'business_hours_enabled' => true,
+            'open_time' => '08:00',
+            'close_time' => '17:00',
+            'working_days' => ['mon', 'tue', 'wed', 'thu', 'fri'],
+            'holiday_dates' => ['2026-12-25', '2026-12-26'],
+        ]))
+        ->assertRedirect();
+
+    $rows = ItSlaPolicy::query()->where('tenant_id', 1)->get();
+    expect($rows)->toHaveCount(4);
+    $rows->each(function (ItSlaPolicy $row) {
+        expect($row->business_hours['mon'])->toBe([['08:00', '17:00']]);
+        expect($row->business_hours['sat'])->toBe([]);
+        expect($row->holiday_dates)->toBe(['2026-12-25', '2026-12-26']);
+    });
+
+    // The calendar is now live for stamping.
+    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->not->toBeNull();
+});
+
+test('the SLA editor clears the calendar back to 24/7 when disabled', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)->put('/it/sla-policies', array_merge(itSlaGrid(), [
+        'business_hours_enabled' => true,
+        'open_time' => '09:00',
+        'close_time' => '17:30',
+        'working_days' => ['mon', 'tue', 'wed', 'thu', 'fri'],
+    ]))->assertRedirect();
+    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->not->toBeNull();
+
+    $this->actingAs($admin)->put('/it/sla-policies', array_merge(itSlaGrid(), [
+        'business_hours_enabled' => false,
+    ]))->assertRedirect();
+
+    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->toBeNull();
+    ItSlaPolicy::query()->where('tenant_id', 1)->get()->each(
+        fn (ItSlaPolicy $row) => expect($row->business_hours)->toBeNull(),
+    );
+});
+
+test('the SLA editor rejects a close time at or before the open time', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)
+        ->from('/it?tab=tickets')
+        ->put('/it/sla-policies', array_merge(itSlaGrid(), [
+            'business_hours_enabled' => true,
+            'open_time' => '17:00',
+            'close_time' => '08:00',
+            'working_days' => ['mon', 'tue', 'wed', 'thu', 'fri'],
+        ]))
+        ->assertRedirect('/it?tab=tickets')
+        ->assertSessionHasErrors('close_time');
+});
+
+test('enabling business hours requires at least one working day', function () {
+    $admin = itSlaUser('admin');
+
+    $this->actingAs($admin)
+        ->from('/it?tab=tickets')
+        ->put('/it/sla-policies', array_merge(itSlaGrid(), [
+            'business_hours_enabled' => true,
+            'open_time' => '08:00',
+            'close_time' => '17:00',
+            'working_days' => [],
+        ]))
+        ->assertRedirect('/it?tab=tickets')
+        ->assertSessionHasErrors('working_days');
+});
