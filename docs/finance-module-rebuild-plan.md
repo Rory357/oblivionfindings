@@ -825,9 +825,18 @@ vendor, receipt) — the mould for C2.
     inline under sync queue in this env** (job `handle()` works when called directly; likely its unusual `queue()`
     method) — so observer-dispatched GL jobs may not post without a running queue worker. App-wide (house-ledger/fuel/
     maintenance), not C7-specific. Spawned as its own task.
-  - **[ ] C7a Sites damage/repair → FinBill(AP) + optional insurance FinInvoice(AR) — MISSING.** Seam =
-    `SiteDamageController::update()` when status→'repaired' + `actual_cost`. AP side clean via `AccountsPayableService::
-    createBill`; insurance AR side harder (⚠️ no `createInvoice` service — see C7-blocker).
+  - **[x] C7a Sites damage/repair → FinBill(AP) — SHIPPED.** `SiteDamageController::update()` now, when a damage is
+    'repaired' with `actual_cost > 0`, posts a DRAFT AP bill via new `AccountsPayableService::captureOperationalBill()`
+    (resolves-or-creates the org's "Property Repairs" contractor vendor + resolves GL 6420 Property Maintenance by code,
+    throws if missing; idempotent on `vendor_reference` = "DAMAGE-{id}"; non-fatal try/catch). Draft = GL-safe: the
+    balanced journal (DR 6420 / CR 2000) posts on approval — synchronous, so unaffected by the observer-dispatch quirk.
+    gst_rate 0 (actual_cost has no GST breakdown; approveBill lumps line GST into the expense anyway). Config
+    `finance.capture.{damage_repair_account,damage_repair_vendor}`. Test `DamageRepairBillCaptureTest` 4/4 (draft bill /
+    idempotent / approval posts balanced DR 6420-CR 2000 / no-cost skips). Browser-verified the capture+approval on the
+    REAL demo chart (DR 6420 / CR 2000 balanced). Insurance-AR half DEFERRED (blocked on missing `createInvoice`).
+    ⚠️ Pre-existing (flagged, not mine): SiteDamageTest `support_worker_blocked` expects 403 but the sites route-group
+    `permission:sites.viewAny` middleware REDIRECTS (302) — worker still blocked, stale expectation; also blocks
+    non-Inertia HTTP browser-verify of sites routes (verified posting via the service path instead).
   - **[ ] C7d Asset/Fleet purchase → FinFixedAsset capitalisation — WIRED in finance, no ops trigger.**
     `FixedAssetService::createAsset()` + `postAcquisitionJournal()` work; missing = an `App\Models\Asset::created`
     observer (fixed-asset categories) dispatching to it. `FinFixedAsset.linked_asset_id` FK already exists.

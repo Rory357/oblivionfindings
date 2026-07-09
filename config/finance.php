@@ -411,4 +411,21 @@ return [
         'threshold' => env('FINANCE_SPEND_APPROVAL_THRESHOLD', 10000),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Capture-at-source (operational events → canonical finance documents)
+    |--------------------------------------------------------------------------
+    |
+    | Vendor names + GL expense codes used when an operational event in another
+    | module is captured as a draft accounts-payable bill. Codes must exist in
+    | the chart of accounts (AccountsPayableService resolves them and throws if
+    | missing — never invents a code).
+    |
+    */
+
+    'capture' => [
+        'damage_repair_account' => env('FINANCE_CAPTURE_DAMAGE_ACCOUNT', '6420'), // Property Maintenance Expense
+        'damage_repair_vendor' => env('FINANCE_CAPTURE_DAMAGE_VENDOR', 'Property Repairs'),
+    ],
+
 ];

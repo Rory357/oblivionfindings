@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\Finance\Services\AccountsPayableService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteDamage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class SiteDamageController extends Controller
 {
+    public function __construct(private AccountsPayableService $accountsPayable) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('viewAny', SiteDamage::class);
@@ -86,7 +90,42 @@ class SiteDamageController extends Controller
 
         $damage->update($data);
 
+        // Capture-at-source: a repaired damage with an actual cost becomes a draft
+        // accounts-payable bill for the repair. Idempotent (one bill per damage) and
+        // non-fatal — never blocks the operational update.
+        $this->captureRepairBill($site, $damage->fresh());
+
         return redirect()->back()->with('success', 'Damage report updated.');
+    }
+
+    /**
+     * Post the repair cost of a repaired damage to accounts payable as a draft
+     * bill (against the org's Property Repairs vendor, GL 6420). The finance
+     * service is idempotent on the "DAMAGE-{id}" reference, so this can run on
+     * every update without duplicating.
+     */
+    private function captureRepairBill(Site $site, SiteDamage $damage): void
+    {
+        if ($damage->status !== 'repaired' || (float) $damage->actual_cost <= 0) {
+            return;
+        }
+
+        try {
+            $this->accountsPayable->captureOperationalBill($damage->tenant_id, [
+                'reference' => "DAMAGE-{$damage->id}",
+                'vendor_name' => config('finance.capture.damage_repair_vendor', 'Property Repairs'),
+                'vendor_type' => 'contractor',
+                'description' => "Repair — {$damage->title} @ {$site->name}",
+                'amount' => (float) $damage->actual_cost,
+                'account_code' => config('finance.capture.damage_repair_account', '6420'),
+                // actual_cost is a single figure with no GST breakdown; record it as the
+                // expense/payable as-is (bill approval lumps any line GST into the expense).
+                'gst_rate' => 0,
+                'notes' => "Auto-captured from damage report #{$damage->id}.",
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Damage repair bill capture failed for damage #{$damage->id}: {$e->getMessage()}");
+        }
     }
 
     public function destroy(Request $request, Site $site, SiteDamage $damage)

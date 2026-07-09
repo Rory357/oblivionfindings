@@ -87,6 +87,77 @@ class AccountsPayableService
     }
 
     /**
+     * Capture-at-source: record an operational expense (a repair, a delivery, …)
+     * as a DRAFT accounts-payable bill. Kept draft so it stays GL-safe — the GL
+     * journal posts only when a finance user approves it (approveBill), never
+     * automatically. Idempotent on `reference` (stored as vendor_reference), so a
+     * source event that fires more than once never creates a duplicate bill. The
+     * vendor is resolved-or-created by name; the expense account is resolved by
+     * code and throws if the chart is missing it (never invents one).
+     *
+     * @param  array{reference:string,vendor_name:string,description:string,amount:float|string,account_code:string,vendor_type?:string,gst_rate?:float|int,bill_date?:string,due_date?:string,notes?:string,cost_centre_id?:int}  $data
+     */
+    public function captureOperationalBill(?int $orgId, array $data): ?FinBill
+    {
+        $amount = (float) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $reference = $data['reference'];
+
+        $existing = FinBill::where('organization_id', $orgId)
+            ->where('vendor_reference', $reference)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $vendor = FinVendor::firstOrCreate(
+            ['organization_id' => $orgId, 'name' => $data['vendor_name']],
+            ['vendor_type' => $data['vendor_type'] ?? 'contractor', 'is_active' => true],
+        );
+
+        $account = $this->resolveExpenseAccount($orgId, $data['account_code']);
+
+        return $this->createBill($orgId, [
+            'vendor_id' => $vendor->id,
+            'vendor_reference' => $reference,
+            'bill_date' => $data['bill_date'] ?? now()->toDateString(),
+            'due_date' => $data['due_date'] ?? now()->addDays(30)->toDateString(),
+            'notes' => $data['notes'] ?? null,
+            'lines' => [[
+                'description' => $data['description'],
+                'quantity' => 1,
+                'unit_price' => $amount,
+                'gst_rate' => $data['gst_rate'] ?? 15,
+                'account_id' => $account->id,
+                'cost_centre_id' => $data['cost_centre_id'] ?? null,
+            ]],
+        ]);
+    }
+
+    /**
+     * Resolve an active expense GL account by code for an org, throwing if the
+     * chart is missing it — capture-at-source must never invent a chart code.
+     */
+    private function resolveExpenseAccount(?int $orgId, string $code): FinAccount
+    {
+        $account = FinAccount::where('organization_id', $orgId)
+            ->where('code', $code)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $account) {
+            throw new InvalidArgumentException(
+                "GL expense account '{$code}' not found (or inactive) for organisation #{$orgId}."
+            );
+        }
+
+        return $account;
+    }
+
+    /**
      * Update a bill. Only allowed if draft.
      */
     public function updateBill(FinBill $bill, array $data): FinBill
