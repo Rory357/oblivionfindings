@@ -27,7 +27,7 @@ beforeEach(function () {
     $this->site = Site::factory()->create(['type' => 'house']);
     $this->org = $this->site->tenant_id;
 
-    foreach ([['1000', 'Bank', 'asset'], ['2000', 'Accounts Payable', 'liability'], ['6420', 'Property Maintenance Expense', 'expense']] as [$code, $name, $type]) {
+    foreach ([['1000', 'Bank', 'asset'], ['2000', 'Accounts Payable', 'liability'], ['6420', 'Property Maintenance Expense', 'expense'], ['4230', 'Insurance Recoveries', 'revenue']] as [$code, $name, $type]) {
         FinAccount::factory()->create([
             'organization_id' => $this->org, 'code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true,
         ]);
@@ -112,4 +112,59 @@ it('does not capture a bill when the repair has no actual cost', function () {
         ->assertRedirect();
 
     expect(FinBill::where('vendor_reference', "DAMAGE-{$damage->id}")->exists())->toBeFalse();
+});
+
+it('captures an approved insurance claim as a draft AR invoice to the insurer', function () {
+    $damage = drbc_damage($this->site->id, $this->admin->id);
+
+    $this->actingAs($this->admin)
+        ->put("/sites/{$this->site->id}/damages/{$damage->id}", [
+            'status' => 'repaired',
+            'actual_cost' => 500.00,
+            'insurance_status' => 'approved',
+            'insurance_claim_ref' => 'CLM-4471',
+        ])
+        ->assertRedirect();
+
+    $invoice = \App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+        ->where('source_id', $damage->id)->first();
+
+    expect($invoice)->not->toBeNull()
+        ->and($invoice->status)->toBe('draft')
+        ->and($invoice->client_name)->toBe('Insurance — claim CLM-4471')
+        ->and($invoice->funding_body)->toBe('Insurance')
+        ->and((float) $invoice->total_amount)->toBe(500.0) // zero-rated, mirrors the gst-0 repair bill
+        ->and($invoice->lines()->first()->account_id)
+        ->toBe(FinAccount::where('organization_id', $this->org)->where('code', '4230')->value('id'));
+});
+
+it('insurance capture is idempotent and falls back to the estimate when unpriced', function () {
+    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage->update(['estimated_cost' => 350.00]);
+    $url = "/sites/{$this->site->id}/damages/{$damage->id}";
+
+    $this->actingAs($this->admin)->put($url, ['insurance_status' => 'approved'])->assertRedirect();
+    $this->actingAs($this->admin)->put($url, ['insurance_status' => 'approved', 'repair_notes' => 'again'])->assertRedirect();
+
+    $invoices = \App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+        ->where('source_id', $damage->id)->get();
+
+    expect($invoices)->toHaveCount(1)
+        ->and((float) $invoices->first()->total_amount)->toBe(350.0);
+});
+
+it('does not raise an insurance invoice for pending or declined claims', function () {
+    $damage = drbc_damage($this->site->id, $this->admin->id);
+
+    foreach (['pending', 'submitted', 'declined'] as $status) {
+        $this->actingAs($this->admin)
+            ->put("/sites/{$this->site->id}/damages/{$damage->id}", [
+                'actual_cost' => 500.00,
+                'insurance_status' => $status,
+            ])
+            ->assertRedirect();
+    }
+
+    expect(\App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+        ->where('source_id', $damage->id)->exists())->toBeFalse();
 });

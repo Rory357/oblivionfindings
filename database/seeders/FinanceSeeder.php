@@ -149,6 +149,7 @@ class FinanceSeeder extends Seeder
             $this->account('4200', 'House Income', 'revenue', 'revenue', true),
             $this->account('4210', 'Resident Contributions', 'revenue', 'revenue', true),
             $this->account('4220', 'Donations Received', 'revenue', 'revenue'),
+            $this->account('4230', 'Insurance Recoveries', 'revenue', 'revenue'),
             $this->account('4300', 'Interest Income', 'revenue', 'revenue'),
 
             // ── Expenses (5000-8999) ────────────────────────────────────

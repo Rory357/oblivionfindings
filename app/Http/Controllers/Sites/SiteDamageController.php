@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteDamage;
@@ -12,7 +13,10 @@ use Inertia\Inertia;
 
 class SiteDamageController extends Controller
 {
-    public function __construct(private AccountsPayableService $accountsPayable) {}
+    public function __construct(
+        private AccountsPayableService $accountsPayable,
+        private AccountsReceivableService $accountsReceivable,
+    ) {}
 
     public function index(Request $request, Site $site)
     {
@@ -91,11 +95,48 @@ class SiteDamageController extends Controller
         $damage->update($data);
 
         // Capture-at-source: a repaired damage with an actual cost becomes a draft
-        // accounts-payable bill for the repair. Idempotent (one bill per damage) and
-        // non-fatal — never blocks the operational update.
+        // accounts-payable bill for the repair, and an approved insurance claim
+        // becomes a draft receivable invoice to the insurer. Both idempotent and
+        // non-fatal — never block the operational update.
         $this->captureRepairBill($site, $damage->fresh());
+        $this->captureInsuranceInvoice($site, $damage->fresh());
 
         return redirect()->back()->with('success', 'Damage report updated.');
+    }
+
+    /**
+     * Post an approved insurance claim as a DRAFT receivable invoice (billed to
+     * the insurer, GL 4230 Insurance Recoveries). Amount = actual cost, falling
+     * back to the estimate while the repair is unpriced. Zero-rated: the claim
+     * amount is recovered as-is, mirroring the gst-0 repair bill so the recovery
+     * offsets the expense 1:1. Idempotent on the SiteDamage source.
+     */
+    private function captureInsuranceInvoice(Site $site, SiteDamage $damage): void
+    {
+        $amount = (float) ($damage->actual_cost ?: $damage->estimated_cost);
+
+        if ($damage->insurance_status !== 'approved' || $amount <= 0) {
+            return;
+        }
+
+        try {
+            $claimRef = $damage->insurance_claim_ref;
+            $this->accountsReceivable->captureOperationalInvoice($damage->tenant_id, [
+                'source_type' => SiteDamage::class,
+                'source_id' => $damage->id,
+                'client_name' => $claimRef ? "Insurance — claim {$claimRef}" : 'Insurance claim',
+                'funding_body' => 'Insurance',
+                'description' => "Insurance recovery — {$damage->title} @ {$site->name}",
+                'quantity' => 1,
+                'unit_price' => $amount,
+                'gst_rate' => 0,
+                'revenue_account_code' => config('finance.capture.insurance_revenue_account', '4230'),
+                'notes' => "Auto-captured from damage report #{$damage->id}"
+                    .($claimRef ? " (claim {$claimRef})" : '').'.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Insurance invoice capture failed for damage #{$damage->id}: {$e->getMessage()}");
+        }
     }
 
     /**
