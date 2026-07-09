@@ -7,12 +7,15 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 
 class PayrollJournalService
 {
+    use SanitizesCsvOutput;
+
     /**
      * GL account code → FinAccount cache (per-request, keyed by orgId:code).
      *
@@ -310,8 +313,10 @@ class PayrollJournalService
 
         $csv = "Employee Name,Bank Account Number,Amount,Reference\n";
         foreach ($payslips as $slip) {
-            $name = str_replace(',', ' ', (string) ($slip->user?->name ?? 'Employee'));
-            $bankAccount = str_replace(',', ' ', (string) ($slip->employeeProfile?->bank_account ?? ''));
+            // Names are user-chosen — neutralise formula-leading cells (OWASP CSV
+            // injection) so `=cmd|...` can't execute when the batch opens in Excel.
+            $name = (string) $this->sanitizeCsvCell(str_replace(',', ' ', (string) ($slip->user?->name ?? 'Employee')));
+            $bankAccount = (string) $this->sanitizeCsvCell(str_replace(',', ' ', (string) ($slip->employeeProfile?->bank_account ?? '')));
             $amount = number_format((float) $slip->net_pay, 2, '.', '');
             $csv .= "{$name},{$bankAccount},{$amount},Net pay {$period}\n";
         }

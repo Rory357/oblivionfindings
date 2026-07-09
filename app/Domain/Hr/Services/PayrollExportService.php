@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrPayRateRule;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\Timesheet;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,8 @@ use Illuminate\Support\Str;
 
 class PayrollExportService
 {
+    use SanitizesCsvOutput;
+
     public function __construct(
         private readonly PayslipService $payslipService,
     ) {}
@@ -988,7 +991,9 @@ class PayrollExportService
     {
         return collect($values)
             ->map(function ($value) use ($enclosure) {
-                $stringValue = (string) ($value ?? '');
+                // Employee names, notes and static profile values are user-chosen —
+                // neutralise formula-leading cells (OWASP CSV injection) before enclosing.
+                $stringValue = (string) $this->sanitizeCsvCell((string) ($value ?? ''));
                 $escaped = str_replace($enclosure, $enclosure . $enclosure, $stringValue);
 
                 return $enclosure . $escaped . $enclosure;

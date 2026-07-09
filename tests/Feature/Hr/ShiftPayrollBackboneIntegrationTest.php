@@ -130,10 +130,18 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     $timesheet->refresh();
     expect($timesheet->status)->toBe('approved');
 
+    // The attendance pipeline stamps work_date as the WORKER-LOCAL calendar day
+    // (DraftTimesheetService converts the clock-in to app.worker_timezone =
+    // Pacific/Auckland), while a raw now() here is app-TZ (UTC). Between midnight
+    // and midday NZ those calendar dates differ by a day, so the run window must
+    // be built in the same worker timezone or the fresh timesheet falls just past
+    // periodEnd — this test failed every NZ morning until the window matched.
+    $workerNow = now()->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')));
+
     $run = app(PayrollExportService::class)->createRun(
         tenantId: 1,
-        periodStart: now()->subWeek()->startOfDay(),
-        periodEnd: now()->endOfDay(),
+        periodStart: $workerNow->copy()->subWeek()->startOfDay(),
+        periodEnd: $workerNow->copy()->endOfDay(),
         createdBy: $finance->id,
     );
 
