@@ -65,3 +65,41 @@ ingestion** (needs a mailbox + inbound-mail driver decision), **ticket merge**,
 **approval workflows**, **external fulfilment integrations** (wireframe §5,
 kept deferred). Business-hours SLA calendars are item 2 above. Say the word on
 any of these and it becomes a fresh §P-scoped slice.
+
+**Update 2026-07-09 — picked up.** All of these (plus item 2, business-hours SLA,
+and item 3, the axe run) are now being built in a follow-up loop, tracked in
+[docs/IT_TICKETING_STRETCH_GAP_ANALYSIS.md](docs/IT_TICKETING_STRETCH_GAP_ANALYSIS.md).
+Merge, approvals and business-hours SLA are full builds on documented NZ defaults.
+Email-in is built app-side but stays blocked on infra (see #5). External fulfilment
+stays blocked on a named target system (see #6).
+
+## 5. Email-to-ticket — which inbound-mail provider? (app-side built; go-live blocked on infra)
+
+The loop builds the full app side of email-in: a provider-agnostic
+`POST /it/email/inbound` endpoint (shared-secret verified), a parser that maps a
+normalised payload (from, to, subject, text, message-id, in-reply-to) into a new
+ticket or a threaded reply (matched by the ticket reference in the subject), and an
+`it_inbound_emails` ingestion log. It does NOT go live until you decide:
+
+- **Provider/driver:** Postmark inbound, Mailgun routes, SendGrid inbound parse, or
+  SES→SNS. Each POSTs slightly different JSON; the endpoint normalises, but the
+  **signature verification** differs per provider.
+- **Mailbox + DNS:** a support address (e.g. `support@…`) with an MX/route pointing
+  at the provider, and the provider's webhook aimed at `/it/email/inbound`.
+- **Secret:** `IT_INBOUND_MAIL_SECRET` in the deployed env.
+
+**Recommendation:** Postmark inbound (cleanest JSON, per-message signature). Say the
+word and I'll pin the verifier to it; until then the endpoint takes a shared-secret
+header so it's testable and safe (rejects unsigned requests).
+
+## 6. External fulfilment integration — which system? (blocked — decision needed)
+
+Wireframe §5's "external fulfilment" was never bound to a named system. Before any
+build I need to know what we'd integrate with — e.g. a procurement / asset-vendor
+portal, an MSP/RMM (NinjaOne, Atera, etc.), or nothing external at all.
+
+**Recommendation (default if you want it generic):** a signed **outbound webhook** on
+provisioning/ticket status change (POST the reference + status + minimal payload to a
+per-tenant configured URL, HMAC-signed) plus an inbound **status callback** to close
+the loop — no vendor lock-in. If that's acceptable I'll seed a §P-S5 and build it;
+otherwise it stays ⛔ blocked pending the target system. **No silent schema** either way.
