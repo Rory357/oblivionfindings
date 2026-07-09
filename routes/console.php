@@ -86,6 +86,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->hourly();
 
+// IT helpdesk email-in: poll the connected support mailbox(es) for unread
+// mail → tickets/replies via InboundEmailIngestor. Inert until an
+// ItMailboxConnection is connected (E4/E6).
+app(Schedule::class)
+    ->job(new \App\Jobs\PollItMailboxJob)
+    ->hourly();
+
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)
     ->command('followups:remind-overdue')
