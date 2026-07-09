@@ -746,6 +746,12 @@ class ItProvisioningController extends Controller
             ],
         ]);
 
+        // §P-S3: block a status→resolved move until approval is signed off.
+        if (($validated['status'] ?? null) === 'resolved'
+            && $ticket->requires_approval && $ticket->approvalState() !== 'approved') {
+            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
+        }
+
         $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
         $update = $validated;
 
@@ -808,6 +814,11 @@ class ItProvisioningController extends Controller
 
         if (in_array($ticket->status, ['resolved', 'closed'], true)) {
             return redirect()->back()->with('error', 'This ticket is already resolved.');
+        }
+
+        // §P-S3: an approval-category ticket can't be resolved until signed off.
+        if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
+            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
         }
 
         // The resolution note is the final PUBLIC reply — "what fixed it"

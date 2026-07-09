@@ -96,7 +96,7 @@ test('a decided approval cannot be decided again', function () {
 
 test('the config drives which categories need approval', function () {
     expect(ItTicket::categoryNeedsApproval('account'))->toBeTrue();
-    expect(ItTicket::categoryNeedsApproval('hardware'))->toBeTrue();
+    expect(ItTicket::categoryNeedsApproval('hardware'))->toBeFalse();
     expect(ItTicket::categoryNeedsApproval('other'))->toBeFalse();
     expect(ItTicket::categoryNeedsApproval(null))->toBeFalse();
 });
@@ -172,4 +172,117 @@ test('an agent cannot approve their own request through the route', function () 
         ->assertForbidden();
 
     expect($approval->refresh()->status)->toBe('pending');
+});
+
+/* ------------------------------------------------------------------ */
+/*  §P-S3 (S9b) — the resolve gate                                     */
+/* ------------------------------------------------------------------ */
+
+function approvedTicket(int $requesterId, int $approverId): ItTicket
+{
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'category' => 'account',
+        'requires_approval' => true,
+        'status' => 'in_progress',
+    ]);
+    ItTicketApproval::create([
+        'tenant_id' => 1,
+        'it_ticket_id' => $ticket->id,
+        'requested_by' => $requesterId,
+        'approver_id' => $approverId,
+        'status' => 'approved',
+        'decided_at' => now(),
+    ]);
+
+    return $ticket;
+}
+
+test('a ticket needing approval cannot be resolved until it is approved', function () {
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'category' => 'account',
+        'requires_approval' => true,
+        'status' => 'in_progress',
+    ]);
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $ticket))
+        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Set the account up'])
+        ->assertRedirect()
+        ->assertSessionHas('error');
+    expect($ticket->refresh()->status)->toBe('in_progress');
+
+    ItTicketApproval::create([
+        'tenant_id' => 1,
+        'it_ticket_id' => $ticket->id,
+        'requested_by' => $this->agent->id,
+        'approver_id' => $this->manager->id,
+        'status' => 'approved',
+        'decided_at' => now(),
+    ]);
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Set the account up'])
+        ->assertRedirect();
+    expect($ticket->refresh()->status)->toBe('resolved');
+});
+
+test('a rejected approval still blocks resolution', function () {
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'requires_approval' => true,
+        'status' => 'in_progress',
+    ]);
+    ItTicketApproval::create([
+        'tenant_id' => 1,
+        'it_ticket_id' => $ticket->id,
+        'requested_by' => $this->agent->id,
+        'approver_id' => $this->manager->id,
+        'status' => 'rejected',
+        'decided_at' => now(),
+    ]);
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $ticket))
+        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Trying anyway'])
+        ->assertSessionHas('error');
+    expect($ticket->refresh()->status)->toBe('in_progress');
+});
+
+test('the update route also refuses to resolve an unapproved ticket', function () {
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'requires_approval' => true,
+        'status' => 'in_progress',
+    ]);
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $ticket))
+        ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
+        ->assertSessionHas('error');
+    expect($ticket->refresh()->status)->toBe('in_progress');
+});
+
+test('an approved ticket resolves through the update route', function () {
+    $ticket = approvedTicket($this->agent->id, $this->manager->id);
+
+    $this->actingAs($this->agent)
+        ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
+        ->assertRedirect();
+    expect($ticket->refresh()->status)->toBe('resolved');
+});
+
+test('a ticket that does not require approval resolves normally', function () {
+    $ticket = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'category' => 'network',
+        'requires_approval' => false,
+        'status' => 'in_progress',
+    ]);
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Rebooted the access point'])
+        ->assertRedirect();
+    expect($ticket->refresh()->status)->toBe('resolved');
 });
