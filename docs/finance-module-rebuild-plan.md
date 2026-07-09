@@ -850,12 +850,21 @@ vendor, receipt) — the mould for C2.
     `AssetMaintenanceLogObserver` ALREADY post the GL (DR 6200/6300 / CR AP 2000) — the spend IS captured, just as a
     journal not a bill. Adding a bill would double-count. The only clean addition (a `SiteVendor.fin_vendor_id` attribution
     migration) has no consumer yet → infra-without-user. DEFER.
-  - **[~] C7c Respite booking-confirmed → FinInvoice vs funder + funding drawdown — DEFERRED (blocked).** Seam =
-    `RespiteBookingController::confirm()` (fires `RespiteEvent`). Blocked on the missing AR `createInvoice` service +
-    funding-drawdown logic; the HARDEST flow. DEFER (build `AccountsReceivableService::createInvoice` first when tackled).
-  - **⚠️ C7-blocker: `AccountsReceivableService` has NO `createInvoice()`** — only `allocatePayment()`. AR-side captures
-    (C7a insurance, C7c respite) need a canonical invoice-creation path first (add `createInvoice` or use `FinInvoice::
-    create` + manual journal). Build the AP/asset/ledger flows first; AR flows after the service gap is closed.
+  - **[x] C7c Respite booking-confirmed → FinInvoice vs funder — SHIPPED.** Unblocked by building the AR service gap
+    first (below). `RespiteBookingController::confirm()`, after status→'confirmed', posts a DRAFT receivable invoice to
+    the funder for `nights × serviceAgreement.daily_rate` (zero-rated — funded disability support), via new
+    `AccountsReceivableService::captureOperationalInvoice()` (idempotent on the RespiteBooking source, resolves GL 4000
+    Funding Revenue best-effort, non-fatal). Skips when no agreement rate / no funder / no dates. Draft = GL-safe: the AR
+    issue journal (DR 1100 / CR 4000) posts on send via `PostFinInvoiceJournalJob`. Config
+    `finance.capture.respite_revenue_account`. Tests: `OperationalInvoiceCaptureTest` 3/3. Browser-verified on the REAL
+    demo chart: draft funder invoice (revenue 4000 resolved) → send posts a balanced DR 1100 / CR 4000 journal.
+    ⚠️ **Funding-DRAWDOWN (debit the funding stream/allocation) is DEFERRED** — the invoice bills the funder; drawing
+    down the funding balance is a separate concern (no clean booking↔funding-stream link yet).
+  - **[x] AR service gap CLOSED — `AccountsReceivableService::createInvoice()` built** (the canonical AR counterpart to
+    `createBill`): DRAFT invoice, bcmath totals, NZ 15% GST default or per-line `gst_rate`/`tax_rate_id`, auto
+    `FinInvoice::nextNumber`, `source_type`/`source_id` capture; NO journal on create (posts on send). Test
+    `CreateInvoiceServiceTest` 3/3. Plus `captureOperationalInvoice()` (idempotent capture wrapper). Unblocks C7c +
+    any future C7a-insurance AR.
 - **[x] C8 — Completion assessment: C-series STEADY STATE reached 2026-07-09.** Every remaining item is
   deferred/blocked/cross-module — the clean, high-value finance work is shipped, gated, and merged. Evidence:
   `route:list` clean (269 finance routes, no dead); **finance feature suite 247 green (1289 assertions)**; demo org
@@ -867,9 +876,10 @@ vendor, receipt) — the mould for C2.
   Catering shopping→HouseLedger groceries `86ba6a59` · **C7-FOUNDATION** demo-chart completion `9fe3039c` (org 1 had only
   8/83 accounts → every observer GL post silently failed on demo; now seeds the full chart idempotently) · root-caused
   the `queue()`-method dispatch bug (fixed `c502ab31`) that silently dropped every observer GL journal under sync.
+  **UPDATE 2026-07-09 (post-C8): C7c Respite→funder invoice SHIPPED** (built the AR `createInvoice` service to unblock it)
+  — 4 of the 5 capture-at-source flows now done; only C7d/C7e remain deferred.
   **DEFERRED — honest residuals (all RE-DERIVED from code, not skipped):**
-  - **C7c/C7d/C7e** (remaining captures): see the C7 scorecard — respite→AR blocked on a missing
-    `AccountsReceivableService::createInvoice` + funder cost-calc; asset→FinFixedAsset is a capitalisation-policy /
+  - **C7d/C7e** (remaining captures): see the C7 scorecard — asset→FinFixedAsset is a capitalisation-policy /
     existing-manual-flow concern (no clean draft-capitalise path); op-spend→bill would double-post (observers already
     post the GL). The clean next chunk if resumed: add `AccountsReceivableService::createInvoice` (mirror `createBill`),
     then C7c respite + C7a-insurance AR.
