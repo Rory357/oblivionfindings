@@ -170,10 +170,10 @@ class MicrosoftGraphService
     /**
      * Unread inbox messages for a mailbox (requires Mail.Read on the connected
      * account, delegated to the support mailbox), oldest first, normalised to
-     * the shape InboundEmailIngestor::ingest() consumes plus `graph_id` for the
-     * follow-up markRead().
+     * the shape InboundEmailIngestor::ingest() consumes plus `remote_id` for
+     * the follow-up markRead().
      *
-     * @return array<int, array{graph_id:string,from:string,subject:?string,text:string,message_id:?string,in_reply_to:?string}>
+     * @return array<int, array{remote_id:string,from:string,subject:?string,text:string,message_id:?string,in_reply_to:?string}>
      */
     public function listUnreadMessages(string $mailboxUpn, int $limit = 25): array
     {
@@ -190,7 +190,7 @@ class MicrosoftGraphService
 
         return collect($response->json('value', []))
             ->map(fn (array $m) => [
-                'graph_id' => (string) ($m['id'] ?? ''),
+                'remote_id' => (string) ($m['id'] ?? ''),
                 'from' => (string) ($m['from']['emailAddress']['address'] ?? ''),
                 'subject' => $m['subject'] ?? null,
                 'text' => $this->plainTextBody($m),
@@ -199,7 +199,7 @@ class MicrosoftGraphService
                 // off the IT-… reference in the subject (InboundEmailIngestor).
                 'in_reply_to' => null,
             ])
-            ->filter(fn (array $m) => $m['graph_id'] !== '' && $m['from'] !== '')
+            ->filter(fn (array $m) => $m['remote_id'] !== '' && $m['from'] !== '')
             ->values()
             ->all();
     }

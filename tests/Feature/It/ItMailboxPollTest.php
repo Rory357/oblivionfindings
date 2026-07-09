@@ -86,10 +86,8 @@ test('an already-ingested message is not ticketed twice but is still marked read
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'); // still silenced for next poll
 });
 
-test('disconnected and non-microsoft connections are skipped without any HTTP', function () {
+test('disconnected connections are skipped without any HTTP', function () {
     itPollConnection(['status' => ItMailboxConnection::STATUS_DISCONNECTED]);
-    // Connected google row — Gmail read lands in E5; skipped, not errored.
-    itPollConnection(['provider' => ItMailboxConnection::PROVIDER_GOOGLE]);
 
     Http::fake();
 
@@ -97,4 +95,46 @@ test('disconnected and non-microsoft connections are skipped without any HTTP', 
 
     Http::assertNothingSent();
     expect(ItMailboxConnection::query()->where('status', ItMailboxConnection::STATUS_ERROR)->count())->toBe(0);
+});
+
+test('polling a connected gmail mailbox turns unread mail into tickets and clears UNREAD', function () {
+    User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    $connection = itPollConnection([
+        'provider' => ItMailboxConnection::PROVIDER_GOOGLE,
+        'account_email' => 'support@example.test',
+        'mailbox_email' => null, // Gmail reads the connected account's own inbox
+    ]);
+
+    $body = rtrim(strtr(base64_encode('Gmail body text.'), '+/', '-_'), '=');
+    Http::fake([
+        'gmail.googleapis.com/gmail/v1/users/me/messages/*/modify*' => Http::response([], 200),
+        'gmail.googleapis.com/gmail/v1/users/me/messages/*' => Http::response([
+            'snippet' => 'Gmail body text.',
+            'payload' => [
+                'mimeType' => 'multipart/alternative',
+                'headers' => [
+                    ['name' => 'From', 'value' => 'Worker <worker@example.test>'],
+                    ['name' => 'Subject', 'value' => 'Laptop battery dead'],
+                    ['name' => 'Message-ID', 'value' => '<gm1@mail.example.test>'],
+                ],
+                'parts' => [
+                    ['mimeType' => 'text/plain', 'body' => ['data' => $body]],
+                ],
+            ],
+        ], 200),
+        'gmail.googleapis.com/gmail/v1/users/me/messages*' => Http::response([
+            'messages' => [['id' => 'gm-1']],
+        ], 200),
+    ]);
+
+    (new PollItMailboxJob)->handle(new InboundEmailIngestor);
+
+    $ticket = ItTicket::query()->firstWhere('title', 'Laptop battery dead');
+    expect($ticket)->not->toBeNull();
+    expect($ticket->source)->toBe('email');
+    expect($ticket->description)->toBe('Gmail body text.');
+    expect($connection->fresh()->last_polled_at)->not->toBeNull();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/messages/gm-1/modify')
+        && $request['removeLabelIds'] === ['UNREAD']);
 });

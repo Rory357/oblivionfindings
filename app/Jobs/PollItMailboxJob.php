@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Domain\It\InboundEmailIngestor;
 use App\Models\ItInboundEmail;
 use App\Models\ItMailboxConnection;
+use App\Services\GoogleGmailService;
 use App\Services\MicrosoftGraphService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -42,12 +43,16 @@ class PollItMailboxJob implements ShouldQueue
             return;
         }
 
-        // Gmail read lands in E5 — a google connection is skipped, not errored.
-        if ($connection->provider !== ItMailboxConnection::PROVIDER_MICROSOFT) {
+        // Both services expose the same listUnreadMessages/markRead pair over
+        // the shared CalendarOAuthToken, so the poll below is provider-blind.
+        $service = match ($connection->provider) {
+            ItMailboxConnection::PROVIDER_MICROSOFT => new MicrosoftGraphService($connection),
+            ItMailboxConnection::PROVIDER_GOOGLE => new GoogleGmailService($connection),
+            default => null,
+        };
+        if (! $service) {
             return;
         }
-
-        $service = new MicrosoftGraphService($connection);
 
         try {
             foreach ($service->listUnreadMessages($mailbox) as $message) {
@@ -60,7 +65,7 @@ class PollItMailboxJob implements ShouldQueue
                     $ingestor->ingest($message);
                 }
 
-                $service->markRead($mailbox, $message['graph_id']);
+                $service->markRead($mailbox, $message['remote_id']);
             }
 
             $connection->update(['last_polled_at' => now(), 'last_error' => null]);

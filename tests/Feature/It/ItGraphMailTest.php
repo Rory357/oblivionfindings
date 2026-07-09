@@ -62,7 +62,7 @@ test('listUnreadMessages filters unread and normalises for the ingestor', functi
 
     expect($messages)->toHaveCount(2);
     expect($messages[0])->toMatchArray([
-        'graph_id' => 'AAMkAGraphId1',
+        'remote_id' => 'AAMkAGraphId1',
         'from' => 'worker@example.test',
         'subject' => 'Printer jammed',
         'text' => 'It has been stuck all morning.', // html stripped
