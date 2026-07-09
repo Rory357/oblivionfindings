@@ -142,15 +142,34 @@ export function HeroClusterTile({
     );
 }
 
-/** A labelled cluster card (Lagging · outcomes / Leading · proactive) wrapping its tiles. */
-export function HeroCluster({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
+// Static class map — Tailwind can't see interpolated `sm:grid-cols-${n}`.
+const CLUSTER_COLUMNS: Record<number, string> = {
+    2: 'grid grid-cols-2 gap-2',
+    3: 'grid grid-cols-2 gap-2 sm:grid-cols-3',
+    4: 'grid grid-cols-2 gap-2 sm:grid-cols-4',
+};
+
+/** A labelled cluster card (Lagging · outcomes / Leading · proactive) wrapping its tiles.
+ *  `columns` (2–4, default 4) sets the ≥sm tile grid so a 3-tile cluster doesn't leave
+ *  an empty 4th column. */
+export function HeroCluster({
+    title,
+    icon: Icon,
+    children,
+    columns = 4,
+}: {
+    title: string;
+    icon: LucideIcon;
+    children: ReactNode;
+    columns?: number;
+}) {
     return (
         <div className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/5 p-3">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
                 <Icon className="h-3.5 w-3.5" />
                 {title}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{children}</div>
+            <div className={CLUSTER_COLUMNS[columns] ?? CLUSTER_COLUMNS[4]}>{children}</div>
         </div>
     );
 }

@@ -7,6 +7,9 @@
  *   - FleetComplianceBadges — WOF / Rego / CoF / Insurance / Open-alert chips fed
  *     by raw counts (never pre-formatted strings), same spirit as the H&S
  *     HeroComplianceBadges. Chips are optionally clickable via `href`.
+ *   - FleetAttentionStrip — the conditional "Needs attention" escalation band
+ *     (overdue returns / outings past return / critical alerts) rendered under
+ *     the hero identity row; always org-wide, hidden when all clear.
  *   - FleetHeroAction — the on-dark quick-action button/link used across the
  *     fleet heroes (Book vehicle, Log fuel, …) so the pages don't hand-roll it.
  *
@@ -16,7 +19,9 @@ import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
+    Car,
     CheckCircle2,
+    Clock,
     FileCheck2,
     type LucideIcon,
     ShieldCheck,
@@ -178,6 +183,103 @@ export function FleetComplianceBadges({
                         </span>
                     );
                 })}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Attention strip                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Optional per-chip link overrides for the attention strip. */
+export type FleetAttentionHrefs = {
+    overdue?: string;
+    outings?: string;
+    alerts?: string;
+};
+
+/** The hero's escalation band — overdue vehicle returns, outings past their
+ *  return time and critical Control-Room alerts, as deep-linked chips under a
+ *  "Needs attention" eyebrow. Renders nothing when everything is clear, sits
+ *  directly under the identity row, and is always fed org-wide counts (the
+ *  safeguarding signal out-ranks any scope lens). Tone is never colour-only:
+ *  every chip carries its count + noun. */
+export function FleetAttentionStrip({
+    overdueReturns = 0,
+    outingsPastReturn = 0,
+    criticalAlerts = 0,
+    hrefs = {},
+    className,
+}: {
+    /** Checked-out bookings past their end time → critical chip. */
+    overdueReturns?: number;
+    /** Active outings past their planned return → warning chip. */
+    outingsPastReturn?: number;
+    /** Open critical Control-Room alerts → critical chip. */
+    criticalAlerts?: number;
+    hrefs?: FleetAttentionHrefs;
+    className?: string;
+}) {
+    if (overdueReturns <= 0 && outingsPastReturn <= 0 && criticalAlerts <= 0) {
+        return null;
+    }
+
+    const chips: FleetBadge[] = [];
+    if (overdueReturns > 0) {
+        chips.push({
+            key: 'overdue',
+            icon: Car,
+            tone: 'critical',
+            label: `${overdueReturns} overdue vehicle return${overdueReturns === 1 ? '' : 's'}`,
+            href: hrefs.overdue ?? '/fleet-assets/bookings',
+        });
+    }
+    if (outingsPastReturn > 0) {
+        chips.push({
+            key: 'outings',
+            icon: Clock,
+            tone: 'warning',
+            label: `${outingsPastReturn} outing${outingsPastReturn === 1 ? '' : 's'} past return time`,
+            href: hrefs.outings ?? '/fleet-assets/outings',
+        });
+    }
+    if (criticalAlerts > 0) {
+        chips.push({
+            key: 'alerts',
+            icon: AlertTriangle,
+            tone: 'critical',
+            label: `${criticalAlerts} critical alert${criticalAlerts === 1 ? '' : 's'}`,
+            href: hrefs.alerts ?? '/fleet-assets/alerts',
+        });
+    }
+
+    return (
+        <div
+            role="status"
+            className={cn(
+                'flex flex-wrap items-center gap-2.5 rounded-xl border border-status-critical/50 bg-status-critical/20 px-3.5 py-2.5',
+                className,
+            )}
+        >
+            <AlertTriangle className="h-4 w-4 shrink-0 text-primary-foreground" />
+            <span className="text-[11px] font-bold tracking-[0.07em] text-primary-foreground uppercase">
+                Needs attention
+            </span>
+            <div className="flex flex-wrap gap-2">
+                {chips.map((chip) => (
+                    <Link
+                        key={chip.key}
+                        href={chip.href!}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-primary-foreground/20',
+                            CHIP_CLASS[chip.tone],
+                        )}
+                    >
+                        <chip.icon className={cn('h-3.5 w-3.5', CHIP_ICON[chip.tone])} />
+                        {chip.label}
+                    </Link>
+                ))}
+            </div>
         </div>
     );
 }
