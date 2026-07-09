@@ -5,7 +5,7 @@
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
 import { CsatRater, CsatStars } from '@/components/it/csat';
-import { ResolveTicketDialog } from '@/components/it/it-wizards';
+import { MergeTicketDialog, ResolveTicketDialog, type MergeTarget } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import {
     TicketThread,
@@ -34,6 +34,7 @@ import {
     Copy,
     Eye,
     EyeOff,
+    GitMerge,
     Link2,
     RotateCcw,
     Server,
@@ -70,6 +71,7 @@ interface TicketPayload {
     updated_at: string | null;
     resolved_at: string | null;
     closed_at: string | null;
+    merged_into: { id: number; reference: string | null; title: string } | null;
 }
 
 interface Props {
@@ -79,6 +81,7 @@ interface Props {
     assignees: { id: number; name: string }[];
     assetOptions: { id: number; name: string; tag: string | null }[];
     kbSuggestions: ThreadKbHint[];
+    mergeTargets: MergeTarget[];
     can: {
         manage: boolean;
         view: boolean;
@@ -86,6 +89,7 @@ interface Props {
         reopen: boolean;
         watching: boolean;
         rate: boolean;
+        merge: boolean;
     };
 }
 
@@ -127,6 +131,7 @@ export default function ItTicketShow({
     assignees,
     assetOptions,
     kbSuggestions,
+    mergeTargets,
     can,
 }: Props) {
     const page = usePage<{ auth?: { user?: { id?: number } } }>();
@@ -139,6 +144,7 @@ export default function ItTicketShow({
 
     const [subcategory, setSubcategory] = useState(ticket.subcategory ?? '');
     const [resolving, setResolving] = useState(false);
+    const [merging, setMerging] = useState(false);
 
     /** PATCH a triage field and toast the outcome. */
     const patch = (data: Record<string, string | number | null>, doneMsg = 'Ticket updated.') =>
@@ -175,8 +181,30 @@ export default function ItTicketShow({
                     onClose={() => setResolving(false)}
                 />
             ) : null}
+            {merging ? (
+                <MergeTicketDialog
+                    ticket={{ id: ticket.id, reference: ticket.reference, title: ticket.title }}
+                    targets={mergeTargets}
+                    onClose={() => setMerging(false)}
+                />
+            ) : null}
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
+                {ticket.merged_into ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-[13px]">
+                        <GitMerge className="h-4 w-4 flex-none text-muted-foreground" />
+                        <span className="font-medium">This ticket was merged into</span>
+                        <Link
+                            href={`/it/tickets/${ticket.merged_into.id}`}
+                            className="font-mono font-semibold text-primary hover:underline"
+                        >
+                            {ticket.merged_into.reference ?? `#${ticket.merged_into.id}`}
+                        </Link>
+                        <span className="min-w-0 truncate text-muted-foreground">
+                            — {ticket.merged_into.title}
+                        </span>
+                    </div>
+                ) : null}
                 {/* Compact header band */}
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-9 py-7 text-primary-foreground">
                     <Link
@@ -231,6 +259,15 @@ export default function ItTicketShow({
                                     onClick={() => setResolving(true)}
                                 >
                                     <CheckCircle2 className="h-3.5 w-3.5" /> Resolve…
+                                </Button>
+                            ) : null}
+                            {can.merge ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                    onClick={() => setMerging(true)}
+                                >
+                                    <GitMerge className="h-3.5 w-3.5" /> Merge…
                                 </Button>
                             ) : null}
                             {can.manage && ticket.status === 'resolved' ? (

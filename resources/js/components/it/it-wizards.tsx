@@ -11,6 +11,7 @@ import {
     ClipboardCheck,
     FileText,
     Flag,
+    GitMerge,
     KeyRound,
     Laptop,
     Mail,
@@ -1613,6 +1614,153 @@ export function SlaPolicyDialog({
                 </div>
             </WizardStepPane>
             )}
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  Merge ticket (agent — fold a duplicate into a survivor, §P-S2)     */
+/* ================================================================== */
+
+export interface MergeTarget {
+    id: number;
+    reference: string | null;
+    title: string;
+    priority: string;
+    status: string;
+}
+
+const MERGE_STEPS: readonly WizardStep[] = [
+    { key: 'target', label: 'Merge target', blurb: 'Pick the survivor', icon: GitMerge },
+];
+
+const MERGE_PRIORITY_VARIANT: Record<string, 'critical' | 'info' | 'neutral'> = {
+    urgent: 'critical',
+    high: 'critical',
+    normal: 'info',
+    low: 'neutral',
+};
+
+export function MergeTicketDialog({
+    ticket,
+    targets,
+    onClose,
+}: {
+    ticket: { id: number; reference: string | null; title: string };
+    targets: MergeTarget[];
+    onClose: () => void;
+}) {
+    const [q, setQ] = useState('');
+    const [selected, setSelected] = useState<number | null>(null);
+    const [processing, setProcessing] = useState(false);
+
+    const filtered = useMemo(() => {
+        const term = q.trim().toLowerCase();
+        if (!term) return targets;
+        return targets.filter(
+            (t) =>
+                (t.reference ?? '').toLowerCase().includes(term) || t.title.toLowerCase().includes(term),
+        );
+    }, [q, targets]);
+
+    const chosen = targets.find((t) => t.id === selected) ?? null;
+
+    const submit = () => {
+        if (!selected) return;
+        setProcessing(true);
+        router.post(
+            `/it/tickets/${ticket.id}/merge`,
+            { target_ticket_id: selected },
+            {
+                onSuccess: () => toast.success('Ticket merged.'),
+                onError: () => toast.error('Could not merge — the target may no longer be open.'),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Merge ticket"
+            description={`Fold ${ticket.reference ?? `#${ticket.id}`} into another open ticket.`}
+            railIcon={GitMerge}
+            railTitle="Merge"
+            railSub="IT helpdesk"
+            steps={MERGE_STEPS}
+            stepIndex={0}
+            onStepClick={() => {}}
+            pct={100}
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={!selected || processing}>
+                        {processing
+                            ? 'Merging…'
+                            : chosen
+                              ? `Merge into ${chosen.reference ?? `#${chosen.id}`}`
+                              : 'Merge'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={GitMerge}
+                    title="Choose the surviving ticket"
+                    blurb="This ticket's conversation and watchers move onto the one you pick; this ticket then closes as a duplicate."
+                />
+                <div className="grid gap-3">
+                    <Input
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search by reference or title…"
+                        aria-label="Search merge targets"
+                    />
+                    <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-border p-4 text-center text-[13px] text-muted-foreground">
+                                {targets.length === 0
+                                    ? 'No other open tickets to merge into.'
+                                    : 'No tickets match your search.'}
+                            </div>
+                        ) : (
+                            filtered.map((t) => {
+                                const on = t.id === selected;
+                                return (
+                                    // eslint-disable-next-line no-restricted-syntax -- selectable list row, not a <Button>
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => setSelected(t.id)}
+                                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                            on ? 'border-primary ring-1 ring-primary' : 'border-border hover:bg-muted'
+                                        }`}
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="truncate text-[13px] font-semibold">{t.title}</div>
+                                            <div className="font-mono text-[11.5px] text-muted-foreground">
+                                                {t.reference ?? `#${t.id}`}
+                                            </div>
+                                        </div>
+                                        <StatusBadge variant={MERGE_PRIORITY_VARIANT[t.priority] ?? 'neutral'} size="sm">
+                                            {t.priority}
+                                        </StatusBadge>
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                    <InfoCard icon={GitMerge}>
+                        Merging can’t be undone. The duplicate stays in the record — closed and linked to
+                        the survivor — so nothing is lost.
+                    </InfoCard>
+                </div>
+            </WizardStepPane>
         </WizardShell>
     );
 }
