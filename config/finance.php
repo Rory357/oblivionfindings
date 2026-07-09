@@ -158,6 +158,7 @@ return [
         '1130' => 'NASC',
         '1180' => 'Card Clearing',
         '2000' => 'Accounts Payable',
+        '2150' => 'ESCT',
         '2310' => 'Expense Claims Payable',
         '2400' => 'Accrued Leave',
         '2510' => 'Provision for Claims',

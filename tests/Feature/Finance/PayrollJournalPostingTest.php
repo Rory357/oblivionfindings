@@ -181,6 +181,7 @@ function createPayrollJournalPostingAccounts(): void
         '2110' => ['ACC Levy Payable', 'liability'],
         '2120' => ['KiwiSaver Payable', 'liability'],
         '2130' => ['Student Loan Payable', 'liability'],
+        '2150' => ['ESCT Payable', 'liability'],
         '2300' => ['Accrued Wages', 'liability'],
     ] as $code => [$name, $type]) {
         FinAccount::factory()->create([

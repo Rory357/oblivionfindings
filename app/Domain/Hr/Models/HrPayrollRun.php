@@ -39,6 +39,7 @@ class HrPayrollRun extends Model
         'validation_errors',
         'journal_id',
         'gl_posted_at',
+        'gl_error',
         'net_paid_at',
         'payment_journal_id',
         'cost_allocated_at',

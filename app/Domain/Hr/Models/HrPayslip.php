@@ -29,6 +29,7 @@ class HrPayslip extends Model
         'acc_levy',
         'kiwisaver_employee',
         'kiwisaver_employer',
+        'esct',
         'student_loan',
         'holiday_pay',
         'total_deductions',
