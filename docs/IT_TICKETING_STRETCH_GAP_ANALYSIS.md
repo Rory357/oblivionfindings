@@ -52,7 +52,7 @@ onboarding→provisioning bridge, or the SLA engine's current behaviour.
 
 - [x] **S0. Planning** — this doc + feasibility triage + §P-S schema + questions #5/#6 (pass 0).
 - [x] **S1.** Business-hours SLA: migration (`business_hours`,`holiday_dates`) + `App\Support\It\BusinessHours` calculator (working-minutes add/between, weekend+holiday aware) + `ItSlaPolicy::calendarFor()` hook + 10 Pest. Null calendar ⇒ continuous 24/7 (unchanged). Suite **98 green**.
-- [ ] **S2.** Wire the calculator into `stampSlaDueDates()` (respond/resolve due) so targets land on working time; Pest: a Fri-17:00 ticket with 8×working-hours lands next working day, and a null-calendar policy is unchanged.
+- [x] **S2.** Wired `BusinessHours` into `stampSlaDueDates()` (both due dates), `->utc()` on store. Null calendar = byte-identical continuous time (existing tests unchanged). 2 Pest: Fri-16:30 ticket rolls to next working day + a holiday skip. Suite **100 green**. (⚠️ `travelTo()` in tests must use a UTC instant — a NZ-tz travel value stamps 12h off; production `now()` is UTC so unaffected.)
 - [ ] **S3.** Teach `it:check-sla` at-risk/breach + `resolveTicket()` met-check to measure working minutes; Pest on breach timing across a weekend/holiday.
 - [ ] **S4.** Admin editor UI: business-hours + holidays on the SLA-targets surface (per-tenant, "apply to all policies"); FormRequest + policy + Pest; copy replaces the "runs 24/7" note when a calendar is set.
 - [ ] **S5.** Ticket merge: migration (`merged_into_ticket_id`,`merged_at`) + model rels + `ItTicketPolicy@merge` + Pest (authz + self/closed-target guards).

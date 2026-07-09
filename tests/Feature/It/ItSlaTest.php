@@ -4,6 +4,8 @@ use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\It\BusinessHours;
+use Carbon\CarbonImmutable;
 use Database\Seeders\ItSlaPolicySeeder;
 use Database\Seeders\RbacSeeder;
 
@@ -171,4 +173,63 @@ test('the grid refuses a resolution target tighter than first response', functio
         ->assertSessionHasErrors('urgent.resolution_minutes');
 
     expect(ItSlaPolicy::query()->count())->toBe(0);
+});
+
+/* ------------------------------------------------------------------ */
+/*  §P-S2 — a business-hours calendar rolls targets onto working time  */
+/* ------------------------------------------------------------------ */
+
+test('a business-hours policy rolls SLA targets onto working time', function () {
+    ItSlaPolicy::query()->create([
+        'tenant_id' => 1,
+        'priority' => 'normal',
+        'first_response_minutes' => 60,
+        'resolution_minutes' => 480, // 8 working hours
+        'business_hours' => BusinessHours::nzDefault()['business_hours'], // Mon–Fri 08:00–17:00
+        'holiday_dates' => [],
+    ]);
+
+    // Freeze "now" at Friday 16:30 NZ so the ticket anchors after-hours. Travel
+    // to the UTC instant (production now() is UTC); assertions stay in NZ.
+    $friday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek()->addDays(4)->setTime(16, 30);
+    $this->travelTo($friday->utc());
+    $this->actingAs($this->worker)->post('/it/tickets', [
+        'title' => 'After-hours breakage',
+        'category' => 'hardware',
+        'priority' => 'normal',
+    ])->assertRedirect();
+    $this->travelBack();
+
+    $ticket = ItTicket::query()->firstWhere('title', 'After-hours breakage');
+
+    // First response 60 working min: Fri 16:30->17:00 (30) + Mon 08:00->08:30 (30).
+    expect($ticket->first_response_due_at->equalTo($friday->addDays(3)->setTime(8, 30)))->toBeTrue();
+    // Resolution 480 working min: Fri 16:30->17:00 (30) leaves 450; Mon 08:00 + 7h30 => 15:30.
+    expect($ticket->resolution_due_at->equalTo($friday->addDays(3)->setTime(15, 30)))->toBeTrue();
+});
+
+test('SLA targets skip a public holiday', function () {
+    $monday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek();
+    $tuesday = $monday->addDay();
+
+    ItSlaPolicy::query()->create([
+        'tenant_id' => 1,
+        'priority' => 'high',
+        'first_response_minutes' => 60,
+        'resolution_minutes' => 540, // 9 working hours
+        'business_hours' => BusinessHours::nzDefault()['business_hours'],
+        'holiday_dates' => [$tuesday->format('Y-m-d')], // Tuesday is a holiday
+    ]);
+
+    $this->travelTo($monday->setTime(16, 0)->utc()); // Mon 16:00 NZ, travelled as its UTC instant
+    $this->actingAs($this->worker)->post('/it/tickets', [
+        'title' => 'Holiday-spanning ticket',
+        'category' => 'network',
+        'priority' => 'high',
+    ])->assertRedirect();
+    $this->travelBack();
+
+    $ticket = ItTicket::query()->firstWhere('title', 'Holiday-spanning ticket');
+    // 540 working min: Mon 16:00->17:00 (60), skip Tue (holiday), Wed 08:00 + 8h => Wed 16:00.
+    expect($ticket->resolution_due_at->equalTo($monday->addDays(2)->setTime(16, 0)))->toBeTrue();
 });

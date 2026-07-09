@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\It\BusinessHours;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -193,9 +194,14 @@ class ItTicket extends Model
             (string) $this->priority,
         );
 
+        $calendar = ItSlaPolicy::calendarFor((int) $this->tenant_id, (string) $this->priority);
         $anchor = $this->created_at ?? now();
-        $this->first_response_due_at = $anchor->copy()->addMinutes($firstResponseMinutes);
-        $this->resolution_due_at = $anchor->copy()->addMinutes($resolutionMinutes);
+
+        // Working-time targets when the tenant set a business-hours calendar;
+        // a null calendar keeps the continuous 24/7 clock (unchanged). ->utc()
+        // so a worker-timezone result stores as the correct instant.
+        $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $firstResponseMinutes, $calendar)->utc();
+        $this->resolution_due_at = BusinessHours::addWorkingMinutes($anchor, $resolutionMinutes, $calendar)->utc();
     }
 
     /* ------------------------------------------------------------------ */
