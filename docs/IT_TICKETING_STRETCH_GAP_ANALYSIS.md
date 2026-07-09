@@ -68,7 +68,18 @@ onboarding→provisioning bridge, or the SLA engine's current behaviour.
 - [x] **S11.** Email-in schema: `it_inbound_emails` ingestion log (table + `ItInboundEmail` model, ticket link, processed/unmatched/rejected) + `email` added to `ItTicket::SOURCES`. Source already rides the `show()` payload; a visible "via email" source chip is folded into S14 polish. 3 model Pest. Suite **135 green**.
 - [x] **S12.** Email-in webhook: `POST /api/it/email/inbound` (API routes → stateless, no session/CSRF; shared-secret `X-IT-Inbound-Secret`, inert until `IT_INBOUND_MAIL_SECRET` set). Provider-agnostic parser: `IT-…` in subject → thread a public reply; else a known staff sender opens a `source=email` ticket; unknown senders logged `unmatched`, never auto-ticketed. Every message hits `it_inbound_emails`. 5 Pest (bad/absent secret, new, threaded, unmatched). Suite **140 green**. ✅ item D app-side done — **go-live only needs the mail-provider pick (questions #5)**.
 - ⛔ **S13.** External fulfilment: **DECISION pass done — BLOCKED (see [questions #6](../IT_TICKETING_QUESTIONS.md))**. No target system was named, so building a signed webhook that fires into the void would be a consumer-less integration (YAGNI) — not built. Recommendation recorded (generic HMAC outbound webhook + status callback → a fresh §P-S5 on your word). **The only stretch item not shipped.** No silent schema.
-- [ ] **S14.** Delight + accessibility: run `npm run visual:test` (axe) if reachable on this build (else re-note in questions #3); static a11y pass on every new surface; final DoD sweep (full suite + types + build + lint).
+- [x] **S14.** Delight + a11y + DoD sweep. Delight: "via email" source chip on the workspace header (closes the S11 badge deferral). Static WCAG-AA pass on the new surfaces — business-hours step (Checkbox in `<label>`, time inputs `aria-label`, working-day chips `aria-pressed`+focus-visible, holiday-remove `aria-label`), merge dialog (search `aria-label`, rows `aria-pressed`+focus-visible), approval rail (kit Buttons + StatusBadge pair colour with text) — colour never the only signal; automated axe still worktree-blocked → run `npm run visual:test` on the deployed build (questions #3). **Final sweep: `tests/Feature/It` 140 passed (1200 assertions) · types ✓ · build ✓ · lint 0 errors.**
+
+---
+
+## ✅ STRETCH LOOP COMPLETE (2026-07-10)
+
+All buildable items shipped on `claude/it-ticketing-stretch`; suite grew 88 → **140**.
+- **A · Business-hours SLA** (S1–S4b) ✅ calculator, stamping, at-risk, admin editor.
+- **B · Ticket merge** (S5–S7b) ✅ schema, policy, fold, payload, dialog + banner.
+- **C · Approval workflows** (S8–S10b) ✅ schema, policies, request/decide, resolve gate, rail.
+- **D · Email-to-ticket** (S11–S12) ✅ app-side (log, webhook, parser, threading); **go-live needs a mail provider (questions #5)**.
+- **E · External fulfilment** (S13) ⛔ **blocked** — needs a named target system or a "build the generic webhook" go-ahead (questions #6).
 
 ## Decisions / questions
 Blockers and chosen defaults live in [IT_TICKETING_QUESTIONS.md](../IT_TICKETING_QUESTIONS.md):

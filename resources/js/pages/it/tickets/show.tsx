@@ -36,6 +36,7 @@ import {
     EyeOff,
     GitMerge,
     Link2,
+    Mail,
     RotateCcw,
     Server,
     ShieldCheck,
@@ -320,6 +321,11 @@ export default function ItTicketShow({
                                 {/* Live SLA countdown — ticks once a minute, tone from the
                                     server verdict, hidden once met/settled. */}
                                 <SlaChip ticket={ticket} />
+                                {ticket.source === 'email' ? (
+                                    <span className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/85">
+                                        <Mail className="h-3 w-3" /> via email
+                                    </span>
+                                ) : null}
                             </div>
                             <h1 className="mt-1 truncate text-[22px] leading-tight font-bold tracking-tight">
                                 {ticket.title}
