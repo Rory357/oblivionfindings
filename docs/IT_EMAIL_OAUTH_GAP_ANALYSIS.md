@@ -30,7 +30,7 @@ against faked HTTP so it's ready the moment it's connected.
 ## Build order (one checkbox each; verify → tick → commit → stop)
 - [x] **E0.** Seed this plan (pass 0).
 - [x] **E1.** Extracted `App\Domain\It\InboundEmailIngestor` (`ingest(array $message): ItInboundEmail` — sender match, `IT-…` subject threading, new `source=email` ticket, `it_inbound_emails` log). Webhook controller is now a thin transport shell (secret gate + validation → ingestor); S12 tests untouched in behaviour, +1 direct-ingestor test. Suite **141 green** (1203 assertions), Pint clean.
-- [ ] **E2.** `MicrosoftGraphService` mail-read: `listUnreadMessages(mailbox)`, `markRead(mailbox, id)` (Graph `/users/{mbx}/messages`). Pest with `Http::fake`.
+- [x] **E2.** `MicrosoftGraphService` mail-read: `listUnreadMessages(mailbox)` (unread-only inbox pull via `$filter=isRead eq false`, normalised to the ingestor shape + `graph_id`, HTML stripped to text, malformed rows dropped) + `markRead(mailbox, id)` (PATCH `isRead=true`) — both on the service's existing token-refresh client. 3 `Http::fake` Pest. Suite **144 green** (1222 assertions).
 - [ ] **E3.** `ItMailboxConnection` (migration + model implementing `CalendarOAuthToken`, mirrors `CalendarSyncConnection`; encrypted tokens, provider, account_email, status). Pest.
 - [ ] **E4.** `PollItMailboxJob` (mirrors `SyncCalendarJob`): pull unread via the Graph service → `InboundEmailIngestor` → mark read; scheduled hourly in `console.php`. Pest driving faked Graph messages → tickets.
 - [ ] **E5.** Gmail read: `listUnreadMessages`/`markRead` on the Google side + wire the poll job to a `google` connection. Pest with `Http::fake`.
