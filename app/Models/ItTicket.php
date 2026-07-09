@@ -43,6 +43,8 @@ class ItTicket extends Model
         'assigned_to_user_id',
         'asset_id',
         'provisioning_request_id',
+        'merged_into_ticket_id',
+        'merged_at',
         'category',
         'subcategory',
         'source',
@@ -69,6 +71,7 @@ class ItTicket extends Model
         'waiting_since' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
+        'merged_at' => 'datetime',
         'csat_submitted_at' => 'datetime',
         'sla_paused_minutes' => 'integer',
         'reopened_count' => 'integer',
@@ -153,6 +156,24 @@ class ItTicket extends Model
     public function provisioningRequest(): BelongsTo
     {
         return $this->belongsTo(ItProvisioningRequest::class, 'provisioning_request_id');
+    }
+
+    /** The survivor this ticket was merged into (a duplicate points here). */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(ItTicket::class, 'merged_into_ticket_id');
+    }
+
+    /** Duplicate tickets folded into this one. */
+    public function mergedTickets(): HasMany
+    {
+        return $this->hasMany(ItTicket::class, 'merged_into_ticket_id');
+    }
+
+    /** True once this ticket has been folded into a survivor. */
+    public function isMerged(): bool
+    {
+        return $this->merged_into_ticket_id !== null;
     }
 
     public function comments(): HasMany

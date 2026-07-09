@@ -63,6 +63,23 @@ class ItTicketPolicy
     }
 
     /**
+     * Merge a duplicate SOURCE ticket into a TARGET survivor. Agent work; a
+     * ticket can't merge into itself, an already-merged source can't be merged
+     * again, and both ends must be live (not closed, not already merged) in the
+     * same tenant.
+     */
+    public function merge(User $user, ItTicket $ticket, ItTicket $target): bool
+    {
+        return $user->canDo('it.manage')
+            && $ticket->id !== $target->id
+            && (int) $ticket->tenant_id === (int) $target->tenant_id
+            && $ticket->merged_into_ticket_id === null
+            && $target->merged_into_ticket_id === null
+            && $ticket->status !== 'closed'
+            && $target->status !== 'closed';
+    }
+
+    /**
      * Rate the resolution (CSAT). The requester's own satisfaction — agents
      * never rate. Allowed only while the ticket is `resolved`: nothing to rate
      * before, and a close locks it in (editable until closed, §K).
