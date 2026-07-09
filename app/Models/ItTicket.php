@@ -27,7 +27,7 @@ class ItTicket extends Model
 
     public const STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 
-    public const SOURCES = ['portal', 'agent', 'system'];
+    public const SOURCES = ['portal', 'agent', 'system', 'email'];
 
     public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
