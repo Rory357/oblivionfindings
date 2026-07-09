@@ -288,6 +288,25 @@ class FixedAssetController extends Controller
     }
 
     /**
+     * Post the acquisition journal for an asset registered without GL accounts
+     * (capture-at-source). Idempotent; errors are surfaced, never silent.
+     */
+    public function capitalise(Request $request, FinFixedAsset $fixedAsset)
+    {
+        $this->authorize('update', $fixedAsset);
+
+        try {
+            $asset = $this->assetService->capitaliseAsset($fixedAsset);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                ->withErrors(['general' => $e->getMessage()]);
+        }
+
+        return redirect()->route('finance.fixed-assets.show', $asset)
+            ->with('success', "Acquisition journal posted for \"{$asset->asset_name}\".");
+    }
+
+    /**
      * Dispose of a fixed asset.
      */
     public function dispose(Request $request, FinFixedAsset $fixedAsset)
