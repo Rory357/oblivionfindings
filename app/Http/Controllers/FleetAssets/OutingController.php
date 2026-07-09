@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetVehicleBooking;
@@ -38,6 +39,9 @@ class OutingController extends Controller
                     'active_now' => 0,
                     'residents_out_now' => 0,
                     'completed_7d' => 0,
+                    'past_return' => 0,
+                    'overdue_returns' => 0,
+                    'critical_alerts' => 0,
                 ],
                 'chart_data' => [],
             ]);
@@ -153,6 +157,22 @@ class OutingController extends Controller
                 'completed_7d' => FleetOuting::query()
                     ->where('status', 'completed')
                     ->where('planned_departure', '>=', now()->subDays(7))
+                    ->count(),
+                // Attention-strip escalations (org-wide, same definitions as
+                // the fleet dashboard hero).
+                'past_return' => FleetOuting::query()
+                    ->where('status', 'active')
+                    ->where('planned_return', '<', now())
+                    ->count(),
+                'overdue_returns' => Schema::hasTable('fleet_vehicle_bookings')
+                    ? FleetVehicleBooking::query()
+                        ->where('status', 'checked_out')
+                        ->where('ends_at', '<', now())
+                        ->count()
+                    : 0,
+                'critical_alerts' => ControlRoomAlert::query()
+                    ->whereNotIn('status', ['closed', 'resolved'])
+                    ->where('severity', 'critical')
                     ->count(),
             ],
             'chart_data' => $chartFormatted,

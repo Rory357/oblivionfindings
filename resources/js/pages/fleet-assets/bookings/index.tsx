@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import {
+    FleetAttentionStrip,
     FleetHeroAction,
     fmt,
     HeroClusterTile,
@@ -53,6 +54,8 @@ type Props = {
         approved_upcoming: number;
         checked_out: number;
         overdue: number;
+        outings_past_return: number;
+        critical_alerts: number;
     };
     filters: {
         status?: string; asset_id?: string; date_from?: string; date_to?: string;
@@ -189,7 +192,10 @@ export default function BookingsIndex({
     const filters = rawFilters ?? {};
     const vehicles = rawVehicles ?? [];
     const calendarBookings = rawCalendarBookings ?? [];
-    const heroStats = hero ?? { pending: 0, approved_upcoming: 0, checked_out: 0, overdue: 0 };
+    const heroStats = hero ?? {
+        pending: 0, approved_upcoming: 0, checked_out: 0, overdue: 0,
+        outings_past_return: 0, critical_alerts: 0,
+    };
 
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>(filters.view === 'calendar' ? 'calendar' : 'list');
     const weekStart = useMemo(() => rawWeekStart ? new Date(rawWeekStart) : getMonday(new Date()), [rawWeekStart]);
@@ -274,6 +280,16 @@ export default function BookingsIndex({
                             />
                         </div>
                     </div>
+
+                    {/* Org-wide escalations — same band as the fleet dashboard; the
+                        overdue chip drills into this page's overdue filter. */}
+                    <FleetAttentionStrip
+                        overdueReturns={heroStats.overdue ?? 0}
+                        outingsPastReturn={heroStats.outings_past_return ?? 0}
+                        criticalAlerts={heroStats.critical_alerts ?? 0}
+                        hrefs={{ overdue: '/fleet-assets/bookings?overdue=1' }}
+                    />
+
                     <div className="flex flex-wrap items-center gap-2">
                         {/* eslint-disable-next-line no-restricted-syntax -- on-dark hero quick action (FleetHeroAction chrome) opening the modal, not a nav link. */}
                         <button

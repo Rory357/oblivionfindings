@@ -3,6 +3,7 @@ import { FleetStatCard } from '@/components/fleet-stat-card';
 import { MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
 import {
+    FleetAttentionStrip,
     FleetHeroAction,
     fmt,
     HeroClusterTile,
@@ -78,6 +79,9 @@ type Props = {
         active_now: number;
         residents_out_now: number;
         completed_7d: number;
+        past_return: number;
+        overdue_returns: number;
+        critical_alerts: number;
     };
     chart_data: ChartItem[];
     can: {
@@ -105,7 +109,10 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
     const safeMeta = outings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeLinks = outings?.links ?? [];
     const safeStats = stats ?? { outings_this_week: 0, residents_this_week: 0, avg_duration_minutes: 0, upcoming: 0 };
-    const safeHero = hero ?? { planned_today: 0, active_now: 0, residents_out_now: 0, completed_7d: 0 };
+    const safeHero = hero ?? {
+        planned_today: 0, active_now: 0, residents_out_now: 0, completed_7d: 0,
+        past_return: 0, overdue_returns: 0, critical_alerts: 0,
+    };
     const safeChartData = chart_data ?? [];
 
     const [search, setSearch] = useState(filters?.search ?? '');
@@ -149,13 +156,13 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                 label="Active now"
                                 value={fmt(safeHero.active_now)}
                                 caption="out in the community"
-                                tone={safeHero.active_now > 0 ? 'warning' : 'success'}
+                                tone="neutral"
                             />
                             <HeroClusterTile
                                 label="Residents out now"
                                 value={fmt(safeHero.residents_out_now)}
-                                caption="not yet returned"
-                                tone={safeHero.residents_out_now > 0 ? 'warning' : 'success'}
+                                caption={(safeHero.past_return ?? 0) > 0 ? `${safeHero.past_return} past return` : 'not yet returned'}
+                                tone={(safeHero.past_return ?? 0) > 0 ? 'critical' : 'neutral'}
                             />
                             <HeroClusterTile
                                 label="Completed 7d"
@@ -165,6 +172,14 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                             />
                         </div>
                     </div>
+
+                    {/* Org-wide escalations — same band as the fleet dashboard. */}
+                    <FleetAttentionStrip
+                        overdueReturns={safeHero.overdue_returns ?? 0}
+                        outingsPastReturn={safeHero.past_return ?? 0}
+                        criticalAlerts={safeHero.critical_alerts ?? 0}
+                        hrefs={{ outings: '/fleet-assets/outings?status=active' }}
+                    />
                     {can.manage && (
                         <div className="flex flex-wrap items-center gap-2">
                             <FleetHeroAction
