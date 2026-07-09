@@ -2,6 +2,7 @@
 
 use App\Models\ItInboundEmail;
 use App\Models\ItTicket;
+use App\Models\User;
 
 /*
  * §P-S4 (S11) — the email-in ingestion log + `email` source. The webhook,
@@ -43,4 +44,72 @@ test('an unmatched inbound email can be logged without a ticket', function () {
 
     expect($inbound->it_ticket_id)->toBeNull();
     expect($inbound->ticket)->toBeNull();
+});
+
+/* ------------------------------------------------------------------ */
+/*  §P-S4 (S12) — the inbound webhook                                  */
+/* ------------------------------------------------------------------ */
+
+test('the webhook rejects a missing or wrong shared secret', function () {
+    config(['it.inbound_mail.secret' => 'top-secret']);
+
+    $this->postJson('/api/it/email/inbound', ['from' => 'x@example.test'])
+        ->assertForbidden();
+
+    $this->postJson('/api/it/email/inbound', ['from' => 'x@example.test'], ['X-IT-Inbound-Secret' => 'nope'])
+        ->assertForbidden();
+});
+
+test('the webhook is inert when no secret is configured', function () {
+    config(['it.inbound_mail.secret' => null]);
+
+    $this->postJson('/api/it/email/inbound', ['from' => 'x@example.test'], ['X-IT-Inbound-Secret' => 'anything'])
+        ->assertForbidden();
+});
+
+test('a known sender opens a new ticket by email', function () {
+    config(['it.inbound_mail.secret' => 'top-secret']);
+    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+
+    $this->postJson('/api/it/email/inbound', [
+        'from' => 'worker@example.test',
+        'subject' => 'Printer jammed',
+        'text' => 'It has been stuck all morning.',
+        'message_id' => '<a@mail>',
+    ], ['X-IT-Inbound-Secret' => 'top-secret'])->assertOk();
+
+    $ticket = ItTicket::query()->where('requester_user_id', $sender->id)->first();
+    expect($ticket)->not->toBeNull();
+    expect($ticket->source)->toBe('email');
+    expect($ticket->title)->toBe('Printer jammed');
+    expect(ItInboundEmail::query()->where('it_ticket_id', $ticket->id)->where('status', 'processed')->exists())->toBeTrue();
+});
+
+test('a reply carrying a ticket reference threads onto that ticket', function () {
+    config(['it.inbound_mail.secret' => 'top-secret']);
+    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'requester_user_id' => $sender->id]);
+
+    $this->postJson('/api/it/email/inbound', [
+        'from' => 'worker@example.test',
+        'subject' => "Re: {$ticket->reference} still broken",
+        'text' => 'Any update?',
+    ], ['X-IT-Inbound-Secret' => 'top-secret'])->assertOk();
+
+    expect($ticket->comments()->where('body', 'Any update?')->exists())->toBeTrue();
+    // No NEW ticket spawned for this sender.
+    expect(ItTicket::query()->where('requester_user_id', $sender->id)->count())->toBe(1);
+});
+
+test('an unknown sender is logged unmatched and never auto-ticketed', function () {
+    config(['it.inbound_mail.secret' => 'top-secret']);
+
+    $this->postJson('/api/it/email/inbound', [
+        'from' => 'stranger@example.test',
+        'subject' => 'Help',
+        'text' => 'I am not staff.',
+    ], ['X-IT-Inbound-Secret' => 'top-secret'])->assertOk();
+
+    expect(ItInboundEmail::query()->where('from_email', 'stranger@example.test')->where('status', 'unmatched')->exists())->toBeTrue();
+    expect(ItTicket::query()->count())->toBe(0);
 });

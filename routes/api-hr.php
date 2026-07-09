@@ -13,3 +13,9 @@ Route::middleware(['auth:sanctum'])->prefix('hr')->name('api.hr.')->group(functi
     Route::get('/time/entries', [HrApiController::class, 'timeEntries'])->name('time.entries');
     Route::get('/payroll/runs', [HrApiController::class, 'payrollRuns'])->name('payroll.runs');
 });
+
+// §P-S4 email-to-ticket webhook — unauthenticated, shared-secret verified in the
+// controller (inert until IT_INBOUND_MAIL_SECRET is set). Stateless: no session,
+// no CSRF. A provider maps its payload to {from, subject, text, message_id}.
+Route::post('/it/email/inbound', \App\Http\Controllers\It\ItInboundEmailController::class)
+    ->name('api.it.email.inbound');

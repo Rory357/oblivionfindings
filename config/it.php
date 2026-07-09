@@ -19,4 +19,19 @@ return [
         'categories' => ['account'],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Inbound email (email-to-ticket)
+    |--------------------------------------------------------------------------
+    |
+    | Shared secret a mail provider must send as the X-IT-Inbound-Secret header
+    | to POST /api/it/email/inbound. Empty (the default) makes the webhook
+    | reject everything — email-in stays inert until this is set (§P-S4).
+    |
+    */
+
+    'inbound_mail' => [
+        'secret' => env('IT_INBOUND_MAIL_SECRET'),
+    ],
+
 ];
