@@ -121,6 +121,35 @@ it('approving the maintenance bill posts DR 6300 / CR 2000 and allocates to the 
         ->and((float) $alloc->amount)->toBe(480.0);
 });
 
+it('allocates exactly the line amounts when two expense lines share an account', function () {
+    // Audit-hardening: two lines on the same expense account must allocate
+    // 100 + 200 = 300 total (one allocation per journal debit line, each with
+    // ITS OWN amount) — never doubled by the account-id matching.
+    $vendor = FinVendor::firstOrCreate(
+        ['organization_id' => 1, 'name' => 'Two-Line Vendor'],
+        ['vendor_type' => 'contractor', 'is_active' => true],
+    );
+    $acct6300 = FinAccount::where('organization_id', 1)->where('code', '6300')->firstOrFail();
+
+    $bill = app(AccountsPayableService::class)->createBill(1, [
+        'vendor_id' => $vendor->id,
+        'bill_date' => now()->toDateString(),
+        'due_date' => now()->addDays(30)->toDateString(),
+        'site_id' => $this->site->id,
+        'allocation_event_type' => 'asset_maintenance_expense',
+        'lines' => [
+            ['description' => 'Part A', 'quantity' => 1, 'unit_price' => 100, 'gst_rate' => 0, 'account_id' => $acct6300->id],
+            ['description' => 'Part B', 'quantity' => 1, 'unit_price' => 200, 'gst_rate' => 0, 'account_id' => $acct6300->id],
+        ],
+    ]);
+
+    app(AccountsPayableService::class)->approveBill($bill, auth()->id());
+
+    $allocs = FinCostAllocation::where('journal_id', $bill->fresh()->journal_id)->get();
+    expect($allocs)->toHaveCount(2)
+        ->and((float) $allocs->sum('amount'))->toBe(300.0); // the bill total, never doubled
+});
+
 it('captures nothing for zero-cost logs', function () {
     $fuel = FleetFuelLog::create([
         'asset_id' => $this->asset->id, 'logged_at' => now(),

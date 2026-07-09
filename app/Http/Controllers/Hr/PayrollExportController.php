@@ -206,7 +206,9 @@ class PayrollExportController extends Controller
 
     /**
      * Retry the GL journal post for a locked run whose posting failed
-     * (surfaced via hr_payroll_runs.gl_error). Sync queue → posts inline.
+     * (surfaced via hr_payroll_runs.gl_error). Runs the job synchronously so
+     * the outcome is deterministic in every environment (a queued dispatch
+     * would return "posted" before the job ran on a real queue connection).
      */
     public function retryGlPost(Request $request, HrPayrollRun $run)
     {
@@ -225,13 +227,13 @@ class PayrollExportController extends Controller
             return redirect()->back()->withErrors(['gl' => 'This run already has a posted journal.']);
         }
 
-        PostPayrollJournalJob::dispatch($run);
+        try {
+            PostPayrollJournalJob::dispatchSync($run);
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['gl' => "GL post failed again: {$e->getMessage()}"]);
+        }
 
-        $run->refresh();
-
-        return $run->gl_error
-            ? redirect()->back()->withErrors(['gl' => "GL post failed again: {$run->gl_error}"])
-            : redirect()->back()->with('success', 'Payroll journal posted.');
+        return redirect()->back()->with('success', 'Payroll journal posted.');
     }
 
     /**

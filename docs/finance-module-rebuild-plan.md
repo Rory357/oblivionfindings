@@ -876,6 +876,36 @@ vendor, receipt) — the mould for C2.
   Catering shopping→HouseLedger groceries `86ba6a59` · **C7-FOUNDATION** demo-chart completion `9fe3039c` (org 1 had only
   8/83 accounts → every observer GL post silently failed on demo; now seeds the full chart idempotently) · root-caused
   the `queue()`-method dispatch bug (fixed `c502ab31`) that silently dropped every observer GL journal under sync.
+  **UPDATE 2026-07-10 — "implement all" round (user-directed): every deferred residual re-derived and CLOSED.**
+  - **C7a-insurance SHIPPED**: approved insurance claim on a damage → draft AR invoice to the insurer (4230 Insurance
+    Recoveries — new chart account; zero-rated to mirror the gst-0 repair bill so recovery offsets expense 1:1).
+  - **C7e SHIPPED (double-post-free design)**: fuel = paid-at-pump card spend → GL credit moved from phantom AP 2000 to
+    **1180 Card Clearing** (config `fuel_expense.credit`; allocations untouched). Maintenance = genuine vendor spend →
+    DRAFT AP bill (vendor from the log, ref MAINT-{id}) REPLACING the direct GL post; bills gained capture context
+    (`fin_bills.site_id/asset_id/allocation_event_type`) and **approveBill now creates the FinCostAllocation rows** its
+    expense lines imply — the pre-condition that made bill-conversion regression-free (SiteCostService groups by
+    event_type; continuity preserved). The old plan's "SiteVendor.fin_vendor_id FK" is superseded: vendor attribution
+    happens through the real FinVendor on the captured bill.
+  - **C7d SHIPPED (GL-safe capture + the missing capitalise action)**: AssetValueObserver registers high-value capital-
+    category valuations on the fixed-asset register WITHOUT GL accounts (no auto journal — policy stays with finance);
+    new `fin_fixed_assets.acquisition_journal_id` + idempotent postAcquisitionJournal + `FixedAssetService::
+    capitaliseAsset` + POST /finance/fixed-assets/{id}/capitalise + a "Post acquisition" ConfirmDialog button on Show.
+  - **C7c-attribution SHIPPED (the honest funding drawdown)**: `fin_invoice_lines.funding_stream_id` (+ send-journal
+    revenue lines carry it into the GL, where the funding-stream summary reads); `resolveFundingStream(orgId, funderKey)`
+    matches respite funding_source → stream (code/funder_type, case-insensitive); the respite capture uses the stream's
+    default revenue account + proper funder name. FinFundingStream has no balance column by design — GL attribution IS
+    the drawdown the data model supports.
+  - **C5 payroll seam SHIPPED**: ESCT (bands 10.5–39% from annualised gross) computed in NzPayrollCalculatorService,
+    stored on `hr_payslips.esct`, split in the payroll journal (CR 2120 net-of-ESCT to the fund + CR **2150 ESCT
+    Payable** — 2140 was already Child Support; DR 5010 stays gross), and summed into the IRD payday filing (was
+    hardcoded '0.00'). GL-failure surfacing: `hr_payroll_runs.gl_error` written by PostPayrollJournalJob on failure
+    (cleared on success), "GL failed" badge + Retry GL button + POST /hr/payroll/runs/{run}/retry-gl.
+  - **C4 client-money modal = SATISFIED-BY-OPERATIONS (no build)**: the ops client-funds Show page already records
+    transactions through ClientFundController::addTransaction and ClientFundTransactionObserver bridges them to the GL —
+    a finance-side duplicate write path would be worse, not better.
+  - **C4-A funding hub = SATISFIED-BY-COMPOSITION (no build)**: /operations/funding hub (stats/claims/agreements) +
+    /finance/funding-streams CRUD + the funding-stream-summary report already compose the hub; a new /finance/funding
+    page would duplicate them. The risky Settings-cascade refactor stays deliberately not done.
   **UPDATE 2026-07-09 (post-C8): C7c Respite→funder invoice SHIPPED** (built the AR `createInvoice` service to unblock it)
   — 4 of the 5 capture-at-source flows now done; only C7d/C7e remain deferred.
   **DEFERRED — honest residuals (all RE-DERIVED from code, not skipped):**

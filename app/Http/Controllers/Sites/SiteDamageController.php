@@ -97,9 +97,12 @@ class SiteDamageController extends Controller
         // Capture-at-source: a repaired damage with an actual cost becomes a draft
         // accounts-payable bill for the repair, and an approved insurance claim
         // becomes a draft receivable invoice to the insurer. Both idempotent and
-        // non-fatal — never block the operational update.
-        $this->captureRepairBill($site, $damage->fresh());
-        $this->captureInsuranceInvoice($site, $damage->fresh());
+        // non-fatal — never block the operational update. (fresh() can be null if
+        // the row was deleted concurrently — skip quietly rather than fatal.)
+        if ($fresh = $damage->fresh()) {
+            $this->captureRepairBill($site, $fresh);
+            $this->captureInsuranceInvoice($site, $fresh);
+        }
 
         return redirect()->back()->with('success', 'Damage report updated.');
     }
