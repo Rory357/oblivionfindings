@@ -159,9 +159,16 @@ class SiteDamageTest extends TestCase
         $this->assertSoftDeleted('site_damages', ['id' => $damage->id]);
     }
 
-    public function test_support_worker_blocked_by_site_middleware(): void
+    public function test_support_worker_can_report_site_damage(): void
     {
-        // Support workers don't have sites.viewAny permission required by route middleware
+        // Frontline support workers are on-site and are expected to report damage
+        // they discover. The role holds sites.viewAny (the site route-group gate)
+        // and sites.damages.create (SiteDamagePolicy::create), so the report is
+        // accepted. This previously asserted a 403; support_worker gained
+        // sites.viewAny with the My Day feature (2026-05-23), which — combined with
+        // the sites.damages.create it has always held — makes the old block obsolete.
+        $this->assertTrue($this->supportWorker->canDo('sites.damages.create'));
+
         $this->actingAs($this->supportWorker)
             ->post("/sites/{$this->site->id}/damages", [
                 'title' => 'Dented door',
@@ -170,6 +177,38 @@ class SiteDamageTest extends TestCase
                 'damage_date' => '2026-02-19',
                 'discovered_date' => '2026-02-19',
             ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('site_damages', [
+            'site_id' => $this->site->id,
+            'title' => 'Dented door',
+            'severity' => 'minor',
+            'status' => 'reported',
+            'reported_by' => $this->supportWorker->id,
+        ]);
+    }
+
+    public function test_unauthorized_user_blocked_by_site_middleware(): void
+    {
+        // The sites/{site} route group is gated by permission:sites.viewAny. A
+        // portal-only user (next_of_kin) lacks that permission, so the group
+        // middleware abort(403)s before the request reaches the controller — and
+        // no damage row is written.
+        $portalUser = User::factory()->create(['role' => 'next_of_kin', 'approved_at' => now()]);
+        $portalUser->roles()->attach(Role::where('name', 'next_of_kin')->first());
+
+        $this->assertFalse($portalUser->canDo('sites.viewAny'));
+
+        $this->actingAs($portalUser)
+            ->post("/sites/{$this->site->id}/damages", [
+                'title' => 'Dented door',
+                'description' => 'Front door has a dent.',
+                'severity' => 'minor',
+                'damage_date' => '2026-02-19',
+                'discovered_date' => '2026-02-19',
+            ])
             ->assertForbidden();
+
+        $this->assertDatabaseCount('site_damages', 0);
     }
 }
