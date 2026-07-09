@@ -88,9 +88,26 @@ ticket or a threaded reply (matched by the ticket reference in the subject), and
   at the provider, and the provider's webhook aimed at `/it/email/inbound`.
 - **Secret:** `IT_INBOUND_MAIL_SECRET` in the deployed env.
 
-**Recommendation:** Postmark inbound (cleanest JSON, per-message signature). Say the
-word and I'll pin the verifier to it; until then the endpoint takes a shared-secret
-header so it's testable and safe (rejects unsigned requests).
+**Recommendation (superseded):** Postmark inbound. Kept only as an optional secondary
+push ingress — see the decision below.
+
+**DECIDED (2026-07-10 — the user): Microsoft Exchange (OAuth) + Gmail (OAuth)**, "same
+as the others" — i.e. the existing calendar-sync OAuth stack already in the app:
+`App\Contracts\CalendarOAuthToken`, `App\Models\CalendarSyncConnection` (encrypted
+access/refresh token store + refresh-window logic), `App\Services\MicrosoftGraphService`
+(token refresh against `login.microsoftonline.com` + Graph client; **already has
+`sendMail`**), `App\Services\GoogleCalendarService`, the Socialite Microsoft/Google
+providers (config/services.php), and the `App\Jobs\SyncCalendarJob` poll pattern.
+
+**Revised build (reuses that infra — ~80% of S12 carries over):** the parser/ingestion
+already built (match sender → thread on `IT-…` in subject → open a `source=email` ticket
+→ `it_inbound_emails` log) is transport-agnostic and stays. The **transport** swaps from
+the S12 push-webhook to an **OAuth mailbox poller**: add mail-READ methods to
+`MicrosoftGraphService` (Graph `GET /users/{mailbox}/messages`, unread/delta) + a Gmail
+equivalent, and a `SyncCalendarJob`-style scheduled job that pulls new messages for a
+connected support mailbox and feeds each into the parser. The `/api/it/email/inbound`
+webhook stays as an optional secondary ingress. **Still needs:** a **support mailbox**
+to connect (e.g. `support@…`) with OAuth consent (reuses the existing MS/Google app creds).
 
 ## 6. External fulfilment integration — which system? (blocked — decision needed)
 
