@@ -26,6 +26,7 @@ class FinInvoiceLine extends Model
         'category',
         'sort_order',
         'account_id',
+        'funding_stream_id',
     ];
 
     protected $casts = [

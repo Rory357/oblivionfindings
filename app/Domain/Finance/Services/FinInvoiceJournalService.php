@@ -58,6 +58,9 @@ class FinInvoiceJournalService
                     'description' => $invoiceLine->description,
                     'debit' => 0,
                     'credit' => $lineRevenue,
+                    // Carries funder attribution into the GL, where the
+                    // funding-stream summary report reads it.
+                    'funding_stream_id' => $invoiceLine->funding_stream_id,
                 ];
             }
 

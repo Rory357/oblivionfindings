@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinTaxRate;
@@ -65,6 +66,7 @@ class AccountsReceivableService
                     'category' => $line['category'] ?? null,
                     'sort_order' => $index,
                     'account_id' => $line['account_id'] ?? null,
+                    'funding_stream_id' => $line['funding_stream_id'] ?? null,
                 ];
                 $subtotal = bcadd($subtotal, $lineSubtotal, 2);
                 $taxTotal = bcadd($taxTotal, $taxAmount, 2);
@@ -127,12 +129,13 @@ class AccountsReceivableService
             return $existing;
         }
 
-        $accountId = ! empty($data['revenue_account_code'])
-            ? FinAccount::where('organization_id', $orgId)
-                ->where('code', $data['revenue_account_code'])
-                ->where('is_active', true)
-                ->value('id')
-            : null;
+        $accountId = $data['revenue_account_id']
+            ?? (! empty($data['revenue_account_code'])
+                ? FinAccount::where('organization_id', $orgId)
+                    ->where('code', $data['revenue_account_code'])
+                    ->where('is_active', true)
+                    ->value('id')
+                : null);
 
         return $this->createInvoice($orgId, [
             'client_id' => $data['client_id'] ?? null,
@@ -148,8 +151,29 @@ class AccountsReceivableService
                 'unit_price' => $data['unit_price'],
                 'gst_rate' => $data['gst_rate'] ?? 0,
                 'account_id' => $accountId,
+                'funding_stream_id' => $data['funding_stream_id'] ?? null,
             ]],
         ]);
+    }
+
+    /**
+     * Resolve a funding stream from an operational funder key (e.g. a respite
+     * booking's `funding_source` such as "whaikaha" or "acc") by matching the
+     * stream code or funder_type, case-insensitively. Returns null when nothing
+     * matches — attribution is best-effort, never blocking.
+     */
+    public function resolveFundingStream(?int $orgId, ?string $funderKey): ?FinFundingStream
+    {
+        $key = strtolower(trim((string) $funderKey));
+        if ($key === '') {
+            return null;
+        }
+
+        return FinFundingStream::forOrganization($orgId)
+            ->active()
+            ->where(fn ($q) => $q->whereRaw('LOWER(code) = ?', [$key])
+                ->orWhereRaw('LOWER(funder_type) = ?', [$key]))
+            ->first();
     }
 
     /**

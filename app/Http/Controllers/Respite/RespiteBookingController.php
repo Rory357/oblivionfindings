@@ -310,17 +310,28 @@ class RespiteBookingController extends Controller
         $nights = max(1, $booking->start_at->diffInDays($booking->end_at));
 
         try {
-            $this->accountsReceivable->captureOperationalInvoice(auth()->user()?->organization_id, [
+            $orgId = auth()->user()?->organization_id;
+
+            // Best-effort funder attribution: when the booking's funding source
+            // matches a configured funding stream, the invoice line carries the
+            // stream (and the stream's default revenue account, if set) so the
+            // funder income lands on the funding-stream summary — the GL-level
+            // drawdown attribution.
+            $stream = $this->accountsReceivable->resolveFundingStream($orgId, $booking->funding_source);
+
+            $this->accountsReceivable->captureOperationalInvoice($orgId, [
                 'source_type' => RespiteBooking::class,
                 'source_id' => $booking->id,
-                'funding_body' => (string) $booking->funding_source,
+                'funding_body' => $stream?->name ?? (string) $booking->funding_source,
                 'client_id' => $booking->client_id,
                 'client_name' => $booking->client?->full_name,
                 'description' => "Respite care — {$nights} night(s)",
                 'quantity' => $nights,
                 'unit_price' => $rate,
                 'gst_rate' => 0,
+                'revenue_account_id' => $stream?->default_revenue_account_id,
                 'revenue_account_code' => config('finance.capture.respite_revenue_account', '4000'),
+                'funding_stream_id' => $stream?->id,
                 'notes' => "Auto-captured from respite booking #{$booking->id}.",
             ]);
         } catch (\Throwable $e) {
