@@ -167,6 +167,14 @@ class ItTicketController extends Controller
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
                 'resolved_at' => $ticket->resolved_at?->toIso8601String(),
                 'closed_at' => $ticket->closed_at?->toIso8601String(),
+                // §P-S2: the survivor this ticket was folded into, for the banner.
+                'merged_into' => $ticket->mergedInto
+                    ? [
+                        'id' => $ticket->mergedInto->id,
+                        'reference' => $ticket->mergedInto->reference,
+                        'title' => $ticket->mergedInto->title,
+                    ]
+                    : null,
             ],
             'comments' => $comments,
             'events' => $events,
@@ -178,6 +186,26 @@ class ItTicketController extends Controller
             // as they type a reply. Agents (it.view) only — requesters already
             // met the KB at raise time and their payload stays lean.
             'kbSuggestions' => $isAgent ? $this->kbSuggestions($tenantId) : [],
+            // §P-S2 merge picker: recent live tickets an agent can fold this one
+            // into. Agents only; excludes self and already-merged tickets.
+            'mergeTargets' => $canManage
+                ? ItTicket::query()
+                    ->forTenant($tenantId)
+                    ->whereIn('status', ItTicket::OPEN_STATUSES)
+                    ->whereNull('merged_into_ticket_id')
+                    ->where('id', '!=', $ticket->id)
+                    ->latest('id')
+                    ->limit(50)
+                    ->get(['id', 'reference', 'title', 'priority', 'status'])
+                    ->map(fn (ItTicket $t) => [
+                        'id' => $t->id,
+                        'reference' => $t->reference,
+                        'title' => $t->title,
+                        'priority' => $t->priority,
+                        'status' => $t->status,
+                    ])
+                    ->all()
+                : [],
             'can' => [
                 'manage' => $canManage,
                 'view' => $isAgent,
@@ -186,6 +214,8 @@ class ItTicketController extends Controller
                 'watching' => $ticket->watchers->contains('id', $user->id),
                 // The requester may rate their own resolved ticket (§K).
                 'rate' => $isRequester && $ticket->status === 'resolved',
+                // Fold a duplicate into another live ticket (§P-S2). Agents only.
+                'merge' => $canManage && ! $ticket->isMerged() && $ticket->status !== 'closed',
             ],
         ];
     }

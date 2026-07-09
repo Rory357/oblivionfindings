@@ -4,6 +4,7 @@ use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /*
  * §P-S2 — ticket merge authorisation (ItTicketPolicy@merge). The fold itself
@@ -117,4 +118,33 @@ test('a merged source cannot be reopened', function () {
         ->assertSessionHas('error');
 
     expect($source->refresh()->status)->toBe('closed');
+});
+
+test('the workspace offers live merge targets to agents but not requesters', function () {
+    $me = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'status' => 'open',
+        'requester_user_id' => $this->worker->id,
+    ]);
+    $candidate = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    // A closed-away merged ticket must never be offered as a target.
+    ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'status' => 'closed',
+        'merged_into_ticket_id' => $candidate->id,
+        'merged_at' => now(),
+    ]);
+
+    $this->actingAs($this->agent)
+        ->get(route('it.tickets.show', $me))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('can.merge', true)
+            ->has('mergeTargets', 1)
+            ->where('mergeTargets.0.id', $candidate->id));
+
+    $this->actingAs($this->worker)
+        ->get(route('it.tickets.show', $me))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('can.merge', false)
+            ->has('mergeTargets', 0));
 });
