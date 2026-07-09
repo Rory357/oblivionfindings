@@ -260,24 +260,29 @@ class OnboardingController extends Controller
             // door (no onboarding yet — we generate it explicitly below so the
             // chosen template / compliance / welcome-email options are honoured).
             $roleName = $validated['role'] ?? 'support_worker';
-            $profile = $intake->intake(
-                name: $validated['name'],
-                email: $validated['email'],
-                roleName: $roleName,
-                profileAttributes: [
-                    'position_title' => $validated['position_title'] ?? 'New starter',
-                    'position_role' => $roleName,
-                    'employment_type' => $validated['employment_type'] ?? 'full_time',
-                    'primary_site_id' => $validated['primary_site_id'] ?? null,
-                    'manager_user_id' => $validated['manager_user_id'] ?? null,
-                    'start_date' => $validated['start_date'] ?? now()->toDateString(),
-                ],
-                actorId: $user->id,
-                tenantId: $tenantId,
-                startOnboarding: false,
-                sendInvite: false,
-                source: 'onboarding_wizard',
-            );
+            try {
+                $profile = $intake->intake(
+                    name: $validated['name'],
+                    email: $validated['email'],
+                    roleName: $roleName,
+                    profileAttributes: [
+                        'position_title' => $validated['position_title'] ?? 'New starter',
+                        'position_role' => $roleName,
+                        'employment_type' => $validated['employment_type'] ?? 'full_time',
+                        'primary_site_id' => $validated['primary_site_id'] ?? null,
+                        'manager_user_id' => $validated['manager_user_id'] ?? null,
+                        'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                    ],
+                    actorId: $user->id,
+                    tenantId: $tenantId,
+                    startOnboarding: false,
+                    sendInvite: false,
+                    source: 'onboarding_wizard',
+                );
+            } catch (\InvalidArgumentException $e) {
+                // D-2 role-assignment guard (admin-grade / external personas).
+                return redirect()->back()->with('error', $e->getMessage());
+            }
         } else {
             $profile = HrEmployeeProfile::query()->findOrFail((int) $validated['employee_profile_id']);
             $this->assertHrTenantAccess($tenantId, $profile->tenant_id);

@@ -495,32 +495,37 @@ class EmployeeProfileController extends Controller
                 ]);
         }
 
-        $profile = $intake->intake(
-            name: $data['name'],
-            email: $data['email'],
-            roleName: $roleName,
-            profileAttributes: [
-                'preferred_name' => $data['preferred_name'] ?? null,
-                'position_id' => $data['position_id'] ?? null,
-                'position_title' => $positionTitle ?: 'New starter',
-                'position_role' => $roleName,
-                'employment_type' => $data['employment_type'] ?? 'full_time',
-                'department' => $data['department'] ?? null,
-                'primary_site_id' => $data['primary_site_id'] ?? null,
-                'manager_user_id' => $data['manager_user_id'] ?? null,
-                'start_date' => $data['start_date'] ?? now()->toDateString(),
-                'work_phone' => $data['work_phone'] ?? null,
-                'work_rights_status' => $data['work_rights_status'] ?? null,
-                'visa_type' => $data['visa_type'] ?? null,
-                'visa_expires_at' => $data['visa_expires_at'] ?? null,
-                'emergency_contacts' => $data['emergency_contacts'] ?? null,
-            ],
-            actorId: $actor->id,
-            tenantId: $this->resolveHrTenantIdForUser($actor),
-            startOnboarding: $request->boolean('start_onboarding', true),
-            sendInvite: $request->boolean('send_invite', false),
-            source: 'manual',
-        );
+        try {
+            $profile = $intake->intake(
+                name: $data['name'],
+                email: $data['email'],
+                roleName: $roleName,
+                profileAttributes: [
+                    'preferred_name' => $data['preferred_name'] ?? null,
+                    'position_id' => $data['position_id'] ?? null,
+                    'position_title' => $positionTitle ?: 'New starter',
+                    'position_role' => $roleName,
+                    'employment_type' => $data['employment_type'] ?? 'full_time',
+                    'department' => $data['department'] ?? null,
+                    'primary_site_id' => $data['primary_site_id'] ?? null,
+                    'manager_user_id' => $data['manager_user_id'] ?? null,
+                    'start_date' => $data['start_date'] ?? now()->toDateString(),
+                    'work_phone' => $data['work_phone'] ?? null,
+                    'work_rights_status' => $data['work_rights_status'] ?? null,
+                    'visa_type' => $data['visa_type'] ?? null,
+                    'visa_expires_at' => $data['visa_expires_at'] ?? null,
+                    'emergency_contacts' => $data['emergency_contacts'] ?? null,
+                ],
+                actorId: $actor->id,
+                tenantId: $this->resolveHrTenantIdForUser($actor),
+                startOnboarding: $request->boolean('start_onboarding', true),
+                sendInvite: $request->boolean('send_invite', false),
+                source: 'manual',
+            );
+        } catch (\InvalidArgumentException $e) {
+            // D-2 role-assignment guard (admin-grade / external personas).
+            return back()->withInput()->withErrors(['role' => $e->getMessage()]);
+        }
 
         return redirect()
             ->route('hr.people.show', $profile->id)

@@ -1752,7 +1752,9 @@ class CandidateController extends Controller
 
         try {
             $profile = $this->recruitmentService->convertToEmployee($candidate, $offer, $user->id);
-        } catch (\LogicException $e) {
+        } catch (\LogicException|\InvalidArgumentException $e) {
+            // LogicException: conversion preconditions; InvalidArgumentException:
+            // the D-2 role-assignment guard inside the intake door.
             return redirect()->back()->with('error', $e->getMessage());
         }
 

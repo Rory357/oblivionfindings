@@ -25,10 +25,58 @@ use Illuminate\Support\Str;
  */
 class EmployeeIntakeService
 {
+    /**
+     * External portal personas — never assignable through employee intake
+     * (they are not staff; their accounts are provisioned by the portal flows).
+     */
+    private const EXTERNAL_PERSONA_ROLES = ['client', 'next_of_kin'];
+
+    /**
+     * RBAC level at/above which a role is system-administrator grade
+     * (RbacSeeder: admin = 100; execs/board sit below).
+     */
+    private const ADMIN_LEVEL_THRESHOLD = 100;
+
     public function __construct(
         private readonly OnboardingService $onboarding,
         private readonly HrWebhookService $webhooks,
     ) {}
+
+    /**
+     * D-2 privilege-escalation guard for both intake doors: an admin-grade role
+     * can only be assigned by an actor who already holds admin, and external
+     * portal personas can never be minted as employees. Throws the same
+     * exception type the intake callers already surface as a flash.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertRoleAssignable(?string $roleName, int $actorId): void
+    {
+        if ($roleName === null || $roleName === '') {
+            return;
+        }
+
+        if (in_array($roleName, self::EXTERNAL_PERSONA_ROLES, true)) {
+            throw new \InvalidArgumentException(
+                "The '{$roleName}' role is an external portal persona and cannot be assigned through employee intake."
+            );
+        }
+
+        $role = Role::query()->where('name', $roleName)->first();
+        $isAdminGrade = $roleName === 'admin'
+            || ($role && (int) ($role->level ?? 0) >= self::ADMIN_LEVEL_THRESHOLD);
+
+        if (! $isAdminGrade) {
+            return;
+        }
+
+        $actor = User::find($actorId);
+        if (! $actor || ! ($actor->role === 'admin' || $actor->hasRole('admin'))) {
+            throw new \InvalidArgumentException(
+                'Only an administrator can assign an administrator-level role.'
+            );
+        }
+    }
 
     /**
      * Create (or link to) the user and upsert their single employee profile.
@@ -56,6 +104,8 @@ class EmployeeIntakeService
         bool $sendInvite = false,
         string $source = 'manual',
     ): HrEmployeeProfile {
+        $this->assertRoleAssignable($roleName, $actorId);
+
         /** @var array{user: User, profile: HrEmployeeProfile, linkedExisting: bool} $written */
         $written = DB::transaction(function () use (
             $name,
@@ -205,6 +255,13 @@ class EmployeeIntakeService
         if (empty($attributes['start_date'])) {
             throw new \InvalidArgumentException('A new start date is required to re-hire.');
         }
+
+        // Same D-2 guard as intake, on the role this re-hire would restore/attach
+        // (step 3 below re-syncs the RBAC pivot for the resolved role).
+        $this->assertRoleAssignable(
+            $attributes['position_role'] ?? $profile->position_role ?? $profile->user?->role,
+            $actorId,
+        );
 
         $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
 
