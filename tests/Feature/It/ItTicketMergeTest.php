@@ -65,3 +65,56 @@ test('a closed target cannot receive a merge', function () {
 
     expect($this->agent->can('merge', [$source, $target]))->toBeFalse();
 });
+
+test('merging folds the conversation and watchers onto the survivor and closes the source', function () {
+    $source = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'status' => 'open',
+        'requester_user_id' => $this->worker->id,
+    ]);
+    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+
+    $source->comments()->create([
+        'tenant_id' => 1,
+        'author_user_id' => $this->worker->id,
+        'body' => 'Same issue as the other ticket',
+        'is_internal' => false,
+    ]);
+    $source->watchers()->syncWithoutDetaching([$this->worker->id]);
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$source->id}/merge", ['target_ticket_id' => $target->id])
+        ->assertRedirect(route('it.tickets.show', $target));
+
+    $source->refresh();
+    expect($source->status)->toBe('closed');
+    expect($source->merged_into_ticket_id)->toBe($target->id);
+    expect($source->merged_at)->not->toBeNull();
+
+    // Conversation + watcher moved to the survivor; the source is emptied.
+    expect($target->comments()->count())->toBe(1);
+    expect($source->comments()->count())->toBe(0);
+    expect($target->watchers()->where('users.id', $this->worker->id)->exists())->toBeTrue();
+
+    // A merged marker on each side.
+    expect($source->events()->where('type', 'merged')->count())->toBe(1);
+    expect($target->events()->where('type', 'merged')->count())->toBe(1);
+});
+
+test('a merged source cannot be reopened', function () {
+    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $source = ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'status' => 'closed',
+        'merged_into_ticket_id' => $target->id,
+        'merged_at' => now(),
+    ]);
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $source))
+        ->post("/it/tickets/{$source->id}/reopen")
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect($source->refresh()->status)->toBe('closed');
+});

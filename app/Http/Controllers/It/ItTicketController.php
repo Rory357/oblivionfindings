@@ -9,6 +9,7 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
+use App\Http\Requests\It\MergeTicketRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
 use App\Models\ItAttachment;
@@ -19,6 +20,7 @@ use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Inertia\Inertia;
 
@@ -311,6 +313,10 @@ class ItTicketController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
+        if ($ticket->isMerged()) {
+            return redirect()->back()->with('error', 'This ticket was merged into another — reopen the survivor instead.');
+        }
+
         if (! in_array($ticket->status, ['resolved', 'closed'], true)) {
             return redirect()->back()->with('error', 'Only resolved or closed tickets can be reopened.');
         }
@@ -331,6 +337,58 @@ class ItTicketController extends Controller
         }
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
+    }
+
+    /**
+     * Fold a duplicate SOURCE ticket into a TARGET survivor: the conversation
+     * and watchers move across, the source closes as merged, and both
+     * timelines get a `merged` marker. Audit events stay put — merging never
+     * rewrites a ticket's own history. Guarded by ItTicketPolicy@merge.
+     */
+    public function merge(MergeTicketRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        $target = $request->targetTicket();
+        abort_unless($target instanceof ItTicket, 404);
+
+        DB::transaction(function () use ($ticket, $target, $user) {
+            // The conversation continues on the survivor.
+            $ticket->comments()->update(['ticket_id' => $target->id]);
+
+            // Watchers follow, de-duplicated against the survivor's list.
+            $watcherIds = $ticket->watchers()->pluck('users.id')->all();
+            if ($watcherIds !== []) {
+                $target->watchers()->syncWithoutDetaching($watcherIds);
+                $ticket->watchers()->detach();
+            }
+
+            // Close the source as merged — kept, never deleted.
+            $ticket->forceFill([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'merged_into_ticket_id' => $target->id,
+                'merged_at' => now(),
+            ])->save();
+
+            // A marker on each timeline; each ticket's own audit stays intact.
+            ItTicketEvent::record($ticket, 'merged', $user->id, [
+                'direction' => 'into',
+                'target_id' => $target->id,
+                'target_reference' => $target->reference,
+            ]);
+            ItTicketEvent::record($target, 'merged', $user->id, [
+                'direction' => 'from',
+                'source_id' => $ticket->id,
+                'source_reference' => $ticket->reference,
+            ]);
+        });
+
+        return redirect()
+            ->route('it.tickets.show', $target)
+            ->with('success', "Merged {$ticket->reference} into {$target->reference}.");
     }
 
     /**

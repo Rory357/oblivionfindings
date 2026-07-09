@@ -196,6 +196,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
+        Route::post('/it/tickets/{ticket}/merge', [ItTicketController::class, 'merge'])->name('it.tickets.merge');
         Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
         Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
         // SLA target grid — admin-only on top of it.manage (FormRequest authorize).
