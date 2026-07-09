@@ -80,6 +80,17 @@ class ItTicketPolicy
     }
 
     /**
+     * Ask for a manager's sign-off (§P-S3). Agent work, on a ticket whose
+     * category needs approval, and only when no request is already live.
+     */
+    public function requestApproval(User $user, ItTicket $ticket): bool
+    {
+        return $user->canDo('it.manage')
+            && $ticket->requires_approval
+            && ! $ticket->approvals()->whereIn('status', ['pending', 'approved'])->exists();
+    }
+
+    /**
      * Rate the resolution (CSAT). The requester's own satisfaction — agents
      * never rate. Allowed only while the ticket is `resolved`: nothing to rate
      * before, and a close locks it in (editable until closed, §K).

@@ -50,6 +50,7 @@ class ItTicket extends Model
         'source',
         'priority',
         'status',
+        'requires_approval',
         'first_response_due_at',
         'resolution_due_at',
         'first_responded_at',
@@ -76,6 +77,7 @@ class ItTicket extends Model
         'sla_paused_minutes' => 'integer',
         'reopened_count' => 'integer',
         'csat_score' => 'integer',
+        'requires_approval' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -174,6 +176,28 @@ class ItTicket extends Model
     public function isMerged(): bool
     {
         return $this->merged_into_ticket_id !== null;
+    }
+
+    /** Sign-off requests on this ticket (§P-S3), newest first. */
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(ItTicketApproval::class, 'it_ticket_id')->latest('id');
+    }
+
+    /** Whether a category is configured to need a manager's approval. */
+    public static function categoryNeedsApproval(?string $category): bool
+    {
+        return $category !== null
+            && in_array($category, (array) config('it.approval.categories', []), true);
+    }
+
+    /**
+     * The current approval verdict for the gate: 'approved' clears it,
+     * 'pending'/'rejected' blocks it, null when none has been requested.
+     */
+    public function approvalState(): ?string
+    {
+        return $this->approvals()->value('status');
     }
 
     public function comments(): HasMany
