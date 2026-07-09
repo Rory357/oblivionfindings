@@ -109,6 +109,22 @@ connected support mailbox and feeds each into the parser. The `/api/it/email/inb
 webhook stays as an optional secondary ingress. **Still needs:** a **support mailbox**
 to connect (e.g. `support@…`) with OAuth consent (reuses the existing MS/Google app creds).
 
+**✅ BUILT (2026-07-10, E0–E7 — docs/IT_EMAIL_OAUTH_GAP_ANALYSIS.md fully ticked):**
+`InboundEmailIngestor` (shared ingestion), Graph + Gmail mail-read services,
+`ItMailboxConnection` (encrypted-token org connection), hourly `PollItMailboxJob`
+(dedupe on message_id, per-connection error stamping), and the **Settings →
+Support Mailbox** page (connect/disconnect via the calendar-sync-style OAuth flow,
+delegated-mailbox field, poll-now). **To go live, an admin needs to (one-time):**
+1. Add the mail scopes to the shared app registrations — Microsoft
+   `Mail.ReadWrite` + `Mail.ReadWrite.Shared` (admin consent), Google
+   `gmail.modify` (note: markRead WRITES, so read-only scopes are not enough).
+2. Visit **Settings → Support Mailbox → Connect** and authorise: for Exchange,
+   any account with delegated access to `support@…` (then set that mailbox in
+   the field); for Gmail, the support account itself.
+That's it — the hourly poll (or Poll now) starts turning unread mail into tickets.
+No MX/DNS changes, no webhook secret needed (the S12 webhook remains available as
+an optional push ingress via `IT_INBOUND_MAIL_SECRET`).
+
 ## 6. External fulfilment integration — which system? (blocked — decision needed)
 
 Wireframe §5's "external fulfilment" was never bound to a named system. Before any

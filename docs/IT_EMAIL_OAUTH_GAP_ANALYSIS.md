@@ -36,7 +36,21 @@ against faked HTTP so it's ready the moment it's connected.
 - [x] **E5.** Gmail read: new `GoogleGmailService` (sibling of `GoogleCalendarService`, same token/refresh shape, Gmail base URL) — `listUnreadMessages` (list `is:unread in:inbox` → fetch full → normalise RFC headers + base64url bodies, text/plain over stripped-HTML over snippet) + `markRead` (remove `UNREAD` label). Poller now provider-blind via `match` (Graph|Gmail); renamed the normalised key `graph_id`→`remote_id` across E2/E4 accordingly. Gmail reads the CONNECTED account's own inbox (connect the support account itself). 3 service Pest + google end-to-end poller test (⚠️ fixture gotcha: `&nbsp;` decodes to U+00A0, not a space). Suite **156 green** (1270 assertions).
 - [x] **E6a.** Backend: `ItMailboxOAuthController` (redirect/callback/disconnect, mirrors `CalendarSyncOAuthController`; reconnect preserves the delegated mailbox) + `ItMailboxSettingsController` (per-provider status payload, delegated-mailbox update, poll-now dispatch) + routes under the `integrations.manage_tenant_secrets` gate (`settings/it-mailbox/*`). **Scope correction vs the plan:** markRead WRITES, so consent is `Mail.ReadWrite(.Shared)` / `gmail.modify` — not the read-only scopes. 6 Pest (authz, mocked-Socialite callback stores the row, disconnect, mailbox set/validate/clear, error-before-connect, poll-now). Suite **162 green** (1310 assertions).
 - [x] **E6b.** UI: `settings/it-mailbox` page ("Support Mailbox" in the settings sidebar, Integrations group, same `integrations.manageTenantSecrets` nav gate as Calendar Sync) — per-provider cards (Connected/Error/Not-connected badges, account · effective mailbox · last poll, last-error box), delegated-mailbox field on the Microsoft card, Connect/Disconnect, Poll-now. Semantic `status-*` tokens (not the sibling page's legacy palette classes). types ✓ · lint 0/0 · build ✓.
-- [ ] **E7.** DoD sweep: full `tests/Feature/It` + types + build + lint; update questions #5 + memory.
+- [x] **E7.** DoD sweep: `tests/Feature/It` **162 passed (1310 assertions)** · types ✓ · lint 0 errors (737 pre-existing repo-wide warnings, none in this loop's files) · build ✓. Questions #5 updated with the go-live runbook; project memory updated.
+
+---
+
+## ✅ E-LOOP COMPLETE (2026-07-10)
+
+Email-in went from push-webhook stub to the chosen **Exchange + Gmail OAuth poller**,
+entirely on the app's existing OAuth stack. Suite 140 → **162** on `claude/it-ticketing-stretch`.
+- **E1** `InboundEmailIngestor` — one ingestion path for every transport.
+- **E2/E5** Graph + Gmail mail-read (`listUnreadMessages`/`markRead`, normalised `remote_id` shape).
+- **E3** `ItMailboxConnection` — encrypted-token org connection on `CalendarOAuthToken`.
+- **E4** hourly `PollItMailboxJob` — dedupe, per-connection error stamping, provider-blind.
+- **E6** Settings → Support Mailbox — OAuth connect/disconnect, delegated mailbox, poll-now.
+- **Go-live (one-time, admin):** add `Mail.ReadWrite(.Shared)` / `gmail.modify` to the app
+  registrations, then connect the support account on the settings page (questions #5).
 
 ## Decisions
 - **Connection model:** a **dedicated `support@…` mailbox connection** on the shared
