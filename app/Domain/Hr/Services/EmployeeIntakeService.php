@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -177,6 +178,18 @@ class EmployeeIntakeService
 
         // --- Best-effort side-effects (post-commit; never block the hire) ---
 
+        // D-3: the USER write (account minted/linked, role set, login approved) is
+        // audited explicitly — User deliberately doesn't carry AuditableChanges
+        // (that would log every login-token touch). AuditLogger never throws,
+        // and uses actor_id when no HTTP request user exists.
+        AuditLogger::log('user.employee_intake', $user, [
+            'actor_id' => $actorId,
+            'source' => $source,
+            'linked_existing_user' => $written['linkedExisting'],
+            'role' => $roleName,
+            'approved' => (bool) $user->approved_at,
+        ]);
+
         // 3. Onboarding parity (toggle; idempotent).
         if ($startOnboarding) {
             $this->maybeGenerateOnboarding($profile, $actorId);
@@ -256,16 +269,17 @@ class EmployeeIntakeService
             throw new \InvalidArgumentException('A new start date is required to re-hire.');
         }
 
+        // Resolve once so validation, the RBAC write, and the audit record all
+        // describe the same role even when the legacy users.role value differs.
+        $roleName = $attributes['position_role'] ?? $profile->position_role ?? $profile->user?->role;
+
         // Same D-2 guard as intake, on the role this re-hire would restore/attach
         // (step 3 below re-syncs the RBAC pivot for the resolved role).
-        $this->assertRoleAssignable(
-            $attributes['position_role'] ?? $profile->position_role ?? $profile->user?->role,
-            $actorId,
-        );
+        $this->assertRoleAssignable($roleName, $actorId);
 
         $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
 
-        $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart) {
+        $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart, $roleName) {
             // 0. Close out any leaver workflow still open from the previous
             //    stint — rehiring supersedes it, and leaving it open would
             //    strand a live checklist whose completion revokes the login
@@ -323,7 +337,6 @@ class EmployeeIntakeService
                     ])->save();
                 }
 
-                $roleName = $attributes['position_role'] ?? $profile->position_role ?? $user->role;
                 if ($roleName) {
                     if (! $user->role) {
                         $user->forceFill(['role' => $roleName])->save();
@@ -339,6 +352,17 @@ class EmployeeIntakeService
         });
 
         // --- Best-effort side-effects (post-commit; never block the re-hire) ---
+
+        // D-3: the login restore (approved_at + role pivot back on) is a user
+        // write — audit it like intake does.
+        if ($profile->user) {
+            AuditLogger::log('user.rehire_login_restored', $profile->user, [
+                'actor_id' => $actorId,
+                'employee_profile_id' => $profile->id,
+                'role' => $roleName,
+                'start_date' => $newStart->toDateString(),
+            ]);
+        }
 
         if ($startOnboarding) {
             $this->maybeGenerateOnboarding($profile, $actorId, $newStart);

@@ -32,6 +32,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
@@ -551,6 +552,14 @@ class EmployeeProfileController extends Controller
         // sign in again (approval is what gates login).
         if ($data['is_active'] && $profile->user && is_null($profile->user->approved_at)) {
             $profile->user->forceFill(['approved_at' => now()])->save();
+
+            // D-3: lightweight reactivation restores login approval directly,
+            // so record the User write just like the full re-hire workflow.
+            AuditLogger::log('user.login_reactivated', $profile->user, [
+                'actor_id' => $request->user()->id,
+                'employee_profile_id' => $profile->id,
+                'reason' => 'employee_profile_reactivated',
+            ]);
         }
 
         return back()->with(

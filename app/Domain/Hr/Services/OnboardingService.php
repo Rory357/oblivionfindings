@@ -754,7 +754,7 @@ class OnboardingService
             $checklist->update(['status' => 'in_progress']);
         }
 
-        $this->checkOffboardingChecklistCompletion($checklist);
+        $this->checkOffboardingChecklistCompletion($checklist, $completedBy);
 
         return $task->fresh();
     }
@@ -1032,7 +1032,7 @@ class OnboardingService
     /**
      * Check if all required offboarding tasks are complete and close the checklist.
      */
-    protected function checkOffboardingChecklistCompletion(HrOffboardingChecklist $checklist): void
+    protected function checkOffboardingChecklistCompletion(HrOffboardingChecklist $checklist, int $actorId): void
     {
         $pendingRequired = $checklist->tasks()
             ->where('is_required', true)
@@ -1068,7 +1068,7 @@ class OnboardingService
             }
 
             if ($profile) {
-                $this->revokeSystemAccess($profile);
+                $this->revokeSystemAccess($profile, $actorId);
             }
         } elseif ($checklist->status !== 'in_progress') {
             $checklist->update(['status' => 'in_progress']);
@@ -1082,7 +1082,7 @@ class OnboardingService
      * live session on their next request. Never revokes the acting user's own
      * account mid-session.
      */
-    protected function revokeSystemAccess(HrEmployeeProfile $profile): void
+    protected function revokeSystemAccess(HrEmployeeProfile $profile, int $actorId): void
     {
         $user = $profile->user;
 
@@ -1090,8 +1090,9 @@ class OnboardingService
             return;
         }
 
-        if (auth()->id() === $user->id) {
+        if ($actorId === $user->id) {
             Log::warning('Skipped login revocation on offboarding completion: actor is the leaver.', [
+                'actor_id' => $actorId,
                 'user_id' => $user->id,
                 'employee_profile_id' => $profile->id,
             ]);
@@ -1103,6 +1104,14 @@ class OnboardingService
             'approved_at' => null,
             'remember_token' => null,
         ])->save();
+
+        // D-3: login revocation is a user write — audit it alongside the app log
+        // (User deliberately doesn't carry AuditableChanges).
+        AuditLogger::log('user.login_revoked', $user, [
+            'actor_id' => $actorId,
+            'employee_profile_id' => $profile->id,
+            'reason' => 'offboarding_completed',
+        ]);
 
         Log::info('Login access revoked on offboarding completion.', [
             'user_id' => $user->id,

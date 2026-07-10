@@ -14,6 +14,14 @@ class AuditLogger
         try {
             $request = $request ?? request();
             $user = $request?->user();
+            $actorId = $user?->id;
+
+            // Service/listener calls may run without an HTTP user even though
+            // their domain command carries an explicit actor. Preserve that
+            // attribution instead of presenting the event as a system write.
+            if ($actorId === null && is_int($meta['actor_id'] ?? null) && $meta['actor_id'] > 0) {
+                $actorId = $meta['actor_id'];
+            }
 
             $clientId = null;
             if ($auditable instanceof Client) {
@@ -25,7 +33,7 @@ class AuditLogger
             }
 
             AuditLog::create([
-                'user_id' => $user?->id,
+                'user_id' => $actorId,
                 'client_id' => $clientId,
                 'action' => $action,
                 'auditable_type' => $auditable ? $auditable->getMorphClass() : null,
