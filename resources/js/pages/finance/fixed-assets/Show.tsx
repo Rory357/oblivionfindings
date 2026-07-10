@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -14,13 +14,14 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
+    ConfirmDialog,
     FixedAssetDialog,
     FixedAssetDisposeDialog,
     formatMoney,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
 } from '@/components/finance';
-import { Cpu, Edit, Trash2 } from 'lucide-react';
+import { BookCheck, Cpu, Edit, Trash2 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { useState } from 'react';
 
@@ -62,6 +63,7 @@ interface FixedAsset {
     gl_asset_account_id: number | null;
     gl_depreciation_account_id: number | null;
     gl_expense_account_id: number | null;
+    acquisition_journal_id: number | null;
     gl_asset_account: GlAccount | null;
     gl_depreciation_account: GlAccount | null;
     gl_expense_account: GlAccount | null;
@@ -138,6 +140,11 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
     const devices = linkedDevices ?? [];
     const [editOpen, setEditOpen] = useState(false);
     const [disposeOpen, setDisposeOpen] = useState(false);
+    const [capitaliseOpen, setCapitaliseOpen] = useState(false);
+
+    // Captured-at-source assets register without GL accounts; once the GL asset
+    // account is assigned, the acquisition journal is posted explicitly here.
+    const needsCapitalisation = !!asset.gl_asset_account_id && !asset.acquisition_journal_id;
 
     const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
 
@@ -186,6 +193,12 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                         actions={
                             canManage && asset.status === 'active' ? (
                                 <>
+                                    {needsCapitalisation && (
+                                        <Button onClick={() => setCapitaliseOpen(true)}>
+                                            <BookCheck className="mr-2 h-4 w-4" />
+                                            Post acquisition
+                                        </Button>
+                                    )}
                                     <Button variant="outline" onClick={() => setEditOpen(true)}>
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
@@ -486,6 +499,32 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                     asset={editableAsset}
                     assetAccounts={assetAccounts}
                     expenseAccounts={expenseAccounts}
+                />
+            )}
+
+            {canManage && (
+                <ConfirmDialog
+                    open={capitaliseOpen}
+                    onOpenChange={setCapitaliseOpen}
+                    title="Post acquisition journal"
+                    description={
+                        <>
+                            Posts the acquisition journal for{' '}
+                            <span className="font-medium">{asset.asset_name}</span>: DR{' '}
+                            {asset.gl_asset_account
+                                ? `${asset.gl_asset_account.code} ${asset.gl_asset_account.name}`
+                                : 'the GL asset account'}{' '}
+                            / CR 1000 Bank for {formatMoney(Number(asset.purchase_cost))}. This posts to the
+                            general ledger and can only happen once.
+                        </>
+                    }
+                    confirmLabel="Post acquisition"
+                    onConfirm={() =>
+                        router.post(`/finance/fixed-assets/${asset.id}/capitalise`, {}, {
+                            preserveScroll: true,
+                            onFinish: () => setCapitaliseOpen(false),
+                        })
+                    }
                 />
             )}
 

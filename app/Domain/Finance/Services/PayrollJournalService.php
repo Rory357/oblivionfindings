@@ -64,6 +64,7 @@ class PayrollJournalService
             $totalAccLevy = '0';
             $totalKiwisaverEmployee = '0';
             $totalKiwisaverEmployer = '0';
+            $totalEsct = '0';
             $totalStudentLoan = '0';
 
             foreach ($payslips as $payslip) {
@@ -72,6 +73,7 @@ class PayrollJournalService
                 $totalAccLevy = bcadd($totalAccLevy, (string) $payslip->acc_levy, 2);
                 $totalKiwisaverEmployee = bcadd($totalKiwisaverEmployee, (string) $payslip->kiwisaver_employee, 2);
                 $totalKiwisaverEmployer = bcadd($totalKiwisaverEmployer, (string) $payslip->kiwisaver_employer, 2);
+                $totalEsct = bcadd($totalEsct, (string) ($payslip->esct ?? '0'), 2);
                 $totalStudentLoan = bcadd($totalStudentLoan, (string) $payslip->student_loan, 2);
             }
 
@@ -138,14 +140,27 @@ class PayrollJournalService
                 ];
             }
 
-            // CR 2120 KiwiSaver Payable (employee + employer)
-            $totalKiwisaverPayable = bcadd($totalKiwisaverEmployee, $totalKiwisaverEmployer, 2);
+            // CR 2120 KiwiSaver Payable (employee + employer NET of ESCT — the
+            // fund receives the employer contribution less ESCT, which is
+            // remitted to IRD instead)
+            $totalKiwisaverPayable = bcsub(bcadd($totalKiwisaverEmployee, $totalKiwisaverEmployer, 2), $totalEsct, 2);
             if (bccomp($totalKiwisaverPayable, '0', 2) > 0) {
                 $lines[] = [
                     'account_id' => $this->findAccountByCode($orgId, '2120')->id,
                     'description' => 'KiwiSaver Payable',
                     'debit' => 0,
                     'credit' => $totalKiwisaverPayable,
+                ];
+            }
+
+            // CR 2150 ESCT Payable (to IRD, deducted from the employer
+            // contribution — 2140 is Child Support Payable in the chart)
+            if (bccomp($totalEsct, '0', 2) > 0) {
+                $lines[] = [
+                    'account_id' => $this->findAccountByCode($orgId, '2150')->id,
+                    'description' => 'ESCT Payable',
+                    'debit' => 0,
+                    'credit' => $totalEsct,
                 ];
             }
 

@@ -134,6 +134,37 @@ class NzPayrollCalculatorService
     }
 
     /**
+     * ESCT (Employer Superannuation Contribution Tax) rate from the employee's
+     * annualised gross — the IRD marginal bands. (Strictly the band uses the
+     * prior year's salary + employer contributions; annualised current gross is
+     * the standard approximation when no prior-year figure is recorded.)
+     */
+    public function esctRate(float $annualGross): float
+    {
+        return match (true) {
+            $annualGross <= 16800 => 0.105,
+            $annualGross <= 57600 => 0.175,
+            $annualGross <= 84000 => 0.30,
+            $annualGross <= 216000 => 0.33,
+            default => 0.39,
+        };
+    }
+
+    /**
+     * ESCT on the employer KiwiSaver contribution for the period. Deducted from
+     * the employer's gross contribution before it reaches the fund: the fund
+     * receives (contribution − ESCT) and IRD receives the ESCT.
+     */
+    public function calculateEsct(float $annualGross, float $employerContribution): float
+    {
+        if ($employerContribution <= 0) {
+            return 0.0;
+        }
+
+        return round($employerContribution * $this->esctRate($annualGross), 2);
+    }
+
+    /**
      * Calculate student loan repayment for a pay period.
      *
      * Repayment is 12% of gross income over the annual threshold,
@@ -258,6 +289,9 @@ class NzPayrollCalculatorService
         // KiwiSaver
         $kiwiSaver = $this->calculateKiwiSaver($grossPay, $kiwiSaverRate);
 
+        // ESCT on the employer contribution (band from annualised gross)
+        $esct = $this->calculateEsct($annualGross, $kiwiSaver['employer']);
+
         // Student loan (annualised then prorated)
         $studentLoan = 0.0;
         if ($hasStudentLoan) {
@@ -286,6 +320,7 @@ class NzPayrollCalculatorService
             'acc_levy'            => $accLevy,
             'kiwisaver_employee'  => $kiwiSaver['employee'],
             'kiwisaver_employer'  => $kiwiSaver['employer'],
+            'esct'                => $esct,
             'student_loan'        => $studentLoan,
             'holiday_pay'         => $holidayPay,
             'total_allowances'    => $totalAllowances,

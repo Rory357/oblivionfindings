@@ -61,6 +61,7 @@ class PayrollExportController extends Controller
             'locked_at' => optional($run->locked_at)->toDateTimeString(),
             'exported_at' => optional($run->exported_at)->toDateTimeString(),
             'gl_posted_at' => optional($run->gl_posted_at)->toDateTimeString(),
+            'gl_error' => $run->gl_error,
             'net_paid_at' => optional($run->net_paid_at)->toDateTimeString(),
             'export_profile' => $run->exportProfile ? [
                 'id' => $run->exportProfile->id,
@@ -201,6 +202,38 @@ class PayrollExportController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Payroll run locked.');
+    }
+
+    /**
+     * Retry the GL journal post for a locked run whose posting failed
+     * (surfaced via hr_payroll_runs.gl_error). Runs the job synchronously so
+     * the outcome is deterministic in every environment (a queued dispatch
+     * would return "posted" before the job ran on a real queue connection).
+     */
+    public function retryGlPost(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        if ($run->tenant_id !== $tenantId) {
+            abort(404);
+        }
+
+        if ($run->locked_at === null) {
+            return redirect()->back()->withErrors(['gl' => 'Lock the run before posting its journal.']);
+        }
+
+        if ($run->journal_id !== null) {
+            return redirect()->back()->withErrors(['gl' => 'This run already has a posted journal.']);
+        }
+
+        try {
+            PostPayrollJournalJob::dispatchSync($run);
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['gl' => "GL post failed again: {$e->getMessage()}"]);
+        }
+
+        return redirect()->back()->with('success', 'Payroll journal posted.');
     }
 
     /**

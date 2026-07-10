@@ -127,6 +127,7 @@ class FinanceSeeder extends Seeder
             $this->account('2120', 'KiwiSaver Payable', 'liability', 'current_liability'),
             $this->account('2130', 'Student Loan Payable', 'liability', 'current_liability'),
             $this->account('2140', 'Child Support Payable', 'liability', 'current_liability'),
+            $this->account('2150', 'ESCT Payable', 'liability', 'current_liability'),
             $this->account('2200', 'GST Collected', 'liability', 'current_liability', true),
             $this->account('2210', 'GST Paid', 'liability', 'current_liability', true),
             $this->account('2300', 'Accrued Wages', 'liability', 'current_liability'),
@@ -149,6 +150,7 @@ class FinanceSeeder extends Seeder
             $this->account('4200', 'House Income', 'revenue', 'revenue', true),
             $this->account('4210', 'Resident Contributions', 'revenue', 'revenue', true),
             $this->account('4220', 'Donations Received', 'revenue', 'revenue'),
+            $this->account('4230', 'Insurance Recoveries', 'revenue', 'revenue'),
             $this->account('4300', 'Interest Income', 'revenue', 'revenue'),
 
             // ── Expenses (5000-8999) ────────────────────────────────────

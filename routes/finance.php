@@ -549,6 +549,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/fixed-assets/{fixedAsset}/dispose', [FixedAssetController::class, 'dispose'])
         ->name('fixed-assets.dispose')
         ->middleware('permission:finance.assets.manage');
+    Route::post('/fixed-assets/{fixedAsset}/capitalise', [FixedAssetController::class, 'capitalise'])
+        ->name('fixed-assets.capitalise')
+        ->middleware('permission:finance.assets.manage');
 
     // ── Petty Cash ──────────────────────────────────────────────────────
     Route::get('/petty-cash', [PettyCashController::class, 'index'])

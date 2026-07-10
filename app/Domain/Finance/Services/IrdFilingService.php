@@ -58,6 +58,7 @@ class IrdFilingService
                 'paye' => (string) $slip->paye,
                 'kiwisaver_employee' => (string) $slip->kiwisaver_employee,
                 'kiwisaver_employer' => (string) $slip->kiwisaver_employer,
+                'esct' => (string) ($slip->esct ?? '0.00'),
                 'student_loan' => (string) $slip->student_loan,
             ])->values()->all(),
             'total_gross' => $sum('gross_pay'),
@@ -65,8 +66,7 @@ class IrdFilingService
             'total_student_loan' => $sum('student_loan'),
             'total_kiwisaver_employee' => $sum('kiwisaver_employee'),
             'total_kiwisaver_employer' => $sum('kiwisaver_employer'),
-            // ESCT isn't separately tracked on the payslip yet.
-            'total_esct' => '0.00',
+            'total_esct' => $sum('esct'),
         ];
 
         $payload = $this->buildPaydayFilingPayload($payrollData);
