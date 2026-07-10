@@ -72,14 +72,16 @@ onboarding→provisioning bridge, or the SLA engine's current behaviour.
 
 ---
 
-## ✅ STRETCH LOOP COMPLETE (2026-07-10)
+## ✅ STRETCH LOOP COMPLETE (verified 2026-07-11)
 
-All buildable stretch items shipped on `claude/it-ticketing-stretch`; the S-loop grew the suite 88 → **140**, and the completed OAuth E-loop grew it again to **162**.
+All buildable stretch items shipped on `claude/it-ticketing-stretch`; the S-loop grew the suite 88 → **140**, and the completed OAuth E-loop plus continuation completion audit grew it again to **164**.
 - **A · Business-hours SLA** (S1–S4b) ✅ calculator, stamping, at-risk, admin editor.
 - **B · Ticket merge** (S5–S7b) ✅ schema, policy, fold, payload, dialog + banner.
 - **C · Approval workflows** (S8–S10b) ✅ schema, policies, request/decide, resolve gate, rail.
-- **D · Email-to-ticket** (S11–S12 + E0–E7) ✅ log, parser, threading, optional webhook, Exchange/Gmail OAuth poller and mailbox settings; go-live setup is in questions #5.
+- **D · Email-to-ticket** (S11–S12 + E0–E8) ✅ log, parser, threading, optional webhook, Exchange/Gmail OAuth poller, mailbox settings and dedicated FormRequest boundaries; go-live setup is in questions #5.
 - **E · External fulfilment** (S13) ⛔ **blocked** — needs a named target system or a "build the generic webhook" go-ahead (questions #6).
+
+**Continuation audit evidence (2026-07-11):** current `origin/main` is an ancestor of the clean feature branch; Laravel exposes 37 ticketing/mailbox routes and schedules SLA check + mailbox poll hourly and resolved-ticket auto-close daily. The complete IT test inventory is 25 files / 164 tests. A fresh isolated MySQL run passed **164 tests (1316 assertions)**. The post-merge frontend gates remain types ✓ · lint 0 errors · client build ✓ · SSR build ✓, and browser proof is desktop-only at 1440×1000 (questions #3).
 
 ## Decisions / questions
 Blockers and chosen defaults live in [IT_TICKETING_QUESTIONS.md](../IT_TICKETING_QUESTIONS.md):

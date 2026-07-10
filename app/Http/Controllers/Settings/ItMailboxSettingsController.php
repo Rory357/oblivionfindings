@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItMailboxConnection;
 use Illuminate\Http\RedirectResponse;
@@ -62,13 +63,9 @@ class ItMailboxSettingsController extends Controller
      * connected account reads support@ via Mail.ReadWrite.Shared). Null falls
      * back to the account's own inbox. Gmail always reads its own inbox.
      */
-    public function updateMailbox(Request $request, string $provider): RedirectResponse
+    public function updateMailbox(UpdateItMailboxRequest $request, string $provider): RedirectResponse
     {
-        $this->authorizeManage($request);
-
-        $validated = $request->validate([
-            'mailbox_email' => ['nullable', 'email', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         $connection = ItMailboxConnection::query()
             ->where('tenant_id', $this->resolveHrTenantIdForUser($request->user()))

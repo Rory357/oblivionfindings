@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Settings\ItMailboxSettingsController;
+use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItMailboxConnection;
 use App\Models\Role;
@@ -30,6 +32,13 @@ beforeEach(function () {
     $this->worker = itMailboxSettingsUser('support_worker');
 });
 
+test('the delegated mailbox mutation uses its dedicated form request', function () {
+    $parameter = (new ReflectionMethod(ItMailboxSettingsController::class, 'updateMailbox'))
+        ->getParameters()[0];
+
+    expect($parameter->getType()?->getName())->toBe(UpdateItMailboxRequest::class);
+});
+
 function itSettingsConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
@@ -45,6 +54,9 @@ function itSettingsConnection(array $overrides = []): ItMailboxConnection
 
 test('the mailbox settings surface is admin-gated', function () {
     $this->actingAs($this->worker)->get('/settings/it-mailbox')->assertForbidden();
+    $this->actingAs($this->worker)
+        ->put('/settings/it-mailbox/mailbox/microsoft', ['mailbox_email' => 'support@example.test'])
+        ->assertForbidden();
     $this->actingAs($this->worker)->post('/settings/it-mailbox/poll-now')->assertForbidden();
     $this->actingAs($this->worker)->get('/settings/it-mailbox/connect/microsoft')->assertForbidden();
 

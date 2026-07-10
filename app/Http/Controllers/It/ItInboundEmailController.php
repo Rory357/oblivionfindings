@@ -4,8 +4,8 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\InboundEmailIngestor;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\IngestInboundEmailRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Email-to-ticket webhook (§P-S4) — the PUSH ingress. A mail provider POSTs a
@@ -17,23 +17,9 @@ use Illuminate\Http\Request;
  */
 class ItInboundEmailController extends Controller
 {
-    public function __invoke(Request $request, InboundEmailIngestor $ingestor): JsonResponse
+    public function __invoke(IngestInboundEmailRequest $request, InboundEmailIngestor $ingestor): JsonResponse
     {
-        $secret = (string) config('it.inbound_mail.secret', '');
-        abort_unless(
-            $secret !== '' && hash_equals($secret, (string) $request->header('X-IT-Inbound-Secret')),
-            403,
-        );
-
-        $data = $request->validate([
-            'from' => ['required', 'email'],
-            'subject' => ['nullable', 'string', 'max:255'],
-            'text' => ['nullable', 'string'],
-            'message_id' => ['nullable', 'string', 'max:255'],
-            'in_reply_to' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $inbound = $ingestor->ingest($data);
+        $inbound = $ingestor->ingest($request->validated());
 
         return response()->json(array_filter([
             'status' => $inbound->status,

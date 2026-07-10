@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\It\InboundEmailIngestor;
+use App\Http\Controllers\It\ItInboundEmailController;
+use App\Http\Requests\It\IngestInboundEmailRequest;
 use App\Models\ItInboundEmail;
 use App\Models\ItTicket;
 use App\Models\User;
@@ -47,8 +50,15 @@ test('an unmatched inbound email can be logged without a ticket', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  §P-S4 (S12) — the inbound webhook                                  */
+/*  §P-S4 (S12) — the inbound webhook */
 /* ------------------------------------------------------------------ */
+
+test('the inbound webhook uses its dedicated form request', function () {
+    $parameter = (new ReflectionMethod(ItInboundEmailController::class, '__invoke'))
+        ->getParameters()[0];
+
+    expect($parameter->getType()?->getName())->toBe(IngestInboundEmailRequest::class);
+});
 
 test('the webhook rejects a missing or wrong shared secret', function () {
     config(['it.inbound_mail.secret' => 'top-secret']);
@@ -58,6 +68,10 @@ test('the webhook rejects a missing or wrong shared secret', function () {
 
     $this->postJson('/api/it/email/inbound', ['from' => 'x@example.test'], ['X-IT-Inbound-Secret' => 'nope'])
         ->assertForbidden();
+
+    $this->postJson('/api/it/email/inbound', ['from' => 'not-an-email'], ['X-IT-Inbound-Secret' => 'top-secret'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('from');
 });
 
 test('the webhook is inert when no secret is configured', function () {
@@ -105,7 +119,7 @@ test('the ingestor can be driven directly — the poller contract (E1)', functio
     $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
     $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'requester_user_id' => $sender->id]);
 
-    $inbound = app(\App\Domain\It\InboundEmailIngestor::class)->ingest([
+    $inbound = app(InboundEmailIngestor::class)->ingest([
         'from' => 'worker@example.test',
         'subject' => "Re: {$ticket->reference}",
         'text' => 'Direct call, no HTTP.',
