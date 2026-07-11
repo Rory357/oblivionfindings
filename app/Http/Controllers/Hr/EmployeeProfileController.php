@@ -54,6 +54,7 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status'); // 'active', 'inactive', or null for all
@@ -185,10 +186,13 @@ class EmployeeProfileController extends Controller
             ->where('probation_end_date', '>=', now())
             ->count();
         $complianceAlerts = HrStaffComplianceStatus::whereIn('status', ['expired', 'expiring_soon'])->count();
-        // Pending invites — active staff who have never signed in (no login yet).
+        // Pending invites — active employee profiles whose login is not active yet.
         $pendingInvites = User::query()->staff()
+            ->whereNull('approved_at')
             ->whereNull('last_login_at')
-            ->whereHas('hrEmployeeProfile', fn ($p) => $p->where('is_active', true))
+            ->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true))
             ->count();
 
         // Employment type breakdown
@@ -226,9 +230,8 @@ class EmployeeProfileController extends Controller
         ] : null;
 
         // --- Positions tab (folds /hr/positions; namespaced filters + paginator) ---
-        // Resolve a real tenant id — users carry no tenant_id column, so the
-        // legacy $user->tenant_id was always null (forTenant(null) → empty).
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        // Users carry no tenant_id column, so all folded tabs reuse the resolved
+        // HR tenant from the start of the request.
         $posSearch = trim((string) $request->query('pq', ''));
         $posDepartment = $request->query('pdepartment');
         $posStatus = $request->query('pstatus');
@@ -408,8 +411,11 @@ class EmployeeProfileController extends Controller
             ->get();
 
         $invites = User::query()->staff()
+            ->whereNull('approved_at')
             ->whereNull('last_login_at')
-            ->whereHas('hrEmployeeProfile', fn ($p) => $p->where('is_active', true))
+            ->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true))
             ->with('hrEmployeeProfile:id,user_id,position_title')
             ->orderBy('name')
             ->limit(50)

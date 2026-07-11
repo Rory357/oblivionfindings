@@ -1,9 +1,9 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
@@ -44,7 +44,7 @@ function triageStaff(string $name, array $userOverrides = [], array $profileOver
 }
 
 test('the people index exposes the triage payload with three rails', function () {
-    triageStaff('Never Loggedin', ['last_login_at' => null]);
+    triageStaff('Never Loggedin', ['approved_at' => null, 'last_login_at' => null]);
     triageStaff('Already In', ['last_login_at' => now()]);
 
     $response = $this->actingAs($this->manager)->get('/hr/people');
@@ -73,10 +73,10 @@ test('a staffer within probation surfaces on the probation rail', function () {
     expect($names)->toContain('On Probation');
 });
 
-test('resendInvite sends a reset-link invite and is manage-gated', function () {
+test('resendInvite sends the HR-branded reset-link invite and is manage-gated', function () {
     Notification::fake();
 
-    $profile = triageStaff('Invite Me', ['last_login_at' => null]);
+    $profile = triageStaff('Invite Me', ['approved_at' => null, 'last_login_at' => null]);
 
     // A non-manager cannot send invites.
     $viewer = User::factory()->create([
@@ -92,5 +92,5 @@ test('resendInvite sends a reset-link invite and is manage-gated', function () {
         ->post("/hr/people/{$profile->id}/invite")
         ->assertRedirect();
 
-    Notification::assertSentTo($profile->user, ResetPassword::class);
+    Notification::assertSentTo($profile->user, EmployeeInviteNotification::class);
 });
