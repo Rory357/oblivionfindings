@@ -37,8 +37,8 @@ interface AuditEntry {
     id: number;
     user_id: number | null;
     action: string;
-    auditable_type: string;
-    auditable_id: number;
+    auditable_type: string | null;
+    auditable_id: number | null;
     old_values: Record<string, any> | null;
     new_values: Record<string, any> | null;
     ip_address: string | null;
@@ -96,7 +96,9 @@ const formatDate = (value?: string | null) => {
           });
 };
 
-const shortModelType = (type: string) => {
+export const shortModelType = (type?: string | null) => {
+    if (!type) return 'System';
+
     const parts = type.split('\\');
     return parts[parts.length - 1] ?? type;
 };
