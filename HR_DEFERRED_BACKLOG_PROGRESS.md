@@ -50,7 +50,7 @@ Status: ⬜ not started · 🔶 in progress/blocked · ✅ verified complete · 
 | U4 | Neutral shared `TextPromptDialog` ownership | ✅ | Initial contract RED: neutral component path absent and both consumers imported recruitment ownership. | Focused 6/6; zero old-owner imports; full frontend 195/195; builds pass. | `d86c3a62` | File moved with API and behavior unchanged; recruitment and documents now import the neutral HR component. |
 | U5 | Time soft refresh updates entries and preserves filters | ✅ | Initial contract RED: partial reload omitted `entries`. | Focused 6/6; full frontend 195/195; types, focused ESLint, client and SSR builds pass. | `d86c3a62` | Existing 30-second overview reload now includes the server-filtered entries prop and explicitly preserves state/scroll; no selection reset was introduced. |
 | C1 | Calendar table guards, permission defence, team audiences | ✅ | Pre-change source proof: no `Schema::hasTable` guard existed; the route group had no permission middleware; controller/wizard audience unions omitted `team`. | Focused: 10 passed / 36 assertions. Planned calendar regression: 24 passed / 90 assertions. Types and focused ESLint pass. | `89d16df2` | Seven optional source tables fail soft; all calendar routes carry the view gate; team values come only from active tenant profiles and visibility requires an active matching profile (creator retains access). |
-| L1 | Classify every historical open/deferred observation | ⬜ | — | — | — | Implemented, stale, or approved closed boundary. |
+| L1 | Classify every historical open/deferred observation | 🔶 | Historical source-ledger observations rechecked against the release baseline and the 26 implemented requirement IDs. | The append-only disposition matrix below maps each observation to implementation evidence, stale evidence, or an approved closed boundary. | — | Classification is complete, but L1 remains partial because browser verification of the changed surfaces was interrupted by the Codex crash and has not been rerun. |
 
 ## Approved closed boundaries retained throughout
 
@@ -139,3 +139,83 @@ The initial source/UI contract failed all six cases: the payroll, training, and 
 Payroll runs and payslips now use one specialised hero backed by the existing server counts and deep links, retain all direct actions, render desktop tables and mobile cards, and attach the shared HR context menu to both forms. Training moved from its bespoke gradient/raw-colour hero to `HrHero` while preserving all counts, actions, filters, tabs, and compliance context. Feedback uses a specialised deep-linked hero derived from the existing server stats. `TextPromptDialog` moved to neutral HR ownership without an API change. The time overview partial reload now requests `entries` alongside KPIs and explicitly preserves state and scroll, so the server's active filters remain authoritative.
 
 Final GREEN: focused **6/6**; complete frontend **46 files / 195 tests** in 17.83s; `npm run types` exit 0; focused ESLint zero warnings; old-owner import and raw-training-colour scans clean; client build **2m 42s**; SSR build **36.86s**; `git diff --check` clean. Implementation commit: `d86c3a62`.
+
+### Run 13 — L1 classification and terminal release gate
+
+Crash recovery restored the exact unmerged branch and recovered the omitted migration evidence from the original task: all seven additive migrations were applied as one test batch, rolled back together, then reapplied; retained-row counts remained stable. The historical audit and closeout ledgers were re-read in full, and every open/deferred/partial observation is classified below as implemented, stale, already closed by an earlier release, or an approved boundary.
+
+Fresh terminal verification on 12 July 2026:
+
+- complete HR suite: **798 passed / 4,891 assertions / 0 failed / 1,426.48s**;
+- Timesheets, Rostering and shift-eligibility bundle: **58 passed / 292 assertions / 0 failed / 178.77s**;
+- complete frontend: **46 files / 195 tests / 0 failed / 38.20s**;
+- PHP syntax: **76 changed PHP files clean**; two deliberately deleted legacy audit files skipped;
+- Pint: all current changed PHP files passed after one import-only normalisation in `RecruitmentHubTest.php`;
+- TypeScript `tsc --noEmit`: **exit 0**;
+- ESLint: **29 changed TypeScript files / zero warnings / exit 0**;
+- client production build: **4,942 modules transformed / exit 0 / 3m 23s**;
+- SSR production build: **1,594 modules transformed / exit 0 / 39.35s**;
+- `git diff --check main...HEAD`: **exit 0**.
+
+Browser proof is still missing. The earlier pass was interrupted by the Codex crash, and no browser was opened during this terminal-only recovery. Therefore the implementation and terminal release gates are green, the historical classification is complete, but L1 and the new release closeout remain **Partial** rather than being overstated as complete.
+
+## L1 historical-observation disposition — 2026-07-12
+
+> This matrix is append-only. It does not rewrite historical observations or pretend redesign ideas were implemented. `L1` remains 🔶 until the deferred-backlog browser proof is completed or explicitly accepted as an unverified release boundary.
+
+| Historical source | Observation(s) | Final disposition |
+|---|---|---|
+| Audit §5 row 2 — People | Generic reset-mail reinvite; active-user reinvite guard | **Implemented — W1**, `1371858d`. |
+| Audit §5 row 2 — People | `setActive` is HR visibility only; client MIME metadata; full-page profile detail | **Approved closed boundaries.** Offboarding owns login revocation; private files retain extension allowlists and authorised downloads; full-page detail remains accepted. |
+| Audit §5 row 2 — People | Carry-over profile-update notification idea | **Approved closed scope.** It never defined a waiting party or transition contract and was not adopted as a requirement; existing audit/success feedback remains. No implementation claim. |
+| Audit §5 row 3 — Recruitment | Force-expire lapsed offers; scorecard quorum | **Implemented — Q1/Q2**, `9ef2e576`. |
+| Audit §5 row 3 / S14 / D-1 | Real approvals absent from the chain inbox | **Implemented before this programme — closeout C8**, `483bb709`: four native queues are surfaced with owning links; no workflow migration. |
+| Audit §5 row 4 — Onboarding | Checklist hard delete | **Implemented before this programme — closeout C4**, `cbef5fed`: checklist archive retains tasks. |
+| Audit §5 row 4 — Onboarding | Task/template/email child deletion; quiet per-task completion; transient `pending` recomputation | **Approved closed boundaries.** Child/reference deletion remains inside C4; aggregate checklist completion remains the notification point; recomputation is harmless. |
+| Audit §5 row 5 — Exit interviews | Store-once immutability | **Implemented before this programme — closeout C5**, `638b55eb`: submitted answers lock and append-only addenda remain available. |
+| Audit §5 row 5 — Offboarding | Title-matched interview link; future-interview notice; late-issued assets; missing-role assignees | **Implemented — O1–O4**, `f0fc8c5d`. |
+| Audit §5 row 5 — Offboarding UI | Generic detail hero and minimal empty states | **Approved closed UI boundary.** Accepted detail/workspace surface; no workflow gap. |
+| Audit §5 row 6 — Calendar | “Unmerged” calendar rebuild branch | **Stale.** The branch was already an ancestor of release `main`; no duplicate redesign work. |
+| Audit §5 row 6 — Calendar | Missing table guards; route-level view defence; dormant team audience | **Implemented — C1**, `89d16df2`. |
+| Audit §5 row 7 — Leave | No `HrLeaveApprovalChain` administration | **Implemented — W2**, `1371858d`. |
+| Audit §5 row 7 — Leave | `react-hooks/refs` failure | **Stale/already fixed before release**, `c31a7b01`; current source no longer contains the reported `reqRef` pattern. |
+| Audit §5 row 7 — Leave | CTA-light empty states; full-page detail; no declined-request appeal | **Approved closed boundaries.** Full-page escape hatch remains; declined leave is resubmitted as a new request. |
+| Audit §5 row 8 — Time | Timesheet approval could fork/replace the linked HR entry | **Implemented — X1**, `c4003c2e`. |
+| Audit §5 row 8 — Time | Soft refresh omitted entries | **Implemented — U5**, `d86c3a62`. |
+| Audit §5 row 8 — Time | Permissive pay types; break warn-not-block | **Approved closed boundaries.** Integration-compatible validation and non-trapping clock-out behavior remain. |
+| Audit §5 row 9 — Compensation | Salary-band retention; service-level benefit tenancy | **Implemented — R2**, `145f5e5f`; **X2**, `c4003c2e`. |
+| Audit §5 row 9 — Compensation | Multi-item full-page expense form and no browser draft recovery | **Approved closed boundary.** The dialog remains the primary guided flow; the full page remains the escape hatch. |
+| Audit §5 row 9 — Compensation | Expense approvals outside the generic spine | **Implemented before this programme — closeout C8**, `483bb709`, by read-only native-queue federation. |
+| Audit §5 row 10 — Payroll | Generic hero and hand-built desktop-only action tables | **Implemented — U1**, `d86c3a62`. |
+| Audit §5 row 10 / D-6 | Payroll CSV formula injection | **Implemented before this programme — closeout C1**, `8f717805`. |
+| Audit §5 row 10 | Audit-invisible default demotion | **Implemented — A2**, `2c4f1f08`. |
+| Audit §5 row 11 — Compliance | `StaffBackgroundCheck` hard delete | **Stale/already retained.** The model uses `SoftDeletes`; closeout C4’s classification is recorded at `cbef5fed`. |
+| Audit §5 row 11 / S3 | Worker expiry nudges; shift licence class/endorsement gate | **Implemented — W6**, `3f2cd2e5`; **W7**, `71fcfd32`. |
+| Audit §5 row 12 — Documents | Hard-delete root documents; recruitment-owned prompt dialog | **Implemented before this programme — closeout C4**, `cbef5fed`; **implemented — U4**, `d86c3a62`. |
+| Audit Run 0 O-6 / Run 12 | Missing policy re-attestation duplicate guard | **Stale.** Same-version duplicate attestation was already rejected by the version-scoped store contract. |
+| Audit §5 row 13 — Performance | Session taxonomy absent from wizard; orphan dialog; visible-note notice | **Implemented — W3**, `3f2cd2e5`. |
+| Audit §5 row 13 / D-7 | Merge or cross-surface HR and governance reviews | **Approved no-action boundary**, `97ff4af0`: two live domains remain separate. |
+| Audit §5 row 14 — Goals | Dead OKR completion notifier | **Implemented — W4**, `3f2cd2e5`. |
+| Audit §5 row 14 | Development-goal hard delete | **Stale/already retained.** `HrDevelopmentGoal` uses `SoftDeletes`; C4 classification remains authoritative. |
+| Audit §5 row 15 — Training | Bespoke hero and raw `oklch()` fallback | **Implemented — U2**, `d86c3a62`. |
+| Audit §5 row 16 — Feed | Announcement replies notified nobody | **Implemented — W5**, `3f2cd2e5`. |
+| Audit §5 row 16 — Feed | Reaction notifications; moderation/privacy deletion | **Approved closed boundaries.** Reactions remain ambient; explicit moderation/privacy deletion remains inside C4. |
+| Audit §5 row 18 — Feedback | Generic `PageHero` | **Implemented — U3**, `d86c3a62`. |
+| Audit §5 row 19 — Wellbeing | Flag-action undo retention; non-private check-in notice; bespoke hero | **Approved redesign boundary.** No wholesale Wellbeing redesign was approved; immediate actor-scoped undo and current confidentiality/acknowledgement behavior remain. No implementation claim. |
+| Audit §5 row 22 / Run 22 | Near-empty inbox and no real-queue deep links | **Implemented before this programme — closeout C8**, `483bb709`: every real native queue has an owning link. |
+| Audit Run 22 | Generic chain-row item text, raw date, bare empty state and generic hero | **Closed to the approved surface-only D-1 outcome.** Generic chain instances remain unfed in production; the real native queues are linked. No redesign claim. |
+| Audit §5 row 23 / Run 23 | Sign/decline requester notices and raw signature dates | **Approved redesign/notification-policy boundary.** These remain future product ideas, not unclassified defects in this programme. |
+| Audit Run 24 partial marker | Headcount, Succession and Import/export pending | **Stale historical marker.** The same ledger’s Run 24 part 2 source-audited all three clean and changed the cluster to ✅. |
+| Audit Run 24 | Analytics/Headcount/Succession specialised heroes | **Approved redesign boundary.** The programme approved only U1–U3 named hero builds. |
+| Audit Run 0 O-1 | Payslip stat-card links | **Approved closed boundary.** No filtered destination exists; the list is the explaining view. |
+| Audit Run 0 O-2 | My-training cards lacked course links | **Already implemented before release**, `8d078521`. |
+| Audit Run 0 O-3 | Supervision acknowledgement notice | **Already implemented before release**, `d1c6da43`. |
+| Audit Run 0 O-4 | Development-goal completion notice | **Already implemented before release**, `2e9bee24`. |
+| Audit Run 0 O-5 | Survey/policy/clock/draft-expense notifications | **Approved closed notification-noise/privacy boundaries.** |
+| Audit S8/S9/S11/S12 historical partials | Runtime proof owed for GL, payroll/time, shared kudos and recruitment/onboarding | **Already closed before release** by `a420be3f`, `327dfe67`, `c45313e7`, and `9f996cbb`. |
+| Audit D-1…D-11 | Eleven historical decisions | **All classified before this programme:** D-1 `483bb709`; D-2 `23a5991e`; D-3 `319ab3ce`; D-4 `cbef5fed`; D-5 `638b55eb`; D-6 `8f717805`; D-7/D-10/D-11 `97ff4af0`; D-8 `51d5b88c`; D-9 `f6d98423`. |
+| Closeout C1 out-of-scope note | `EmployeeImportExportService` and `ReportBuilderService` CSV cells | **Implemented — E1**, `c36ce490`. |
+| Closeout C3 architecture note | Split legacy HR audit viewer and missing organisation scope | **Implemented — A1**, `2c4f1f08`; canonical organisation-scoped store only. |
+| Closeout C4 boundary note | Calendar had no honest archive lifecycle | **Implemented — R1**, `145f5e5f`. |
+| Closeout contained-gate notes | Several slices deferred the full suite/build | **Stale for that release.** Closeout C10 `9eaab3a5` ran the complete terminal release gates. This does not substitute for the deferred-backlog branch’s own final proof. |
+| Deferred-backlog Task 13 Step 5 | Browser proof for audit log, calendar, salary bands, offboarding, recruitment, leave chains, payroll, training, feedback, supervision, time refresh and licence requirements | **Still unverified.** The attempted browser pass was interrupted by a Codex crash. No URL/actor/action/visible-result/console/network matrix exists, so L1/release closeout must not be marked fully complete. |

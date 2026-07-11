@@ -534,3 +534,15 @@ New `tests/Feature/Hr/ProcedureAckHrComplianceBoundaryTest.php` (1 test, 3 asser
 | npm run test (vitest) | ✅ no NEW failures — 8 fails, all reproduced at clean HEAD via stash (my-day ×4, app-sidebar ×1, behaviour-abc ×2, resident-tracking ×1) |
 | pest tests/Feature/Hr tests/Unit/Hr | ✅ no NEW failures — 3 failed / 690 passed (928s); all 3 reproduced at clean HEAD (see corrected baselines). `MyLeaveCancelTest` (covers the changed cancel path) fully green with the new notification. |
 | screenshots | n/a in worktree (Herd serves parent only) — post-deploy visual check per established pattern |
+
+## Deferred-backlog disposition addendum — 2026-07-12
+
+Historical audit text above is preserved as evidence. The canonical append-only classification is now recorded in `HR_DEFERRED_BACKLOG_PROGRESS.md` under **L1 historical-observation disposition**.
+
+- Deferred-backlog implementations: A1/A2 `2c4f1f08`; E1 `c36ce490`; R1/R2 `145f5e5f`; O1–O4 `f0fc8c5d`; X1/X2 `c4003c2e`; Q1/Q2 `9ef2e576`; W1/W2 `1371858d`; W3–W6 `3f2cd2e5`; W7 `71fcfd32`; C1 `89d16df2`; U1–U5 `d86c3a62`.
+- Earlier closeout decisions remain authoritative: D-1 `483bb709`; D-2 `23a5991e`; D-3 `319ab3ce`; D-4 `cbef5fed`; D-5 `638b55eb`; D-6 `8f717805`; D-7/D-10/D-11 `97ff4af0`; D-8 `51d5b88c`; D-9 `f6d98423`.
+- Historical stale markers include the already-merged calendar rebuild, the existing policy-attestation duplicate guard, already-soft-deleted background/development-goal models, the corrected leave lint issue, and Run 24’s same-ledger partial marker.
+- Accepted boundaries remain unchanged: `setActive` visibility ownership, private-upload access controls, quiet per-task completion, child/reference/moderation deletion, declined-leave resubmission, break warn-not-block, permissive integration pay types, full-page escape-hatch forms, ambient reactions, and the D-7/D-10/D-11 ownership separations.
+- Redesign-only observations not selected by the approved deferred-backlog design are classified as closed to this programme, not falsely labelled implemented.
+
+**Verification boundary:** the deferred-backlog browser pass was interrupted by a Codex crash. The changed surfaces therefore have no complete URL/actor/action/result/console/network proof matrix. This addendum does not mark L1 or the deferred-backlog release fully complete.

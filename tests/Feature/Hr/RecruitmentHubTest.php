@@ -4,6 +4,7 @@ use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
+use App\Domain\Hr\Models\HrCandidateEmailTemplate;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewKit;
@@ -25,6 +26,8 @@ use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Notifications\RequisitionApprovalRequestNotification;
+use App\Domain\Hr\Services\RecruitmentAnalyticsService;
+use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -32,6 +35,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 function makeOffer(array $ctx, string $state, int $hrId, int $siteId): HrOffer
@@ -948,7 +952,7 @@ test('scoring requires recruitment manage and rejects unknown criteria labels', 
 test('createApplication persists screening answers and the legacy answers column is gone', function () {
     ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
 
-    $application = app(\App\Domain\Hr\Services\RecruitmentService::class)->createApplication(
+    $application = app(RecruitmentService::class)->createApplication(
         $candidate->fresh(),
         [
             'position_title' => 'Team Leader',
@@ -958,7 +962,7 @@ test('createApplication persists screening answers and the legacy answers column
 
     expect($application->screening_answers)->toBe(['drivers_licence' => 'Yes', 'availability' => 'Weekends']);
     // The dead column is dropped by migration.
-    expect(\Illuminate\Support\Facades\Schema::hasColumn('hr_applications', 'answers'))->toBeFalse();
+    expect(Schema::hasColumn('hr_applications', 'answers'))->toBeFalse();
 });
 
 /* ---- Analytics date-range filter (Analytics tab) ---- */
@@ -967,7 +971,7 @@ test('analytics conversion and sources honour the date window', function () {
     HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'seek', 'created_at' => now()->subYear(), 'created_by' => $this->hr->id]);
     HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'referral', 'created_at' => now()->subDays(2), 'created_by' => $this->hr->id]);
 
-    $svc = app(\App\Domain\Hr\Services\RecruitmentAnalyticsService::class);
+    $svc = app(RecruitmentAnalyticsService::class);
 
     $allScreening = collect($svc->getPipelineConversion(1))->firstWhere('stage', 'screening')['count'];
     expect($allScreening)->toBe(2);
@@ -992,7 +996,7 @@ test('a manager can save, surface and remove a candidate email template', functi
         'body' => "We'd love to meet you.\nPlease pick a time that suits.",
     ])->assertRedirect();
 
-    $template = \App\Domain\Hr\Models\HrCandidateEmailTemplate::query()->where('name', 'Interview invite')->first();
+    $template = HrCandidateEmailTemplate::query()->where('name', 'Interview invite')->first();
     expect($template)->not->toBeNull();
     expect($template->subject)->toBe('Invitation to interview');
     expect($template->tenant_id)->not->toBeNull();
@@ -1006,7 +1010,7 @@ test('a manager can save, surface and remove a candidate email template', functi
 
     // Remove it.
     $this->actingAs($this->hr)->delete(route('hr.email-templates.destroy', $template->id))->assertRedirect();
-    expect(\App\Domain\Hr\Models\HrCandidateEmailTemplate::query()->count())->toBe(0);
+    expect(HrCandidateEmailTemplate::query()->count())->toBe(0);
 
     // Gated on hr.recruitment.manage.
     $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);

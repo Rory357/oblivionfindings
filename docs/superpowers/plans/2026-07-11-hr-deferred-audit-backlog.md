@@ -588,15 +588,15 @@ git commit -m "feat(hr): complete deferred hub and table polish"
 - Modify: `HR_AUDIT_FIX_PROGRESS.md`
 - Modify: `HR_CLOSEOUT_PROGRESS.md`
 
-- [ ] **Step 1: Classify every historical open observation**
+- [x] **Step 1: Classify every historical open observation**
 
 Search both source ledgers for `Open:`, `deferred`, `follow-up`, `Decision`, and partial markers. Append a matrix mapping each observation to a requirement commit, stale evidence, or an approved closed boundary. Leave no unclassified open item.
 
-- [ ] **Step 2: Run migration verification**
+- [x] **Step 2: Run migration verification**
 
 On the testing database, run migrations from release baseline forward, rollback the new batch, and migrate forward again. Verify additive backfills are idempotent and no retained rows/files disappear.
 
-- [ ] **Step 3: Run complete backend verification**
+- [x] **Step 3: Run complete backend verification**
 
 ```powershell
 php artisan test tests/Feature/Hr --compact
@@ -605,7 +605,7 @@ php artisan test tests/Feature/Timesheets tests/Feature/Rostering tests/Unit/Ser
 
 Expected: zero failures. Record tests, assertions, warnings, and duration exactly.
 
-- [ ] **Step 4: Run complete frontend and static verification**
+- [x] **Step 4: Run complete frontend and static verification**
 
 ```powershell
 npm test
@@ -623,11 +623,15 @@ Expected: zero failures/warnings for changed files, successful client and SSR bu
 
 Verify every changed surface in the isolated preview: audit log, calendar archive/team audience, salary bands, offboarding, recruitment, leave-chain settings, payroll, training, feedback, supervision, time refresh, and shift licence requirements. Record URL, actor/permission, action, visible result, console errors, and failed network requests.
 
+The attempted browser pass was interrupted by a Codex crash. It was deliberately not rerun during the terminal-only merge/push recovery on 12 July 2026, so this step and L1 remain partial.
+
 - [ ] **Step 6: Perform the requirement-by-requirement completion audit**
 
 For A1 through L1, cite the authoritative test, source, migration, UI proof, and commit. Any missing or indirect evidence keeps the row incomplete and must be fixed before closing.
 
-- [ ] **Step 7: Commit closeout**
+The terminal/source/commit audit and historical-observation classification are complete. This step remains unchecked solely because Step 5 has no complete browser proof matrix.
+
+- [x] **Step 7: Commit closeout**
 
 ```powershell
 git add HR_DEFERRED_BACKLOG_PROGRESS.md HR_AUDIT_FIX_PROGRESS.md HR_CLOSEOUT_PROGRESS.md
@@ -635,3 +639,5 @@ git commit -m "docs(hr): close deferred audit backlog"
 ```
 
 Do not merge, push, deploy, or change `main` without separate user authorisation.
+
+Separate authorisation was provided on 12 July 2026 to commit this HR branch, merge it to `main`, and push `main`. Browser automation, direct deployment commands, live writes, live migrations and live seeding remain outside that authorisation.
