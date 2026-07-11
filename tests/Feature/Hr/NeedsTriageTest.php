@@ -4,10 +4,11 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->manager = User::factory()->create([
         'name' => 'HR Manager',
@@ -25,7 +26,7 @@ function triageStaff(string $name, array $userOverrides = [], array $profileOver
 {
     $staff = User::factory()->create(array_merge([
         'name' => $name,
-        'email' => str($name)->slug() . '@example.test',
+        'email' => str($name)->slug().'@example.test',
         'role' => 'support_worker',
         'approved_at' => now(),
     ], $userOverrides));
@@ -33,7 +34,7 @@ function triageStaff(string $name, array $userOverrides = [], array $profileOver
     return HrEmployeeProfile::query()->create(array_merge([
         'tenant_id' => 1,
         'user_id' => $staff->id,
-        'employee_number' => 'EMP-' . $staff->id,
+        'employee_number' => 'EMP-'.$staff->id,
         'work_email' => $staff->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
