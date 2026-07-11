@@ -241,30 +241,32 @@ git commit -m "feat(hr): retain calendar events and salary bands"
 - Modify: `app/Domain/Hr/Services/ExitInterviewService.php`
 - Modify: `app/Domain/Hr/Services/AssetService.php`
 - Modify: `app/Http/Controllers/Hr/ExitInterviewController.php`
+- Modify: `app/Http/Controllers/Hr/OffboardingController.php`
+- Modify: `resources/js/pages/hr/offboarding/show.tsx`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Cover explicit linkage without title lookup, ambiguous legacy tasks left untouched, future-scheduled notification only, late asset assignment creating one task, returned asset creating none, and assignee fallback order role → manager → actor.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/OffboardingDeferredBacklogTest.php --compact`
 
 Expected: FAIL on missing column, notification, reconciliation, and fallback.
 
-- [ ] **Step 3: Add the one-to-one link and deterministic backfill**
+- [x] **Step 3: Add the one-to-one link and deterministic backfill**
 
 Add nullable unique `exit_interview_id` on tasks. Backfill only when an interview’s employee has exactly one open unmatched task. Add model relations.
 
-- [ ] **Step 4: Remove title matching from new flows**
+- [x] **Step 4: Remove title matching from new flows**
 
 Pass `offboarding_task_id` from the checklist flow and attach/complete that exact task. Standalone creation attaches when exactly one open unmatched exit-interview task exists for that employee; zero or multiple matches remain unlinked.
 
-- [ ] **Step 5: Implement notification, asset reconciliation, and fallback**
+- [x] **Step 5: Implement notification, asset reconciliation, and fallback**
 
 Add `OnboardingService::reconcileAssetReturnTask(HrOffboardingChecklist $checklist, HrAsset $asset, int $actorId)` keyed by checklist plus asset assignment identity. Resolve all required task assignees before inserts and throw `ValidationException` if none resolve.
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/OffboardingDeferredBacklogTest.php tests/Feature/Hr/OffboardingWorkflowTest.php tests/Feature/Hr/ExitInterviewWizardTest.php tests/Feature/Hr/AssetLifecycleTest.php --compact
