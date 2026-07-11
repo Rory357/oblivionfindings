@@ -382,23 +382,23 @@ git commit -m "feat(hr): complete offer expiry and interview quorum"
 - Modify: `resources/js/pages/hr/approvals/chains.tsx`
 - Modify: HR routes
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Assert inactive users receive `EmployeeInviteNotification` containing a reset URL, active users receive a validation error and no notification, leave chains are tenant-scoped CRUD/reorder/activate, and native leave approval behavior remains unchanged.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/EmployeeInviteLifecycleTest.php tests/Feature/Hr/LeaveApprovalChainAdministrationTest.php --compact`
 
-- [ ] **Step 3: Implement branded invite**
+- [x] **Step 3: Implement branded invite**
 
 Generate the same password-reset token securely, but deliver a database/mail HR notification with `type=employee_invite` and `action_url`. Guard `approved_at !== null` before token creation.
 
-- [ ] **Step 4: Add leave-chain administration**
+- [x] **Step 4: Add leave-chain administration**
 
 Expose `HrLeaveApprovalChain` separately from generic `HrApprovalChain` in the chains page. Validate tenant users/roles, use transactions for reorder, and guarantee only one active chain per leave type and tenant.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/EmployeeInviteLifecycleTest.php tests/Feature/Hr/LeaveApprovalChainAdministrationTest.php tests/Feature/Hr/ApprovalChainTenantTest.php --compact
