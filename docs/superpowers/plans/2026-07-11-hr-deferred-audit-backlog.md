@@ -335,25 +335,25 @@ git commit -m "fix(hr): preserve time-entry identity and benefit tenancy"
 - Modify: `routes/hr.php`
 - Modify: `resources/js/pages/hr/recruitment/index.tsx`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Cover forced expiry with required reason, accepted-offer rejection, portal denial, resend token rotation/revival, full interviewer quorum, zero-interviewer block, missing-score block, and audited override.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/RecruitmentDeferredLifecycleTest.php --compact`
 
 Expected: routes absent and stage advancement ignores scores.
 
-- [ ] **Step 3: Implement force expiry**
+- [x] **Step 3: Implement force expiry**
 
 Add `expired_by` and `expiry_reason`. Manager action sets `portal_expires_at=now()`, rotates token to null, stamps actor/reason, and audits. Resend generates a new token and clears explicit expiry attribution.
 
-- [ ] **Step 4: Implement quorum in the domain service**
+- [x] **Step 4: Implement quorum in the domain service**
 
 Before advancing beyond interview, load the latest relevant interview, unique assigned interviewer IDs, and submitted score interviewer IDs. Block missing IDs. The override path requires a reason and logs `recruitment.scorecard_quorum_overridden` with missing IDs.
 
-- [ ] **Step 5: Add UI actions and run GREEN**
+- [x] **Step 5: Add UI actions and run GREEN**
 
 Use the existing confirmation/prompt dialog pattern for force expiry and override. Then run:
 
@@ -363,7 +363,7 @@ npm run types
 npx eslint resources/js/pages/hr/recruitment/index.tsx --max-warnings=0
 ```
 
-- [ ] **Step 6: Update ledger and commit**
+- [x] **Step 6: Update ledger and commit**
 
 ```powershell
 git add app database/migrations resources/js routes tests/Feature/Hr HR_DEFERRED_BACKLOG_PROGRESS.md
