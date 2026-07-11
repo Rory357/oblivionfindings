@@ -4,11 +4,18 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\CarePlan;
+use App\Models\CarePlanGoal;
 use App\Models\CarePlanSignOff;
 use App\Models\Client;
-use App\Models\TimelineEvent;
+use App\Models\ClientNote;
+use App\Models\ClientOnboardingStep;
+use App\Models\ClientOnboardingWorkflow;
+use App\Models\ServiceAgreement;
+use App\Models\User;
+use App\Services\Timeline\TimelineEmitter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -43,7 +50,7 @@ class CarePlanController extends Controller
             'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
             'in_review' => (clone $baseQuery)->where('status', 'review')->count(),
             'plans_without_goals' => (clone $baseQuery)->whereDoesntHave('goals')->where('status', '!=', 'archived')->count(),
-            'overdue_goals' => \App\Models\CarePlanGoal::query()
+            'overdue_goals' => CarePlanGoal::query()
                 ->whereHas('carePlan', function ($q) use ($auth) {
                     $q->where('status', 'active')
                         ->when($auth->organization_id, fn ($q2) => $q2->where('organization_id', $auth->organization_id));
@@ -64,11 +71,11 @@ class CarePlanController extends Controller
         // Filtered query for listing
         $carePlans = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->when(!empty($data['q']), fn ($q) => $q->where('title', 'like', '%' . $data['q'] . '%'))
-            ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
-            ->when(!empty($data['plan_type']), fn ($q) => $q->where('plan_type', $data['plan_type']))
-            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
-            ->when(!empty($data['review_due']), fn ($q) => $q->where('status', 'active')->where(function ($q2) {
+            ->when(! empty($data['q']), fn ($q) => $q->where('title', 'like', '%'.$data['q'].'%'))
+            ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->when(! empty($data['plan_type']), fn ($q) => $q->where('plan_type', $data['plan_type']))
+            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(! empty($data['review_due']), fn ($q) => $q->where('status', 'active')->where(function ($q2) {
                 $q2->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
             }))
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
@@ -77,7 +84,7 @@ class CarePlanController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $clients = \App\Models\Client::query()
+        $clients = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
@@ -113,9 +120,18 @@ class CarePlanController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.create'), 403);
 
         $this->validateStructuredDomains($request->input('content'));
+        $clientId = $request->integer('client_id');
 
         $data = $request->validate(array_merge([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('clients', 'id')->where(
+                    fn ($query) => $auth->organization_id !== null
+                        ? $query->where('organization_id', $auth->organization_id)
+                        : $query,
+                ),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'plan_type' => ['required', 'string', 'max:100'],
             'content' => ['nullable', 'array'],
@@ -129,8 +145,15 @@ class CarePlanController extends Controller
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
-        ], $this->planContentRules()));
+            'status' => ['nullable', 'string', 'in:draft,active'],
+        ], $this->planContentRules($auth->organization_id, $clientId)));
+
+        if (($data['status'] ?? 'draft') === 'active'
+            && ! $this->hasStructuredDomains($data['content'] ?? [])) {
+            throw ValidationException::withMessages([
+                'goals' => 'Cannot create an active care plan without at least one support domain.',
+            ]);
+        }
 
         $carePlan = CarePlan::create([
             'organization_id' => $auth->organization_id,
@@ -147,7 +170,7 @@ class CarePlanController extends Controller
         ]);
 
         $client = Client::find($data['client_id']);
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => CarePlan::class,
             'source_id' => $carePlan->id,
             'occurred_at' => now(),
@@ -155,7 +178,7 @@ class CarePlanController extends Controller
             'actor_user_id' => $auth->id,
             'client_id' => $data['client_id'],
             'site_id' => $client?->site_id,
-            'subject' => 'Care plan created: ' . $data['title'],
+            'subject' => 'Care plan created: '.$data['title'],
             'body' => null,
             'meta' => array_filter([
                 'plan_type' => $data['plan_type'],
@@ -168,12 +191,12 @@ class CarePlanController extends Controller
 
         // Auto-complete onboarding step if from_onboarding
         if ($request->boolean('from_onboarding')) {
-            $workflow = \App\Models\ClientOnboardingWorkflow::where('client_id', $data['client_id'])
+            $workflow = ClientOnboardingWorkflow::where('client_id', $data['client_id'])
                 ->where('status', 'in_progress')
                 ->first();
 
             if ($workflow) {
-                $step = \App\Models\ClientOnboardingStep::where('workflow_id', $workflow->id)
+                $step = ClientOnboardingStep::where('workflow_id', $workflow->id)
                     ->where('step_name', 'Care Plan Created')
                     ->where('status', '!=', 'completed')
                     ->first();
@@ -183,7 +206,7 @@ class CarePlanController extends Controller
                         'status' => 'completed',
                         'completed_at' => now(),
                         'completed_by' => $auth->id,
-                        'notes' => 'Auto-completed: Care plan #' . $carePlan->id . ' created.',
+                        'notes' => 'Auto-completed: Care plan #'.$carePlan->id.' created.',
                     ]);
                 }
             }
@@ -208,7 +231,10 @@ class CarePlanController extends Controller
                 'creator:id,name',
                 'reviewer:id,name',
                 'goals' => fn ($q) => $q->orderBy('priority')->orderBy('title'),
-                'goals.progressNotes' => fn ($q) => $q->latest()->limit(5),
+                'goals.progressNotes' => fn ($q) => $q
+                    ->with(['author:id,name', 'carePlanGoal:id,title'])
+                    ->orderByDesc('occurred_at')
+                    ->limit(5),
             ])
             ->withCount([
                 'goals',
@@ -226,12 +252,25 @@ class CarePlanController extends Controller
                 : 0,
         ];
 
-        // Progress notes linked to this plan's goals
-        $progressNotes = \App\Models\ProgressNote::query()
-            ->whereHas('goal', fn ($q) => $q->where('care_plan_id', $carePlan->id))
-            ->with(['author:id,name', 'goal:id,title'])
+        $carePlan->goals->each(function ($goal) {
+            $goal->setRelation(
+                'progressNotes',
+                $goal->progressNotes->map(
+                    fn (ClientNote $note) => $this->legacyNotePayload($note),
+                ),
+            );
+        });
+
+        // Canonical client notes linked to this plan's goals. The explicit map
+        // preserves the payload consumed by the existing care-plan page.
+        $progressNotes = ClientNote::query()
+            ->whereHas('carePlanGoal', fn ($q) => $q->where('care_plan_id', $carePlan->id))
+            ->where('type', 'progress_note')
+            ->with(['author:id,name', 'carePlanGoal:id,title'])
+            ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(fn (ClientNote $note) => $this->legacyNotePayload($note));
 
         // Review history via parent_id chain
         $reviewHistory = CarePlan::query()
@@ -245,7 +284,7 @@ class CarePlanController extends Controller
             ->get();
 
         // Staff in same org for reviewer assignment
-        $staff = \App\Models\User::query()
+        $staff = User::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->select('id', 'name')
             ->orderBy('name')
@@ -290,10 +329,17 @@ class CarePlanController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
+        $this->ensureMutableCarePlan($carePlan);
+
         $this->validateStructuredDomains($request->input('content'));
 
         $data = $request->validate(array_merge([
-            'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'sometimes',
+                'required',
+                'integer',
+                Rule::in([(int) $carePlan->client_id]),
+            ],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'plan_type' => ['sometimes', 'required', 'string', 'max:100'],
             'content' => ['nullable', 'array'],
@@ -308,7 +354,13 @@ class CarePlanController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
-        ], $this->planContentRules()));
+        ], $this->planContentRules($auth->organization_id, (int) $carePlan->client_id)));
+
+        if (! $carePlan->allowsGenericTransitionTo($data['status'] ?? null)) {
+            throw ValidationException::withMessages([
+                'status' => 'Use the care plan review actions to change this plan status.',
+            ]);
+        }
 
         // Prevent activating a plan with no goals
         $becomingActive = ($data['status'] ?? null) === 'active' && $carePlan->status !== 'active';
@@ -327,21 +379,81 @@ class CarePlanController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+        $this->authorize('update', $carePlan);
 
-        // Create new version
-        $newVersion = $carePlan->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
-        $newVersion->version = $carePlan->version + 1;
-        $newVersion->parent_id = $carePlan->parent_id ?? $carePlan->id;
-        $newVersion->status = 'review';
-        $newVersion->reviewed_at = null;
-        $newVersion->reviewed_by = null;
-        $newVersion->save();
+        $reviewCreated = DB::transaction(function () use ($auth, $carePlan): bool {
+            $source = CarePlan::query()
+                ->where('organization_id', $carePlan->organization_id)
+                ->where('client_id', $carePlan->client_id)
+                ->lockForUpdate()
+                ->findOrFail($carePlan->id);
 
-        // Copy goals to new version
-        foreach ($carePlan->goals as $goal) {
-            $newGoal = $goal->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
-            $newGoal->care_plan_id = $newVersion->id;
-            $newGoal->save();
+            if ($source->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only an active care plan can start a review.',
+                ]);
+            }
+
+            $rootId = $source->parent_id ?? $source->id;
+            $existingReview = CarePlan::query()
+                ->where('organization_id', $source->organization_id)
+                ->where('client_id', $source->client_id)
+                ->where('status', 'review')
+                ->where(function ($query) use ($rootId) {
+                    $query->whereKey($rootId)->orWhere('parent_id', $rootId);
+                })
+                ->exists();
+            if ($existingReview) {
+                return false;
+            }
+
+            $source->load(['goals.steps', 'signOffs']);
+            $content = $source->content ?? [];
+            data_set($content, 'review_context.source_plan_id', $source->id);
+            data_set($content, 'review_context.source_version', $source->version);
+            data_set(
+                $content,
+                'review_context.prior_sign_offs',
+                $source->signOffs->map(fn (CarePlanSignOff $signOff) => [
+                    'party_role' => $signOff->party_role,
+                    'party_name' => $signOff->party_name,
+                    'relationship' => $signOff->relationship,
+                    'agreed_on' => $signOff->agreed_on?->toDateString(),
+                    'method' => $signOff->method,
+                    'acknowledgement' => $signOff->acknowledgement,
+                ])->values()->all(),
+            );
+
+            $newVersion = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+            $newVersion->version = $source->version + 1;
+            $newVersion->parent_id = $rootId;
+            $newVersion->status = 'review';
+            $newVersion->reviewed_at = null;
+            $newVersion->reviewed_by = null;
+            $newVersion->created_by = $auth->id;
+            $newVersion->content = $content;
+            $newVersion->save();
+
+            foreach ($source->goals as $goal) {
+                $newGoal = $goal->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+                $newGoal->care_plan_id = $newVersion->id;
+                $newGoal->created_by = $auth->id;
+                $newGoal->save();
+
+                foreach ($goal->steps as $step) {
+                    $newStep = $step->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+                    $newStep->care_plan_goal_id = $newGoal->id;
+                    $newStep->created_by = $auth->id;
+                    $newStep->save();
+                }
+            }
+
+            return true;
+        });
+
+        if (! $reviewCreated) {
+            return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
+                ->with('status', 'A review is already in progress.');
         }
 
         // Stay inside the client profile — the Care & Support Plan tab surfaces the
@@ -354,28 +466,57 @@ class CarePlanController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+        $this->authorize('update', $carePlan);
 
         $data = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // A care plan must have at least one goal before it can be activated
-        if ($carePlan->goals()->count() === 0 && ! $this->hasStructuredDomains($carePlan->content ?? [])) {
-            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal or support domain. Please add goals or domains before completing the review.']);
-        }
+        DB::transaction(function () use ($auth, $carePlan, $data): void {
+            $locked = CarePlan::query()->lockForUpdate()->findOrFail($carePlan->id);
+            if ($locked->status !== 'review') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only an in-progress review can be completed.',
+                ]);
+            }
+            if ($locked->goals()->count() === 0 && ! $this->hasStructuredDomains($locked->content ?? [])) {
+                throw ValidationException::withMessages([
+                    'goals' => 'Cannot activate a care plan without at least one goal or support domain. Please add goals or domains before completing the review.',
+                ]);
+            }
+            if (! $locked->signOffs()->exists()) {
+                throw ValidationException::withMessages([
+                    'sign_offs' => 'Record at least one new sign-off on this review before completing it.',
+                ]);
+            }
 
-        // Archive the parent version
-        if ($carePlan->parent_id) {
-            CarePlan::where('id', $carePlan->parent_id)->update(['status' => 'archived']);
-        }
+            $rootId = $locked->parent_id ?? $locked->id;
 
-        // Activate this version
-        $carePlan->update([
-            'status' => 'active',
-            'reviewed_at' => now(),
-            'reviewed_by' => $auth->id,
-            'next_review_at' => $carePlan->next_review_at ?? now()->addMonths(3),
-        ]);
+            CarePlan::query()
+                ->where('organization_id', $locked->organization_id)
+                ->where('client_id', $locked->client_id)
+                ->where('id', '!=', $locked->id)
+                ->where(function ($query) use ($rootId) {
+                    $query->whereKey($rootId)->orWhere('parent_id', $rootId);
+                })
+                ->where('status', 'active')
+                ->update(['status' => 'archived']);
+
+            $content = $locked->content ?? [];
+            if (filled($data['review_notes'] ?? null)) {
+                data_set($content, 'review_context.review_notes', $data['review_notes']);
+            }
+            data_set($content, 'review_context.completed_at', now()->toISOString());
+            data_set($content, 'review_context.completed_by', $auth->id);
+
+            $locked->update([
+                'status' => 'active',
+                'reviewed_at' => now(),
+                'reviewed_by' => $auth->id,
+                'next_review_at' => $locked->next_review_at ?? now()->addMonths(3),
+                'content' => $content,
+            ]);
+        });
 
         return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
             ->with('success', 'Review completed. Plan is now active.');
@@ -384,11 +525,14 @@ class CarePlanController extends Controller
     public function destroy(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.delete'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
+
+        $this->authorize('delete', $carePlan);
+        $this->ensureMutableCarePlan($carePlan);
 
         $carePlan->delete();
 
@@ -405,6 +549,8 @@ class CarePlanController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
+        $this->ensureMutableCarePlan($carePlan);
+
         $data = $request->validate([
             'party_role' => ['required', Rule::in(CarePlanSignOff::PARTY_ROLES)],
             'party_name' => ['required', 'string', 'max:160'],
@@ -414,35 +560,38 @@ class CarePlanController extends Controller
             'acknowledgement' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $signOff = $carePlan->signOffs()->create([
-            'organization_id' => $auth->organization_id,
-            'party_role' => $data['party_role'],
-            'party_name' => $data['party_name'],
-            'relationship' => $data['relationship'] ?? null,
-            'agreed_on' => $data['agreed_on'],
-            'method' => $data['method'] ?? null,
-            'acknowledgement' => $data['acknowledgement'] ?? null,
-            'recorded_by' => $auth->id,
-        ]);
+        DB::transaction(function () use ($auth, $carePlan, $data): void {
+            $signOff = $carePlan->signOffs()->create([
+                'organization_id' => $carePlan->organization_id,
+                'party_role' => $data['party_role'],
+                'party_name' => $data['party_name'],
+                'relationship' => $data['relationship'] ?? null,
+                'agreed_on' => $data['agreed_on'],
+                'method' => $data['method'] ?? null,
+                'acknowledgement' => $data['acknowledgement'] ?? null,
+                'recorded_by' => $auth->id,
+            ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
-            'source_type' => CarePlan::class,
-            'source_id' => $carePlan->id,
-            'occurred_at' => now(),
-            'type' => 'care_plan_signed_off',
-            'actor_user_id' => $auth->id,
-            'client_id' => $carePlan->client_id,
-            'site_id' => $carePlan->client?->site_id,
-            'subject' => 'Care plan agreed by ' . $signOff->party_name,
-            'body' => null,
-            'meta' => array_filter([
-                'party_role' => $signOff->party_role,
-                'method' => $signOff->method,
-            ]),
-            'visibility' => 'internal',
-            'is_pinned' => false,
-            'created_by' => $auth->id,
-        ]);
+            app(TimelineEmitter::class)->record([
+                'source_type' => CarePlanSignOff::class,
+                'source_id' => $signOff->id,
+                'occurred_at' => now(),
+                'type' => 'care_plan_signed_off',
+                'actor_user_id' => $auth->id,
+                'client_id' => $carePlan->client_id,
+                'site_id' => $carePlan->client?->site_id,
+                'subject' => 'Care plan agreed by '.$signOff->party_name,
+                'body' => null,
+                'meta' => array_filter([
+                    'care_plan_id' => $carePlan->id,
+                    'party_role' => $signOff->party_role,
+                    'method' => $signOff->method,
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $auth->id,
+            ]);
+        });
 
         return back()->with('success', 'Sign-off recorded.');
     }
@@ -456,7 +605,13 @@ class CarePlanController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
-        $carePlan->signOffs()->findOrFail($signOff)->delete();
+        $this->ensureMutableCarePlan($carePlan);
+
+        DB::transaction(function () use ($carePlan, $signOff): void {
+            $signOff = $carePlan->signOffs()->findOrFail($signOff);
+            app(TimelineEmitter::class)->retract($signOff);
+            $signOff->delete();
+        });
 
         return back()->with('success', 'Sign-off removed.');
     }
@@ -483,8 +638,9 @@ class CarePlanController extends Controller
         $agreement = null;
         $agreementId = data_get($content, 'funding.service_agreement_id');
         if ($agreementId) {
-            $agreement = \App\Models\ServiceAgreement::query()
+            $agreement = ServiceAgreement::query()
                 ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                ->where('client_id', $carePlan->client_id)
                 ->find($agreementId);
         }
 
@@ -495,10 +651,53 @@ class CarePlanController extends Controller
             'generatedAt' => now(),
         ])->setPaper('A4');
 
-        $clientName = trim(($carePlan->client?->first_name ?? '') . ' ' . ($carePlan->client?->last_name ?? ''));
-        $filename = 'care-plan-' . Str::slug($clientName !== '' ? $clientName : 'client') . '-v' . ($carePlan->version ?? 1) . '.pdf';
+        $clientName = trim(($carePlan->client?->first_name ?? '').' '.($carePlan->client?->last_name ?? ''));
+        $filename = 'care-plan-'.Str::slug($clientName !== '' ? $clientName : 'client').'-v'.($carePlan->version ?? 1).'.pdf';
 
         return $pdf->download($filename);
+    }
+
+    /**
+     * Keep the care-plan frontend contract stable while ClientNote is the
+     * canonical persistence model.
+     *
+     * @return array<string, mixed>
+     */
+    private function legacyNotePayload(ClientNote $note): array
+    {
+        $author = $note->author ? [
+            'id' => $note->author->id,
+            'name' => $note->author->name,
+        ] : null;
+        $goal = $note->carePlanGoal ? [
+            'id' => $note->carePlanGoal->id,
+            'title' => $note->carePlanGoal->title,
+        ] : null;
+
+        return [
+            'id' => $note->id,
+            'organization_id' => $note->organization_id,
+            'client_id' => $note->client_id,
+            'shift_id' => $note->shift_id,
+            'care_plan_goal_id' => $note->care_plan_goal_id,
+            'author_id' => $note->user_id,
+            'note_type' => $note->category ?: $note->type,
+            'content' => $note->body,
+            'mood_rating' => $note->mood_rating,
+            'emotions' => $note->behaviour_tags ?? [],
+            'is_flagged' => (bool) $note->is_flagged,
+            'flagged_reason' => $note->flagged_reason,
+            'ai_summary' => $note->ai_summary,
+            'visibility' => $note->is_private
+                ? 'private'
+                : ($note->visibility === 'portal' ? 'include_family' : 'staff_only'),
+            'created_at' => optional($note->occurred_at ?? $note->created_at)->toISOString(),
+            'updated_at' => optional($note->updated_at)->toISOString(),
+            'deleted_at' => optional($note->deleted_at)->toISOString(),
+            'author' => $author,
+            'user' => $author,
+            'goal' => $goal,
+        ];
     }
 
     /**
@@ -508,7 +707,7 @@ class CarePlanController extends Controller
      *
      * @return array<string, array<int, mixed>>
      */
-    private function planContentRules(): array
+    private function planContentRules(?int $organizationId, int $clientId): array
     {
         return [
             'content.about_me' => ['nullable', 'array'],
@@ -533,14 +732,26 @@ class CarePlanController extends Controller
             'content.funding.nasc_organisation' => ['nullable', 'string', 'max:160'],
             'content.funding.needs_assessment_ref' => ['nullable', 'string', 'max:160'],
             'content.funding.needs_assessment_date' => ['nullable', 'date'],
-            'content.funding.service_agreement_id' => ['nullable', 'integer', 'exists:service_agreements,id'],
+            'content.funding.service_agreement_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('service_agreements', 'id')->where(
+                    fn ($query) => $query
+                        ->where('client_id', $clientId)
+                        ->whereNull('deleted_at')
+                        ->when(
+                            $organizationId !== null,
+                            fn ($scoped) => $scoped->where('organization_id', $organizationId),
+                        ),
+                ),
+            ],
             'content.funding.allocated_hours' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'content.funding.funding_notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
     /**
-     * @param array<string, mixed>|null $content
+     * @param  array<string, mixed>|null  $content
      */
     private function hasStructuredDomains(?array $content): bool
     {
@@ -549,7 +760,7 @@ class CarePlanController extends Controller
     }
 
     /**
-     * @param array<string, mixed>|null $content
+     * @param  array<string, mixed>|null  $content
      */
     private function validateStructuredDomains(?array $content): void
     {
@@ -577,6 +788,15 @@ class CarePlanController extends Controller
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function ensureMutableCarePlan(CarePlan $carePlan): void
+    {
+        if (! $carePlan->isMutableVersion()) {
+            throw ValidationException::withMessages([
+                'care_plan' => 'Only the current working care plan version can be changed.',
+            ]);
         }
     }
 }

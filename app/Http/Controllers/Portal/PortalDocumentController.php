@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientDocument;
-use App\Models\TimelineEvent;
 use App\Services\AuditLogger;
+use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
 
 class PortalDocumentController extends Controller
@@ -16,22 +17,26 @@ class PortalDocumentController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $canViewSharedDocuments = app(PortalClientSectionAccess::class)
+            ->for($user, $client)['has_family_information_consent'];
 
-        $documents = ClientDocument::where('client_id', $client->id)
-            ->where('portal_visible', true)
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn ($doc) => [
-                'id' => $doc->id,
-                'title' => $doc->title,
-                'category' => $doc->category,
-                'notes' => $doc->notes,
-                'original_name' => $doc->original_name,
-                'mime_type' => $doc->mime_type,
-                'size_bytes' => $doc->size_bytes,
-                'version' => $doc->version,
-                'created_at' => $doc->created_at?->toISOString(),
-            ]);
+        $documents = $canViewSharedDocuments
+            ? ClientDocument::where('client_id', $client->id)
+                ->where('portal_visible', true)
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn ($doc) => [
+                    'id' => $doc->id,
+                    'title' => $doc->title,
+                    'category' => $doc->category,
+                    'notes' => $doc->notes,
+                    'original_name' => $doc->original_name,
+                    'mime_type' => $doc->mime_type,
+                    'size_bytes' => $doc->size_bytes,
+                    'version' => $doc->version,
+                    'created_at' => $doc->created_at?->toISOString(),
+                ])
+            : collect();
 
         // Family-uploaded documents (category = 'family_upload', always visible to portal)
         $familyUploads = ClientDocument::where('client_id', $client->id)
@@ -101,7 +106,7 @@ class PortalDocumentController extends Controller
             'portal_visible' => true,
         ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => ClientDocument::class,
             'source_id' => $doc->id,
             'occurred_at' => now(),
@@ -109,7 +114,7 @@ class PortalDocumentController extends Controller
             'actor_user_id' => $user->id,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'subject' => 'Family uploaded: ' . ($doc->title ?: $doc->original_name),
+            'subject' => 'Family uploaded: '.($doc->title ?: $doc->original_name),
             'body' => $request->input('notes'),
             'visibility' => 'portal',
             'is_pinned' => false,

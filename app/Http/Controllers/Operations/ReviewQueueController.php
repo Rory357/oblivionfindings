@@ -25,18 +25,31 @@ class ReviewQueueController extends Controller
 
         $siteFilter = $request->integer('site');
         $ageFilter = $request->string('age', '')->toString(); // '24h', '7d', '30d'
+        $user = $request->user();
+        $organizationId = $user?->organization_id;
 
         $accessibleClientIds = Client::query()
             ->when(
-                ! $request->user()?->canDo('clients.viewAny'),
+                $organizationId !== null,
+                fn ($q) => $q->where(
+                    fn ($tenantQuery) => $tenantQuery
+                        ->whereNull('organization_id')
+                        ->orWhere('organization_id', $organizationId),
+                ),
+            )
+            ->when(
+                ! $user?->canDo('clients.viewAny'),
                 fn ($q) => $q->whereHas(
                     'supportWorkers',
-                    fn ($s) => $s->where('users.id', $request->user()?->id),
+                    fn ($s) => $s->where('users.id', $user?->id),
                 ),
             )
             ->pluck('id');
 
         $baseQuery = ClientNote::query()
+            ->forUser($user)
+            ->dailyNotes()
+            ->where('is_draft', false)
             ->where('is_flagged', true)
             ->whereNull('reviewed_at')
             ->whereIn('client_id', $accessibleClientIds);

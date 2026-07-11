@@ -10,6 +10,7 @@ use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Tasks\TaskAggregator;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -81,7 +82,7 @@ class HandleInertiaRequests extends Middleware
                 "tasks.nav.{$user->id}",
                 now()->addMinutes(5),
                 function () use ($user) {
-                    $taskAggregator = app(\App\Services\Tasks\TaskAggregator::class);
+                    $taskAggregator = app(TaskAggregator::class);
                     $view = $taskAggregator->sourcesFor($user) !== [];
 
                     return [
@@ -474,6 +475,7 @@ class HandleInertiaRequests extends Middleware
                 'viewAny' => $user->canDo('calendar.viewAny'),
                 'view' => $user->canDo('calendar.view'),
                 'create' => $user->canDo('calendar.create'),
+                'manage' => $user->canDo('calendar.manage'),
                 'approve' => $user->canDo('calendar.approve'),
                 'manageRecurring' => $user->canDo('calendar.manage_recurring'),
             ],

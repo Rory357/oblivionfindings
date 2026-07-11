@@ -14,7 +14,8 @@ class ClientConsentPolicy
 
     public function view(User $user, ClientConsent $consent): bool
     {
-        return $user->canDo('consents.viewAny');
+        return $user->canDo('consents.viewAny')
+            && $user->can('view', $consent->client);
     }
 
     public function create(User $user): bool
@@ -24,11 +25,19 @@ class ClientConsentPolicy
 
     public function update(User $user, ClientConsent $consent): bool
     {
-        return $user->canDo('consents.manage');
+        return $user->canDo('consents.manage')
+            && $user->can('view', $consent->client);
     }
 
     public function delete(User $user, ClientConsent $consent): bool
     {
-        return $user->canDo('consents.manage');
+        return $user->canDo('consents.manage')
+            && $user->can('view', $consent->client);
+    }
+
+    public function withdraw(User $user, ClientConsent $consent): bool
+    {
+        return ($user->canDo('consents.withdraw') || $user->canDo('consents.manage'))
+            && $user->can('view', $consent->client);
     }
 }

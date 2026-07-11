@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientAppointment;
-use App\Models\FamilyPortalSetting;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\RespiteBooking;
 use App\Models\Shift;
+use App\Services\Portal\PortalClientSectionAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PortalCalendarController extends Controller
 {
@@ -52,14 +53,32 @@ class PortalCalendarController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
-        $portalSettings = FamilyPortalSetting::query()
-            ->where('client_id', $client->id)
-            ->first();
-        $showShiftSchedule = $portalSettings?->show_shift_schedule ?? true;
-        $showRespite = $portalSettings?->show_respite ?? true;
+        $sectionAccess = app(PortalClientSectionAccess::class)->for($user, $client);
+        $showShiftSchedule = $sectionAccess['show_shift_schedule'];
+        $showRespite = $sectionAccess['show_respite'];
+        $showCareNotes = $sectionAccess['show_care_notes'];
+        $canViewSharedCare = $sectionAccess['has_family_information_consent'];
 
-        $start = $this->parseCalendarBoundary($request->query('start'), now()->startOfMonth());
-        $end = $this->parseCalendarBoundary($request->query('end'), now()->endOfMonth());
+        $request->merge([
+            'start' => $this->normalizeCalendarBoundaryInput($request->query('start')),
+            'end' => $this->normalizeCalendarBoundaryInput($request->query('end')),
+        ]);
+        $boundaries = $request->validate([
+            'start' => ['nullable', 'date'],
+            'end' => ['nullable', 'date'],
+        ]);
+        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, now()->startOfMonth());
+        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, now()->endOfMonth());
+        if ($end->lt($start)) {
+            throw ValidationException::withMessages([
+                'end' => 'The calendar end must be on or after the start.',
+            ]);
+        }
+        if ($start->diffInDays($end) > 93) {
+            throw ValidationException::withMessages([
+                'end' => 'The calendar range cannot exceed 93 days.',
+            ]);
+        }
 
         $events = collect();
 
@@ -76,8 +95,8 @@ class PortalCalendarController extends Controller
                 $isRespite = (bool) $s->respite_booking_id;
 
                 $events->push([
-                    'id' => 'shift-' . $s->id,
-                    'title' => ($s->staff?->name ?? 'Support Worker') . ' — ' . ucfirst(str_replace('_', ' ', $s->shift_type ?? 'support')),
+                    'id' => 'shift-'.$s->id,
+                    'title' => ($s->staff?->name ?? 'Support Worker').' — '.ucfirst(str_replace('_', ' ', $s->shift_type ?? 'support')),
                     'start' => $s->starts_at?->toIso8601String(),
                     'end' => $s->ends_at?->toIso8601String(),
                     'backgroundColor' => $isRespite ? '#7c3aed' : ($s->status === 'completed' ? '#10b981' : '#3b82f6'),
@@ -110,7 +129,7 @@ class PortalCalendarController extends Controller
 
             foreach ($respiteBookings as $booking) {
                 $events->push([
-                    'id' => 'respite-' . $booking->id,
+                    'id' => 'respite-'.$booking->id,
                     'title' => 'Respite stay',
                     'start' => $booking->start_at?->toIso8601String(),
                     'end' => $booking->end_at?->toIso8601String(),
@@ -130,6 +149,7 @@ class PortalCalendarController extends Controller
         $visits = FamilyVisitRequest::where('client_id', $client->id)
             ->where('status', 'approved')
             ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+            ->when(! $canViewSharedCare, fn ($query) => $query->where('user_id', $user->id))
             ->with('user:id,name')
             ->get();
 
@@ -149,8 +169,8 @@ class PortalCalendarController extends Controller
 
             $visitTypes = ['in_person' => 'In Person', 'video_call' => 'Video Call', 'outing' => 'Outing'];
             $events->push([
-                'id' => 'visit-' . $v->id,
-                'title' => 'Family Visit — ' . ($visitTypes[$v->visit_type] ?? $v->visit_type),
+                'id' => 'visit-'.$v->id,
+                'title' => 'Family Visit — '.($visitTypes[$v->visit_type] ?? $v->visit_type),
                 'start' => $startTime->toIso8601String(),
                 'end' => $endTime->toIso8601String(),
                 'backgroundColor' => '#22c55e',
@@ -164,11 +184,13 @@ class PortalCalendarController extends Controller
         }
 
         // 3. Appointments shared with family
-        $appointments = ClientAppointment::forClient($client->id)
-            ->inRange($start, $end)
-            ->sharedWithFamily()
-            ->where('status', '!=', 'cancelled')
-            ->get();
+        $appointments = $canViewSharedCare
+            ? ClientAppointment::forClient($client->id)
+                ->inRange($start, $end)
+                ->sharedWithFamily()
+                ->where('status', '!=', 'cancelled')
+                ->get()
+            : collect();
 
         $typeColors = [
             'gp_visit' => '#f59e0b',
@@ -190,11 +212,11 @@ class PortalCalendarController extends Controller
 
         foreach ($appointments as $a) {
             $events->push([
-                'id' => 'appt-' . $a->id,
+                'id' => 'appt-'.$a->id,
                 'title' => $a->title,
                 'start' => $a->starts_at->toIso8601String(),
                 'end' => $a->ends_at?->toIso8601String(),
-                'allDay' => !$a->ends_at,
+                'allDay' => ! $a->ends_at,
                 'backgroundColor' => $typeColors[$a->appointment_type] ?? '#64748b',
                 'borderColor' => 'transparent',
                 'extendedProps' => [
@@ -208,11 +230,13 @@ class PortalCalendarController extends Controller
         }
 
         // 4. Family notes with due dates
-        $familyNotes = FamilyNote::forClient($client->id)
-            ->withDueDate()
-            ->open()
-            ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
-            ->get();
+        $familyNotes = $showCareNotes
+            ? FamilyNote::forClient($client->id)
+                ->withDueDate()
+                ->open()
+                ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+                ->get()
+            : collect();
 
         foreach ($familyNotes as $fn) {
             $noteStart = $fn->due_date->copy();
@@ -221,11 +245,11 @@ class PortalCalendarController extends Controller
                 $noteStart->setTime((int) $h, (int) $m);
             }
             $events->push([
-                'id' => 'fnote-' . $fn->id,
-                'title' => '📝 ' . $fn->title,
+                'id' => 'fnote-'.$fn->id,
+                'title' => '📝 '.$fn->title,
                 'start' => $fn->due_time ? $noteStart->toIso8601String() : $fn->due_date->toDateString(),
                 'end' => $fn->due_time ? $noteStart->copy()->addHour()->toIso8601String() : null,
-                'allDay' => !$fn->due_time,
+                'allDay' => ! $fn->due_time,
                 'backgroundColor' => '#a78bfa',
                 'borderColor' => 'transparent',
                 'extendedProps' => [
@@ -250,8 +274,19 @@ class PortalCalendarController extends Controller
             return $fallback->copy();
         }
 
-        $normalized = preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', trim($value)) ?? trim($value);
+        $normalized = $this->normalizeCalendarBoundaryInput($value);
 
         return Carbon::parse($normalized);
+    }
+
+    private function normalizeCalendarBoundaryInput(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+
+        return preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', $trimmed) ?? $trimmed;
     }
 }

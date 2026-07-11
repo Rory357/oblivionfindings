@@ -3,23 +3,21 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientConsent;
 use App\Models\Client;
+use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Services\Operations\OpsNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class ClientConsentController extends Controller
 {
-    public function index(Request $request, $client)
+    public function index(Request $request, Client $client)
     {
-        $auth = $request->user();
-        abort_unless(
-            $auth && ($auth->canDo('clients.viewAny') || $auth->canDo('clients.viewAssigned')),
-            403,
-        );
-
-        $client = Client::findOrFail($client);
+        $this->authorize('view', $client);
+        Gate::authorize('viewAny', ClientConsent::class);
 
         $consents = ClientConsent::where('client_id', $client->id)
             ->with(['consentType', 'givenBy:id,name', 'creator:id,name'])
@@ -28,9 +26,9 @@ class ClientConsentController extends Controller
 
         $stats = [
             'total' => $consents->count(),
-            'active' => $consents->filter(fn($c) => $c->isValid())->count(),
-            'expiring_soon' => $consents->filter(fn($c) => $c->isExpiringSoon())->count(),
-            'expired' => $consents->filter(fn($c) => $c->isExpired())->count(),
+            'active' => $consents->filter(fn ($c) => $c->isValid())->count(),
+            'expiring_soon' => $consents->filter(fn ($c) => $c->isExpiringSoon())->count(),
+            'expired' => $consents->filter(fn ($c) => $c->isExpired())->count(),
             'withdrawn' => $consents->where('status', 'withdrawn')->count(),
         ];
 
@@ -44,12 +42,11 @@ class ClientConsentController extends Controller
         ]);
     }
 
-    public function store(Request $request, $client)
+    public function store(Request $request, Client $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('clients.update'), 403);
-
-        $client = Client::findOrFail($client);
+        $this->authorize('view', $client);
+        Gate::authorize('create', ClientConsent::class);
 
         $data = $request->validate([
             'consent_type_id' => ['required', 'exists:consent_types,id'],
@@ -115,26 +112,58 @@ class ClientConsentController extends Controller
         return redirect()->back()->with('success', 'Consent recorded successfully.');
     }
 
-    public function withdraw(Request $request, $client, $consent)
-    {
+    public function withdraw(
+        Request $request,
+        Client $client,
+        ClientConsent $consent,
+    ) {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('clients.update'), 403);
-
-        $consent = ClientConsent::where('client_id', $client)->findOrFail($consent);
+        $this->authorize('view', $client);
+        abort_unless($consent->client_id === $client->id, 404);
+        Gate::authorize('withdraw', $consent);
 
         $data = $request->validate([
             'withdrawal_reason' => ['required', 'string', 'max:2000'],
         ]);
 
-        $consent->update([
-            'status' => 'withdrawn',
-            'withdrawn_at' => now(),
-            'withdrawn_by_user_id' => $auth->id,
-            'withdrawal_reason' => $data['withdrawal_reason'],
-            'updated_by' => $auth->id,
-        ]);
+        $didWithdraw = DB::transaction(function () use ($auth, $client, $consent, $data): bool {
+            $lockedConsent = ClientConsent::query()
+                ->lockForUpdate()
+                ->findOrFail($consent->id);
 
-        app(OpsNotificationService::class)->notifyCrud($auth, 'withdrawn', 'consent', $consent, Client::find($client));
+            abort_unless($lockedConsent->client_id === $client->id, 404);
+            Gate::forUser($auth)->authorize('withdraw', $lockedConsent);
+
+            if ($lockedConsent->status === 'withdrawn') {
+                if ($lockedConsent->withdrawal_reason === $data['withdrawal_reason']) {
+                    return false;
+                }
+
+                throw ValidationException::withMessages([
+                    'status' => 'This consent has already been withdrawn with a different reason.',
+                ]);
+            }
+
+            if ($lockedConsent->status !== 'given') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only a currently given consent can be withdrawn.',
+                ]);
+            }
+
+            $lockedConsent->update([
+                'status' => 'withdrawn',
+                'withdrawn_at' => now(),
+                'withdrawn_by_user_id' => $auth->id,
+                'withdrawal_reason' => $data['withdrawal_reason'],
+                'updated_by' => $auth->id,
+            ]);
+
+            return true;
+        });
+
+        if ($didWithdraw) {
+            app(OpsNotificationService::class)->notifyCrud($auth, 'withdrawn', 'consent', $consent->fresh(), $client);
+        }
 
         return redirect()->back()->with('success', 'Consent withdrawn.');
     }

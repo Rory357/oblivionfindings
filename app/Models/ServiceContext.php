@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServiceType;
 use App\Models\Concerns\AuditableChanges;
-use App\Models\AppSetting;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +50,20 @@ class ServiceContext extends Model
         return $this->hasMany(Shift::class);
     }
 
+    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
+    {
+        if ($organizationId === null) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($organizationId) {
+            $query->whereNull('site_id')->orWhereHas(
+                'site',
+                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
+            );
+        });
+    }
+
     /**
      * Returns the configured default service context id (if any).
      *
@@ -61,11 +75,10 @@ class ServiceContext extends Model
         $raw = AppSetting::query()->where('key', 'service_context.default_id')->value('value');
 
         $id = is_numeric($raw) ? (int) $raw : null;
-        if (!$id) {
+        if (! $id) {
             return null;
         }
 
         return self::query()->whereKey($id)->where('is_active', true)->exists() ? $id : null;
     }
-
 }

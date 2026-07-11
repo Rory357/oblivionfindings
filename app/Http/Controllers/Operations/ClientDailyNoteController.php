@@ -9,6 +9,7 @@ use App\Models\ClientNote;
 use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ClientDailyNoteController extends Controller
 {
@@ -33,9 +34,9 @@ class ClientDailyNoteController extends Controller
     public function store(Request $request, Client $client)
     {
         $this->authorize('view', $client);
-        abort_unless($request->user()?->canDo('progress_notes.create') || $request->user()?->canDo('timeline.create'), 403);
+        $this->authorize('create', ClientNote::class);
 
-        $data = $this->validatedPayload($request, creating: true);
+        $data = $this->validatedPayload($request, $client, creating: true);
         $isDraft = (bool) ($data['is_draft'] ?? false);
 
         ClientNote::query()->create([
@@ -59,9 +60,15 @@ class ClientDailyNoteController extends Controller
     {
         $this->authorize('view', $client);
         abort_unless($note->client_id === $client->id, 404);
-        abort_unless($request->user()?->canDo('progress_notes.update'), 403);
+        $this->ensureWorkspaceNote($note);
+        $this->authorize('update', $note);
 
-        $data = $this->validatedPayload($request, creating: false);
+        $data = $this->validatedPayload($request, $client, creating: false);
+        if (! $note->is_draft && ($data['is_draft'] ?? false) === true) {
+            throw ValidationException::withMessages([
+                'is_draft' => 'A submitted daily note cannot be moved back to draft.',
+            ]);
+        }
         if (($data['is_draft'] ?? $note->is_draft) === true) {
             $data['visibility'] = 'internal';
         }
@@ -80,7 +87,8 @@ class ClientDailyNoteController extends Controller
     {
         $this->authorize('view', $client);
         abort_unless($note->client_id === $client->id, 404);
-        abort_unless($request->user()?->canDo('progress_notes.delete') || $request->user()?->canDo('progress_notes.update'), 403);
+        $this->ensureWorkspaceNote($note);
+        $this->authorize('delete', $note);
 
         $note->delete();
 
@@ -91,7 +99,8 @@ class ClientDailyNoteController extends Controller
     {
         $this->authorize('view', $client);
         abort_unless($note->client_id === $client->id, 404);
-        abort_unless($request->user()?->canDo('progress_notes.update') || $request->user()?->canDo('progress_notes.review'), 403);
+        $this->ensureWorkspaceNote($note);
+        $this->authorize('flag', $note);
 
         $data = $request->validate([
             'is_flagged' => ['required', 'boolean'],
@@ -126,7 +135,8 @@ class ClientDailyNoteController extends Controller
     {
         $this->authorize('view', $client);
         abort_unless($note->client_id === $client->id, 404);
-        abort_unless($request->user()?->canDo('progress_notes.review'), 403);
+        $this->ensureWorkspaceNote($note);
+        $this->authorize('review', $note);
 
         $note->update([
             'reviewed_at' => now(),
@@ -144,11 +154,26 @@ class ClientDailyNoteController extends Controller
             ->with(['author:id,name', 'reviewer:id,name', 'shift:id,starts_at,ends_at']);
     }
 
+    private function ensureWorkspaceNote(ClientNote $note): void
+    {
+        abort_unless(in_array($note->type, [
+            'daily_note',
+            'quick',
+            'communication',
+            'note',
+            'progress_note',
+            'handover',
+        ], true), 404);
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function validatedPayload(Request $request, bool $creating): array
-    {
+    private function validatedPayload(
+        Request $request,
+        Client $client,
+        bool $creating,
+    ): array {
         $required = $creating ? 'required' : 'sometimes';
 
         return $request->validate([
@@ -158,7 +183,12 @@ class ClientDailyNoteController extends Controller
             'goal' => ['nullable', 'string', 'max:255'],
             'body' => [$required, 'string', 'min:2'],
             'occurred_at' => ['nullable', 'date'],
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'shift_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('shifts', 'id')
+                    ->where(fn ($query) => $query->where('client_id', $client->id)),
+            ],
             'visibility' => ['nullable', 'string', Rule::in(['internal', 'portal'])],
             'is_flagged' => ['nullable', 'boolean'],
             'flagged_reason' => ['nullable', 'string', 'max:500'],

@@ -26,6 +26,11 @@ type ChatPayload = {
         participants: { id: number; name: string }[];
     } | null;
     messages: ChatMessage[];
+    meta: {
+        total: number;
+        loaded: number;
+        has_more: boolean;
+    };
     portal_users: { id: number; name: string }[];
 };
 
@@ -42,11 +47,13 @@ export function FamilyChatPopup({
     onClose,
     clientId,
     clientName,
+    canSend,
 }: {
     open: boolean;
     onClose: () => void;
     clientId: number;
     clientName: string;
+    canSend: boolean;
 }) {
     const [payload, setPayload] = useState<ChatPayload | null>(null);
     const [loading, setLoading] = useState(true);
@@ -182,6 +189,12 @@ export function FamilyChatPopup({
                     ref={scrollRef}
                     className="flex-1 space-y-1.5 overflow-y-auto bg-muted/20 px-3 py-3"
                 >
+                    {payload?.meta.has_more ? (
+                        <div className="mb-2 rounded-md border border-border bg-card px-3 py-2 text-center text-[11px] text-muted-foreground">
+                            Showing the latest {payload.meta.loaded} of{' '}
+                            {payload.meta.total} messages.
+                        </div>
+                    ) : null}
                     {loading ? (
                         <div className="flex h-full items-center justify-center text-muted-foreground">
                             <Loader2 className="h-5 w-5 animate-spin" />
@@ -233,44 +246,49 @@ export function FamilyChatPopup({
                                 Start the conversation
                             </p>
                             <p className="max-w-[260px] text-xs text-muted-foreground">
-                                Messages here are shared with{' '}
-                                {clientName}&apos;s whānau on the family
-                                portal.
+                                Messages here are shared with {clientName}
+                                &apos;s whānau on the family portal.
                             </p>
                         </div>
                     )}
                 </div>
 
                 {/* composer */}
-                <div className="flex items-center gap-2 border-t border-border bg-card px-3 py-2.5">
-                    <input
-                        ref={inputRef}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                void send();
-                            }
-                        }}
-                        placeholder="Type a message"
-                        className="h-10 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <Button
-                        type="button"
-                        size="icon"
-                        className="h-10 w-10 shrink-0 rounded-full"
-                        onClick={() => void send()}
-                        disabled={sending || !draft.trim()}
-                        aria-label="Send message"
-                    >
-                        {sending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Send className="h-4 w-4" />
-                        )}
-                    </Button>
-                </div>
+                {canSend ? (
+                    <div className="flex items-center gap-2 border-t border-border bg-card px-3 py-2.5">
+                        <input
+                            ref={inputRef}
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    void send();
+                                }
+                            }}
+                            placeholder="Type a message"
+                            className="h-10 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            className="h-10 w-10 shrink-0 rounded-full"
+                            onClick={() => void send()}
+                            disabled={sending || !draft.trim()}
+                            aria-label="Send message"
+                        >
+                            {sending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Send className="h-4 w-4" />
+                            )}
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="border-t border-border bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+                        This conversation is read-only for your role.
+                    </div>
+                )}
             </div>
         </div>
     );

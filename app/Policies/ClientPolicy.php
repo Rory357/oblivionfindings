@@ -32,11 +32,14 @@ class ClientPolicy
 
         // Assigned-only access
         if ($user->canDo('clients.viewAssigned')) {
-            return $client->supportWorkers()->whereKey($user->id)->exists();
+            return $this->sharesOrganization($user, $client)
+                && $client->supportWorkers()->whereKey($user->id)->exists();
         }
 
         // Support workers can view only assigned clients (legacy)
-        return $user->hasRole('support_worker') && $client->supportWorkers()->whereKey($user->id)->exists();
+        return $user->hasRole('support_worker')
+            && $this->sharesOrganization($user, $client)
+            && $client->supportWorkers()->whereKey($user->id)->exists();
     }
 
     /**
@@ -72,13 +75,15 @@ class ClientPolicy
         }
 
         // Assigned-only access.
-        $assigned = $client->supportWorkers()->whereKey($user->id)->exists();
-        if ($assigned) {
+        $assigned = $client->relationLoaded('supportWorkers')
+            ? $client->supportWorkers->contains('id', $user->id)
+            : $client->supportWorkers()->whereKey($user->id)->exists();
+        if ($assigned && $this->sharesOrganization($user, $client)) {
             return $user->canDo('medications.view');
         }
 
         // Break-glass (temporary) for meds-only access.
-        if ($user->canDo('medications.breakglass')) {
+        if ($user->canDo('medications.breakglass') && $this->sharesOrganization($user, $client)) {
             $has = $client->breakGlassAccesses()
                 ->where('user_id', $user->id)
                 ->where(function ($q) {
@@ -91,6 +96,24 @@ class ClientPolicy
         }
 
         return false;
+    }
+
+    public function breakGlass(User $user, Client $client): bool
+    {
+        return $user->canDo('medications.breakglass')
+            && $this->sharesOrganization($user, $client);
+    }
+
+    public function manageBreakGlass(User $user, Client $client): bool
+    {
+        return ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view'))
+            && $this->sharesOrganization($user, $client);
+    }
+
+    public function reviewBreakGlass(User $user, Client $client): bool
+    {
+        return $user->canDo('medications.audit.view')
+            && $this->sharesOrganization($user, $client);
     }
 
     public function create(User $user): bool
@@ -107,6 +130,12 @@ class ClientPolicy
     {
         // create this permission if you want it
         return $user->canDo('clients.delete') && $this->sharesOrganization($user, $client);
+    }
+
+    public function manageMeals(User $user, Client $client): bool
+    {
+        return ($user->canDo('sites.meals.view') || $user->canDo('clients.update'))
+            && $this->sharesOrganization($user, $client);
     }
 
     /**

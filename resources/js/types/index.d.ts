@@ -35,6 +35,14 @@ export interface AuthPermissions {
         update?: boolean;
         manageAny?: boolean;
     };
+    calendar?: {
+        viewAny?: boolean;
+        view?: boolean;
+        create?: boolean;
+        manage?: boolean;
+        approve?: boolean;
+        manageRecurring?: boolean;
+    };
     medications?: {
         view?: boolean;
         breakGlass?: boolean;
@@ -56,7 +64,12 @@ export interface AuthPermissions {
         meetings?: { view?: boolean; manage?: boolean };
         resolutions?: { view?: boolean; vote?: boolean; manage?: boolean };
         risks?: { view?: boolean; manage?: boolean; create?: boolean };
-        budgets?: { view?: boolean; create?: boolean; submit?: boolean; approve?: boolean };
+        budgets?: {
+            view?: boolean;
+            create?: boolean;
+            submit?: boolean;
+            approve?: boolean;
+        };
         compliance?: { view?: boolean; manage?: boolean; create?: boolean };
         performance?: { view?: boolean; manage?: boolean; create?: boolean };
         strategy?: { view?: boolean; manage?: boolean };

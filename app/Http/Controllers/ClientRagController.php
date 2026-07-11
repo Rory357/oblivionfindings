@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\User;
 use App\Services\Rag\ClientRagIndexer;
 use App\Services\Rag\OpenAiVectorStoreClient;
 use Illuminate\Http\Request;
@@ -13,19 +14,21 @@ class ClientRagController extends Controller
     public function ask(Request $request, Client $client, OpenAiVectorStoreClient $openai, ClientRagIndexer $indexer)
     {
         $this->authorize('view', $client);
+        $user = $request->user();
+        abort_unless($user && $this->canAskAboutClient($user, $client), 403);
 
         $data = $request->validate([
             'question' => ['required', 'string', 'max:2000'],
         ]);
 
-        if (!$openai->isEnabled()) {
+        if (! $openai->isEnabled()) {
             return back()->withErrors(['question' => 'LLM is not configured. Set OPENAI_API_KEY.']);
         }
 
         // Ensure per-client vector store exists
-        if (!$client->openai_vector_store_id) {
-            $vsId = $openai->createVectorStore('client_' . $client->id);
-            if (!$vsId) {
+        if (! $client->openai_vector_store_id) {
+            $vsId = $openai->createVectorStore('client_'.$client->id);
+            if (! $vsId) {
                 return back()->withErrors(['question' => 'Unable to create vector store.']);
             }
             $client->forceFill(['openai_vector_store_id' => $vsId])->save();
@@ -33,7 +36,7 @@ class ClientRagController extends Controller
 
         // Build a fresh knowledge snapshot for this client (rolling)
         $md = $indexer->buildMarkdown($client, 120);
-        $path = 'rag/client_' . $client->id . '_latest.md';
+        $path = 'rag/client_'.$client->id.'_latest.md';
         Storage::disk('local')->put($path, $md);
         $abs = Storage::disk('local')->path($path);
 
@@ -43,12 +46,12 @@ class ClientRagController extends Controller
             $openai->attachFileToVectorStore($client->openai_vector_store_id, $fileId);
         }
 
-        $systemHint = "You are an assistant for supported living operations. "
-            . "Answer using only the retrieved client context. "
-            . "If the answer is not in the context, say you don't know. "
-            . "Be concise, factual, and avoid speculation.";
+        $systemHint = 'You are an assistant for supported living operations. '
+            .'Answer using only the retrieved client context. '
+            ."If the answer is not in the context, say you don't know. "
+            .'Be concise, factual, and avoid speculation.';
 
-        $question = $systemHint . "\n\n" . $data['question'];
+        $question = $systemHint."\n\n".$data['question'];
 
         $model = (string) (config('llm.openai.model') ?: 'gpt-5');
         $result = $openai->askWithFileSearch($model, $question, [$client->openai_vector_store_id]);
@@ -59,8 +62,9 @@ class ClientRagController extends Controller
             if (is_array($result['raw'] ?? null)) {
                 $detail = data_get($result, 'raw.error.message');
             }
+
             return back()->withErrors([
-                'question' => trim(($result['error'] ?? 'LLM request failed.') . ($detail ? ' ' . $detail : '')),
+                'question' => trim(($result['error'] ?? 'LLM request failed.').($detail ? ' '.$detail : '')),
             ]);
         }
 
@@ -68,5 +72,38 @@ class ClientRagController extends Controller
             'text' => $result['text'] ?? null,
             'sources' => $result['sources'] ?? [],
         ]);
+    }
+
+    private function canAskAboutClient(User $user, Client $client): bool
+    {
+        $isSelf = $user->hasRole('client')
+            && $user->canDo('rag.ask.self')
+            && $user->portalClients()
+                ->whereKey($client->id)
+                ->wherePivotIn('relation', ['self', 'client'])
+                ->exists();
+
+        if ($isSelf) {
+            return true;
+        }
+
+        // The current index is an unredacted clinical/timeline snapshot stored
+        // in the client's shared vector store. A NOK-specific response cannot
+        // safely be permission-filtered after retrieval, so family identities
+        // must stay out until a separate disclosure-scoped store exists.
+        if ($user->hasRole('client', 'next_of_kin')) {
+            return false;
+        }
+
+        if ($user->canDo('rag.ask.any')) {
+            return true;
+        }
+
+        if (! $user->canDo('rag.ask.assigned')) {
+            return false;
+        }
+
+        return (int) $client->key_worker_id === (int) $user->id
+            || $client->supportWorkers()->whereKey($user->id)->exists();
     }
 }

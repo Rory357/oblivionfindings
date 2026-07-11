@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\FamilyPortalSetting;
-use App\Models\NextOfKin;
+use App\Services\Portal\PortalClientSectionAccess;
 use Illuminate\Http\Request;
 
 class PortalHealthController extends Controller
@@ -16,25 +15,26 @@ class PortalHealthController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        $client->load([
-            'medicalProfile',
-            'medications' => fn ($q) => $q->where('active', true),
-            'conditions',
-            'supportPlan',
-        ]);
-
-        $nok = NextOfKin::where('user_id', $user->id)
-            ->where('client_id', $client->id)
-            ->first();
-
-        $portalSettings = FamilyPortalSetting::where('client_id', $client->id)->first();
-
+        $sectionAccess = app(PortalClientSectionAccess::class)->for($user, $client);
         $permissions = [
-            'can_view_medical' => (bool) $nok?->can_view_medical,
-            'can_view_medications' => (bool) $nok?->can_view_medications,
-            'show_care_plans' => (bool) $portalSettings?->show_care_plans,
-            'show_medication_status' => (bool) $portalSettings?->show_medication_status,
+            'can_view_medical' => $sectionAccess['can_view_medical'],
+            'can_view_medications' => $sectionAccess['can_view_medications'],
+            'show_care_plans' => $sectionAccess['show_care_plans'],
+            'show_medication_status' => $sectionAccess['show_medication_status'],
         ];
+
+        $clientRelations = [];
+        if ($permissions['show_care_plans']) {
+            $clientRelations[] = 'supportPlan';
+        }
+        if ($permissions['can_view_medical']) {
+            $clientRelations[] = 'medicalProfile';
+            $clientRelations[] = 'conditions';
+        }
+        if ($permissions['can_view_medications']) {
+            $clientRelations['medications'] = fn ($query) => $query->where('active', true);
+        }
+        $client->load($clientRelations);
 
         return inertia('portal/health', [
             'client' => [
@@ -43,8 +43,12 @@ class PortalHealthController extends Controller
                 'last_name' => $client->last_name,
                 'avatar' => $client->avatar,
                 'profile_photo_url' => $client->profile_photo_url,
-                'dietary_requirements' => $client->dietary_requirements,
-                'mobility_needs' => $client->mobility_needs,
+                'dietary_requirements' => $permissions['can_view_medical']
+                    ? $client->dietary_requirements
+                    : null,
+                'mobility_needs' => $permissions['can_view_medical']
+                    ? $client->mobility_needs
+                    : null,
             ],
             'medicalProfile' => $permissions['can_view_medical'] ? $client->medicalProfile : null,
             'medications' => $permissions['can_view_medications']

@@ -499,9 +499,6 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                         <SelectItem value="active">
                                             Active
                                         </SelectItem>
-                                        <SelectItem value="review">
-                                            Review
-                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -665,7 +662,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                             type="button"
                                             variant="outline"
                                             onClick={() => applyTemplate(key)}
-                                            className="group hover:bg-primary/10 h-auto rounded-lg border-2 border-border p-4 text-left hover:border-primary hover:shadow-sm"
+                                            className="group h-auto rounded-lg border-2 border-border p-4 text-left hover:border-primary hover:bg-primary/10 hover:shadow-sm"
                                         >
                                             <div className="text-sm font-semibold text-foreground group-hover:text-primary">
                                                 {template.title}

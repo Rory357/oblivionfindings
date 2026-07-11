@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\FamilyPortalSetting;
 use App\Models\TimelineEvent;
+use App\Services\Portal\PortalClientSectionAccess;
 use App\Services\ShiftTimelineService;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 class PortalTimelineController extends Controller
 {
@@ -17,10 +17,8 @@ class PortalTimelineController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
-        $showShiftSchedule = FamilyPortalSetting::query()
-            ->where('client_id', $client->id)
-            ->value('show_shift_schedule');
-        $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
+        $sectionAccessService = app(PortalClientSectionAccess::class);
+        $sectionAccess = $sectionAccessService->for($user, $client);
 
         $query = TimelineEvent::where('client_id', $client->id)
             ->where('visibility', 'portal')
@@ -30,9 +28,7 @@ class PortalTimelineController extends Controller
                 'reactions',
             ]);
 
-        if (! $showShiftSchedule) {
-            $query->whereNotIn('type', ShiftTimelineService::shiftEventTypes());
-        }
+        $sectionAccessService->constrainTimeline($query, $sectionAccess);
 
         if ($request->filled('type') && $request->type !== 'all') {
             $this->applyTypeFilter($query, (string) $request->type);
@@ -53,7 +49,7 @@ class PortalTimelineController extends Controller
                     'body' => $c->body,
                     'user_id' => $c->user_id,
                     'user_name' => $c->user?->name,
-                    'is_staff' => !in_array($c->user?->role, ['client', 'next_of_kin'], true),
+                    'is_staff' => ! in_array($c->user?->role, ['client', 'next_of_kin'], true),
                     'likes_count' => $c->likes->count(),
                     'liked_by_user_ids' => $c->likes->pluck('user_id')->all(),
                     'created_at' => $c->created_at?->toISOString(),
@@ -62,7 +58,7 @@ class PortalTimelineController extends Controller
                         'body' => $r->body,
                         'user_id' => $r->user_id,
                         'user_name' => $r->user?->name,
-                        'is_staff' => !in_array($r->user?->role, ['client', 'next_of_kin'], true),
+                        'is_staff' => ! in_array($r->user?->role, ['client', 'next_of_kin'], true),
                         'likes_count' => $r->likes->count(),
                         'liked_by_user_ids' => $r->likes->pluck('user_id')->all(),
                         'created_at' => $r->created_at?->toISOString(),
@@ -89,7 +85,7 @@ class PortalTimelineController extends Controller
             ],
             'events' => $events,
             'filter' => $request->type,
-            'showShiftSchedule' => $showShiftSchedule,
+            'showShiftSchedule' => $sectionAccess['show_shift_schedule'],
         ]);
     }
 

@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\FamilyNote;
-use App\Models\TimelineEvent;
+use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
 
 class PortalFamilyNoteController extends Controller
@@ -15,6 +16,10 @@ class PortalFamilyNoteController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)->for($user, $client)['show_care_notes'],
+            403,
+        );
 
         $notes = FamilyNote::forClient($client->id)
             ->with([
@@ -80,6 +85,10 @@ class PortalFamilyNoteController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)->for($user, $client)['show_care_notes'],
+            403,
+        );
 
         $data = $request->validate([
             'title' => 'required|string|max:255',
@@ -97,7 +106,7 @@ class PortalFamilyNoteController extends Controller
             'visibility' => 'portal',
         ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => FamilyNote::class,
             'source_id' => $note->id,
             'occurred_at' => now(),
@@ -105,7 +114,7 @@ class PortalFamilyNoteController extends Controller
             'actor_user_id' => $user->id,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'subject' => 'Family note: ' . $data['title'],
+            'subject' => 'Family note: '.$data['title'],
             'body' => $data['description'],
             'meta' => array_filter([
                 'note_type' => $data['note_type'],
@@ -125,6 +134,11 @@ class PortalFamilyNoteController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)->for($user, $client)['show_care_notes'],
+            403,
+        );
+        abort_unless($familyNote->client_id === $client->id, 404);
         abort_unless($familyNote->created_by === $user->id, 403);
         abort_unless(in_array($familyNote->status, ['open', 'in_progress']), 422);
 
@@ -147,6 +161,11 @@ class PortalFamilyNoteController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)->for($user, $client)['show_care_notes'],
+            403,
+        );
+        abort_unless($familyNote->client_id === $client->id, 404);
         abort_unless($familyNote->created_by === $user->id, 403);
 
         $familyNote->delete();

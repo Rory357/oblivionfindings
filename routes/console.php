@@ -8,6 +8,7 @@ use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
 use App\Domain\Finance\Jobs\ProcessRecurringChargesJob;
 use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
+use App\Domain\Finance\Jobs\ReconcileUnpostedClientFundJournalsJob;
 use App\Domain\Finance\Jobs\RunDepreciationJob;
 use App\Domain\Finance\Jobs\RunPaymentMatchingJob;
 use App\Domain\Finance\Jobs\SnapshotFinancialReportsJob;
@@ -23,11 +24,12 @@ use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
 use App\Domain\Hr\Jobs\PublishDueAnnouncementsJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
-use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendAssetRemindersJob;
+use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendOfferExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendPipRemindersJob;
+use App\Domain\Hr\Jobs\SendWellbeingRemindersJob;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
@@ -437,6 +439,14 @@ app(Schedule::class)
     ->dailyAt('07:00')
     ->withoutOverlapping();
 
+// Client-fund transactions are the durable outbox for GL posting. Recover
+// rows left unposted by transient queue or handler failures.
+app(Schedule::class)
+    ->job(new ReconcileUnpostedClientFundJournalsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 // Recurring charges: generate billing entries for due recurring charges, per org.
 app(Schedule::class)
     ->call(function () {
@@ -715,7 +725,7 @@ app(Schedule::class)
 // Auto-close published engagement surveys past their end date + one-time
 // follow-up reminders for due wellbeing check-ins: daily at 08:00 NZ
 app(Schedule::class)
-    ->job(new \App\Domain\Hr\Jobs\SendWellbeingRemindersJob)
+    ->job(new SendWellbeingRemindersJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00')
     ->withoutOverlapping();

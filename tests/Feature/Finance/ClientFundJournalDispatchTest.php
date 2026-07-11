@@ -7,7 +7,9 @@ use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Client;
 use App\Models\ClientFund;
+use App\Observers\ClientFundTransactionObserver;
 use Database\Seeders\FinanceSeeder;
+use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,6 +36,11 @@ class ClientFundJournalDispatchTest extends TestCase
 
     public function test_client_fund_credit_and_debit_transactions_post_journals_once(): void
     {
+        $this->assertInstanceOf(
+            ShouldHandleEventsAfterCommit::class,
+            new ClientFundTransactionObserver,
+        );
+
         $client = Client::factory()->create(['organization_id' => $this->orgId]);
         $fund = ClientFund::create([
             'organization_id' => $this->orgId,
@@ -53,6 +60,10 @@ class ClientFundJournalDispatchTest extends TestCase
             'transaction_date' => now()->toDateString(),
         ]);
 
+        // RefreshDatabase holds an outer transaction open, so an after-commit
+        // observer cannot fire inside this test. Execute the canonical queued
+        // job explicitly while separately asserting the observer contract.
+        PostClientFundJournalJob::dispatchSync($credit);
         $credit->refresh();
         $this->assertNotNull($credit->journal_id);
 
@@ -77,6 +88,7 @@ class ClientFundJournalDispatchTest extends TestCase
             'transaction_date' => now()->toDateString(),
         ]);
 
+        PostClientFundJournalJob::dispatchSync($debit);
         $debit->refresh();
         $this->assertNotNull($debit->journal_id);
 
@@ -92,7 +104,7 @@ class ClientFundJournalDispatchTest extends TestCase
                 && (string) $line->credit === '40.00'
         ));
 
-        PostClientFundJournalJob::dispatch($debit->refresh());
+        PostClientFundJournalJob::dispatchSync($debit->refresh());
 
         $this->assertSame(1, FinJournal::where('source_type', 'client_fund_transaction')
             ->where('source_id', $debit->id)

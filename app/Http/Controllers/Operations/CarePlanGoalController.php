@@ -5,19 +5,23 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
-use App\Models\ProgressNote;
+use App\Models\ClientNote;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CarePlanGoalController extends Controller
 {
     public function store(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+        abort_unless($auth, 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
+
+        $this->ensureMutableCarePlan($carePlan);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -95,13 +99,15 @@ class CarePlanGoalController extends Controller
      */
     public function show(Request $request, $carePlan, $goal)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal, false);
 
         $goal->load('steps');
 
-        $notes = ProgressNote::query()
+        $notes = ClientNote::query()
             ->where('care_plan_goal_id', $goal->id)
+            ->where('type', 'progress_note')
             ->with('author:id,name')
+            ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
             ->get();
 
@@ -124,19 +130,19 @@ class CarePlanGoalController extends Controller
                 'sort_order' => $s->sort_order,
                 'target_date' => optional($s->target_date)->toDateString(),
             ])->values(),
-            'hurdles' => $notes->where('note_type', 'goal_hurdle')->map(fn ($n) => [
+            'hurdles' => $notes->where('category', 'goal_hurdle')->map(fn ($n) => [
                 'id' => $n->id,
-                'content' => $n->content,
+                'content' => $n->body,
                 'reason' => $n->flagged_reason,
                 'resolved' => ! $n->is_flagged,
                 'author' => $n->author?->name,
-                'created_at' => optional($n->created_at)->toISOString(),
+                'created_at' => optional($n->occurred_at ?? $n->created_at)->toISOString(),
             ])->values(),
-            'progress_log' => $notes->where('note_type', 'goal_progress')->map(fn ($n) => [
+            'progress_log' => $notes->where('category', 'goal_progress')->map(fn ($n) => [
                 'id' => $n->id,
-                'content' => $n->content,
+                'content' => $n->body,
                 'author' => $n->author?->name,
-                'created_at' => optional($n->created_at)->toISOString(),
+                'created_at' => optional($n->occurred_at ?? $n->created_at)->toISOString(),
             ])->values(),
         ]);
     }
@@ -246,9 +252,10 @@ class CarePlanGoalController extends Controller
     {
         [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
 
-        $note = ProgressNote::query()
+        $note = ClientNote::query()
             ->where('care_plan_goal_id', $goal->id)
-            ->where('note_type', 'goal_hurdle')
+            ->where('type', 'progress_note')
+            ->where('category', 'goal_hurdle')
             ->findOrFail($note);
 
         $note->update(['is_flagged' => false]);
@@ -260,20 +267,38 @@ class CarePlanGoalController extends Controller
      * Authorize the caller, scope the care plan to their organization, and
      * resolve a goal that belongs to that plan. Returns [carePlan, goal].
      */
-    private function authorizeGoal(Request $request, $carePlan, $goal): array
-    {
+    private function authorizeGoal(
+        Request $request,
+        $carePlan,
+        $goal,
+        bool $requiresMutablePlan = true,
+    ): array {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+        abort_unless($auth, 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
+
+        if ($requiresMutablePlan) {
+            $this->ensureMutableCarePlan($carePlan);
+        }
 
         $goal = CarePlanGoal::query()
             ->where('care_plan_id', $carePlan->id)
             ->findOrFail($goal);
 
         return [$carePlan, $goal];
+    }
+
+    private function ensureMutableCarePlan(CarePlan $carePlan): void
+    {
+        if (! $carePlan->isMutableVersion()) {
+            throw ValidationException::withMessages([
+                'care_plan' => 'Only the current working care plan version can be changed.',
+            ]);
+        }
     }
 
     /**
@@ -309,17 +334,24 @@ class CarePlanGoalController extends Controller
         string $content,
         bool $flagged = false,
         ?string $flaggedReason = null,
-    ): ProgressNote {
-        return ProgressNote::create([
+    ): ClientNote {
+        return ClientNote::create([
             'organization_id' => $request->user()->organization_id,
             'client_id' => $goal->client_id,
             'care_plan_goal_id' => $goal->id,
-            'author_id' => $request->user()->id,
-            'note_type' => $type,
-            'content' => $content,
+            'user_id' => $request->user()->id,
+            'type' => 'progress_note',
+            'category' => $type,
+            'subject' => ucfirst(str_replace('_', ' ', $type)),
+            'goal' => $goal->title,
+            'body' => $content,
+            'occurred_at' => now(),
             'is_flagged' => $flagged,
             'flagged_reason' => $flaggedReason,
-            'visibility' => 'staff_only',
+            'visibility' => 'internal',
+            'is_private' => false,
+            'appears_on_timeline' => true,
+            'is_draft' => false,
         ]);
     }
 }

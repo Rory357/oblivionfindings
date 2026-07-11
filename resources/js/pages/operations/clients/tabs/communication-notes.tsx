@@ -19,7 +19,12 @@ type CommunicationNotesTabProps = {
     notes: ClientDailyNote[];
     familyNotes: any[];
     familyNotesOpenCount: number;
-    onCreate: () => void;
+    coverage?: {
+        total?: number;
+        loaded?: number;
+        has_more?: boolean;
+    };
+    onCreate?: () => void;
     canReview?: boolean;
     canUpdate?: boolean;
     onMarkReviewed?: (noteId: number) => void;
@@ -41,6 +46,7 @@ export function CommunicationNotesTab({
     notes,
     familyNotes,
     familyNotesOpenCount,
+    coverage = {},
     onCreate,
     canReview = false,
     canUpdate = false,
@@ -76,7 +82,7 @@ export function CommunicationNotesTab({
                         Communication notes
                     </p>
                     <p className="mt-1 text-2xl font-semibold">
-                        {notes.length}
+                        {coverage.total ?? notes.length}
                     </p>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
@@ -105,6 +111,13 @@ export function CommunicationNotesTab({
                 </div>
             </div>
 
+            {coverage.has_more ? (
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    Showing the latest {coverage.loaded ?? notes.length} of{' '}
+                    {coverage.total ?? notes.length} communication notes.
+                </p>
+            ) : null}
+
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-lg font-semibold">
@@ -115,10 +128,16 @@ export function CommunicationNotesTab({
                         client.
                     </p>
                 </div>
-                <Button type="button" onClick={onCreate} className="min-h-11">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Communication
-                </Button>
+                {onCreate ? (
+                    <Button
+                        type="button"
+                        onClick={onCreate}
+                        className="min-h-11"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Communication
+                    </Button>
+                ) : null}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -139,7 +158,11 @@ export function CommunicationNotesTab({
                         <EmptyState
                             icon={MessageSquare}
                             title="No communication notes yet"
-                            description="Record calls, emails, portal messages, or in-person conversations from the button above."
+                            description={
+                                onCreate
+                                    ? 'Record calls, emails, portal messages, or in-person conversations from the button above.'
+                                    : 'No communication notes are available.'
+                            }
                         />
                     )}
                 </div>

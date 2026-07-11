@@ -6,7 +6,11 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\LocationHardware;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -18,7 +22,9 @@ class ClientDeviceRefactorTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private Client $clientA;
+
     private Client $clientB;
 
     protected function setUp(): void
@@ -33,6 +39,22 @@ class ClientDeviceRefactorTest extends TestCase
 
         $this->clientA = Client::factory()->create();
         $this->clientB = Client::factory()->create();
+
+        $trackingConsentType = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)',
+        ]);
+        ClientConsent::query()->create([
+            'client_id' => $this->clientA->id,
+            'consent_type_id' => $trackingConsentType->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_by_user_id' => $this->admin->id,
+            'given_by_relationship' => 'staff',
+            'given_method' => 'written',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
     }
 
     // ── Client profile: active tracker appears ────────────────────
@@ -159,16 +181,37 @@ class ClientDeviceRefactorTest extends TestCase
 
     public function test_available_trackers_only_shows_unassigned_tracking_devices(): void
     {
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $availableHardware = LocationHardware::query()->create([
+            'tenant_id' => 1,
+            'site_id' => $site->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Available Tracker Shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
+
         // Unassigned tracker — should appear.
         $available = Device::factory()->tracking()->create([
             'name' => 'Available Tracker',
             'status' => DeviceStatus::Active,
+            'legacy_location_hardware_id' => $availableHardware->id,
+        ]);
+
+        $assignedHardware = LocationHardware::query()->create([
+            'tenant_id' => 1,
+            'site_id' => $site->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Assigned Tracker Shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
         ]);
 
         // Assigned tracker — should NOT appear.
         $assigned = Device::factory()->tracking()->create([
             'name' => 'Assigned Tracker',
             'status' => DeviceStatus::Active,
+            'legacy_location_hardware_id' => $assignedHardware->id,
         ]);
         DeviceAssignment::create([
             'device_id' => $assigned->id,
@@ -178,9 +221,18 @@ class ClientDeviceRefactorTest extends TestCase
         ]);
 
         // Decommissioned tracker — should NOT appear.
+        $retiredHardware = LocationHardware::query()->create([
+            'tenant_id' => 1,
+            'site_id' => $site->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Retired Tracker Shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
         Device::factory()->tracking()->create([
             'name' => 'Retired Tracker',
             'status' => DeviceStatus::Decommissioned,
+            'legacy_location_hardware_id' => $retiredHardware->id,
         ]);
 
         // Non-tracking device — should NOT appear.

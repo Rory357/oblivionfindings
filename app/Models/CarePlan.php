@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CarePlan extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -86,5 +86,46 @@ class CarePlan extends Model
     public function scopeReviewDue($query)
     {
         return $query->where('next_review_at', '<=', now());
+    }
+
+    /**
+     * Only the latest draft, active, or in-review version may be changed.
+     * Once a newer working version exists, the published source becomes
+     * historical even before the review is completed and archived.
+     */
+    public function isMutableVersion(): bool
+    {
+        if (! in_array($this->status, ['draft', 'active', 'review'], true)) {
+            return false;
+        }
+
+        $rootId = $this->parent_id ?? $this->getKey();
+        $version = (int) ($this->version ?? 1);
+
+        return ! self::query()
+            ->where('organization_id', $this->organization_id)
+            ->where('client_id', $this->client_id)
+            ->whereKeyNot($this->getKey())
+            ->whereIn('status', ['active', 'review'])
+            ->where(function ($query) use ($rootId) {
+                $query->whereKey($rootId)->orWhere('parent_id', $rootId);
+            })
+            ->where(function ($query) use ($version) {
+                $query->where('version', '>', $version)
+                    ->orWhere(function ($sameVersion) use ($version) {
+                        $sameVersion->where('version', $version)
+                            ->where('id', '>', $this->getKey());
+                    });
+            })
+            ->exists();
+    }
+
+    public function allowsGenericTransitionTo(?string $status): bool
+    {
+        if ($status === null || $status === $this->status) {
+            return true;
+        }
+
+        return $this->status === 'draft' && $status === 'active';
     }
 }

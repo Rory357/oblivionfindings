@@ -22,8 +22,6 @@ use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\AssetGeofence;
 use App\Models\AuditLog;
 use App\Models\CarePlan;
-use App\Models\SiteHazard;
-use App\Support\HazardDetailPresenter;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientBowelEntry;
@@ -50,46 +48,59 @@ use App\Models\ClientRisk;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
+use App\Models\ClientTransportBooking;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
-use App\Models\HsRiskAssessment;
-use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
+use App\Models\FirstAidRecord;
 use App\Models\FleetIncident;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetTelemetryEvent;
+use App\Models\HsRiskAssessment;
+use App\Models\LocationHardware;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
-use App\Models\ProgressNote;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\Role;
+use App\Models\SafeWorkProcedure;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftSeries;
 use App\Models\Site;
+use App\Models\SiteHazard;
 use App\Models\SiteHouseRoom;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
+use App\Services\Clients\ClientFamilyCommunicationAccess;
+use App\Services\Clients\ClientOnboardingAccess;
+use App\Services\Clients\ClientPhotoMediaUrls;
+use App\Services\Clients\ClientPhotoStorage;
+use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Clients\ClientStaffPreparationProjection;
+use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\NotificationService;
-use App\Services\Respite\ClientRespiteAllocationSummary;
+use App\Services\Portal\PortalClientSectionAccess;
 use App\Services\Queclink\LocateNowService;
+use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\ShiftCoverageService;
 use App\Services\Tracking\GeofenceStatusService;
 use App\Support\ClientSafetyPayload;
+use App\Support\HazardDetailPresenter;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -109,12 +120,21 @@ class ClientController extends Controller
         $this->authorize('viewAny', Client::class);
 
         $user = auth()->user();
+        $organizationId = $user->organization_id;
 
         $clients = Client::query()
             // Include soft-deleted (archived) clients so the redesigned index can
             // surface them under the "Archived" saved view / "Show archived" toggle.
             // They are excluded from the live stats and hidden by default client-side.
             ->withTrashed()
+            ->when(
+                $organizationId !== null,
+                fn ($q) => $q->where(
+                    fn ($tenantQuery) => $tenantQuery
+                        ->whereNull('organization_id')
+                        ->orWhere('organization_id', $organizationId),
+                ),
+            )
             ->when(
                 $user->hasRole('support_worker') && ! $user->hasRole('admin', 'manager', 'coordinator'),
                 fn ($q) => $q->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
@@ -166,6 +186,7 @@ class ClientController extends Controller
             ]);
 
         $clients = $clients->map(function (Client $c) use ($user) {
+            $sectionAccess = app(ClientProfileSectionAccess::class)->for($user, $c);
             $summary = $this->buildOnboardingSummaryFromCounts($c);
             $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
 
@@ -192,12 +213,22 @@ class ClientController extends Controller
                     'name' => $c->keyWorker->name,
                     'initials' => $this->nameInitials($c->keyWorker->name),
                 ] : null,
-                'notes_week' => (int) ($c->notes_week_count ?? 0),
-                'onboarding' => $summary,
-                'has_respite' => $hasRespite,
+                ...($sectionAccess['notes'] ? [
+                    'notes_week' => (int) ($c->notes_week_count ?? 0),
+                ] : []),
+                ...($sectionAccess['onboarding'] ? [
+                    'onboarding' => $summary,
+                ] : []),
+                ...($sectionAccess['respite'] ? [
+                    'has_respite' => $hasRespite,
+                ] : []),
                 'archived' => $c->trashed(),
                 'mine' => $mine,
-                'safety' => ClientSafetyPayload::summaryForClient($c),
+                'safety' => ClientSafetyPayload::summaryForClient(
+                    $c,
+                    includeMedical: $sectionAccess['medical'],
+                    includeRisks: $sectionAccess['risks'],
+                ),
             ];
         })->values();
 
@@ -205,7 +236,9 @@ class ClientController extends Controller
             'clients' => $clients,
             // Option lists for the in-context "Add client" wizard so it can
             // render without an extra round-trip.
-            ...$this->clientFormOptions(),
+            ...($user->canDo('clients.create')
+                ? $this->clientFormOptions($user->organization_id)
+                : []),
         ]);
     }
 
@@ -214,10 +247,22 @@ class ClientController extends Controller
      * sites, service contexts, assignable key workers and monitored-home
      * geofences, plus the org default service context.
      */
-    private function clientFormOptions(): array
+    private function clientFormOptions(?int $organizationId = null): array
     {
+        $defaultServiceContextId = ServiceContext::defaultId();
+        if (
+            $defaultServiceContextId !== null
+            && ! ServiceContext::query()
+                ->forOrganization($organizationId)
+                ->whereKey($defaultServiceContextId)
+                ->exists()
+        ) {
+            $defaultServiceContextId = null;
+        }
+
         return [
             'sites' => Site::query()
+                ->forTenant($organizationId)
                 ->where('is_active', true)
                 ->with(['houseRooms' => fn ($query) => $query
                     ->where('is_active', true)
@@ -236,17 +281,20 @@ class ClientController extends Controller
                     ])->values(),
                 ]),
             'serviceContexts' => ServiceContext::query()
+                ->forOrganization($organizationId)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'type', 'name']),
-            'keyWorkers' => User::staff()
+            'keyWorkers' => app(ClientWorkerEligibility::class)
+                ->queryForOrganization($organizationId)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'geofences' => AssetGeofence::query()
+                ->forOrganization($organizationId)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name']),
-            'defaultServiceContextId' => ServiceContext::defaultId(),
+            'defaultServiceContextId' => $defaultServiceContextId,
         ];
     }
 
@@ -345,26 +393,84 @@ class ClientController extends Controller
     {
         $this->authorize('view', $client);
 
+        // `/clients/{client}` is retained only as a compatibility entry point.
+        // Portal identities must never receive the staff profile payload, while
+        // staff bookmarks should converge on the canonical operations route.
+        if ($request->routeIs('clients.show')) {
+            $user = $request->user();
+            $routeName = $user?->hasRole('client', 'next_of_kin')
+                ? 'portal.clients.show'
+                : 'operations.clients.show';
+            $location = route($routeName, $client, false);
+            if ($request->getQueryString()) {
+                $location .= '?'.$request->getQueryString();
+            }
+
+            return redirect()->to($location);
+        }
+
         AuditLogger::log('clients.view', $client);
 
-        $client->load([
-            'site:id,name',
+        $sectionAccess = app(ClientProfileSectionAccess::class)
+            ->for($request->user(), $client);
+        $canViewClientLocation = (bool) $sectionAccess['tracking'];
+        $canManageClientTrackers = $this->canManageClientTrackers($request->user());
+        $canEditClientAssets = (bool) $request->user()?->can('update', $client);
+        $canAssignWorkers = (bool) $request->user()?->canDo('clients.assignments.update')
+            && $canEditClientAssets;
+        $canViewCareContext = $sectionAccess['daily_living']
+            || $sectionAccess['health']
+            || $sectionAccess['medical'];
+        $canManageFamilyNotes = app(
+            ClientFamilyCommunicationAccess::class,
+        )->canManage($request->user(), $client);
+        $canViewFamilyChat = app(
+            ClientFamilyCommunicationAccess::class,
+        )->canView($request->user(), $client);
+        $onboardingAccess = app(ClientOnboardingAccess::class)
+            ->forClient($request->user(), $client);
+        $clientTenantId = $this->clientTenantId($client);
+        $profileRelations = [
+            'site:id,tenant_id,name',
             'room:id,site_id,name,notes',
             'serviceContext:id,type,name',
             'keyWorker:id,name',
-            'houseGeofence:id,name',
-            'supportWorkers:id,name,email',
-            'medicalProfile',
-            'medications.stock',
-            'conditions',
-            'emergencyContacts',
-            'portalUsers:id,name,email',
-            'supportPlan',
-            'assessments',
-            'onboardingOverrides',
-            'onboardingWorkflow.steps',
-            'risks',
-        ]);
+            $canAssignWorkers || $canViewCareContext
+                ? 'supportWorkers:id,name,email'
+                : 'supportWorkers:id,name',
+        ];
+        if ($sectionAccess['tracking']) {
+            $profileRelations[] = 'houseGeofence:id,name';
+        }
+        if ($sectionAccess['onboarding']) {
+            array_push(
+                $profileRelations,
+                'onboardingOverrides',
+                'onboardingWorkflow.steps',
+            );
+        }
+        if ($sectionAccess['care_plans']) {
+            $profileRelations[] = 'supportPlan';
+        }
+        if ($sectionAccess['assessments']) {
+            $profileRelations[] = 'assessments';
+        }
+        if ($sectionAccess['medical']) {
+            array_push(
+                $profileRelations,
+                'medicalProfile',
+                'medications.stock',
+                'conditions',
+                'emergencyContacts',
+            );
+        }
+        if ($sectionAccess['portal_access']) {
+            $profileRelations[] = 'portalUsers:id,name,email';
+        }
+        if ($sectionAccess['risks']) {
+            $profileRelations[] = 'risks';
+        }
+        $client->load($profileRelations);
 
         // For modal / async detail views, return JSON.
         if ($request->wantsJson() || $request->boolean('modal')) {
@@ -383,20 +489,26 @@ class ClientController extends Controller
                         ]
                         : null,
                     'room' => $this->roomPayload($client->room),
-                    'support_workers' => $client->supportWorkers->map(fn ($u) => [
-                        'id' => $u->id,
-                        'name' => $u->name,
-                        'email' => $u->email,
-                    ])->values(),
+                    'support_workers' => $canAssignWorkers || $canViewCareContext
+                        ? $client->supportWorkers->map(fn ($u) => [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            ...($canAssignWorkers ? ['email' => $u->email] : []),
+                        ])->values()
+                        : [],
                 ],
             ]);
         }
 
         // Check for expired consents and pass to frontend
-        $expiredConsents = ConsentValidationService::getExpiredConsents($client);
-        $missingMandatory = ConsentValidationService::getMissingMandatoryConsents($client);
+        $expiredConsents = $sectionAccess['consents']
+            ? ConsentValidationService::getExpiredConsents($client)
+            : collect();
+        $missingMandatory = $sectionAccess['consents']
+            ? ConsentValidationService::getMissingMandatoryConsents($client)
+            : collect();
 
-        $nextShift = Shift::query()
+        $nextShift = $sectionAccess['shifts'] ? Shift::query()
             ->where('client_id', $client->id)
             ->where('starts_at', '>=', now())
             ->whereNotIn('status', ['cancelled'])
@@ -412,9 +524,9 @@ class ClientController extends Controller
                 'residentTransports',
             ])
             ->orderBy('starts_at')
-            ->first();
+            ->first() : null;
 
-        $lastShift = Shift::query()
+        $lastShift = $sectionAccess['shifts'] ? Shift::query()
             ->where('client_id', $client->id)
             ->where('starts_at', '<', now())
             ->whereNotIn('status', ['cancelled'])
@@ -430,9 +542,9 @@ class ClientController extends Controller
                 'residentTransports',
             ])
             ->orderByDesc('starts_at')
-            ->first();
+            ->first() : null;
 
-        $recurringShiftSeries = ShiftSeries::query()
+        $recurringShiftSeries = $sectionAccess['shifts'] ? ShiftSeries::query()
             ->where('client_id', $client->id)
             ->where('status', '!=', 'cancelled')
             ->with([
@@ -458,36 +570,49 @@ class ClientController extends Controller
             ], 'starts_at')
             ->orderByDesc('updated_at')
             ->limit(3)
-            ->get();
+            ->get() : collect();
 
-        $documents = ClientDocument::query()
-            ->where('client_id', $client->id)
-            ->orderByDesc('created_at')
-            ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at']);
+        $documents = $sectionAccess['documents']
+            ? ClientDocument::query()
+                ->where('client_id', $client->id)
+                ->orderByDesc('created_at')
+                ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at'])
+            : collect();
 
-        $events = TimelineEvent::query()
-            ->where('client_id', $client->id)
-            ->orderByDesc('occurred_at')
-            ->limit(80)
-            ->with([
-                'actor:id,name',
-                'site:id,name',
-                'comments' => fn ($q) => $q->whereNull('parent_id')->with(['user:id,name,role', 'replies' => fn ($r) => $r->with('user:id,name,role')->orderBy('created_at'), 'replies.likes', 'likes'])->orderBy('created_at'),
-                'reactions',
-            ])
-            ->get();
+        $eventsBase = $sectionAccess['timeline']
+            ? TimelineEvent::query()->where('client_id', $client->id)
+            : null;
+        $eventsTotal = $eventsBase ? (clone $eventsBase)->count() : 0;
+        $events = $eventsBase
+            ? (clone $eventsBase)
+                ->orderByDesc('occurred_at')
+                ->limit(80)
+                ->with([
+                    'actor:id,name',
+                    'site:id,name',
+                    'comments' => fn ($q) => $q->whereNull('parent_id')->with(['user:id,name,role', 'replies' => fn ($r) => $r->with('user:id,name,role')->orderBy('created_at'), 'replies.likes', 'likes'])->orderBy('created_at'),
+                    'reactions',
+                ])
+                ->get()
+            : collect();
 
-        $handover = TimelineEvent::query()
-            ->where('client_id', $client->id)
-            ->where('type', 'handover')
-            ->where('is_pinned', true)
-            ->orderByDesc('occurred_at')
-            ->limit(5)
-            ->with(['actor:id,name'])
-            ->get();
+        $handoverBase = $sectionAccess['timeline']
+            ? TimelineEvent::query()
+                ->where('client_id', $client->id)
+                ->where('type', 'handover')
+                ->where('is_pinned', true)
+            : null;
+        $handoverTotal = $handoverBase ? (clone $handoverBase)->count() : 0;
+        $handover = $handoverBase
+            ? (clone $handoverBase)
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->with(['actor:id,name'])
+                ->get()
+            : collect();
 
         $siteCoverageSummary = null;
-        if ($client->site_id) {
+        if ($client->site_id && $sectionAccess['shifts']) {
             $siteCoverageSummary = collect(app(ShiftCoverageService::class)->buildSiteSummaries(
                 now()->copy()->startOfDay(),
                 now()->copy()->addDays(14)->endOfDay(),
@@ -495,7 +620,7 @@ class ClientController extends Controller
             ))->first();
         }
 
-        $dailyNotes = ClientNote::query()
+        $dailyNotes = $sectionAccess['notes'] ? ClientNote::query()
             ->where('client_id', $client->id)
             ->forUser($request->user())
             ->dailyNotes()
@@ -503,9 +628,9 @@ class ClientController extends Controller
             ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get();
+            ->get() : collect();
 
-        $communicationNotes = ClientNote::query()
+        $communicationNotes = $sectionAccess['notes'] ? ClientNote::query()
             ->where('client_id', $client->id)
             ->forUser($request->user())
             ->communication()
@@ -513,18 +638,23 @@ class ClientController extends Controller
             ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get();
+            ->get() : collect();
 
-        $dailyNotesBase = ClientNote::query()
-            ->where('client_id', $client->id)
-            ->forUser($request->user());
+        $dailyNotesBase = $sectionAccess['notes']
+            ? ClientNote::query()
+                ->where('client_id', $client->id)
+                ->forUser($request->user())
+            : null;
 
-        $actionsReviews = app(ActionsAggregator::class)->forClient($client, $request->user());
+        $actionsReviewCoverage = $sectionAccess['actions_reviews']
+            ? app(ActionsAggregator::class)->forClientWithCoverage($client, $request->user())
+            : ['items' => [], 'has_more' => false];
+        $actionsReviews = $actionsReviewCoverage['items'];
 
         // Site / environmental hazards at the client's current home (read-only
         // context — managed from the Hazards register). Open + mitigated only.
         $siteId = $client->site_id;
-        $homeHazards = $siteId
+        $homeHazards = ($siteId && $sectionAccess['first_aid'])
             ? SiteHazard::query()
                 ->where('site_id', $siteId)
                 ->whereIn('status', ['open', 'in_progress', 'mitigated'])
@@ -547,7 +677,7 @@ class ClientController extends Controller
             : collect();
 
         $homeHazardDetail = null;
-        if ($request->filled('hazard') && $siteId) {
+        if ($request->filled('hazard') && $siteId && $sectionAccess['first_aid']) {
             $hz = SiteHazard::query()
                 ->where('site_id', $siteId)
                 ->with(['site:id,name,type', 'reportedBy:id,name', 'assignedTo:id,name', 'statusChangedBy:id,name', 'closedBy:id,name', 'actions.assignedTo:id,name', 'actions.completedBy:id,name'])
@@ -560,7 +690,7 @@ class ClientController extends Controller
         // Safe Work Procedures governing care at this client's home (site-scoped +
         // org-wide, approved), read-only — deep-links to the procedures register.
         $homeProcedures = ($siteId && $request->user()?->canDo('procedures.view'))
-            ? \App\Models\SafeWorkProcedure::query()->applicableToSite($siteId)
+            ? SafeWorkProcedure::query()->applicableToSite($siteId)
                 ->orderBy('title')
                 ->limit(15)
                 ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
@@ -574,7 +704,37 @@ class ClientController extends Controller
                 ])->values()
             : collect();
 
-        return inertia('operations/clients/show', [
+        $workingCarePlan = $sectionAccess['care_plans']
+            ? $this->carePlanWorkingVersion($client)
+            : null;
+        $carePlanTotal = $sectionAccess['care_plans']
+            ? CarePlan::where('client_id', $client->id)->count()
+            : 0;
+        $carePlanRecentNotesTotal = $sectionAccess['care_plans']
+            ? ClientNote::where('client_id', $client->id)
+                ->where('type', 'progress_note')
+                ->count()
+            : 0;
+        $staffPreparation = $sectionAccess['onboarding']
+            && ($request->user()?->canDo('hr.onboarding.view') ?? false)
+            ? app(ClientStaffPreparationProjection::class)
+                ->forClient($client, $clientTenantId)
+            : null;
+        $canCreateClientNote = $request->user()?->can('create', ClientNote::class) ?? false;
+        $canRecordMedicationAdministration = $sectionAccess['medical'] && (
+            ($request->user()?->canDo('clients.update') ?? false)
+            || ($request->user()?->canDo('medications.administer.record') ?? false)
+            || ($request->user()?->canDo('medications.orders.manage') ?? false)
+        );
+        $dailyNotesTotal = $dailyNotesBase
+            ? (clone $dailyNotesBase)->dailyNotes()->count()
+            : 0;
+        $communicationNotesTotal = $dailyNotesBase
+            ? (clone $dailyNotesBase)->communication()->count()
+            : 0;
+
+        $profileProps = [
+            'profile_section_access' => $sectionAccess,
             'homeHazards' => $homeHazards,
             'homeHazardDetail' => $homeHazardDetail,
             'homeProcedures' => $homeProcedures,
@@ -598,8 +758,10 @@ class ClientController extends Controller
                 'suburb' => $client->suburb,
                 'city' => $client->city,
                 'postcode' => $client->postcode,
-                'funding_type' => $client->funding_type,
-                'funding_notes' => $client->funding_notes,
+                ...($sectionAccess['finance'] ? [
+                    'funding_type' => $client->funding_type,
+                    'funding_notes' => $client->funding_notes,
+                ] : []),
                 'site' => $client->site ? ['id' => $client->site->id, 'name' => $client->site->name] : null,
                 'room' => $this->roomPayload($client->room),
                 'service_context' => $client->serviceContext ? [
@@ -607,7 +769,13 @@ class ClientController extends Controller
                     'type' => $client->serviceContext->type?->value,
                     'name' => $client->serviceContext->name,
                 ] : null,
-                'support_workers' => $client->supportWorkers->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
+                'support_workers' => $canAssignWorkers || $canViewCareContext
+                    ? $client->supportWorkers->map(fn ($u) => [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                        ...($canAssignWorkers ? ['email' => $u->email] : []),
+                    ])->values()
+                    : [],
                 // Identity & Culture
                 'ethnicity' => $client->ethnicity,
                 'preferred_pronouns' => $client->preferred_pronouns,
@@ -619,39 +787,49 @@ class ClientController extends Controller
                 'interests_hobbies' => $client->interests_hobbies,
                 'strengths_abilities' => $client->strengths_abilities,
                 'life_story' => $client->life_story,
-                // Transport
-                'transport_needs' => $client->transport_needs,
-                'transport_notes' => $client->transport_notes,
-                // Support needs (captured at intake, shown on Personal details)
-                'mobility_needs' => $client->mobility_needs,
-                'sensory_needs' => $client->sensory_needs,
-                'cognitive_needs' => $client->cognitive_needs,
-                'dietary_requirements' => $client->dietary_requirements,
-                'sleep_preferences' => $client->sleep_preferences,
-                'sleep_target_hours' => $client->sleep_target_hours ? (float) $client->sleep_target_hours : null,
-                'fluid_intake_min_ml' => $client->fluid_intake_min_ml,
-                'fluid_intake_max_ml' => $client->fluid_intake_max_ml,
-                'seizure_duration_escalation_seconds' => $client->seizure_duration_escalation_seconds,
-                // Care setup
-                'service_start_date' => optional($client->service_start_date)->toDateString(),
-                'risk_level' => $client->risk_level,
-                'safeguarding_flag' => (bool) $client->safeguarding_flag,
-                'key_worker' => $client->keyWorker ? [
-                    'id' => $client->keyWorker->id,
-                    'name' => $client->keyWorker->name,
-                ] : null,
-                'house_geofence' => $client->houseGeofence ? [
-                    'id' => $client->houseGeofence->id,
-                    'name' => $client->houseGeofence->name,
-                ] : null,
+                ...($sectionAccess['transport'] || $sectionAccess['daily_living'] ? [
+                    'transport_needs' => $client->transport_needs,
+                    'transport_notes' => $client->transport_notes,
+                ] : []),
+                ...($canViewCareContext ? [
+                    // Support needs captured at intake.
+                    'mobility_needs' => $client->mobility_needs,
+                    'sensory_needs' => $client->sensory_needs,
+                    'cognitive_needs' => $client->cognitive_needs,
+                    'sleep_preferences' => $client->sleep_preferences,
+                    'sleep_target_hours' => $client->sleep_target_hours ? (float) $client->sleep_target_hours : null,
+                    'fluid_intake_min_ml' => $client->fluid_intake_min_ml,
+                    'fluid_intake_max_ml' => $client->fluid_intake_max_ml,
+                    'seizure_duration_escalation_seconds' => $client->seizure_duration_escalation_seconds,
+                    'service_start_date' => optional($client->service_start_date)->toDateString(),
+                ] : []),
+                ...($canViewCareContext || $sectionAccess['meals'] ? [
+                    'dietary_requirements' => $client->dietary_requirements,
+                ] : []),
+                ...($sectionAccess['risks'] ? [
+                    'risk_level' => $client->risk_level,
+                    'safeguarding_flag' => (bool) $client->safeguarding_flag,
+                ] : []),
+                ...($canAssignWorkers || $canViewCareContext ? [
+                    'key_worker' => $client->keyWorker ? [
+                        'id' => $client->keyWorker->id,
+                        'name' => $client->keyWorker->name,
+                    ] : null,
+                ] : []),
+                ...($sectionAccess['tracking'] ? [
+                    'house_geofence' => $client->houseGeofence ? [
+                        'id' => $client->houseGeofence->id,
+                        'name' => $client->houseGeofence->name,
+                    ] : null,
+                ] : []),
             ],
-            'medical' => [
+            'medical' => $sectionAccess['medical'] ? [
                 'profile' => $client->medicalProfile,
                 'medications' => $client->medications->map(fn (ClientMedication $medication) => $this->medicationPayload($medication))->values(),
                 'conditions' => $client->conditions,
                 'emergency_contacts' => $client->emergencyContacts,
-            ],
-            'next_of_kins' => $client->nextOfKins()
+            ] : null,
+            'next_of_kins' => $sectionAccess['portal_access'] ? $client->nextOfKins()
                 ->with('user:id,name,email')
                 ->get()
                 ->map(function ($k) {
@@ -677,9 +855,8 @@ class ClientController extends Controller
                         'notes' => $k->notes,
                     ];
                 })
-                ->values(),
-            'audit_history' => $request->user()?->canDo('audit.viewClient')
-                || $request->user()?->canDo('clients.update')
+                ->values() : null,
+            'audit_history' => $sectionAccess['audit']
                 ? AuditLog::query()
                     ->where('client_id', $client->id)
                     ->with('user:id,name,email')
@@ -699,24 +876,27 @@ class ClientController extends Controller
                         'created_at' => optional($log->created_at)->toISOString(),
                     ])
                 : [],
-            'behaviour_patterns' => app(BehaviourPatternsService::class)
-                ->forClient($client, $request->user()),
-            'path_plan' => ClientPathPlan::query()
-                ->where('client_id', $client->id)
-                ->first()?->only([
-                    'id',
-                    'dream',
-                    'north_star',
-                    'strengths',
-                    'action_steps',
-                    'trusted_people',
-                    'independence_goals',
-                    'community',
-                    'meaningful_outcomes',
-                    'plan_date',
-                    'next_review_at',
-                ]),
-            'leave_excursions' => [
+            'behaviour_patterns' => $sectionAccess['behaviour']
+                ? app(BehaviourPatternsService::class)->forClient($client, $request->user())
+                : null,
+            'path_plan' => $sectionAccess['care_plans']
+                ? ClientPathPlan::query()
+                    ->where('client_id', $client->id)
+                    ->first()?->only([
+                        'id',
+                        'dream',
+                        'north_star',
+                        'strengths',
+                        'action_steps',
+                        'trusted_people',
+                        'independence_goals',
+                        'community',
+                        'meaningful_outcomes',
+                        'plan_date',
+                        'next_review_at',
+                    ])
+                : null,
+            'leave_excursions' => $sectionAccess['daily_living'] ? [
                 'leave' => ClientLeaveRequest::query()
                     ->where('client_id', $client->id)
                     ->with(['requester:id,name', 'approver:id,name'])
@@ -760,8 +940,8 @@ class ClientController extends Controller
                         'approval_notes' => $e->approval_notes,
                     ])
                     ->values(),
-            ],
-            'client_finance' => [
+            ] : null,
+            'client_finance' => $sectionAccess['finance'] ? [
                 'funds' => ClientFund::query()
                     ->where('client_id', $client->id)
                     ->orderBy('fund_name')
@@ -847,18 +1027,22 @@ class ClientController extends Controller
                         'raised_at' => ($d->raised_at ?? $d->created_at)?->toISOString(),
                     ])
                     ->values(),
-            ],
-            'support_plan' => $client->supportPlan,
-            'assessments' => $client->assessments
-                ->sortByDesc(fn ($a) => $a->assessed_at ?? $a->created_at)
-                ->values(),
+            ] : null,
+            'support_plan' => $sectionAccess['care_plans']
+                ? $client->supportPlan
+                : null,
+            'assessments' => $sectionAccess['assessments']
+                ? $client->assessments
+                    ->sortByDesc(fn ($a) => $a->assessed_at ?? $a->created_at)
+                    ->values()
+                : null,
             'documents' => $documents,
-            'portal_users' => $client->portalUsers->map(fn ($u) => [
+            'portal_users' => $sectionAccess['portal_access'] ? $client->portalUsers->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
                 'relation' => $u->pivot?->relation,
-            ])->values(),
+            ])->values() : null,
             'events' => $events->map(fn ($e) => [
                 'id' => $e->id,
                 'source_id' => $e->source_id,
@@ -914,7 +1098,15 @@ class ClientController extends Controller
                 'is_pinned' => (bool) $e->is_pinned,
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
             ])->values(),
-            'shifts_summary' => [
+            'timeline_summary' => $sectionAccess['timeline'] ? [
+                'total' => $eventsTotal,
+                'loaded' => $events->count(),
+                'has_more' => $eventsTotal > $events->count(),
+                'pinned_handover_total' => $handoverTotal,
+                'pinned_handover_loaded' => $handover->count(),
+                'pinned_handover_has_more' => $handoverTotal > $handover->count(),
+            ] : null,
+            'shifts_summary' => $sectionAccess['shifts'] ? [
                 'next' => $this->serializeShiftSummary($nextShift),
                 'last' => $this->serializeShiftSummary($lastShift),
                 'recurring' => $recurringShiftSeries->map(fn (ShiftSeries $series) => [
@@ -942,7 +1134,7 @@ class ClientController extends Controller
                     'open_occurrences_count' => (int) ($series->open_occurrences_count ?? 0),
                     'active_replacements_count' => (int) ($series->active_replacements_count ?? 0),
                 ])->values(),
-            ],
+            ] : null,
             'site_coverage' => $siteCoverageSummary ? [
                 'site_id' => (int) $siteCoverageSummary['site_id'],
                 'site_name' => $siteCoverageSummary['site_name'],
@@ -962,7 +1154,7 @@ class ClientController extends Controller
                     'ends_at' => $alert['ends_at'] ?? null,
                 ])->values(),
             ] : null,
-            'onboarding' => [
+            'onboarding' => $sectionAccess['onboarding'] ? [
                 'checklist' => $this->buildOnboardingChecklist($client),
                 'workflow' => $client->onboardingWorkflow ? [
                     'id' => $client->onboardingWorkflow->id,
@@ -986,26 +1178,25 @@ class ClientController extends Controller
                         'due_date' => $s->due_date?->toDateString(),
                     ])->values()->toArray(),
                 ] : null,
-            ],
-            // Progress notes for client (last 20)
-            'client_progress_notes' => ProgressNote::where('client_id', $client->id)
-                ->with(['author:id,name', 'goal:id,title'])
-                ->orderByDesc('created_at')
-                ->limit(20)
-                ->get(),
+            ] : null,
+            'staff_preparation' => $staffPreparation,
             'client_daily_notes' => ClientDailyNoteResource::collection($dailyNotes)->resolve($request),
             'communication_notes' => ClientDailyNoteResource::collection($communicationNotes)->resolve($request),
-            'daily_notes_summary' => [
-                'total' => (clone $dailyNotesBase)->dailyNotes()->count(),
+            'daily_notes_summary' => $dailyNotesBase ? [
+                'total' => $dailyNotesTotal,
+                'loaded' => $dailyNotes->count(),
+                'has_more' => $dailyNotesTotal > $dailyNotes->count(),
                 'flagged_open' => (clone $dailyNotesBase)->dailyNotes()->reviewQueue()->count(),
                 'drafts' => (clone $dailyNotesBase)->dailyNotes()->where('is_draft', true)->count(),
-                'communication' => (clone $dailyNotesBase)->communication()->count(),
+                'communication' => $communicationNotesTotal,
+                'communication_loaded' => $communicationNotes->count(),
+                'communication_has_more' => $communicationNotesTotal > $communicationNotes->count(),
                 'open_follow_ups' => (clone $dailyNotesBase)
                     ->whereNotNull('follow_up_action')
                     ->whereNull('follow_up_completed_at')
                     ->count(),
-            ],
-            'health_monitoring' => [
+            ] : null,
+            'health_monitoring' => $sectionAccess['health'] ? [
                 'bowel' => ClientBowelEntry::query()
                     ->where('client_id', $client->id)
                     ->with('recorder:id,name')
@@ -1031,36 +1222,48 @@ class ClientController extends Controller
                     ->limit(60)
                     ->get(),
                 'sleep_summary' => $this->buildSleepSummary($client),
-            ],
-            'meal_logs' => $this->buildMealLogData($client),
-            'client_routines' => ClientRoutine::query()
-                ->where('client_id', $client->id)
-                ->with('updater:id,name')
-                ->orderBy('display_order')
-                ->get(),
-            'actions_reviews' => $actionsReviews,
-            'actions_reviews_summary' => [
+            ] : null,
+            'meal_logs' => $sectionAccess['meals']
+                ? $this->buildMealLogData($client)
+                : null,
+            'client_routines' => $sectionAccess['daily_living']
+                ? ClientRoutine::query()
+                    ->where('client_id', $client->id)
+                    ->with('updater:id,name')
+                    ->orderBy('display_order')
+                    ->get()
+                : null,
+            'actions_reviews' => $sectionAccess['actions_reviews']
+                ? $actionsReviews
+                : null,
+            'actions_reviews_summary' => $sectionAccess['actions_reviews'] ? [
                 'open' => count($actionsReviews),
+                'loaded' => count($actionsReviews),
+                'has_more' => (bool) $actionsReviewCoverage['has_more'],
                 'critical' => collect($actionsReviews)->where('severity', 'critical')->count(),
                 'warning' => collect($actionsReviews)->where('severity', 'warning')->count(),
-            ],
+            ] : null,
 
             // Service agreements
-            'client_agreements' => ServiceAgreement::where('client_id', $client->id)
-                ->orderByDesc('created_at')
-                ->get(),
+            'client_agreements' => $sectionAccess['agreements']
+                ? ServiceAgreement::where('client_id', $client->id)
+                    ->orderByDesc('created_at')
+                    ->get()
+                : null,
 
             // Risks (active first, inactive shown below for management)
-            'client_risks' => ClientRisk::where('client_id', $client->id)
-                ->orderByDesc('active')
-                ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
-                ->orderBy('label')
-                ->limit(50)
-                ->get(),
+            'client_risks' => $sectionAccess['risks']
+                ? ClientRisk::where('client_id', $client->id)
+                    ->orderByDesc('active')
+                    ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+                    ->orderBy('label')
+                    ->limit(50)
+                    ->get()
+                : null,
 
             // Formal H&S risk assessments (polymorphic; distinct from the ClientRisk
             // care-risk list above — shown as a separate section in the same tab).
-            'hs_risk_assessments' => ($request->user()?->canDo('hazards.view') ?? false)
+            'hs_risk_assessments' => $sectionAccess['first_aid']
                 ? HsRiskAssessment::forAssessable(Client::class, $client->id)
                     ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
                     ->withCount('attachments')
@@ -1070,28 +1273,34 @@ class ClientController extends Controller
                     ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
                     ->values()
                 : [],
-            'ra_pickers' => ($request->user()?->canDo('hazards.view') ?? false)
-                ? RiskAssessmentPresenter::pickers()
+            'ra_pickers' => $sectionAccess['first_aid_manage']
+                ? RiskAssessmentPresenter::pickers($client->organization_id)
                 : ['sites' => [], 'clients' => [], 'events' => []],
 
             // Recent incidents (last 5)
-            'client_incidents' => ClientIncident::where('client_id', $client->id)
-                ->with(['reporter:id,name'])
-                ->orderByDesc('occurred_at')
-                ->limit(5)
-                ->get(),
+            'client_incidents' => $sectionAccess['incidents']
+                ? ClientIncident::where('client_id', $client->id)
+                    ->with(['reporter:id,name'])
+                    ->orderByDesc('occurred_at')
+                    ->limit(5)
+                    ->get()
+                : null,
 
             // First-aid treatments recorded for this client (read-only panel; gated on the
             // first_aid_records.client_id FK added by the gold-standard rebuild).
-            'first_aid_records' => \Illuminate\Support\Facades\Schema::hasTable('first_aid_records')
-                ? \App\Models\FirstAidRecord::where('client_id', $client->id)
+            'first_aid_records' => $sectionAccess['first_aid']
+                && Schema::hasTable('first_aid_records')
+                ? FirstAidRecord::where('client_id', $client->id)
                     ->with(['site:id,name', 'firstAider:id,name'])
                     ->orderByDesc('treatment_date')
                     ->limit(10)
                     ->get()
                 : [],
 
-            'care_plans_summary' => [
+            'care_plans_summary' => $sectionAccess['care_plans'] ? [
+                // The version staff should edit: an in-progress review takes
+                // precedence over the published plan it was cloned from.
+                'working_plan' => $workingCarePlan,
                 // The "current" plan: the active plan if one exists, otherwise the
                 // latest draft (so a freshly-created draft is visible + editable in-tab).
                 'active_plan' => CarePlan::where('client_id', $client->id)
@@ -1103,28 +1312,47 @@ class ClientController extends Controller
                         'signOffs' => fn ($q) => $q->latest('agreed_on'),
                         'signOffs.recorder:id,name',
                         'goals' => function ($q) {
-                        $q->select('id', 'care_plan_id', 'title', 'status', 'progress_percentage', 'priority', 'category', 'target_date', 'description')
-                            ->withCount([
-                                'steps',
-                                'steps as steps_done_count' => fn ($s) => $s->where('is_complete', true),
-                                'progressNotes as open_hurdles_count' => fn ($n) => $n->where('note_type', 'goal_hurdle')->where('is_flagged', true),
-                            ])
-                            ->orderByDesc('progress_percentage');
-                    }])
+                            $q->select('id', 'care_plan_id', 'title', 'status', 'progress_percentage', 'priority', 'category', 'target_date', 'description')
+                                ->withCount([
+                                    'steps',
+                                    'steps as steps_done_count' => fn ($s) => $s->where('is_complete', true),
+                                    'progressNotes as open_hurdles_count' => fn ($n) => $n->where('category', 'goal_hurdle')->where('is_flagged', true),
+                                ])
+                                ->orderByDesc('progress_percentage');
+                        }])
                     ->orderByRaw("FIELD(status, 'active', 'draft')")
                     ->orderByDesc('version')
                     ->first(),
-                'total_plans' => CarePlan::where('client_id', $client->id)->count(),
+                'total_plans' => $carePlanTotal,
                 'review_due' => CarePlan::where('client_id', $client->id)
                     ->where('status', 'active')
                     ->where(function ($q) {
                         $q->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
                     })->exists(),
-                'recent_notes' => ProgressNote::where('client_id', $client->id)
-                    ->with(['author:id,name', 'goal:id,title'])
+                'recent_notes' => ClientNote::where('client_id', $client->id)
+                    ->where('type', 'progress_note')
+                    ->with(['author:id,name', 'carePlanGoal:id,title'])
+                    ->orderByDesc('occurred_at')
                     ->orderByDesc('created_at')
                     ->limit(5)
-                    ->get(),
+                    ->get()
+                    ->map(fn (ClientNote $note) => [
+                        'id' => $note->id,
+                        'content' => $note->body,
+                        'created_at' => optional($note->occurred_at ?? $note->created_at)->toISOString(),
+                        'author' => $note->author ? [
+                            'id' => $note->author->id,
+                            'name' => $note->author->name,
+                        ] : null,
+                        'goal' => $note->carePlanGoal ? [
+                            'id' => $note->carePlanGoal->id,
+                            'title' => $note->carePlanGoal->title,
+                        ] : null,
+                        'is_flagged' => (bool) $note->is_flagged,
+                    ]),
+                'recent_notes_total' => $carePlanRecentNotesTotal,
+                'recent_notes_loaded' => min(5, $carePlanRecentNotesTotal),
+                'recent_notes_has_more' => $carePlanRecentNotesTotal > 5,
                 // Full version history for the client (active + in-review + archived).
                 'versions' => CarePlan::where('client_id', $client->id)
                     ->select('id', 'title', 'status', 'plan_type', 'version', 'parent_id', 'reviewed_at', 'reviewed_by', 'next_review_at', 'starts_at', 'created_at')
@@ -1133,6 +1361,9 @@ class ClientController extends Controller
                     ->orderByDesc('created_at')
                     ->limit(30)
                     ->get(),
+                'versions_total' => $carePlanTotal,
+                'versions_loaded' => min(30, $carePlanTotal),
+                'versions_has_more' => $carePlanTotal > 30,
                 // In-progress review version (status=review), surfaced so the tab can
                 // edit + complete it without leaving the profile.
                 'review_plan' => CarePlan::where('client_id', $client->id)
@@ -1141,8 +1372,8 @@ class ClientController extends Controller
                     ->withCount(['goals'])
                     ->orderByDesc('version')
                     ->first(),
-            ],
-            'respite' => [
+            ] : null,
+            'respite' => $sectionAccess['respite'] ? [
                 'bookings' => RespiteBooking::query()
                     ->where('client_id', $client->id)
                     ->orderByDesc('start_at')
@@ -1169,38 +1400,40 @@ class ClientController extends Controller
                         'status' => $r->status,
                     ])->values(),
                 'allocation' => app(ClientRespiteAllocationSummary::class)->forClient($client),
-            ],
-            'consents' => ClientConsent::where('client_id', $client->id)
-                ->with('consentType:id,name,category')
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'consent_type' => $c->consentType?->name ?? 'Unknown',
-                    'consent_type_category' => $c->consentType?->category,
-                    'status' => $c->status,
-                    'given_at' => $c->given_at?->toISOString(),
-                    'given_method' => $c->given_method,
-                    'expires_at' => $c->expires_at?->toISOString(),
-                    'is_expired' => $c->isExpired(),
-                    'is_expiring_soon' => $c->isExpiringSoon(),
-                    'withdrawn_at' => $c->withdrawn_at?->toISOString(),
-                    'withdrawal_reason' => $c->withdrawal_reason,
-                    'conditions' => $c->conditions,
-                    'special_conditions' => $c->special_conditions,
-                    'capacity_assessed' => $c->capacity_assessed,
-                    'capacity_outcome' => $c->capacity_outcome,
-                    'best_interests_decision' => $c->best_interests_decision,
-                ]),
-            'consent_type_options' => ($request->user()?->canDo('consents.viewAny') ?? false)
-                ? \App\Models\ConsentType::query()
+            ] : null,
+            'consents' => $sectionAccess['consents']
+                ? ClientConsent::where('client_id', $client->id)
+                    ->with('consentType:id,name,category')
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->map(fn ($c) => [
+                        'id' => $c->id,
+                        'consent_type' => $c->consentType?->name ?? 'Unknown',
+                        'consent_type_category' => $c->consentType?->category,
+                        'status' => $c->status,
+                        'given_at' => $c->given_at?->toISOString(),
+                        'given_method' => $c->given_method,
+                        'expires_at' => $c->expires_at?->toISOString(),
+                        'is_expired' => $c->isExpired(),
+                        'is_expiring_soon' => $c->isExpiringSoon(),
+                        'withdrawn_at' => $c->withdrawn_at?->toISOString(),
+                        'withdrawal_reason' => $c->withdrawal_reason,
+                        'conditions' => $c->conditions,
+                        'special_conditions' => $c->special_conditions,
+                        'capacity_assessed' => $c->capacity_assessed,
+                        'capacity_outcome' => $c->capacity_outcome,
+                        'best_interests_decision' => $c->best_interests_decision,
+                    ])
+                : null,
+            'consent_type_options' => $sectionAccess['consents']
+                ? ConsentType::query()
                     ->orderBy('name')
                     ->get(['id', 'name'])
                     ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
                     ->values()
                 : [],
-            'consent_request_list' => ($request->user()?->canDo('consents.viewAny') ?? false)
-                ? \App\Models\ConsentRequest::where('client_id', $client->id)
+            'consent_request_list' => $sectionAccess['consents']
+                ? ConsentRequest::where('client_id', $client->id)
                     ->with(['consentType:id,name', 'recipient:id,name'])
                     ->orderByDesc('created_at')
                     ->limit(50)
@@ -1215,15 +1448,38 @@ class ClientController extends Controller
                         'expires_at' => $r->expires_at?->toISOString(),
                     ])->values()
                 : [],
-            'health_summary' => $this->buildHealthSummary($client),
+            'health_summary' => $sectionAccess['health']
+                ? $this->buildHealthSummary($client)
+                : null,
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
-                'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
+                'update_client' => $canEditClientAssets,
+                'assign_workers' => ($request->user()?->canDo('clients.assignments.update') ?? false)
+                    && ($request->user()?->can('update', $client) ?? false),
+                'view_family_chat' => $canViewFamilyChat,
+                'send_family_chat' => $canManageFamilyNotes,
+                'record_medication_administration' => $canRecordMedicationAdministration,
+                'update_risk_level' => $canEditClientAssets,
+                'navigate_daily_notes' => (bool) $sectionAccess['notes'],
+                'navigate_care_plans' => (bool) $sectionAccess['care_plans'],
+                'navigate_risks' => (bool) $sectionAccess['risks'],
+                'navigate_medical' => (bool) $sectionAccess['medical'],
+                'navigate_calendar' => (bool) $sectionAccess['calendar'],
+                'navigate_workers' => (bool) ($sectionAccess['daily_living'] || $canAssignWorkers),
+                'navigate_family_portal' => (bool) $sectionAccess['portal_access'],
+                'navigate_site' => $request->user()?->canDo('sites.viewAny') ?? false,
                 'create_note' => $request->user()?->canDo('timeline.create') ?? false,
+                'create_daily_note' => $canCreateClientNote,
+                'create_quick_note' => $canCreateClientNote,
+                'create_communication_note' => $canCreateClientNote,
                 'pin_handover' => $request->user()?->canDo('timeline.pin') ?? false,
-                'manage_onboarding' => $request->user()?->canDo('clients.onboarding.manage') ?? false,
+                'manage_onboarding' => $onboardingAccess['manage_checklist'],
+                'manage_onboarding_checklist' => $onboardingAccess['manage_checklist'],
+                'create_onboarding_workflow' => $onboardingAccess['create_workflow'],
+                'manage_family_notes' => $canManageFamilyNotes,
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
-                'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
+                'manage_onboarding_workflow' => $onboardingAccess['manage_workflow'],
+                'view_hr_onboarding' => $request->user()?->canDo('hr.onboarding.view') ?? false,
                 'record_observation' => $request->user()?->canDo('clinical.observations.record') ?? false,
                 'record_clinical_observation' => $request->user()?->canDo('clinical.observations.recordClinical') ?? false,
                 'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
@@ -1237,135 +1493,101 @@ class ClientController extends Controller
                 'care_plans_view' => $request->user()?->canDo('care_plans.viewAny') ?? false,
                 'care_plans_create' => $request->user()?->canDo('care_plans.create') ?? false,
                 'care_plans_update' => $request->user()?->canDo('care_plans.update') ?? false,
+                'care_plans_delete' => $request->user()?->canDo('care_plans.delete') ?? false,
+                'manage_care_plan_goals' => $workingCarePlan
+                    ? ($request->user()?->can('update', $workingCarePlan) ?? false)
+                    : false,
+                'edit_path_plan' => $request->user()?->can('update', $client) ?? false,
             ],
             'assignable_workers' => $this->buildAssignableWorkers($client, $request->user()),
-            'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
-            'pending_consent_requests_count' => $this->buildPendingConsentRequestCount($client),
-            'family_notes_open_count' => FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
-            'family_notes' => FamilyNote::where('client_id', $client->id)
-                ->with([
-                    'creator:id,name',
-                    'completer:id,name',
-                    'staffResponder:id,name',
-                    'shift:id,starts_at,ends_at,shift_type,location,service_context_id,user_id',
-                    'shift.serviceContext:id,name',
-                    'shift.staff:id,name',
-                ])
-                ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'cancelled')")
-                ->orderByDesc('created_at')
-                ->limit(50)
-                ->get()
-                ->map(fn ($n) => [
-                    'id' => $n->id,
-                    'title' => $n->title,
-                    'description' => $n->description,
-                    'note_type' => $n->note_type,
-                    'priority' => $n->priority,
-                    'status' => $n->status,
-                    'due_date' => $n->due_date?->toDateString(),
-                    'due_time' => $n->due_time,
-                    'completed_at' => $n->completed_at?->toISOString(),
-                    'completed_by_name' => $n->completer?->name,
-                    'staff_response' => $n->staff_response,
-                    'staff_responded_by_name' => $n->staffResponder?->name,
-                    'staff_responded_at' => $n->staff_responded_at?->toISOString(),
-                    'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
-                    'assigned_to_shift_id' => $n->assigned_to_shift_id,
-                    'assigned_shift' => $n->shift ? [
-                        'id' => $n->shift->id,
-                        'starts_at' => $n->shift->starts_at?->toISOString(),
-                        'ends_at' => $n->shift->ends_at?->toISOString(),
-                        'shift_type' => $n->shift->shift_type ?? 'standard',
-                        'location' => $n->shift->location,
-                        'service_context' => $n->shift->serviceContext?->name,
-                        'staff_name' => $n->shift->staff?->name,
-                    ] : null,
-                    'creator_name' => $n->creator?->name,
-                    'created_by' => $n->created_by,
-                    'created_at' => $n->created_at?->toISOString(),
-                    'is_overdue' => $n->due_date && $n->due_date->isPast() && in_array($n->status, ['open', 'in_progress']),
-                ]),
-            'photos' => ClientPhoto::where('client_id', $client->id)
-                ->with('uploadedBy:id,name')
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn ($p) => [
-                    'id' => $p->id,
-                    'url' => $p->url,
-                    'thumbnail_url' => $p->thumbnail_url,
-                    'caption' => $p->caption,
-                    'tags' => $p->tags,
-                    'visibility' => $p->visibility,
-                    'status' => $p->status,
-                    'original_name' => $p->original_name,
-                    'uploaded_by' => $p->uploadedBy?->name,
-                    'created_at' => $p->created_at?->toISOString(),
-                ])->values(),
-            'personal_assets' => ClientPersonalAsset::where('client_id', $client->id)
-                ->with(['recordedBy:id,name', 'site:id,name', 'room:id,site_id,name', 'tracker'])
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn ($a) => [
-                    'id' => $a->id,
-                    'name' => $a->name,
-                    'category' => $a->category,
-                    'description' => $a->description,
-                    'serial_number' => $a->serial_number,
-                    'estimated_value' => $a->estimated_value,
-                    'condition' => $a->condition,
-                    'location' => $a->location,
-                    'site_id' => $a->site_id,
-                    'site_name' => $a->site?->name,
-                    'room_id' => $a->room_id,
-                    'room_name' => $a->room?->name,
-                    'tracker_hardware_id' => $a->tracker_hardware_id,
-                    'tracker' => $a->tracker ? [
-                        'id' => $a->tracker->id,
-                        'name' => $a->tracker->name,
-                        'status' => $a->tracker->status,
-                        'last_seen_at' => $a->tracker->last_seen_at?->toISOString(),
-                        'battery' => $a->tracker->meta['battery'] ?? null,
-                        'lat' => $a->tracker->meta['lat'] ?? null,
-                        'lng' => $a->tracker->meta['lng'] ?? null,
-                        'speed' => $a->tracker->meta['speed'] ?? null,
-                    ] : null,
-                    'photo_url' => $a->photo_url,
-                    'acquired_at' => $a->acquired_at?->toDateString(),
-                    'notes' => $a->notes,
-                    'status' => $a->status,
-                    'ownership' => $a->ownership,
-                    'funding_source' => $a->funding_source,
-                    'return_required' => $a->return_required,
-                    'return_by' => $a->return_by?->toDateString(),
-                    'last_serviced_at' => $a->last_serviced_at?->toDateString(),
-                    'next_service_due' => $a->next_service_due?->toDateString(),
-                    'service_provider' => $a->service_provider,
-                    'warranty_expires_at' => $a->warranty_expires_at?->toDateString(),
-                    'insurance_reference' => $a->insurance_reference,
-                    'disposed_at' => $a->disposed_at?->toDateString(),
-                    'disposal_reason' => $a->disposal_reason,
-                    'portal_visible' => $a->portal_visible,
-                    'is_service_overdue' => $a->isServiceOverdue(),
-                    'is_warranty_expired' => $a->isWarrantyExpired(),
-                    'is_warranty_expiring_soon' => $a->isWarrantyExpiringSoon(),
-                    'is_return_overdue' => $a->isReturnOverdue(),
-                    'recorded_by' => $a->recordedBy?->name,
-                    'created_at' => $a->created_at?->toISOString(),
-                ])->values(),
-            'asset_locations' => Site::where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'type'])
-                ->map(fn ($s) => [
-                    'id' => $s->id,
-                    'name' => $s->name,
-                    'type' => $s->type,
-                    'rooms' => $s->houseRooms()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name'])->map(fn ($r) => [
-                        'id' => $r->id,
-                        'name' => $r->name,
-                    ]),
-                ]),
-            'available_trackers' => $this->buildAvailableTrackers(),
-            'emar_summary' => [
+            'pending_visit_count' => $sectionAccess['portal_access']
+                ? FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count()
+                : null,
+            'pending_consent_requests_count' => $sectionAccess['consents']
+                ? $this->buildPendingConsentRequestCount($client)
+                : null,
+            'family_notes_open_count' => $sectionAccess['family_notes']
+                ? FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count()
+                : null,
+            'family_notes' => $sectionAccess['family_notes']
+                ? FamilyNote::where('client_id', $client->id)
+                    ->with([
+                        'creator:id,name',
+                        'completer:id,name',
+                        'staffResponder:id,name',
+                        'shift:id,starts_at,ends_at,shift_type,location,service_context_id,user_id',
+                        'shift.serviceContext:id,name',
+                        'shift.staff:id,name',
+                    ])
+                    ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'cancelled')")
+                    ->orderByDesc('created_at')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn ($n) => [
+                        'id' => $n->id,
+                        'title' => $n->title,
+                        'description' => $n->description,
+                        'note_type' => $n->note_type,
+                        'priority' => $n->priority,
+                        'status' => $n->status,
+                        'due_date' => $n->due_date?->toDateString(),
+                        'due_time' => $n->due_time,
+                        'completed_at' => $n->completed_at?->toISOString(),
+                        'completed_by_name' => $n->completer?->name,
+                        'staff_response' => $n->staff_response,
+                        'staff_responded_by_name' => $n->staffResponder?->name,
+                        'staff_responded_at' => $n->staff_responded_at?->toISOString(),
+                        'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
+                        'assigned_to_shift_id' => $n->assigned_to_shift_id,
+                        'assigned_shift' => $n->shift ? [
+                            'id' => $n->shift->id,
+                            'starts_at' => $n->shift->starts_at?->toISOString(),
+                            'ends_at' => $n->shift->ends_at?->toISOString(),
+                            'shift_type' => $n->shift->shift_type ?? 'standard',
+                            'location' => $n->shift->location,
+                            'service_context' => $n->shift->serviceContext?->name,
+                            'staff_name' => $n->shift->staff?->name,
+                        ] : null,
+                        'creator_name' => $n->creator?->name,
+                        'created_by' => $n->created_by,
+                        'created_at' => $n->created_at?->toISOString(),
+                        'is_overdue' => $n->due_date && $n->due_date->isPast() && in_array($n->status, ['open', 'in_progress']),
+                    ])
+                : null,
+            'photos' => $sectionAccess['photos']
+                ? ClientPhoto::where('client_id', $client->id)
+                    ->with('uploadedBy:id,name')
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->map(function (ClientPhoto $photo): array {
+                        return [
+                            'id' => $photo->id,
+                            ...app(ClientPhotoMediaUrls::class)->staff($photo),
+                            'caption' => $photo->caption,
+                            'tags' => $photo->tags,
+                            'visibility' => $photo->visibility,
+                            'status' => $photo->status,
+                            'original_name' => $photo->original_name,
+                            'uploaded_by' => $photo->uploadedBy?->name,
+                            'created_at' => $photo->created_at?->toISOString(),
+                        ];
+                    })->values()
+                : null,
+            'personal_assets' => $sectionAccess['personal_assets']
+                ? $this->buildPersonalAssetsData(
+                    $client,
+                    $clientTenantId,
+                    $canViewClientLocation,
+                    $canManageClientTrackers,
+                )
+                : null,
+            ...($sectionAccess['personal_assets'] && $canEditClientAssets ? [
+                'asset_locations' => $this->buildAssetLocations($clientTenantId),
+            ] : []),
+            ...($sectionAccess['tracking'] && $canEditClientAssets && $canManageClientTrackers ? [
+                'available_trackers' => $this->buildAvailableTrackers($client, $clientTenantId),
+            ] : []),
+            'emar_summary' => $sectionAccess['medical'] ? [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
                     ->where('active', true)
                     ->whereNull('ceased_at')
@@ -1382,21 +1604,36 @@ class ClientController extends Controller
                     ->where('scheduled_date', '>=', now()->toDateString())
                     ->orderBy('scheduled_date')
                     ->value('scheduled_date'),
-            ],
-            'location' => $this->buildLocationData($client),
-            'calendar_events' => $this->buildCalendarEvents($client),
+            ] : null,
+            ...($sectionAccess['tracking'] && $canViewClientLocation ? [
+                'location' => $this->buildLocationData($client, $canManageClientTrackers),
+            ] : []),
+            'calendar_events' => $sectionAccess['calendar']
+                ? $this->buildCalendarEvents(
+                    $client,
+                    includeShifts: $sectionAccess['shifts'],
+                    includeFamilyVisits: $sectionAccess['portal_access'],
+                    includeMedicationData: $sectionAccess['medical'],
+                )
+                : null,
             'expiredConsents' => $expiredConsents->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => $c->consentType?->name,
                 'expired_at' => $c->expires_at?->toIso8601String(),
             ]),
             'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
-            'transport' => Inertia::optional(fn () => $this->buildTransportData($client)),
+            'transport' => $sectionAccess['transport']
+                ? Inertia::optional(fn () => $this->buildTransportData($client))
+                : null,
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
-            'safety' => ClientSafetyPayload::forClient($client),
+            'safety' => ClientSafetyPayload::forClient(
+                $client,
+                includeMedical: $sectionAccess['medical'],
+                includeRisks: $sectionAccess['risks'],
+            ),
             // Read-only Privacy panel — the client's Privacy Act 2020 access/
             // correction requests (gated on the privacy view permission).
-            'data_subject_requests' => $request->user()?->canDo('privacy.viewRequests')
+            'data_subject_requests' => $sectionAccess['privacy']
                 ? $client->dataSubjectRequests()->with('assignedTo:id,name')->latest('received_at')->get()->map(fn ($r) => [
                     'id' => $r->id,
                     'reference' => $r->reference_number,
@@ -1408,7 +1645,102 @@ class ClientController extends Controller
                     'assigned_to' => $r->assignedTo?->name,
                 ])->all()
                 : [],
-        ]);
+        ];
+
+        foreach ([
+            'events' => 'timeline',
+            'handover' => 'timeline',
+            'timeline_summary' => 'timeline',
+            'client_daily_notes' => 'notes',
+            'communication_notes' => 'notes',
+            'daily_notes_summary' => 'notes',
+            'support_plan' => 'care_plans',
+            'care_plans_summary' => 'care_plans',
+            'path_plan' => 'care_plans',
+            'assessments' => 'assessments',
+            'behaviour_patterns' => 'behaviour',
+            'calendar_events' => 'calendar',
+            'shifts_summary' => 'shifts',
+            'site_coverage' => 'shifts',
+            'medical' => 'medical',
+            'health_monitoring' => 'health',
+            'health_summary' => 'health',
+            'emar_summary' => 'medical',
+            'client_finance' => 'finance',
+            'consents' => 'consents',
+            'consent_type_options' => 'consents',
+            'consent_request_list' => 'consents',
+            'expiredConsents' => 'consents',
+            'missingMandatoryConsents' => 'consents',
+            'pending_consent_requests_count' => 'consents',
+            'client_risks' => 'risks',
+            'hs_risk_assessments' => 'first_aid',
+            'ra_pickers' => 'first_aid_manage',
+            'client_incidents' => 'incidents',
+            'first_aid_records' => 'first_aid',
+            'documents' => 'documents',
+            'portal_users' => 'portal_access',
+            'next_of_kins' => 'portal_access',
+            'audit_history' => 'audit',
+            'data_subject_requests' => 'privacy',
+            'respite' => 'respite',
+            'onboarding' => 'onboarding',
+            'leave_excursions' => 'daily_living',
+            'meal_logs' => 'meals',
+            'client_routines' => 'daily_living',
+            'actions_reviews' => 'actions_reviews',
+            'actions_reviews_summary' => 'actions_reviews',
+            'client_agreements' => 'agreements',
+            'pending_visit_count' => 'portal_access',
+            'family_notes_open_count' => 'family_notes',
+            'family_notes' => 'family_notes',
+            'photos' => 'photos',
+            'personal_assets' => 'personal_assets',
+            'asset_locations' => 'personal_assets',
+            'available_trackers' => 'tracking',
+            'location' => 'tracking',
+            'transport' => 'transport',
+            'homeHazards' => 'first_aid',
+            'homeHazardDetail' => 'first_aid',
+            'hs_summary' => 'first_aid',
+        ] as $prop => $section) {
+            if (! $sectionAccess[$section]) {
+                unset($profileProps[$prop]);
+            }
+        }
+
+        return inertia('operations/clients/show', $profileProps);
+    }
+
+    private function carePlanWorkingVersion(Client $client): ?CarePlan
+    {
+        return CarePlan::query()
+            ->where('client_id', $client->id)
+            ->whereIn('status', ['review', 'active', 'draft'])
+            ->withCount([
+                'goals',
+                'goals as goals_completed' => fn ($query) => $query->where('status', 'completed'),
+            ])
+            ->with([
+                'creator:id,name',
+                'reviewer:id,name',
+                'signOffs' => fn ($query) => $query->latest('agreed_on'),
+                'signOffs.recorder:id,name',
+                'goals' => function ($query) {
+                    $query->select('id', 'care_plan_id', 'title', 'status', 'progress_percentage', 'priority', 'category', 'target_date', 'description')
+                        ->withCount([
+                            'steps',
+                            'steps as steps_done_count' => fn ($steps) => $steps->where('is_complete', true),
+                            'progressNotes as open_hurdles_count' => fn ($notes) => $notes
+                                ->where('category', 'goal_hurdle')
+                                ->where('is_flagged', true),
+                        ])
+                        ->orderByDesc('progress_percentage');
+                },
+            ])
+            ->orderByRaw("FIELD(status, 'review', 'active', 'draft')")
+            ->orderByDesc('version')
+            ->first();
     }
 
     private function roomPayload(?SiteHouseRoom $room): ?array
@@ -1498,14 +1830,16 @@ class ClientController extends Controller
 
     private function buildAssignableWorkers(Client $client, ?User $user): array
     {
-        if (! ($user?->canDo('clients.assignments.update') ?? false)) {
+        if (
+            ! ($user?->canDo('clients.assignments.update') ?? false)
+            || ! ($user?->can('update', $client) ?? false)
+        ) {
             return [];
         }
 
         $assignedIds = $client->supportWorkers->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        return User::staff()
-            ->when($user->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
+        return app(ClientWorkerEligibility::class)->query($client)
             ->orderByRaw(
                 count($assignedIds) > 0
                     ? 'CASE WHEN id IN ('.implode(',', array_map('intval', $assignedIds)).') THEN 0 ELSE 1 END'
@@ -1605,57 +1939,63 @@ class ClientController extends Controller
         ];
     }
 
-    private function buildCalendarEvents(Client $client): array
-    {
+    private function buildCalendarEvents(
+        Client $client,
+        bool $includeShifts,
+        bool $includeFamilyVisits,
+        bool $includeMedicationData,
+    ): array {
         $start = now()->startOfMonth();
         $end = now()->endOfMonth()->addDays(7);
         $events = collect();
 
-        // Shifts
-        $shifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$start, $end])
-            ->with('staff:id,name')
-            ->get();
-        foreach ($shifts as $s) {
-            $events->push([
-                'id' => 'shift-'.$s->id,
-                'title' => ($s->staff?->name ?? 'Staff TBC').' — Shift',
-                'start' => $s->starts_at?->toIso8601String(),
-                'end' => $s->ends_at?->toIso8601String(),
-                'backgroundColor' => $s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6'),
-                'borderColor' => 'transparent',
-                'extendedProps' => ['type' => 'shift', 'status' => $s->status, 'staff_name' => $s->staff?->name, 'notes' => $s->notes, 'location' => $s->location],
-            ]);
+        if ($includeShifts) {
+            $shifts = Shift::where('client_id', $client->id)
+                ->whereBetween('starts_at', [$start, $end])
+                ->with('staff:id,name')
+                ->get();
+            foreach ($shifts as $s) {
+                $events->push([
+                    'id' => 'shift-'.$s->id,
+                    'title' => ($s->staff?->name ?? 'Staff TBC').' — Shift',
+                    'start' => $s->starts_at?->toIso8601String(),
+                    'end' => $s->ends_at?->toIso8601String(),
+                    'backgroundColor' => $s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6'),
+                    'borderColor' => 'transparent',
+                    'extendedProps' => ['type' => 'shift', 'status' => $s->status, 'staff_name' => $s->staff?->name, 'notes' => $s->notes, 'location' => $s->location],
+                ]);
+            }
         }
 
-        // Family visits
-        $visits = FamilyVisitRequest::where('client_id', $client->id)
-            ->where('status', 'approved')
-            ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
-            ->with('user:id,name')
-            ->get();
-        foreach ($visits as $v) {
-            $vStart = $v->requested_date->copy();
-            if ($v->preferred_time_start) {
-                [$h, $m] = explode(':', $v->preferred_time_start);
-                $vStart->setTime((int) $h, (int) $m);
+        if ($includeFamilyVisits) {
+            $visits = FamilyVisitRequest::where('client_id', $client->id)
+                ->where('status', 'approved')
+                ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+                ->with('user:id,name')
+                ->get();
+            foreach ($visits as $v) {
+                $vStart = $v->requested_date->copy();
+                if ($v->preferred_time_start) {
+                    [$h, $m] = explode(':', $v->preferred_time_start);
+                    $vStart->setTime((int) $h, (int) $m);
+                }
+                $vEnd = $v->requested_date->copy();
+                if ($v->preferred_time_end) {
+                    [$h, $m] = explode(':', $v->preferred_time_end);
+                    $vEnd->setTime((int) $h, (int) $m);
+                } else {
+                    $vEnd = $vStart->copy()->addHour();
+                }
+                $events->push([
+                    'id' => 'visit-'.$v->id,
+                    'title' => 'Family Visit — '.($v->user?->name ?? 'Family'),
+                    'start' => $vStart->toIso8601String(),
+                    'end' => $vEnd->toIso8601String(),
+                    'backgroundColor' => '#22c55e',
+                    'borderColor' => 'transparent',
+                    'extendedProps' => ['type' => 'family_visit', 'requester' => $v->user?->name, 'notes' => $v->notes],
+                ]);
             }
-            $vEnd = $v->requested_date->copy();
-            if ($v->preferred_time_end) {
-                [$h, $m] = explode(':', $v->preferred_time_end);
-                $vEnd->setTime((int) $h, (int) $m);
-            } else {
-                $vEnd = $vStart->copy()->addHour();
-            }
-            $events->push([
-                'id' => 'visit-'.$v->id,
-                'title' => 'Family Visit — '.($v->user?->name ?? 'Family'),
-                'start' => $vStart->toIso8601String(),
-                'end' => $vEnd->toIso8601String(),
-                'backgroundColor' => '#22c55e',
-                'borderColor' => 'transparent',
-                'extendedProps' => ['type' => 'family_visit', 'requester' => $v->user?->name, 'notes' => $v->notes],
-            ]);
         }
 
         // Appointments
@@ -1677,57 +2017,60 @@ class ClientController extends Controller
             ]);
         }
 
-        // Medication administrations
-        $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
-            ->whereBetween('scheduled_for', [$start, $end])
-            ->with('medication:id,name,dosage,route')
-            ->get();
-        foreach ($medAdmins as $ma) {
-            $medName = $ma->medication?->name ?? 'Medication';
-            $statusColor = match ($ma->status) {
-                'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899'
-            };
-            $statusLabel = match ($ma->status) {
-                'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled'
-            };
-            $events->push([
-                'id' => 'med-'.$ma->id,
-                'title' => $medName.' — '.$statusLabel,
-                'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
-                'backgroundColor' => $statusColor,
-                'borderColor' => 'transparent',
-                'extendedProps' => ['type' => 'medication', 'status' => $ma->status, 'medication_name' => $medName, 'dosage' => $ma->medication?->dosage],
-            ]);
-        }
+        if ($includeMedicationData) {
+            // Medication administrations
+            $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
+                ->whereBetween('scheduled_for', [$start, $end])
+                ->with('medication:id,name,dosage,route')
+                ->get();
+            foreach ($medAdmins as $ma) {
+                $medName = $ma->medication?->name ?? 'Medication';
+                $statusColor = match ($ma->status) {
+                    'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899'
+                };
+                $statusLabel = match ($ma->status) {
+                    'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled'
+                };
+                $events->push([
+                    'id' => 'med-'.$ma->id,
+                    'title' => $medName.' — '.$statusLabel,
+                    'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
+                    'backgroundColor' => $statusColor,
+                    'borderColor' => 'transparent',
+                    'extendedProps' => ['type' => 'medication', 'status' => $ma->status, 'medication_name' => $medName, 'dosage' => $ma->medication?->dosage],
+                ]);
+            }
 
-        // Scheduled medication doses — only show for today ± 3 days to avoid clutter
-        $medStart = now()->subDays(3)->startOfDay();
-        $medEnd = now()->addDays(3)->endOfDay();
-        $activeMeds = ClientMedication::where('client_id', $client->id)->where('active', true)->whereNull('ceased_at')->where('is_prn', false)->get();
-        foreach ($activeMeds as $med) {
-            $times = $this->parseFrequencyTimes($med->frequency);
-            if (empty($times)) {
-                continue;
-            }
-            $current = $medStart->copy();
-            while ($current->lte($medEnd)) {
-                foreach ($times as $time) {
-                    $scheduledAt = $current->copy()->setTimeFromTimeString($time);
-                    $alreadyRecorded = $medAdmins->contains(fn ($ma) => $ma->client_medication_id === $med->id && $ma->scheduled_for && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i'));
-                    if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
-                        $isPast = $scheduledAt->lt(now());
-                        $events->push([
-                            'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
-                            'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
-                            'start' => $scheduledAt->toIso8601String(),
-                            'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
-                            'borderColor' => 'transparent',
-                            'extendedProps' => ['type' => 'medication', 'status' => $isPast ? 'overdue' : 'scheduled', 'medication_name' => $med->name, 'dosage' => $med->dosage],
-                        ]);
-                    }
+            // Scheduled medication doses — only show for today ± 3 days to avoid clutter
+            $medStart = now()->subDays(3)->startOfDay();
+            $medEnd = now()->addDays(3)->endOfDay();
+            $activeMeds = ClientMedication::where('client_id', $client->id)->where('active', true)->whereNull('ceased_at')->where('is_prn', false)->get();
+            foreach ($activeMeds as $med) {
+                $times = $this->parseFrequencyTimes($med->frequency);
+                if (empty($times)) {
+                    continue;
                 }
-                $current->addDay();
+                $current = $medStart->copy();
+                while ($current->lte($medEnd)) {
+                    foreach ($times as $time) {
+                        $scheduledAt = $current->copy()->setTimeFromTimeString($time);
+                        $alreadyRecorded = $medAdmins->contains(fn ($ma) => $ma->client_medication_id === $med->id && $ma->scheduled_for && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i'));
+                        if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
+                            $isPast = $scheduledAt->lt(now());
+                            $events->push([
+                                'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
+                                'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
+                                'start' => $scheduledAt->toIso8601String(),
+                                'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
+                                'borderColor' => 'transparent',
+                                'extendedProps' => ['type' => 'medication', 'status' => $isPast ? 'overdue' : 'scheduled', 'medication_name' => $med->name, 'dosage' => $med->dosage],
+                            ]);
+                        }
+                    }
+                    $current->addDay();
+                }
             }
+
         }
 
         return $events->values()->toArray();
@@ -1806,28 +2149,164 @@ class ClientController extends Controller
         }
     }
 
-    private function buildAvailableTrackers()
+    private function buildPersonalAssetsData(
+        Client $client,
+        int $tenantId,
+        bool $canViewLocation,
+        bool $canManageTrackers,
+    ) {
+        return ClientPersonalAsset::query()
+            ->where('client_id', $client->id)
+            ->with([
+                'recordedBy:id,name',
+                'site:id,tenant_id,name',
+                'room:id,site_id,tenant_id,name',
+                'trackerDevice',
+            ])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (ClientPersonalAsset $asset) use ($tenantId, $canViewLocation, $canManageTrackers): array {
+                $site = $asset->site && (int) $asset->site->tenant_id === $tenantId
+                    ? $asset->site
+                    : null;
+                $room = $site && $asset->room && (int) $asset->room->site_id === (int) $site->id
+                    ? $asset->room
+                    : null;
+                $tracker = $asset->trackerDevice
+                    && (int) $asset->trackerDevice->tenant_id === $tenantId
+                    ? $asset->trackerDevice
+                    : null;
+                $trackerMeta = $tracker?->meta ?? [];
+
+                return [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'category' => $asset->category,
+                    'description' => $asset->description,
+                    'serial_number' => $asset->serial_number,
+                    'estimated_value' => $asset->estimated_value,
+                    'condition' => $asset->condition,
+                    'location' => $asset->location,
+                    'site_id' => $site?->id,
+                    'site_name' => $site?->name,
+                    'room_id' => $room?->id,
+                    'room_name' => $room?->name,
+                    'tracker_hardware_id' => $canManageTrackers ? $tracker?->id : null,
+                    'tracker' => $canViewLocation && $tracker ? [
+                        'id' => $tracker->id,
+                        'name' => $tracker->name,
+                        'status' => $tracker->getRawOriginal('status'),
+                        'last_seen_at' => $tracker->last_seen_at?->toISOString(),
+                        'battery' => $tracker->battery_level ?? $trackerMeta['battery'] ?? null,
+                        'lat' => $tracker->latitude ?? $trackerMeta['lat'] ?? null,
+                        'lng' => $tracker->longitude ?? $trackerMeta['lng'] ?? null,
+                        'speed' => $trackerMeta['speed'] ?? null,
+                    ] : null,
+                    'photo_url' => $asset->photo_url,
+                    'acquired_at' => $asset->acquired_at?->toDateString(),
+                    'notes' => $asset->notes,
+                    'status' => $asset->status,
+                    'ownership' => $asset->ownership,
+                    'funding_source' => $asset->funding_source,
+                    'return_required' => $asset->return_required,
+                    'return_by' => $asset->return_by?->toDateString(),
+                    'last_serviced_at' => $asset->last_serviced_at?->toDateString(),
+                    'next_service_due' => $asset->next_service_due?->toDateString(),
+                    'service_provider' => $asset->service_provider,
+                    'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
+                    'insurance_reference' => $asset->insurance_reference,
+                    'disposed_at' => $asset->disposed_at?->toDateString(),
+                    'disposal_reason' => $asset->disposal_reason,
+                    'portal_visible' => $asset->portal_visible,
+                    'is_service_overdue' => $asset->isServiceOverdue(),
+                    'is_warranty_expired' => $asset->isWarrantyExpired(),
+                    'is_warranty_expiring_soon' => $asset->isWarrantyExpiringSoon(),
+                    'is_return_overdue' => $asset->isReturnOverdue(),
+                    'recorded_by' => $asset->recordedBy?->name,
+                    'created_at' => $asset->created_at?->toISOString(),
+                ];
+            })
+            ->values();
+    }
+
+    private function buildAssetLocations(int $tenantId)
     {
-        if (! Schema::hasTable('devices')) {
+        return Site::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->with(['houseRooms' => fn ($query) => $query
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->select(['id', 'site_id', 'name'])])
+            ->orderBy('name')
+            ->get(['id', 'name', 'type'])
+            ->map(fn (Site $site) => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'type' => $site->type,
+                'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                ])->values(),
+            ]);
+    }
+
+    private function buildAvailableTrackers(Client $client, int $tenantId)
+    {
+        if (! Schema::hasTable('devices') || ! Schema::hasTable('location_hardware')) {
             return collect();
         }
 
         try {
-            return Device::query()
+            $trackers = Device::query()
+                ->forTenant($tenantId)
                 ->where('domain', 'tracking')
                 ->whereNotIn('status', ['decommissioned', 'lost'])
+                ->whereNotNull('legacy_location_hardware_id')
                 ->whereDoesntHave('assignments', fn ($query) => $query->active())
+                ->whereExists(function ($query) use ($tenantId): void {
+                    $query->selectRaw('1')
+                        ->from('location_hardware')
+                        ->whereColumn('location_hardware.id', 'devices.legacy_location_hardware_id')
+                        ->where('location_hardware.tenant_id', $tenantId)
+                        ->where('location_hardware.category', LocationHardware::CATEGORY_TRACKER)
+                        ->where('location_hardware.status', '!=', LocationHardware::STATUS_RETIRED)
+                        ->whereNull('location_hardware.deleted_at');
+                })
+                ->whereNotExists(function ($query) use ($client): void {
+                    $query->selectRaw('1')
+                        ->from('client_personal_assets')
+                        ->whereColumn('client_personal_assets.tracker_hardware_id', 'devices.legacy_location_hardware_id')
+                        ->where('client_personal_assets.client_id', '!=', $client->id)
+                        ->whereNull('client_personal_assets.deleted_at');
+                })
                 ->orderBy('name')
-                ->get(['id', 'device_uid', 'name', 'status', 'health_status', 'last_seen_at', 'serial_number', 'battery_level'])
-                ->map(fn ($tracker) => [
-                    'id' => $tracker->id,
-                    'name' => $tracker->name,
-                    'status' => $tracker->status,
-                    'serial' => $tracker->serial,
-                    'site_id' => $tracker->site_id,
-                    'last_seen_at' => $tracker->last_seen_at?->toISOString(),
-                    'battery' => $tracker->meta['battery'] ?? null,
+                ->get([
+                    'id',
+                    'legacy_location_hardware_id',
+                    'name',
+                    'status',
+                    'last_seen_at',
+                    'serial_number',
+                    'battery_level',
+                    'meta',
                 ]);
+
+            $hardwareById = LocationHardware::query()
+                ->forTenant($tenantId)
+                ->whereIn('id', $trackers->pluck('legacy_location_hardware_id'))
+                ->get(['id', 'site_id'])
+                ->keyBy('id');
+
+            return $trackers->map(fn (Device $tracker) => [
+                'id' => $tracker->id,
+                'name' => $tracker->name,
+                'status' => $tracker->getRawOriginal('status'),
+                'serial' => $tracker->serial_number,
+                'site_id' => $hardwareById->get($tracker->legacy_location_hardware_id)?->site_id,
+                'last_seen_at' => $tracker->last_seen_at?->toISOString(),
+                'battery' => $tracker->battery_level ?? $tracker->meta['battery'] ?? null,
+            ])->values();
         } catch (QueryException $exception) {
             report($exception);
 
@@ -1926,11 +2405,14 @@ class ClientController extends Controller
     //     ]);
     // }
 
-    public function create()
+    public function create(Request $request)
     {
         $this->authorize('create', Client::class);
 
-        return inertia('operations/clients/create', $this->clientFormOptions());
+        return inertia(
+            'operations/clients/create',
+            $this->clientFormOptions($request->user()?->organization_id),
+        );
     }
 
     public function store(StoreClientRequest $request)
@@ -2125,12 +2607,24 @@ class ClientController extends Controller
     {
         $this->authorize('update', $client);
 
-        $sitesQuery = Site::query()->orderBy('name');
+        $client->loadMissing([
+            'medicalProfile',
+            'conditions',
+            'emergencyContacts',
+        ]);
+
+        $organizationId = $client->organization_id;
+
+        $sitesQuery = Site::query()
+            ->forTenant($organizationId)
+            ->orderBy('name');
         // Keep inactive site visible if client currently assigned to it
-        $sitesQuery->where('is_active', true);
-        if ($client->site_id) {
-            $sitesQuery->orWhere('id', $client->site_id);
-        }
+        $sitesQuery->where(function ($query) use ($client) {
+            $query->where('is_active', true);
+            if ($client->site_id) {
+                $query->orWhere('id', $client->site_id);
+            }
+        });
 
         $sites = $sitesQuery
             ->with(['houseRooms' => fn ($query) => $query
@@ -2150,22 +2644,51 @@ class ClientController extends Controller
                 ])->values(),
             ]);
 
-        $serviceContextsQuery = ServiceContext::query()->orderBy('name');
-        $serviceContextsQuery->where('is_active', true);
-        if ($client->service_context_id) {
-            $serviceContextsQuery->orWhere('id', $client->service_context_id);
-        }
+        $serviceContextsQuery = ServiceContext::query()
+            ->forOrganization($organizationId)
+            ->orderBy('name');
+        $serviceContextsQuery->where(function ($query) use ($client) {
+            $query->where('is_active', true);
+            if ($client->service_context_id) {
+                $query->orWhere('id', $client->service_context_id);
+            }
+        });
         $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
 
+        $geofences = AssetGeofence::query()
+            ->forOrganization($organizationId)
+            ->where(function ($query) use ($client) {
+                $query->where('is_active', true);
+                if ($client->house_geofence_id) {
+                    $query->orWhere('id', $client->house_geofence_id);
+                }
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $keyWorkers = app(ClientWorkerEligibility::class)
+            ->query($client)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         $payload = [
+            // Keep the compact legacy key during the compatibility window, but
+            // hydrate the canonical Add Client completion wizard from one full
+            // round-trippable shape.
             'client' => $client->only([
                 'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
+            'initialValues' => $this->clientWizardInitialValues($client),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
-            'defaultServiceContextId' => ServiceContext::defaultId(),
+            'keyWorkers' => $keyWorkers,
+            'geofences' => $geofences,
+            'defaultServiceContextId' => ServiceContext::query()
+                ->forOrganization($organizationId)
+                ->whereKey(ServiceContext::defaultId())
+                ->value('id'),
         ];
 
         // The edit form is rendered inline as a modal on the index page —
@@ -2176,6 +2699,98 @@ class ClientController extends Controller
         }
 
         return redirect()->route('operations.clients.show', $client);
+    }
+
+    /** @return array<string, mixed> */
+    private function clientWizardInitialValues(Client $client): array
+    {
+        $stringId = fn (mixed $value): string => filled($value)
+            ? (string) $value
+            : '';
+        $medical = $client->medicalProfile;
+
+        return [
+            '_modal' => true,
+            'site_id' => $stringId($client->site_id),
+            'room_id' => $stringId($client->room_id),
+            'service_context_id' => $stringId($client->service_context_id),
+            'status' => $client->status ?? 'onboarding',
+            'first_name' => $client->first_name ?? '',
+            'last_name' => $client->last_name ?? '',
+            'preferred_name' => $client->preferred_name ?? '',
+            'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
+            'gender' => $client->gender ?? '',
+            'preferred_pronouns' => $client->preferred_pronouns ?? '',
+            'nhi_number' => $client->nhi_number ?? '',
+            'phone' => $client->phone ?? '',
+            'email' => $client->email ?? '',
+            'address_line_1' => $client->address_line_1 ?? '',
+            'address_line_2' => $client->address_line_2 ?? '',
+            'suburb' => $client->suburb ?? '',
+            'city' => $client->city ?? '',
+            'postcode' => $client->postcode ?? '',
+            'create_client_portal_user' => false,
+            'ethnicity' => $client->ethnicity ?? '',
+            'languages' => $client->languages ?? [],
+            'religion' => $client->religion ?? '',
+            'mobility_needs' => $client->mobility_needs ?? '',
+            'sensory_needs' => $client->sensory_needs ?? '',
+            'cognitive_needs' => $client->cognitive_needs ?? '',
+            'dietary_requirements' => $client->dietary_requirements ?? '',
+            'sleep_preferences' => $client->sleep_preferences ?? '',
+            'transport_needs' => $client->transport_needs ?? [],
+            'transport_notes' => $client->transport_notes ?? '',
+            'fluid_intake_min_ml' => $stringId($client->fluid_intake_min_ml),
+            'fluid_intake_max_ml' => $stringId($client->fluid_intake_max_ml),
+            'seizure_duration_escalation_seconds' => $stringId($client->seizure_duration_escalation_seconds),
+            'interests_hobbies' => $client->interests_hobbies ?? '',
+            'strengths_abilities' => $client->strengths_abilities ?? '',
+            'life_story' => $client->life_story ?? '',
+            'education_level' => $client->education_level ?? '',
+            'employment_status' => $client->employment_status ?? '',
+            'medical' => [
+                'gp_name' => $medical?->gp_name ?? '',
+                'gp_practice' => $medical?->gp_practice ?? '',
+                'gp_phone' => $medical?->gp_phone ?? '',
+                'hospital_preference' => $medical?->hospital_preference ?? '',
+                'blood_type' => $medical?->blood_type ?? '',
+                'organ_donor' => (bool) ($medical?->organ_donor ?? false),
+                'allergies' => $medical?->allergies ?? [],
+                'disabilities' => $medical?->disabilities ?? [],
+                'medical_history' => $medical?->medical_history ?? '',
+                'mental_health_history' => $medical?->mental_health_history ?? '',
+                'surgical_history' => $medical?->surgical_history ?? '',
+                'immunisation_notes' => $medical?->immunisation_notes ?? '',
+                'notes' => $medical?->notes ?? '',
+            ],
+            'conditions' => $client->conditions->map(fn ($condition) => [
+                'label' => $condition->label ?? '',
+                'severity' => $condition->severity ?? 'Mild',
+                'notes' => $condition->notes ?? '',
+            ])->values(),
+            'service_start_date' => $client->service_start_date?->toDateString() ?? '',
+            'key_worker_id' => $stringId($client->key_worker_id),
+            'risk_level' => $client->risk_level ?? 'low',
+            'safeguarding_flag' => (bool) $client->safeguarding_flag,
+            'house_geofence_id' => $stringId($client->house_geofence_id),
+            'funding_type' => $client->funding_type ?? '',
+            'funding_notes' => $client->funding_notes ?? '',
+            'emergency_contacts' => $client->emergencyContacts->map(fn ($contact) => [
+                'name' => $contact->name ?? '',
+                'relationship' => $contact->relationship ?? '',
+                'phone' => $contact->phone ?? '',
+                'alternate_phone' => $contact->alternate_phone ?? '',
+                'email' => $contact->email ?? '',
+                'address' => $contact->address ?? '',
+                'preferred_method' => $contact->preferred_method ?? '',
+                'availability' => $contact->availability ?? '',
+                'notes' => $contact->notes ?? '',
+                'can_view_medical' => (bool) $contact->can_view_medical,
+                'can_view_medications' => (bool) $contact->can_view_medications,
+                'can_view_incidents' => (bool) $contact->can_view_incidents,
+                'can_receive_updates' => (bool) $contact->can_receive_updates,
+            ])->values(),
+        ];
     }
 
     public function update(UpdateClientRequest $request, Client $client)
@@ -2347,13 +2962,21 @@ class ClientController extends Controller
      */
     public function quickUpdate(Request $request, Client $client)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('clients.update'), 403);
+        $this->authorize('update', $client);
 
         $data = $request->validate([
             'risk_level' => ['nullable', 'in:low,medium,high,critical'],
             'safeguarding_flag' => ['nullable', 'boolean'],
-            'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
+            'key_worker_id' => [
+                'bail',
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($client): void {
+                    if (! app(ClientWorkerEligibility::class)->contains($client, (int) $value)) {
+                        $fail('Choose an eligible key worker from this organisation.');
+                    }
+                },
+            ],
         ]);
 
         $client->update(collect($data)
@@ -2406,56 +3029,19 @@ class ClientController extends Controller
         $this->authorize('update', $client);
 
         $request->validate([
-            'photo' => 'required|image|max:10240',
-            'caption' => 'nullable|string|max:500',
-            'tags' => 'nullable|array',
-            'visibility' => 'nullable|in:staff_only,family,all_portal_users',
+            'photo' => ['required', 'file', 'max:10240', 'mimes:jpg,jpeg,png,gif,webp'],
+            'caption' => ['nullable', 'string', 'max:500'],
+            'tags' => ['nullable', 'array'],
+            'visibility' => ['nullable', 'in:staff_only,family,all_portal_users'],
         ]);
 
         $file = $request->file('photo');
-        $dir = "client-photos/{$client->id}";
-        $path = $file->store($dir, 'public');
-
-        // Generate thumbnail
-        $thumbPath = null;
-        try {
-            $data = file_get_contents($file->getRealPath());
-            $src = @imagecreatefromstring($data);
-            if ($src) {
-                $w = imagesx($src);
-                $h = imagesy($src);
-                $max = 400;
-                if ($w > $max || $h > $max) {
-                    $ratio = min($max / $w, $max / $h);
-                    $nw = (int) round($w * $ratio);
-                    $nh = (int) round($h * $ratio);
-                    $thumb = imagecreatetruecolor($nw, $nh);
-                    imagecopyresampled($thumb, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
-                } else {
-                    $thumb = $src;
-                }
-                $thumbDir = "client-photos/{$client->id}/thumbs";
-                $thumbName = pathinfo($path, PATHINFO_FILENAME).'.jpg';
-                $thumbPath = "{$thumbDir}/{$thumbName}";
-                $absPath = \Storage::disk('public')->path($thumbPath);
-                if (! is_dir(dirname($absPath))) {
-                    mkdir(dirname($absPath), 0755, true);
-                }
-                imagejpeg($thumb, $absPath, 85);
-                if ($thumb !== $src) {
-                    imagedestroy($thumb);
-                }
-                imagedestroy($src);
-            }
-        } catch (\Throwable $e) {
-            // Thumbnail generation failed, continue without it
-        }
+        $stored = app(ClientPhotoStorage::class)->store($file, $client);
 
         ClientPhoto::create([
             'client_id' => $client->id,
             'uploaded_by_user_id' => $request->user()->id,
-            'storage_path' => $path,
-            'thumbnail_path' => $thumbPath,
+            ...$stored,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
             'size_bytes' => $file->getSize(),
@@ -2480,10 +3066,7 @@ class ClientController extends Controller
         $this->authorize('update', $client);
         abort_unless($photo->client_id === $client->id, 404);
 
-        \Storage::disk('public')->delete($photo->storage_path);
-        if ($photo->thumbnail_path) {
-            \Storage::disk('public')->delete($photo->thumbnail_path);
-        }
+        app(ClientPhotoStorage::class)->delete($photo);
         $photo->delete();
 
         AuditLogger::log('client.photo.delete', $client);
@@ -2649,7 +3232,7 @@ class ClientController extends Controller
 
         // Client-scoped transport bookings (Book transport workflow)
         $bookings = Schema::hasTable('client_transport_bookings')
-            ? \App\Models\ClientTransportBooking::query()
+            ? ClientTransportBooking::query()
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['requested', 'confirmed'])
                 ->with('driver:id,name')
@@ -2688,12 +3271,54 @@ class ClientController extends Controller
      * Build location/tracker data for the client profile.
      * Reads from canonical Security & Devices registry.
      */
-    private function buildLocationData(Client $client): array
+    private function clientTenantId(Client $client): int
     {
-        $tenantId = $client->tenant_id ?? 1;
+        if ($client->organization_id !== null) {
+            return (int) $client->organization_id;
+        }
+
+        $siteTenantId = $client->relationLoaded('site')
+            ? $client->site?->tenant_id
+            : $client->site()->value('tenant_id');
+
+        // Preserve the repository's single-tenant compatibility convention only
+        // after checking the client's real organisation and site tenant.
+        return (int) ($siteTenantId ?? 1);
+    }
+
+    private function canViewClientLocation(?User $user, Client $client): bool
+    {
+        return $user !== null
+            && (bool) app(ClientProfileSectionAccess::class)->for($user, $client)['tracking'];
+    }
+
+    private function canManageClientTrackers(?User $user): bool
+    {
+        return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.trackers.manage'));
+    }
+
+    private function buildLocationData(Client $client, bool $canManageTrackers): array
+    {
+        $tenantId = $this->clientTenantId($client);
+        $trackingConsent = app(PortalClientSectionAccess::class)
+            ->activeLocationTrackingConsent($client);
+
+        if (! $trackingConsent) {
+            return [
+                'trackingRestricted' => true,
+                'canManage' => false,
+                'tracker' => null,
+                'currentLocation' => null,
+                'trackingConsent' => null,
+                'geofences' => [],
+                'geofenceStatus' => GeofenceStatusService::STATUS_UNKNOWN,
+            ];
+        }
 
         if (! Schema::hasTable('devices')) {
             return [
+                'trackingRestricted' => false,
+                'canManage' => $canManageTrackers,
                 'tracker' => null,
                 'currentLocation' => null,
                 'trackingConsent' => null,
@@ -2711,6 +3336,8 @@ class ClientController extends Controller
             report($exception);
 
             return [
+                'trackingRestricted' => false,
+                'canManage' => $canManageTrackers,
                 'tracker' => null,
                 'currentLocation' => null,
                 'trackingConsent' => null,
@@ -2775,8 +3402,10 @@ class ClientController extends Controller
                 'last_safety_event' => $meta['last_safety_event'] ?? null,
                 'last_safety_event_at' => $meta['last_safety_event_at'] ?? null,
                 'panic_active' => (bool) ($meta['panic_active'] ?? false),
-                'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
-                'acknowledge_panic_url' => route('operations.clients.location.acknowledge-panic', ['client' => $client->id], false),
+                ...($canManageTrackers ? [
+                    'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
+                    'acknowledge_panic_url' => route('operations.clients.location.acknowledge-panic', ['client' => $client->id], false),
+                ] : []),
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
                 'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
                 'last_command_status' => QueclinkPendingCommand::query()
@@ -2802,43 +3431,34 @@ class ClientController extends Controller
             }
         }
 
-        // Tracking consent
-        $trackingConsentType = ConsentType::query()
-            ->where('name', 'Asset Location Tracking (Safety)')
-            ->first();
-
-        $trackingConsent = null;
-        if ($trackingConsentType) {
-            $consent = ClientConsent::query()
-                ->where('client_id', $client->id)
-                ->where('consent_type_id', $trackingConsentType->id)
-                ->active()
-                ->orderByDesc('given_at')
-                ->first();
-
-            if ($consent) {
-                $trackingConsent = [
-                    'status' => $consent->status,
-                    'given_at' => optional($consent->given_at)->toISOString(),
-                    'expires_at' => optional($consent->expires_at)->toISOString(),
-                ];
-            }
-        }
-
-        // Only the resident's specific house geofence (with legacy fallback).
+        // Only the resident's explicitly linked or same-site house geofence.
+        // A client without a site must never inherit the first global fence.
         $geofences = [];
         $houseGeofence = null;
         try {
             if (Schema::hasTable('asset_geofences')) {
-                $houseGeofence = $client->houseGeofence
-                    ?: AssetGeofence::query()
+                if ($client->house_geofence_id) {
+                    $houseGeofence = AssetGeofence::query()
+                        ->forOrganization($tenantId)
+                        ->whereKey($client->house_geofence_id)
                         ->where('is_active', true)
-                        ->when($client->site_id, fn ($q) => $q->where('site_id', $client->site_id))
+                        ->where(function ($q) {
+                            $q->where('scope', 'house')->orWhere('scope', 'resident');
+                        })
+                        ->first();
+                }
+
+                if (! $houseGeofence && $client->site_id) {
+                    $houseGeofence = AssetGeofence::query()
+                        ->forOrganization($tenantId)
+                        ->where('site_id', $client->site_id)
+                        ->where('is_active', true)
                         ->where(function ($q) {
                             $q->where('scope', 'house')->orWhere('scope', 'resident');
                         })
                         ->orderByRaw("CASE scope WHEN 'house' THEN 0 WHEN 'resident' THEN 1 ELSE 2 END")
                         ->first();
+                }
             }
 
             if ($houseGeofence) {
@@ -2857,9 +3477,15 @@ class ClientController extends Controller
             : GeofenceStatusService::STATUS_UNKNOWN;
 
         return [
+            'trackingRestricted' => false,
+            'canManage' => $canManageTrackers,
             'tracker' => $trackerInfo,
             'currentLocation' => $currentLocation,
-            'trackingConsent' => $trackingConsent,
+            'trackingConsent' => [
+                'status' => $trackingConsent->status,
+                'given_at' => optional($trackingConsent->given_at)->toISOString(),
+                'expires_at' => optional($trackingConsent->expires_at)->toISOString(),
+            ],
             'geofences' => $geofences,
             'geofenceStatus' => $geofenceStatus,
         ];
@@ -2906,8 +3532,14 @@ class ClientController extends Controller
     public function locationHistory(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        abort_unless($this->canViewClientLocation($request->user(), $client), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)
+                ->activeLocationTrackingConsent($client),
+            403,
+        );
 
-        $tenantId = $client->tenant_id ?? 1;
+        $tenantId = $this->clientTenantId($client);
 
         // Canonical device lookup.
         $device = app(DeviceRegistryService::class)
@@ -2924,8 +3556,14 @@ class ClientController extends Controller
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
     {
         $this->authorize('view', $client);
+        abort_unless($this->canManageClientTrackers($request->user()), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)
+                ->activeLocationTrackingConsent($client),
+            403,
+        );
 
-        $tenantId = $client->tenant_id ?? 1;
+        $tenantId = $this->clientTenantId($client);
         $device = app(DeviceRegistryService::class)
             ->forClient($tenantId, $client->id)
             ->where('domain', 'tracking')
@@ -2945,8 +3583,14 @@ class ClientController extends Controller
     public function acknowledgePanic(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        abort_unless($this->canManageClientTrackers($request->user()), 403);
+        abort_unless(
+            app(PortalClientSectionAccess::class)
+                ->activeLocationTrackingConsent($client),
+            403,
+        );
 
-        $tenantId = $client->tenant_id ?? 1;
+        $tenantId = $this->clientTenantId($client);
         $device = app(DeviceRegistryService::class)
             ->forClient($tenantId, $client->id)
             ->where('domain', 'tracking')

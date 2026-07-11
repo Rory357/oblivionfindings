@@ -3,6 +3,10 @@
  * shared WizardShell so every create/record flow matches the Add Client UX:
  * stepper rail + blurbs, "Step x of y" header, scroll body, per-step required
  * validation and an auto-generated Review & save step. */
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     ChipMulti,
     Field,
@@ -20,10 +24,6 @@ import {
     WizardStepPane,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
     AlertCircle,
     Check,
@@ -35,8 +35,8 @@ import {
     UploadCloud,
     User,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /* ------------------------------------------------------------------ types */
 
@@ -118,7 +118,7 @@ export type WorkflowConfig = {
     reviewTitle?: string;
     reviewBlurb?: string;
     steps: WizardStepConfig[];
-    initialValues?: WizardValues;
+    initialValues?: WizardValues | (() => WizardValues);
     submit: (values: WizardValues, helpers: WizardSubmitHelpers) => void;
 };
 
@@ -145,17 +145,21 @@ function displayValue(field: WizardField, value: unknown): string {
 }
 
 function buildInitialValues(config: WorkflowConfig): WizardValues {
+    const initialValues =
+        typeof config.initialValues === 'function'
+            ? config.initialValues()
+            : config.initialValues;
     const values: WizardValues = {};
     for (const step of config.steps) {
         if (step.picker) {
             values[step.picker.key] =
-                config.initialValues?.[step.picker.key] ??
+                initialValues?.[step.picker.key] ??
                 step.picker.options[0]?.key ??
                 '';
         }
         for (const field of step.fields ?? []) {
             values[field.key] =
-                config.initialValues?.[field.key] ??
+                initialValues?.[field.key] ??
                 (field.type === 'checkbox'
                     ? false
                     : field.type === 'chips'
@@ -492,7 +496,8 @@ export function WorkflowWizardDialog({
                     {errorCount ? (
                         <span className="flex items-center gap-1.5 text-xs font-medium text-status-critical">
                             <AlertCircle className="h-3.5 w-3.5" />
-                            Fill in the required field{errorCount > 1 ? 's' : ''}.
+                            Fill in the required field
+                            {errorCount > 1 ? 's' : ''}.
                         </span>
                     ) : null}
                 </div>
@@ -640,9 +645,7 @@ export function WorkflowWizardDialog({
                                 {current.picker.label}
                             </p>
                             <TilePicker
-                                value={String(
-                                    values[current.picker.key] ?? '',
-                                )}
+                                value={String(values[current.picker.key] ?? '')}
                                 onChange={(v) =>
                                     setValue(current.picker!.key, v)
                                 }
