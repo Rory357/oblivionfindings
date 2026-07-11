@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -15,6 +16,7 @@ use App\Listeners\Finance\LogJournalPosted;
 use App\Listeners\Governance\LogQuarterlyPlanPublished;
 use App\Listeners\Roadmap\LogInitiativeScored;
 use App\Models\AssetMaintenanceLog;
+use App\Models\AssetValue;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientAssessment;
@@ -38,9 +40,12 @@ use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
-use App\Models\ProgressNote;
+use App\Models\ItProvisioningRequest;
+use App\Models\ItTicket;
+use App\Models\ItTicketComment;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
+use App\Models\SafeguardingInvestigation;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
@@ -51,24 +56,27 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Observers\AssetMaintenanceLogObserver;
-use App\Observers\ClientFundTransactionObserver;
+use App\Observers\AssetValueObserver;
 use App\Observers\ClientConsentObserver;
+use App\Observers\ClientFundTransactionObserver;
 use App\Observers\ClientIncidentObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
 use App\Observers\DeviceEventObserver;
 use App\Observers\EmergencyDrillObserver;
 use App\Observers\FirstAidObserver;
-use App\Observers\HrEmployeeProfileObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
 use App\Observers\FleetWorkOrderObserver;
 use App\Observers\FundingClaimObserver;
 use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
+use App\Observers\HrEmployeeProfileObserver;
+use App\Observers\HrLeaveRequestObserver;
 use App\Observers\ProjectsToTimelineObserver;
 use App\Observers\RestraintEventObserver;
 use App\Observers\SafeguardingConcernObserver;
+use App\Observers\SafeguardingInvestigationObserver;
 use App\Observers\ShiftObserver;
 use App\Observers\SiteChecklistRunObserver;
 use App\Observers\SiteHazardObserver;
@@ -178,15 +186,14 @@ class AppServiceProvider extends ServiceProvider
             // IT activity trail subjects (it_ticket_events.subject_type) and
             // attachment parents (it_attachments.attachable_type) — stable
             // short keys so DB rows survive class moves.
-            'it_ticket' => \App\Models\ItTicket::class,
-            'it_provisioning_request' => \App\Models\ItProvisioningRequest::class,
-            'it_ticket_comment' => \App\Models\ItTicketComment::class,
+            'it_ticket' => ItTicket::class,
+            'it_provisioning_request' => ItProvisioningRequest::class,
+            'it_ticket_comment' => ItTicketComment::class,
         ]);
 
         Shift::observe(ShiftObserver::class);
         ClientConsent::observe(ClientConsentObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
-        ProgressNote::observe(ProjectsToTimelineObserver::class);
         ClientBowelEntry::observe(ProjectsToTimelineObserver::class);
         ClientFluidEntry::observe(ProjectsToTimelineObserver::class);
         ClientSeizureEntry::observe(ProjectsToTimelineObserver::class);
@@ -208,7 +215,7 @@ class AppServiceProvider extends ServiceProvider
         ClientIncident::observe(ClientIncidentObserver::class);
         ClientIncident::observe(ProjectsToTimelineObserver::class);
         SafeguardingConcern::observe(SafeguardingConcernObserver::class);
-        \App\Models\SafeguardingInvestigation::observe(\App\Observers\SafeguardingInvestigationObserver::class);
+        SafeguardingInvestigation::observe(SafeguardingInvestigationObserver::class);
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
         SubstanceExposureRecord::observe(SubstanceExposureRecordObserver::class);
@@ -217,14 +224,14 @@ class AppServiceProvider extends ServiceProvider
         EmergencyDrill::observe(EmergencyDrillObserver::class);
         FirstAidRecord::observe(FirstAidObserver::class);
         HrEmployeeProfile::observe(HrEmployeeProfileObserver::class);
-        \App\Domain\Hr\Models\HrLeaveRequest::observe(\App\Observers\HrLeaveRequestObserver::class);
+        HrLeaveRequest::observe(HrLeaveRequestObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);
         FleetWorkOrder::observe(FleetWorkOrderObserver::class);
         AssetMaintenanceLog::observe(AssetMaintenanceLogObserver::class);
         // Capitalisation capture: high-value asset valuations → fixed-asset register
-        \App\Models\AssetValue::observe(\App\Observers\AssetValueObserver::class);
+        AssetValue::observe(AssetValueObserver::class);
         // HrExpenseClaim GL posting is handled solely by
         // ExpenseService::approveClaim() → PostExpenseJournalJob (per-category DR /
         // CR 2000 Accounts Payable). The former HrExpenseClaimObserver posted a

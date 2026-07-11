@@ -5,14 +5,24 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientRoutine;
+use App\Services\Clients\ClientProfileSectionAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ClientRoutineController extends Controller
 {
+    public function __construct(
+        private readonly ClientProfileSectionAccess $profileSectionAccess,
+    ) {}
+
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        $user = $request->user();
+        abort_unless(
+            $user && $this->profileSectionAccess->for($user, $client)['daily_living'],
+            403,
+        );
 
         return ClientRoutine::query()
             ->where('client_id', $client->id)

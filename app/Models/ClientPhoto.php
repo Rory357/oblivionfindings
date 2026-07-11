@@ -4,13 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class ClientPhoto extends Model
 {
     protected $fillable = [
         'client_id',
         'uploaded_by_user_id',
+        'storage_disk',
         'storage_path',
         'thumbnail_path',
         'original_name',
@@ -29,7 +29,10 @@ class ClientPhoto extends Model
         'approved_at' => 'datetime',
     ];
 
-    protected $appends = ['url', 'thumbnail_url'];
+    protected $hidden = [
+        'storage_path',
+        'thumbnail_path',
+    ];
 
     public function client(): BelongsTo
     {
@@ -44,16 +47,6 @@ class ClientPhoto extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
-    }
-
-    public function getUrlAttribute(): ?string
-    {
-        return $this->storage_path ? Storage::disk('public')->url($this->storage_path) : null;
-    }
-
-    public function getThumbnailUrlAttribute(): ?string
-    {
-        return $this->thumbnail_path ? Storage::disk('public')->url($this->thumbnail_path) : null;
     }
 
     public function scopeApproved($query)

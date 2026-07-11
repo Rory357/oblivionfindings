@@ -37,7 +37,7 @@ abstract class TestCase extends BaseTestCase
 
         $app->make(Kernel::class)->bootstrap();
 
-        if (static::$isolatedMysqlSchemaLoaded) {
+        if (static::$isolatedMysqlSchemaLoaded && ! static::$pendingMigrationsApplied) {
             $this->runPendingMigrationsAfterSchemaLoad($app);
             RefreshDatabaseState::$migrated = true;
         }
@@ -70,10 +70,6 @@ abstract class TestCase extends BaseTestCase
 
     protected function configureMysqlClientPath(): void
     {
-        if (static::$mysqlClientPathConfigured) {
-            return;
-        }
-
         $currentPath = (string) ($this->environmentValue('PATH') ?? getenv('PATH') ?: '');
 
         foreach ($this->mysqlClientDirectories() as $directory) {
@@ -82,6 +78,10 @@ abstract class TestCase extends BaseTestCase
             }
 
             if (str_contains(strtolower($currentPath), strtolower($directory))) {
+                // PHPUnit/application teardown may restore one casing of the
+                // Windows path variable between tests. Reassert both entries
+                // on every application bootstrap even when no prepend is due.
+                $this->setEnvironmentValue('PATH', $currentPath);
                 static::$mysqlClientPathConfigured = true;
 
                 return;
@@ -247,9 +247,9 @@ abstract class TestCase extends BaseTestCase
     /**
      * Snapshot the set of currently running process IDs.
      *
-     * @return array<int, true>|null  Map of alive PID => true, or null when the
-     *                                set can't be determined (caller must then
-     *                                fail safe and prune nothing).
+     * @return array<int, true>|null Map of alive PID => true, or null when the
+     *                               set can't be determined (caller must then
+     *                               fail safe and prune nothing).
      */
     protected function runningProcessIds(): ?array
     {
@@ -340,6 +340,16 @@ abstract class TestCase extends BaseTestCase
         putenv(sprintf('%s=%s', $key, $value));
         $_ENV[$key] = $value;
         $_SERVER[$key] = $value;
+
+        // Symfony Process builds a case-preserving Windows environment block.
+        // If the inherited variable is named `Path`, adding only `PATH` leaves
+        // both entries present and cmd.exe may resolve executables against the
+        // stale one. Keep both spellings aligned for schema-load subprocesses.
+        if ($key === 'PATH' && DIRECTORY_SEPARATOR === '\\') {
+            putenv(sprintf('Path=%s', $value));
+            $_ENV['Path'] = $value;
+            $_SERVER['Path'] = $value;
+        }
     }
 
     /**

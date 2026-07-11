@@ -1,3 +1,4 @@
+import type { MapMarker } from '@/components/leaflet-map';
 import ResidentMap from '@/components/resident-tracking/resident-map';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type {
@@ -6,7 +7,6 @@ import type {
     GeofenceStatus,
     Resident,
 } from '@/components/resident-tracking/types';
-import type { MapMarker } from '@/components/leaflet-map';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,8 @@ type HistoryPoint = {
 };
 
 export type ClientLocationData = {
+    trackingRestricted?: boolean;
+    canManage: boolean;
     tracker: {
         id: number;
         device_uid?: string | null;
@@ -142,14 +144,25 @@ export default function ClientLocationTab({
     clientPhoto,
     location,
 }: Props) {
-    const { tracker, currentLocation, trackingConsent, geofences, geofenceStatus } = location;
+    const {
+        tracker,
+        currentLocation,
+        trackingConsent,
+        geofences,
+        geofenceStatus,
+        trackingRestricted = false,
+    } = location;
 
     const [showHistory, setShowHistory] = useState(false);
-    const [historyLocations, setHistoryLocations] = useState<HistoryPoint[]>([]);
+    const [historyLocations, setHistoryLocations] = useState<HistoryPoint[]>(
+        [],
+    );
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(new Date().toISOString());
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(
+        new Date().toISOString(),
+    );
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -162,7 +175,9 @@ export default function ClientLocationTab({
     }, []);
 
     const hasConsent =
-        trackingConsent?.status === 'active' || trackingConsent?.status === 'granted';
+        trackingConsent?.status === 'active' ||
+        trackingConsent?.status === 'given' ||
+        trackingConsent?.status === 'granted';
     const hasTracker = tracker !== null;
     const hasLocation = currentLocation !== null;
 
@@ -235,10 +250,20 @@ export default function ClientLocationTab({
             detail_url: tracker.detail_url,
             last_command_status: tracker.last_command_status,
         };
-    }, [tracker, currentLocation, geofences, geofenceStatus, clientId, clientName, clientHouse, clientPhoto]);
+    }, [
+        tracker,
+        currentLocation,
+        geofences,
+        geofenceStatus,
+        clientId,
+        clientName,
+        clientHouse,
+        clientPhoto,
+    ]);
 
     const mapCenter = useMemo(() => {
-        if (currentLocation) return { lat: currentLocation.lat, lng: currentLocation.lng };
+        if (currentLocation)
+            return { lat: currentLocation.lat, lng: currentLocation.lng };
         if (geofences[0]?.center) return geofences[0].center;
         return { lat: -41.2865, lng: 174.7762 };
     }, [currentLocation, geofences]);
@@ -265,7 +290,9 @@ export default function ClientLocationTab({
 
     const polyline = useMemo(() => {
         if (!showHistory || historyLocations.length < 2) return undefined;
-        return [...historyLocations].reverse().map((l) => ({ lat: l.lat, lng: l.lng }));
+        return [...historyLocations]
+            .reverse()
+            .map((l) => ({ lat: l.lat, lng: l.lng }));
     }, [showHistory, historyLocations]);
 
     const fetchHistory = useCallback(() => {
@@ -274,9 +301,15 @@ export default function ClientLocationTab({
         if (dateFrom) params.set('date_from', dateFrom);
         if (dateTo) params.set('date_to', dateTo);
 
-        fetch(`/operations/clients/${clientId}/location/history?${params.toString()}`, {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        })
+        fetch(
+            `/operations/clients/${clientId}/location/history?${params.toString()}`,
+            {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            },
+        )
             .then((res) => res.json())
             .then((data) => {
                 setHistoryLocations(data.locations ?? []);
@@ -288,7 +321,8 @@ export default function ClientLocationTab({
 
     const handleExport = () => {
         if (historyLocations.length === 0) return;
-        const csvHeader = 'Address,Latitude,Longitude,Timestamp,Speed,Battery\n';
+        const csvHeader =
+            'Address,Latitude,Longitude,Timestamp,Speed,Battery\n';
         const csvBody = historyLocations
             .map((l) =>
                 [
@@ -313,18 +347,22 @@ export default function ClientLocationTab({
     };
 
     const handleLocateNow = useCallback(() => {
-        const url =
-            tracker?.locate_now_url ??
-            `/operations/clients/${clientId}/location/locate-now`;
-        router.post(url, {}, { preserveScroll: true });
-    }, [tracker, clientId]);
+        if (!tracker?.locate_now_url) return;
+
+        router.post(tracker.locate_now_url, {}, { preserveScroll: true });
+    }, [tracker?.locate_now_url]);
 
     const handleAcknowledgePanic = useCallback(() => {
-        const url =
-            tracker?.acknowledge_panic_url ??
-            `/operations/clients/${clientId}/location/acknowledge-panic`;
-        router.post(url, {}, { preserveScroll: true });
-    }, [tracker, clientId]);
+        if (!tracker?.acknowledge_panic_url) return;
+
+        router.post(
+            tracker.acknowledge_panic_url,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    }, [tracker?.acknowledge_panic_url]);
 
     return (
         <div className="mt-4 space-y-4">
@@ -338,8 +376,9 @@ export default function ClientLocationTab({
                                 Location Tracking Consent Not Active
                             </p>
                             <p className="text-sm text-status-warning">
-                                Location tracking requires active consent. Update consent in the
-                                Consents tab or contact the care team.
+                                Location tracking requires active consent.
+                                Update consent in the Consents tab or contact
+                                the care team.
                             </p>
                         </div>
                     </CardContent>
@@ -347,7 +386,7 @@ export default function ClientLocationTab({
             )}
 
             {/* No tracker assigned */}
-            {!hasTracker && (
+            {!hasTracker && !trackingRestricted && (
                 <Card className="border-status-info/30 bg-status-info-bg">
                     <CardContent className="flex items-center gap-3 p-4">
                         <Radio className="h-5 w-5 shrink-0 text-status-info" />
@@ -356,17 +395,19 @@ export default function ClientLocationTab({
                                 No Personal Tracker Assigned
                             </p>
                             <p className="text-sm text-status-info">
-                                Assign a tracker device from the Fleet & Assets module to enable
-                                location tracking.
+                                Assign a tracker device from the Fleet & Assets
+                                module to enable location tracking.
                             </p>
                         </div>
-                        <Link
-                            href="/fleet-assets/resident-tracking?new=1"
-                            className="inline-flex items-center gap-1 rounded-md border border-status-info/30 bg-card px-3 py-1.5 text-xs font-medium text-status-info hover:bg-status-info-bg"
-                        >
-                            Assign Tracker
-                            <ExternalLink className="h-3 w-3" />
-                        </Link>
+                        {location.canManage && (
+                            <Link
+                                href="/fleet-assets/resident-tracking?new=1"
+                                className="inline-flex items-center gap-1 rounded-md border border-status-info/30 bg-card px-3 py-1.5 text-xs font-medium text-status-info hover:bg-status-info-bg"
+                            >
+                                Assign Tracker
+                                <ExternalLink className="h-3 w-3" />
+                            </Link>
+                        )}
                     </CardContent>
                 </Card>
             )}
@@ -382,7 +423,10 @@ export default function ClientLocationTab({
                                 Current location
                             </CardTitle>
                             <Link
-                                href={tracker.fleet_dashboard_url ?? `/fleet-assets/resident-tracking?focus=${clientId}`}
+                                href={
+                                    tracker.fleet_dashboard_url ??
+                                    `/fleet-assets/resident-tracking?focus=${clientId}`
+                                }
                                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                             >
                                 Open in Fleet Dashboard
@@ -393,7 +437,12 @@ export default function ClientLocationTab({
                             {hasLocation ? (
                                 <ResidentMap
                                     center={mapCenter}
-                                    zoom={showHistory && historyLocations.length > 0 ? 14 : 16}
+                                    zoom={
+                                        showHistory &&
+                                        historyLocations.length > 0
+                                            ? 14
+                                            : 16
+                                    }
                                     markers={markers}
                                     geofences={geofences}
                                     polyline={polyline}
@@ -418,7 +467,8 @@ export default function ClientLocationTab({
                                             No location data available
                                         </p>
                                         <p className="text-xs">
-                                            The tracker may be offline or not yet reporting
+                                            The tracker may be offline or not
+                                            yet reporting
                                         </p>
                                     </div>
                                 </div>
@@ -432,9 +482,18 @@ export default function ClientLocationTab({
                             <ResidentSidebar
                                 resident={resident}
                                 variant="profile-detail"
-                                canManage={true}
-                                onLocateNow={handleLocateNow}
-                                onAcknowledgePanic={handleAcknowledgePanic}
+                                canManage={location.canManage}
+                                onLocateNow={
+                                    location.canManage && tracker.locate_now_url
+                                        ? handleLocateNow
+                                        : undefined
+                                }
+                                onAcknowledgePanic={
+                                    location.canManage &&
+                                    tracker.acknowledge_panic_url
+                                        ? handleAcknowledgePanic
+                                        : undefined
+                                }
                             />
                         </CardContent>
                     </Card>
@@ -457,7 +516,9 @@ export default function ClientLocationTab({
                                 <Input
                                     type="date"
                                     value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    onChange={(e) =>
+                                        setDateFrom(e.target.value)
+                                    }
                                     className="w-40"
                                 />
                             </div>
@@ -470,7 +531,11 @@ export default function ClientLocationTab({
                                     className="w-40"
                                 />
                             </div>
-                            <Button onClick={fetchHistory} size="sm" disabled={loadingHistory}>
+                            <Button
+                                onClick={fetchHistory}
+                                size="sm"
+                                disabled={loadingHistory}
+                            >
                                 <Calendar className="mr-2 h-4 w-4" />
                                 {loadingHistory ? 'Loading...' : 'Show history'}
                             </Button>
@@ -498,7 +563,10 @@ export default function ClientLocationTab({
                                         <Download className="mr-2 h-4 w-4" />
                                         Export CSV
                                     </Button>
-                                    <Badge variant="secondary" className="ml-auto text-xs">
+                                    <Badge
+                                        variant="secondary"
+                                        className="ml-auto text-xs"
+                                    >
                                         {historyLocations.length} points
                                     </Badge>
                                 </>
@@ -510,19 +578,31 @@ export default function ClientLocationTab({
                                 <Separator className="my-4" />
                                 <div className="max-h-[300px] divide-y overflow-y-auto rounded-md border">
                                     {historyLocations.map((loc, i) => (
-                                        <div key={i} className="flex items-start gap-3 px-4 py-3">
+                                        <div
+                                            key={i}
+                                            className="flex items-start gap-3 px-4 py-3"
+                                        >
                                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                                 <MapPin className="h-3.5 w-3.5 text-primary" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs text-muted-foreground">
-                                                    {formatDateTime(loc.timestamp)}
-                                                </p>
-                                                <p className="text-sm">{displayLocation(loc)}</p>
-                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                                    {loc.address && loc.coordinates && (
-                                                        <span>{loc.coordinates}</span>
+                                                    {formatDateTime(
+                                                        loc.timestamp,
                                                     )}
+                                                </p>
+                                                <p className="text-sm">
+                                                    {displayLocation(loc)}
+                                                </p>
+                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {loc.address &&
+                                                        loc.coordinates && (
+                                                            <span>
+                                                                {
+                                                                    loc.coordinates
+                                                                }
+                                                            </span>
+                                                        )}
                                                     {loc.speed != null && (
                                                         <span className="flex items-center gap-1">
                                                             <Navigation className="h-3 w-3" />
@@ -530,7 +610,10 @@ export default function ClientLocationTab({
                                                         </span>
                                                     )}
                                                     {loc.battery != null && (
-                                                        <span>{loc.battery}% battery</span>
+                                                        <span>
+                                                            {loc.battery}%
+                                                            battery
+                                                        </span>
                                                     )}
                                                 </div>
                                             </div>
@@ -540,11 +623,14 @@ export default function ClientLocationTab({
                             </>
                         )}
 
-                        {showHistory && historyLocations.length === 0 && !loadingHistory && (
-                            <div className="mt-4 py-8 text-center text-sm text-muted-foreground">
-                                No movement data found for the selected period.
-                            </div>
-                        )}
+                        {showHistory &&
+                            historyLocations.length === 0 &&
+                            !loadingHistory && (
+                                <div className="mt-4 py-8 text-center text-sm text-muted-foreground">
+                                    No movement data found for the selected
+                                    period.
+                                </div>
+                            )}
                     </CardContent>
                 </Card>
             )}

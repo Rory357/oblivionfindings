@@ -1,34 +1,41 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PortalController;
-use App\Http\Controllers\PortalClientController;
-use App\Http\Controllers\PortalIncidentAttachmentController;
-use App\Http\Controllers\ClientRagController;
+use App\Http\Controllers\AnnouncementInboxController;
+use App\Http\Controllers\Auth\PortalOAuthController;
+use App\Http\Controllers\ClientCalendarController;
 use App\Http\Controllers\ClientDocumentController;
+use App\Http\Controllers\ClientPhotoMediaController;
+use App\Http\Controllers\ClientRagController;
+use App\Http\Controllers\ClientVisitRequestController;
+use App\Http\Controllers\FamilyNoteController;
+use App\Http\Controllers\NotificationInboxController;
+use App\Http\Controllers\Portal\ConsentRequestPortalController;
+use App\Http\Controllers\Portal\FamilyDashboardController;
+use App\Http\Controllers\Portal\PortalCalendarController;
+use App\Http\Controllers\Portal\PortalDocumentController;
+use App\Http\Controllers\Portal\PortalFamilyNoteController;
+use App\Http\Controllers\Portal\PortalHealthController;
+use App\Http\Controllers\Portal\PortalLocationController;
+use App\Http\Controllers\Portal\PortalMessageController;
+use App\Http\Controllers\Portal\PortalNotificationController;
+use App\Http\Controllers\Portal\PortalPhotoController;
+use App\Http\Controllers\Portal\PortalPreferenceController;
+use App\Http\Controllers\Portal\PortalScheduleController;
+use App\Http\Controllers\Portal\PortalTimelineController;
+use App\Http\Controllers\Portal\PortalTimelineInteractionController;
+use App\Http\Controllers\PortalClientController;
+use App\Http\Controllers\PortalController;
+use App\Http\Controllers\PortalIncidentAttachmentController;
+use App\Http\Controllers\RagController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
-use App\Http\Controllers\RagController;
-use App\Http\Controllers\NotificationInboxController;
-use App\Http\Controllers\AnnouncementInboxController;
-use App\Http\Controllers\Portal\FamilyDashboardController;
-use App\Http\Controllers\Portal\PortalTimelineController;
-use App\Http\Controllers\Portal\PortalHealthController;
-use App\Http\Controllers\Portal\PortalScheduleController;
-use App\Http\Controllers\Portal\PortalDocumentController;
-use App\Http\Controllers\Portal\PortalPhotoController;
-use App\Http\Controllers\Portal\PortalMessageController;
-use App\Http\Controllers\Portal\PortalCalendarController;
-use App\Http\Controllers\Portal\PortalFamilyNoteController;
-use App\Http\Controllers\FamilyNoteController;
-use App\Http\Controllers\Portal\PortalNotificationController;
 use App\Http\Controllers\TimelineInteractionController;
-use App\Http\Controllers\ClientCalendarController;
-use App\Http\Controllers\ClientVisitRequestController;
-use App\Http\Controllers\Portal\PortalPreferenceController;
-use App\Http\Controllers\Portal\PortalLocationController;
-use App\Http\Controllers\Portal\PortalTimelineInteractionController;
-use App\Http\Controllers\Portal\ConsentRequestPortalController;
+use App\Models\Announcement;
+use App\Models\Client;
+use App\Models\FamilyVisitRequest;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /**
  * Portal & Shared Features Routes
@@ -38,11 +45,11 @@ use App\Http\Controllers\Portal\ConsentRequestPortalController;
  */
 
 // Portal SSO routes (outside auth middleware - these are for login)
-Route::get('portal/login', fn () => \Inertia\Inertia::render('portal/login'))->name('portal.login')->middleware('guest');
-Route::get('portal/auth/microsoft/redirect', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'redirectMicrosoft'])->name('portal.auth.microsoft');
-Route::get('portal/auth/microsoft/callback', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'callbackMicrosoft']);
-Route::get('portal/auth/google/redirect', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'redirectGoogle'])->name('portal.auth.google');
-Route::get('portal/auth/google/callback', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'callbackGoogle']);
+Route::get('portal/login', fn () => Inertia::render('portal/login'))->name('portal.login')->middleware('guest');
+Route::get('portal/auth/microsoft/redirect', [PortalOAuthController::class, 'redirectMicrosoft'])->name('portal.auth.microsoft');
+Route::get('portal/auth/microsoft/callback', [PortalOAuthController::class, 'callbackMicrosoft']);
+Route::get('portal/auth/google/redirect', [PortalOAuthController::class, 'redirectGoogle'])->name('portal.auth.google');
+Route::get('portal/auth/google/callback', [PortalOAuthController::class, 'callbackGoogle']);
 
 Route::middleware(['auth'])->group(function () {
     // Client/Next-of-kin Portal
@@ -122,6 +129,14 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.photos');
     Route::post('/portal/clients/{client}/photos', [PortalPhotoController::class, 'store'])
         ->name('portal.clients.photos.store');
+    Route::get('/portal/clients/{client}/photos/{photo}/media', [ClientPhotoMediaController::class, 'portalMedia'])
+        ->whereNumber('client')
+        ->whereNumber('photo')
+        ->name('portal.clients.photos.media');
+    Route::get('/portal/clients/{client}/photos/{photo}/thumbnail', [ClientPhotoMediaController::class, 'portalThumbnail'])
+        ->whereNumber('client')
+        ->whereNumber('photo')
+        ->name('portal.clients.photos.thumbnail');
 
     // Messaging
     Route::get('/portal/clients/{client}/messages', [PortalMessageController::class, 'index'])
@@ -154,6 +169,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.preferences.update');
 
     Route::post('/portal/summaries/generate', [SummaryController::class, 'generate'])
+        ->middleware('throttle:ai-queries')
         ->name('portal.summaries.generate');
 
     // Header inbox (notifications + announcements)
@@ -170,13 +186,17 @@ Route::middleware(['auth'])->group(function () {
         ->name('inbox.announcements.readAll');
 
     // Notification Centre (full page)
-    Route::get('/notifications', function (\Illuminate\Http\Request $request) {
+    Route::get('/notifications', function (Request $request) {
         $user = $request->user();
         $query = $user->notifications();
 
         $filter = $request->query('filter', 'all');
-        if ($filter === 'unread') $query->whereNull('read_at');
-        if ($filter === 'read') $query->whereNotNull('read_at');
+        if ($filter === 'unread') {
+            $query->whereNull('read_at');
+        }
+        if ($filter === 'read') {
+            $query->whereNotNull('read_at');
+        }
 
         $type = $request->query('type', 'all');
         if ($type !== 'all') {
@@ -194,7 +214,7 @@ Route::middleware(['auth'])->group(function () {
             ]),
             'unread_count' => $user->unreadNotifications()->count(),
             'filters' => ['filter' => $filter, 'type' => $type],
-            'announcements' => \App\Models\Announcement::query()
+            'announcements' => Announcement::query()
                 ->where('is_active', true)
                 ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
                 ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
@@ -216,17 +236,24 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/clients/{client}/timeline', [TimelineController::class, 'client'])->name('timeline.client');
 
     // Client Calendar
-    Route::get('/operations/clients/{client}/calendar', function (\Illuminate\Http\Request $request, \App\Models\Client $client) {
-        app(\App\Http\Controllers\ClientCalendarController::class)->authorize('view', $client);
+    Route::get('/operations/clients/{client}/calendar', function (Request $request, Client $client) {
+        app(ClientCalendarController::class)->authorize('view', $client);
+
         return inertia('operations/clients/calendar', [
             'client' => ['id' => $client->id, 'first_name' => $client->first_name, 'last_name' => $client->last_name],
-            'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+            'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
         ]);
     })->name('client.calendar');
     Route::get('/clients/{client}/calendar/events', [ClientCalendarController::class, 'events'])->name('client.calendar.events');
-    Route::post('/clients/{client}/calendar/appointments', [ClientCalendarController::class, 'storeAppointment'])->name('client.calendar.appointments.store');
-    Route::put('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'updateAppointment'])->name('client.calendar.appointments.update');
-    Route::delete('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'destroyAppointment'])->name('client.calendar.appointments.destroy');
+    Route::post('/clients/{client}/calendar/appointments', [ClientCalendarController::class, 'storeAppointment'])
+        ->middleware('permission:calendar.create')
+        ->name('client.calendar.appointments.store');
+    Route::put('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'updateAppointment'])
+        ->middleware('permission:calendar.manage')
+        ->name('client.calendar.appointments.update');
+    Route::delete('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'destroyAppointment'])
+        ->middleware('permission:calendar.manage')
+        ->name('client.calendar.appointments.destroy');
 
     // Family Notes (Staff)
     Route::post('/clients/{client}/family-notes/{familyNote}/respond', [FamilyNoteController::class, 'respond'])
@@ -252,7 +279,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('timeline.react');
 
     // Summaries
-    Route::get('/summaries', fn() => redirect('/summaries/me'))->name('summaries.home');
+    Route::get('/summaries', fn () => redirect('/summaries/me'))->name('summaries.home');
     Route::get('/summaries/me', [SummaryController::class, 'my'])->name('summaries.me');
     Route::get('/summaries/staff/{user}', [SummaryController::class, 'staff'])->name('summaries.staff');
     Route::get('/summaries/clients/{client}', [SummaryController::class, 'client'])->name('summaries.client');

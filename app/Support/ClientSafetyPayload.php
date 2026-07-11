@@ -45,15 +45,22 @@ class ClientSafetyPayload
      *   safeguarding_flag: bool
      * }
      */
-    public static function forClient(Client $client): array
-    {
-        $profile = $client->relationLoaded('medicalProfile')
-            ? $client->medicalProfile
-            : $client->medicalProfile()->first();
+    public static function forClient(
+        Client $client,
+        bool $includeMedical = true,
+        bool $includeRisks = true,
+    ): array {
+        $profile = $includeMedical
+            ? ($client->relationLoaded('medicalProfile')
+                ? $client->medicalProfile
+                : $client->medicalProfile()->first())
+            : null;
 
-        $risks = $client->relationLoaded('risks')
-            ? $client->risks
-            : $client->risks()->get();
+        $risks = $includeRisks
+            ? ($client->relationLoaded('risks')
+                ? $client->risks
+                : $client->risks()->get())
+            : collect();
 
         $allergies = self::normaliseAllergies($profile);
         $disabilities = self::normaliseDisabilities($profile);
@@ -70,7 +77,11 @@ class ClientSafetyPayload
             ])
             ->all();
 
-        $careFlags = self::buildCareFlags($client, $disabilities);
+        $careFlags = self::buildCareFlags(
+            $client,
+            $disabilities,
+            includeRiskSignals: $includeRisks,
+        );
 
         $hasAny = ! empty($allergies)
             || ! empty($criticalRisks)
@@ -83,8 +94,12 @@ class ClientSafetyPayload
             'other_risks_count' => max(0, $activeRisks->count() - count($criticalRisks)),
             'active_risks_count' => $activeRisks->count(),
             'care_flags' => $careFlags,
-            'risk_level' => $client->risk_level ? strtolower((string) $client->risk_level) : null,
-            'safeguarding_flag' => (bool) ($client->safeguarding_flag ?? false),
+            'risk_level' => $includeRisks && $client->risk_level
+                ? strtolower((string) $client->risk_level)
+                : null,
+            'safeguarding_flag' => $includeRisks
+                ? (bool) ($client->safeguarding_flag ?? false)
+                : false,
         ];
     }
 
@@ -103,9 +118,16 @@ class ClientSafetyPayload
      *   top_risk: ?string
      * }
      */
-    public static function summaryForClient(Client $client): array
-    {
-        $full = self::forClient($client);
+    public static function summaryForClient(
+        Client $client,
+        bool $includeMedical = true,
+        bool $includeRisks = true,
+    ): array {
+        $full = self::forClient(
+            $client,
+            includeMedical: $includeMedical,
+            includeRisks: $includeRisks,
+        );
 
         return [
             'has_any' => $full['has_any']
@@ -170,7 +192,7 @@ class ClientSafetyPayload
     }
 
     /**
-     * @return array<int,string>  Known disability keys for this client.
+     * @return array<int,string> Known disability keys for this client.
      */
     private static function normaliseDisabilities(?ClientMedicalProfile $profile): array
     {
@@ -191,14 +213,17 @@ class ClientSafetyPayload
     }
 
     /**
-     * @param array<int,string> $disabilities
+     * @param  array<int,string>  $disabilities
      * @return array<int,array{key:string,label:string,tone:string,icon:string}>
      */
-    private static function buildCareFlags(Client $client, array $disabilities): array
-    {
+    private static function buildCareFlags(
+        Client $client,
+        array $disabilities,
+        bool $includeRiskSignals = true,
+    ): array {
         $flags = [];
 
-        if ((bool) ($client->safeguarding_flag ?? false)) {
+        if ($includeRiskSignals && (bool) ($client->safeguarding_flag ?? false)) {
             $flags[] = [
                 'key' => 'safeguarding',
                 'label' => 'Safeguarding',
@@ -207,7 +232,9 @@ class ClientSafetyPayload
             ];
         }
 
-        $riskLevel = $client->risk_level ? strtolower((string) $client->risk_level) : null;
+        $riskLevel = $includeRiskSignals && $client->risk_level
+            ? strtolower((string) $client->risk_level)
+            : null;
         if ($riskLevel === 'critical') {
             $flags[] = [
                 'key' => 'risk_level_critical',

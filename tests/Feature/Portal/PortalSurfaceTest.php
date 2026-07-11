@@ -5,6 +5,8 @@ namespace Tests\Feature\Portal;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
+use App\Models\FamilyPortalSetting;
+use App\Models\NextOfKin;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,6 +29,31 @@ class PortalSurfaceTest extends TestCase
         $client = Client::factory()->create();
 
         $client->portalUsers()->attach($portalUser->id, ['relation' => 'next_of_kin']);
+        NextOfKin::query()->create([
+            'client_id' => $client->id,
+            'user_id' => $portalUser->id,
+            'relationship' => 'guardian',
+        ]);
+        $familyConsentType = ConsentType::factory()->create([
+            'name' => 'Information Sharing with Whānau / Family',
+            'category' => 'communication',
+        ]);
+        ClientConsent::query()->create([
+            'client_id' => $client->id,
+            'consent_type_id' => $familyConsentType->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_by_user_id' => $portalUser->id,
+            'given_by_relationship' => 'next_of_kin',
+            'given_method' => 'portal',
+            'created_by' => $portalUser->id,
+            'updated_by' => $portalUser->id,
+        ]);
+        FamilyPortalSetting::query()->create([
+            'client_id' => $client->id,
+            'show_shift_schedule' => true,
+        ]);
 
         $shift = Shift::factory()->create([
             'client_id' => $client->id,
@@ -40,7 +67,7 @@ class PortalSurfaceTest extends TestCase
             ->getJson("/portal/clients/{$client->id}/calendar/events?start=2026-04-20T00:00:00+12:00&end=2026-04-27T00:00:00+12:00")
             ->assertOk()
             ->assertJson(fn (AssertableJson $json) => $json
-                ->where('0.id', 'shift-' . $shift->id)
+                ->where('0.id', 'shift-'.$shift->id)
                 ->where('0.extendedProps.staff_name', $staffUser->name)
                 ->etc()
             );

@@ -8,6 +8,7 @@ use App\Models\HsRiskAssessment;
 use App\Models\HsRiskAssessmentAttachment;
 use App\Models\Site;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Single source of truth for serialising a risk assessment to the React layer —
@@ -101,16 +102,22 @@ class RiskAssessmentPresenter
      * Lightweight picker datasets for the create / supersede wizards and the
      * site/client filters. Shared by the register, Client profile and Site profile.
      *
-     * @return array{sites:\Illuminate\Support\Collection,clients:\Illuminate\Support\Collection,events:\Illuminate\Support\Collection}
+     * @return array{sites:Collection,clients:Collection,events:Collection}
      */
-    public static function pickers(): array
+    public static function pickers(?int $organizationId = null): array
     {
         return [
-            'sites' => Site::query()->orderBy('name')->get(['id', 'name'])
+            'sites' => Site::query()
+                ->when($organizationId !== null, fn ($query) => $query->where('tenant_id', $organizationId))
+                ->orderBy('name')->get(['id', 'name'])
                 ->map(fn (Site $s) => ['id' => $s->id, 'name' => $s->name])->values(),
-            'clients' => Client::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
+            'clients' => Client::query()
+                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+                ->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
                 ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])->values(),
-            'events' => HsEvent::query()->latest()->limit(50)->get(['id', 'reference_number'])
+            'events' => HsEvent::query()
+                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+                ->latest()->limit(50)->get(['id', 'reference_number'])
                 ->map(fn (HsEvent $e) => ['id' => $e->id, 'name' => $e->reference_number])->values(),
         ];
     }

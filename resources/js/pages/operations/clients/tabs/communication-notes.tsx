@@ -4,6 +4,7 @@ import {
 } from '@/components/daily-note-entry';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -14,13 +15,17 @@ import {
     Plus,
     Users,
 } from 'lucide-react';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type CommunicationNotesTabProps = {
     notes: ClientDailyNote[];
     familyNotes: any[];
     familyNotesOpenCount: number;
-    onCreate: () => void;
+    coverage?: {
+        total?: number;
+        loaded?: number;
+        has_more?: boolean;
+    };
+    onCreate?: () => void;
     canReview?: boolean;
     canUpdate?: boolean;
     onMarkReviewed?: (noteId: number) => void;
@@ -42,6 +47,7 @@ export function CommunicationNotesTab({
     notes,
     familyNotes,
     familyNotesOpenCount,
+    coverage = {},
     onCreate,
     canReview = false,
     canUpdate = false,
@@ -72,15 +78,21 @@ export function CommunicationNotesTab({
     return (
         <div className="space-y-6">
             <div className="grid gap-3 md:grid-cols-3">
-                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border bg-card p-4"
+                >
                     <p className="text-xs text-muted-foreground">
                         Communication notes
                     </p>
                     <p className="mt-1 text-2xl font-semibold">
-                        {notes.length}
+                        {coverage.total ?? notes.length}
                     </p>
                 </GuardrailCard>
-                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border bg-card p-4"
+                >
                     <p className="text-xs text-muted-foreground">
                         Open family notes
                     </p>
@@ -88,7 +100,10 @@ export function CommunicationNotesTab({
                         {familyNotesOpenCount}
                     </p>
                 </GuardrailCard>
-                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border bg-card p-4"
+                >
                     <p className="text-xs text-muted-foreground">
                         Completed this week
                     </p>
@@ -106,6 +121,13 @@ export function CommunicationNotesTab({
                 </GuardrailCard>
             </div>
 
+            {coverage.has_more ? (
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    Showing the latest {coverage.loaded ?? notes.length} of{' '}
+                    {coverage.total ?? notes.length} communication notes.
+                </p>
+            ) : null}
+
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-lg font-semibold">
@@ -116,10 +138,16 @@ export function CommunicationNotesTab({
                         client.
                     </p>
                 </div>
-                <Button type="button" onClick={onCreate} className="min-h-11">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Communication
-                </Button>
+                {onCreate ? (
+                    <Button
+                        type="button"
+                        onClick={onCreate}
+                        className="min-h-11"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Communication
+                    </Button>
+                ) : null}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -140,13 +168,20 @@ export function CommunicationNotesTab({
                         <EmptyState
                             icon={MessageSquare}
                             title="No communication notes yet"
-                            description="Record calls, emails, portal messages, or in-person conversations from the button above."
+                            description={
+                                onCreate
+                                    ? 'Record calls, emails, portal messages, or in-person conversations from the button above.'
+                                    : 'No communication notes are available.'
+                            }
                         />
                     )}
                 </div>
 
                 <aside className="space-y-4">
-                    <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
+                    <GuardrailCard
+                        unstyled
+                        className="rounded-lg border bg-card p-4"
+                    >
                         <h3 className="flex items-center gap-2 font-semibold">
                             <Users className="h-4 w-4 text-primary" />
                             Family Notes

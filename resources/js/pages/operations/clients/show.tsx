@@ -4,6 +4,7 @@ import ClientLocationTab, {
 } from '@/components/client-location-tab';
 import RecentClientsStrip from '@/components/client-profile/recent-clients-strip';
 import { type ClientSafety } from '@/components/client-safety-ribbon';
+import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
 import {
     ProfileDialogs,
     type ProfileDialogState,
@@ -24,13 +25,18 @@ import {
     type ProfileNavGroup,
 } from '@/components/clients/profile/nav';
 import {
-    OverviewDesignGrid,
     buildAboutTiles,
+    OverviewDesignGrid,
 } from '@/components/clients/profile/overview-grid';
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
-import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
+import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
+import type {
+    RaPickers,
+    RaRow,
+} from '@/components/health-safety/risk-assessments/types';
 import PageShell from '@/components/page-shell';
+import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,20 +55,25 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
+import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
 import {
+    canonicalProfileTab,
     CLIENT_TAB_GROUPS,
     groupForTab,
+    profileDialogQuery,
+    profileDialogStateFromSearch,
+    resolveVisibleProfileTab,
+    updateClientProfileQuery,
     type ClientTabGroupKey,
 } from '@/pages/operations/clients/tabs/_groups';
 import { ActionsReviewsTab } from '@/pages/operations/clients/tabs/actions-reviews';
-import { CareSupportPlanTab } from './tabs/care-support-plan';
+import { clientAppointmentActionAllowed } from '@/pages/operations/clients/tabs/client-appointment-access';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
-import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
-import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
+import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
     AssessmentsTab,
@@ -112,9 +123,9 @@ import {
     Users,
     Utensils,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuditHistoryTab } from './tabs/audit-history';
+import { CareSupportPlanTab } from './tabs/care-support-plan';
 import { DocumentsTab } from './tabs/documents';
 import { FamilyTreeTab } from './tabs/family-tree';
 import { FinanceTab } from './tabs/finance';
@@ -124,10 +135,9 @@ import { LeaveExcursionsTab } from './tabs/leave-excursions';
 import { PersonalDetailsTab } from './tabs/personal-details';
 import { RespiteTab } from './tabs/respite';
 import { RiskManagementTab } from './tabs/risk-management';
-import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
-import type { RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
 import { WorkersTab } from './tabs/workers';
-import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
+
+export { clientAppointmentActionAllowed } from '@/pages/operations/clients/tabs/client-appointment-access';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -135,50 +145,6 @@ function Field({ label, value }: { label: string; value: string }) {
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="text-sm font-medium">{value}</p>
         </div>
-    );
-}
-
-function ClientProfilePlaceholder({
-    title,
-    description,
-    items,
-    emptyLabel = 'Nothing to show yet.',
-}: {
-    title: string;
-    description: string;
-    items: Array<[string, ReactNode]>;
-    emptyLabel?: string;
-}) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </CardHeader>
-            <CardContent>
-                {items.length > 0 ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {items.map(([label, value]) => (
-                            <div
-                                key={label}
-                                className="rounded-lg border bg-muted/30 p-4"
-                            >
-                                <p className="text-xs text-muted-foreground">
-                                    {label}
-                                </p>
-                                <p className="mt-1 text-sm font-medium">
-                                    {value}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                        {emptyLabel}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
     );
 }
 
@@ -329,7 +295,42 @@ type ClientTab =
 
 type ClientNavigationTab = Extract<ClientTab, { href?: undefined }>;
 
+type ClientProfileSectionAccess = Partial<
+    Record<
+        | 'medical'
+        | 'health'
+        | 'notes'
+        | 'timeline'
+        | 'care_plans'
+        | 'assessments'
+        | 'behaviour'
+        | 'finance'
+        | 'consents'
+        | 'risks'
+        | 'incidents'
+        | 'first_aid'
+        | 'calendar'
+        | 'documents'
+        | 'portal_access'
+        | 'audit'
+        | 'privacy'
+        | 'respite'
+        | 'onboarding'
+        | 'daily_living'
+        | 'meals'
+        | 'agreements'
+        | 'family_notes'
+        | 'photos'
+        | 'personal_assets'
+        | 'tracking'
+        | 'transport'
+        | 'actions_reviews',
+        boolean
+    >
+>;
+
 type Props = {
+    profile_section_access?: ClientProfileSectionAccess;
     client: {
         id: number;
         nhi_number?: string | null;
@@ -382,22 +383,34 @@ type Props = {
         } | null;
         transport_needs?: string[] | null;
         transport_notes?: string | null;
-        support_workers: Array<{ id: number; name: string; email: string }>;
+        support_workers: Array<{
+            id: number;
+            name: string;
+            email?: string | null;
+        }>;
     };
-    medical: {
+    medical?: {
         profile: any | null;
         medications: Array<any>;
         conditions: Array<any>;
         emergency_contacts: Array<any>;
     };
-    support_plan: any | null;
-    assessments: Array<any>;
-    documents: Array<any>;
-    photos: GalleryPhoto[];
-    personal_assets: PersonalAsset[];
-    portal_users: Array<any>;
-    events: Array<any>;
-    handover: Array<any>;
+    support_plan?: any | null;
+    assessments?: Array<any>;
+    documents?: Array<any>;
+    photos?: GalleryPhoto[];
+    personal_assets?: PersonalAsset[];
+    portal_users?: Array<any>;
+    events?: Array<any>;
+    handover?: Array<any>;
+    timeline_summary?: {
+        total?: number;
+        loaded?: number;
+        has_more?: boolean;
+        pinned_handover_total?: number;
+        pinned_handover_loaded?: number;
+        pinned_handover_has_more?: boolean;
+    };
     shifts_summary?: {
         next: ClientShiftSummary | null;
         last: ClientShiftSummary | null;
@@ -443,7 +456,7 @@ type Props = {
         email?: string | null;
     }>;
     health_summary?: HealthSummary | null;
-    onboarding: {
+    onboarding?: {
         items: Array<{
             key: string;
             label: string;
@@ -458,19 +471,67 @@ type Props = {
         percent: number;
         status: 'complete' | 'incomplete';
     };
+    staff_preparation?: {
+        summary: {
+            assigned: number;
+            prepared: number;
+            in_progress: number;
+            needs_attention: number;
+        };
+        workers: Array<{
+            user_id: number;
+            name: string;
+            role?: string | null;
+            employee_profile_id?: number | null;
+            checklist_id?: number | null;
+            status: string;
+            tasks_total: number;
+            tasks_completed: number;
+            progress_percentage: number;
+            due_date?: string | null;
+            is_overdue: boolean;
+        }>;
+    } | null;
     can: {
         edit: boolean;
+        update_client?: boolean;
         assign_workers: boolean;
+        view_family_chat?: boolean;
+        send_family_chat?: boolean;
+        record_medication_administration?: boolean;
+        update_risk_level?: boolean;
+        navigate_daily_notes?: boolean;
+        navigate_care_plans?: boolean;
+        navigate_risks?: boolean;
+        navigate_medical?: boolean;
+        navigate_calendar?: boolean;
+        navigate_workers?: boolean;
+        navigate_family_portal?: boolean;
+        navigate_site?: boolean;
         create_note?: boolean;
+        create_daily_note?: boolean;
+        create_quick_note?: boolean;
+        create_communication_note?: boolean;
         pin_handover?: boolean;
         manage_onboarding?: boolean;
+        manage_onboarding_checklist?: boolean;
+        create_onboarding_workflow?: boolean;
+        manage_onboarding_workflow?: boolean;
+        view_hr_onboarding?: boolean;
+        manage_family_notes?: boolean;
         create_shift?: boolean;
         record_observation?: boolean;
         record_clinical_observation?: boolean;
         record_event?: boolean;
+        create_risks?: boolean;
+        update_risks?: boolean;
+        delete_risks?: boolean;
         care_plans_view?: boolean;
         care_plans_create?: boolean;
         care_plans_update?: boolean;
+        care_plans_delete?: boolean;
+        manage_care_plan_goals?: boolean;
+        edit_path_plan?: boolean;
     };
     location?: ClientLocationData;
     transport?: {
@@ -562,6 +623,106 @@ type TabKey =
     | 'location'
     | 'assignments';
 
+const CLIENT_PROFILE_RESTRICTED_TABS: Partial<
+    Record<
+        TabKey,
+        {
+            section: keyof ClientProfileSectionAccess;
+            propKeys: readonly string[];
+        }
+    >
+> = {
+    onboarding: { section: 'onboarding', propKeys: ['onboarding'] },
+    progress_notes: {
+        section: 'notes',
+        propKeys: ['client_daily_notes'],
+    },
+    communication_notes: {
+        section: 'notes',
+        propKeys: ['communication_notes'],
+    },
+    timeline: { section: 'timeline', propKeys: ['events'] },
+    meal_prefs: { section: 'meals', propKeys: ['meal_logs'] },
+    rhythms_routines: {
+        section: 'daily_living',
+        propKeys: ['client_routines'],
+    },
+    care_plans: {
+        section: 'care_plans',
+        propKeys: ['care_plans_summary'],
+    },
+    goals_path: {
+        section: 'care_plans',
+        propKeys: ['care_plans_summary', 'path_plan'],
+    },
+    assessments: { section: 'assessments', propKeys: ['assessments'] },
+    observations: {
+        section: 'behaviour',
+        propKeys: ['behaviour_patterns'],
+    },
+    medical: { section: 'medical', propKeys: ['medical'] },
+    mar: { section: 'medical', propKeys: ['emar_summary', 'medical'] },
+    health_monitoring: {
+        section: 'health',
+        propKeys: ['health_monitoring'],
+    },
+    finance: { section: 'finance', propKeys: ['client_finance'] },
+    consents: { section: 'consents', propKeys: ['consents'] },
+    'consent-requests': {
+        section: 'consents',
+        propKeys: ['consent_request_list'],
+    },
+    risk_management: { section: 'risks', propKeys: ['client_risks'] },
+    incidents_accidents: {
+        section: 'incidents',
+        propKeys: ['client_incidents'],
+    },
+    first_aid: { section: 'first_aid', propKeys: ['first_aid_records'] },
+    calendar: { section: 'calendar', propKeys: ['calendar_events'] },
+    transport: { section: 'transport', propKeys: ['transport'] },
+    leave_excursions: {
+        section: 'daily_living',
+        propKeys: ['leave_excursions'],
+    },
+    personal_assets: {
+        section: 'personal_assets',
+        propKeys: ['personal_assets'],
+    },
+    service_agreements: {
+        section: 'agreements',
+        propKeys: ['client_agreements'],
+    },
+    documents: { section: 'documents', propKeys: ['documents'] },
+    photos: { section: 'photos', propKeys: ['photos'] },
+    family_tree: { section: 'portal_access', propKeys: ['next_of_kins'] },
+    portal: { section: 'portal_access', propKeys: ['portal_users'] },
+    family_notes: { section: 'family_notes', propKeys: ['family_notes'] },
+    actions_reviews: {
+        section: 'actions_reviews',
+        propKeys: ['actions_reviews'],
+    },
+    location: { section: 'tracking', propKeys: ['location'] },
+    audit_history: { section: 'audit', propKeys: ['audit_history'] },
+    privacy: { section: 'privacy', propKeys: ['data_subject_requests'] },
+    respite: { section: 'respite', propKeys: ['respite'] },
+};
+
+export function clientProfileTabHasSectionAccess(
+    tab: string,
+    access: ClientProfileSectionAccess | null | undefined,
+    props: Record<string, unknown>,
+): boolean {
+    const restriction = CLIENT_PROFILE_RESTRICTED_TABS[tab as TabKey];
+    if (!restriction) return true;
+
+    const explicitAccess = access?.[restriction.section];
+    if (typeof explicitAccess === 'boolean') return explicitAccess;
+
+    return restriction.propKeys.some((propKey) =>
+        Object.prototype.hasOwnProperty.call(props, propKey),
+    );
+}
+
 type DailyNotesFilter = 'all' | 'flagged' | 'follow_up' | 'drafts';
 
 /* Folded sub-tab constants removed in the profile redesign — every tab is
@@ -632,17 +793,29 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 }
 
 export default function ClientShow({
+    profile_section_access: profileSectionAccessProp,
     client,
-    medical,
-    support_plan,
-    assessments,
-    documents,
-    photos,
-    personal_assets,
-    portal_users,
-    events,
-    handover,
-    onboarding,
+    medical = {
+        profile: null,
+        medications: [],
+        conditions: [],
+        emergency_contacts: [],
+    },
+    support_plan = null,
+    assessments = [],
+    documents = [],
+    photos = [],
+    personal_assets = [],
+    portal_users = [],
+    events = [],
+    handover = [],
+    onboarding = {
+        items: [],
+        completed: 0,
+        total: 0,
+        percent: 0,
+        status: 'incomplete',
+    },
     shifts_summary,
     respite,
     can,
@@ -651,6 +824,20 @@ export default function ClientShow({
 }: Props) {
     const pageProps = usePage().props as any;
     const { auth, labels } = pageProps;
+    const profileSectionAccess =
+        profileSectionAccessProp ??
+        (pageProps.profile_section_access as
+            | ClientProfileSectionAccess
+            | undefined);
+    const canShowProfileTab = useCallback(
+        (tabKey: TabKey) =>
+            clientProfileTabHasSectionAccess(
+                tabKey,
+                profileSectionAccess,
+                pageProps,
+            ),
+        [pageProps, profileSectionAccess],
+    );
     const safety = pageProps.safety as ClientSafety | null | undefined;
     const createShiftLauncher = useCreateShiftLauncher();
     const nextShiftSummary = shifts_summary?.next ?? null;
@@ -664,6 +851,10 @@ export default function ClientShow({
     const respiteCan = auth?.can?.respite ?? {};
     const consentsCan = auth?.can?.consents ?? {};
     const privacyCan = auth?.can?.privacy ?? {};
+    const canCreateAppointment = clientAppointmentActionAllowed(
+        'create',
+        auth?.can?.calendar,
+    );
     const dataSubjectRequests = pageProps.data_subject_requests ?? [];
     const consents = pageProps.consents ?? [];
     const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
@@ -672,9 +863,15 @@ export default function ClientShow({
         pageProps.pending_consent_requests_count ?? 0;
     const emarSummary = pageProps.emar_summary ?? null;
     const carePlansSummary = pageProps.care_plans_summary ?? {};
+    const workingCarePlan =
+        carePlansSummary?.working_plan ??
+        carePlansSummary?.review_plan ??
+        carePlansSummary?.active_plan ??
+        null;
+    const staffPreparation = pageProps.staff_preparation ?? null;
     const carePlanGoals = useMemo(
-        () => carePlansSummary?.active_plan?.goals ?? [],
-        [carePlansSummary?.active_plan?.goals],
+        () => workingCarePlan?.goals ?? [],
+        [workingCarePlan?.goals],
     );
     const dailyNoteShiftOptions = useMemo(() => {
         return [nextShiftSummary, ...(recurringShiftSeries ?? [])]
@@ -701,7 +898,6 @@ export default function ClientShow({
             })),
         [carePlanGoals],
     );
-    const clientProgressNotes = pageProps.client_progress_notes ?? [];
     const hasClientDailyNotesProp = Object.prototype.hasOwnProperty.call(
         pageProps,
         'client_daily_notes',
@@ -732,6 +928,7 @@ export default function ClientShow({
     );
     const actionsReviews = pageProps.actions_reviews ?? [];
     const actionsReviewsSummary = pageProps.actions_reviews_summary ?? {};
+    const timelineSummary = pageProps.timeline_summary ?? {};
     const progressNotesCan = auth?.can?.progress_notes ?? {};
     const clientAgreements = pageProps.client_agreements ?? [];
     const serviceAgreementOptions = useMemo(
@@ -761,45 +958,51 @@ export default function ClientShow({
                 key: 'onboarding',
                 label: 'Onboarding',
                 icon: CheckCircle2,
-                show: client.status === 'onboarding' || !!onboarding?.workflow,
+                show: canShowProfileTab('onboarding'),
                 count: onboarding?.total,
             },
-            { key: 'medical', label: 'Medical', icon: Heart, show: true },
-            { key: 'mar', label: 'MAR', icon: Pill, show: true },
+            {
+                key: 'medical',
+                label: 'Medical',
+                icon: Heart,
+                show: canShowProfileTab('medical'),
+            },
+            {
+                key: 'mar',
+                label: 'MAR',
+                icon: Pill,
+                show: canShowProfileTab('mar'),
+            },
             {
                 key: 'meal_prefs',
                 label: 'Food & Meal',
                 icon: Utensils,
-                show: true,
+                show: canShowProfileTab('meal_prefs'),
             },
             {
                 key: 'observations',
                 label: 'Behaviour / ABC',
                 icon: Stethoscope,
-                show: Boolean(
-                    can.record_observation ||
-                    can.record_clinical_observation ||
-                    can.record_event,
-                ),
+                show: canShowProfileTab('observations'),
             },
             {
                 key: 'care_plans',
                 label: 'Care & Support Plan',
                 icon: Target,
-                show: true,
+                show: canShowProfileTab('care_plans'),
             },
             {
                 key: 'goals_path',
                 label: 'Goals Path',
                 icon: Target,
-                show: true,
-                count: carePlansSummary?.active_plan?.goals?.length,
+                show: canShowProfileTab('goals_path'),
+                count: carePlanGoals.length,
             },
             {
                 key: 'progress_notes',
                 label: 'Daily Notes',
                 icon: ClipboardList,
-                show: true,
+                show: canShowProfileTab('progress_notes'),
                 count:
                     dailyNotesSummary?.flagged_open ||
                     dailyNotesSummary?.drafts ||
@@ -809,14 +1012,14 @@ export default function ClientShow({
                 key: 'communication_notes',
                 label: 'Communication',
                 icon: MsgIcon,
-                show: true,
+                show: canShowProfileTab('communication_notes'),
                 count: communicationNotes.length || undefined,
             },
             {
                 key: 'rhythms_routines',
                 label: 'Rhythms & Routines',
                 icon: Clock,
-                show: true,
+                show: canShowProfileTab('rhythms_routines'),
                 count:
                     clientRoutines.filter((routine: any) =>
                         String(routine.body ?? '').trim(),
@@ -826,13 +1029,13 @@ export default function ClientShow({
                 key: 'health_monitoring',
                 label: 'Health Monitoring',
                 icon: Activity,
-                show: true,
+                show: canShowProfileTab('health_monitoring'),
             },
             {
                 key: 'risk_management',
                 label: 'Risk Management',
                 icon: ShieldAlert,
-                show: true,
+                show: canShowProfileTab('risk_management'),
                 count:
                     (pageProps.client_risks ?? []).filter((r: any) => r.active)
                         .length || undefined,
@@ -841,92 +1044,99 @@ export default function ClientShow({
                 key: 'incidents_accidents',
                 label: 'Incidents & Accidents',
                 icon: AlertTriangle,
-                show: true,
+                show: canShowProfileTab('incidents_accidents'),
                 count: (pageProps.client_incidents ?? []).length || undefined,
             },
             {
                 key: 'first_aid',
                 label: 'First Aid',
                 icon: HeartPulse,
-                show: true,
+                show: canShowProfileTab('first_aid'),
                 count: (pageProps.first_aid_records ?? []).length || undefined,
             },
             {
                 key: 'calendar',
                 label: 'Appointments',
                 icon: Calendar,
-                show: true,
+                show: canShowProfileTab('calendar'),
             },
             {
                 key: 'actions_reviews',
                 label: 'Actions & Reviews',
                 icon: ListTodo,
-                show: true,
-                count: actionsReviewsSummary?.open || undefined,
+                show: canShowProfileTab('actions_reviews'),
+                count: actionsReviewsSummary?.has_more
+                    ? undefined
+                    : actionsReviewsSummary?.open || undefined,
             },
             {
                 key: 'service_agreements',
                 label: 'Agreements',
                 icon: FileText,
-                show: true,
+                show: canShowProfileTab('service_agreements'),
             },
             {
                 key: 'assessments',
                 label: 'Assessments',
                 icon: BookOpen,
-                show: true,
+                show: canShowProfileTab('assessments'),
             },
-            { key: 'timeline', label: 'Timeline', icon: Activity, show: true },
+            {
+                key: 'timeline',
+                label: 'Timeline',
+                icon: Activity,
+                show: canShowProfileTab('timeline'),
+            },
             {
                 key: 'family_tree',
                 label: 'Family Tree',
                 icon: Users,
-                show: true,
+                show: canShowProfileTab('family_tree'),
             },
             {
                 key: 'audit_history',
                 label: 'Audit History',
                 icon: Shield,
-                show: true,
+                show: canShowProfileTab('audit_history'),
             },
             {
                 key: 'documents',
                 label: 'Documents',
                 icon: FolderOpen,
-                show: true,
+                show: canShowProfileTab('documents'),
                 count: documents?.length,
             },
             {
                 key: 'photos',
                 label: 'Photos',
                 icon: Camera,
-                show: true,
+                show: canShowProfileTab('photos'),
                 count: photos?.length,
             },
             {
                 key: 'personal_assets',
                 label: 'Personal Inventory',
                 icon: Package,
-                show: true,
+                show: canShowProfileTab('personal_assets'),
                 count: personal_assets?.length,
             },
             {
                 key: 'finance',
                 label: 'Finance',
                 icon: DollarSign,
-                show: true,
+                show: canShowProfileTab('finance'),
             },
             {
                 key: 'leave_excursions',
                 label: 'Leave & Excursions',
                 icon: CalendarDays,
-                show: true,
+                show: canShowProfileTab('leave_excursions'),
             },
             {
                 key: 'transport',
                 label: 'Transport',
                 icon: Truck,
-                show: true,
+                show: canShowProfileTab('transport'),
                 count:
                     (transport?.stats?.transports_30d ?? 0) +
                         (transport?.stats?.outings_30d ?? 0) || undefined,
@@ -935,75 +1145,73 @@ export default function ClientShow({
                 key: 'consents',
                 label: 'Consents',
                 icon: Shield,
-                show: Boolean(consentsCan?.viewAny),
+                show: canShowProfileTab('consents'),
             },
             {
                 key: 'privacy',
                 label: 'Privacy',
                 icon: Shield,
-                show: Boolean(privacyCan?.viewRequests),
+                show: canShowProfileTab('privacy'),
                 count: dataSubjectRequests.length || undefined,
             },
             {
                 key: 'consent-requests',
                 label: 'Consent Requests',
                 icon: Send,
-                show: Boolean(consentsCan?.viewAny),
+                show: canShowProfileTab('consent-requests'),
                 count: pendingConsentRequestsCount || undefined,
             },
             {
                 key: 'location',
                 label: 'Location',
                 icon: Navigation,
-                show: true,
+                show: canShowProfileTab('location'),
             },
-            { key: 'portal', label: 'Family Portal', icon: Users, show: true },
+            {
+                key: 'portal',
+                label: 'Family Portal',
+                icon: Users,
+                show: canShowProfileTab('portal'),
+            },
             {
                 key: 'family_notes',
                 label: 'Family Notes',
                 icon: ListTodo,
-                show: true,
+                show: canShowProfileTab('family_notes'),
                 count: familyNotesOpenCount,
             },
             {
                 key: 'respite',
                 label: 'Respite',
                 icon: Calendar,
-                show: Boolean(respiteCan?.viewAny),
+                show: canShowProfileTab('respite'),
             },
             {
                 key: 'assignments',
                 label: 'Workers',
                 icon: Users,
-                show: can.assign_workers || can.edit,
+                show: Boolean(can.navigate_workers),
             },
         ],
         [
-            can.assign_workers,
-            can.edit,
-            can.record_observation,
-            can.record_clinical_observation,
-            can.record_event,
-            carePlansSummary?.active_plan?.goals?.length,
+            can.navigate_workers,
+            canShowProfileTab,
+            carePlanGoals.length,
             clientRoutines,
             communicationNotes.length,
             dailyNotesSummary?.drafts,
             dailyNotesSummary?.flagged_open,
-            client.status,
+            actionsReviewsSummary?.has_more,
             actionsReviewsSummary?.open,
-            consentsCan?.viewAny,
-            privacyCan?.viewRequests,
             dataSubjectRequests.length,
-            respiteCan?.viewAny,
             documents?.length,
             photos?.length,
             personal_assets?.length,
             onboarding?.total,
-            onboarding?.workflow,
             familyNotesOpenCount,
+            pageProps.first_aid_records,
             pageProps.client_incidents,
             pageProps.client_risks,
-            pageProps.first_aid_records,
             pendingConsentRequestsCount,
             transport?.stats?.outings_30d,
             transport?.stats?.transports_30d,
@@ -1011,17 +1219,14 @@ export default function ClientShow({
     );
 
     // Support ?tab=onboarding deep linking from dashboard
-    const initialTab =
+    const requestedInitialTab =
         typeof window !== 'undefined'
             ? (new URLSearchParams(window.location.search).get(
                   'tab',
               ) as TabKey) || 'profile'
             : 'profile';
+    const initialTab = canonicalProfileTab(requestedInitialTab) as TabKey;
     const [tab, setTab] = useState<TabKey>(initialTab);
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
-    const [quickNoteOpen, setQuickNoteOpen] = useState(false);
-    const [dailyNoteOpen, setDailyNoteOpen] = useState(false);
-    const [communicationNoteOpen, setCommunicationNoteOpen] = useState(false);
     const [dailyNotesFilter, setDailyNotesFilter] = useState<DailyNotesFilter>(
         () => initialDailyNotesFilter(),
     );
@@ -1031,22 +1236,115 @@ export default function ClientShow({
         groupForTab(initialTab),
     );
     const [paletteOpen, setPaletteOpen] = useState(false);
-    const [profileDialog, setProfileDialog] =
-        useState<ProfileDialogState>(null);
+    const canOpenProfileDialog = useCallback(
+        (key: string) => {
+            if (key === 'goal') {
+                return Boolean(can.manage_care_plan_goals);
+            }
+            if (key === 'edit_path_plan') {
+                return Boolean(can.edit_path_plan);
+            }
+            if (key === 'add_onboarding_step') {
+                return Boolean(can.manage_onboarding_workflow);
+            }
+            if (key === 'daily_note') {
+                return Boolean(can.create_daily_note);
+            }
+            if (key === 'quick_note') {
+                return Boolean(can.create_quick_note);
+            }
+            if (key === 'comm_note') {
+                return Boolean(can.create_communication_note);
+            }
+            if (key === 'family_chat') {
+                return Boolean(can.view_family_chat);
+            }
+            if (key === 'emar') {
+                return Boolean(can.record_medication_administration);
+            }
+            if (key === 'edit_profile') {
+                return Boolean(can.update_client);
+            }
+            if (key === 'add_risk') {
+                return Boolean(can.create_risks);
+            }
+            if (key === 'edit_risk') {
+                return Boolean(can.update_risks);
+            }
+            if (key === 'appointment') {
+                return canCreateAppointment;
+            }
+
+            return true;
+        },
+        [
+            can.edit_path_plan,
+            can.create_communication_note,
+            can.create_daily_note,
+            can.create_quick_note,
+            can.create_risks,
+            can.manage_care_plan_goals,
+            can.manage_onboarding_workflow,
+            can.record_medication_administration,
+            can.update_client,
+            can.update_risks,
+            can.view_family_chat,
+            canCreateAppointment,
+        ],
+    );
+    const readProfileDialogState = useCallback(
+        (search: string) => {
+            const state = profileDialogStateFromSearch(search, {
+                carePlans: [
+                    carePlansSummary?.active_plan,
+                    carePlansSummary?.review_plan,
+                ].filter((plan): plan is any => Boolean(plan?.id)),
+                goals: carePlanGoals as any[],
+                risks: (pageProps.client_risks ?? []) as any[],
+                carePlanContext: { serviceAgreementOptions },
+            });
+
+            return state && canOpenProfileDialog(state.key) ? state : null;
+        },
+        [
+            canOpenProfileDialog,
+            carePlanGoals,
+            carePlansSummary?.active_plan,
+            carePlansSummary?.review_plan,
+            pageProps.client_risks,
+            serviceAgreementOptions,
+        ],
+    );
+    const [profileDialog, setProfileDialog] = useState<ProfileDialogState>(
+        () =>
+            typeof window === 'undefined'
+                ? null
+                : readProfileDialogState(window.location.search),
+    );
+    const authorizedProfileDialog =
+        profileDialog && canOpenProfileDialog(profileDialog.key)
+            ? profileDialog
+            : null;
+    const editDialogOpen = authorizedProfileDialog?.key === 'edit_profile';
+    const quickNoteOpen = authorizedProfileDialog?.key === 'quick_note';
+    const dailyNoteOpen = authorizedProfileDialog?.key === 'daily_note';
+    const communicationNoteOpen = authorizedProfileDialog?.key === 'comm_note';
     // Bumped when the ABC dialog closes so the lazy-fetched ABC log re-fetches.
     const [abcRefreshToken, setAbcRefreshToken] = useState(0);
 
     const openProfileDialog = useCallback(
         (key: string, ctx?: Record<string, unknown>) => {
-            // Keys owned by pre-existing dialogs keep their bespoke flows.
-            if (key === 'daily_note') return setDailyNoteOpen(true);
-            if (key === 'quick_note') return setQuickNoteOpen(true);
-            if (key === 'comm_note') return setCommunicationNoteOpen(true);
-            if (key === 'edit_profile') return setEditDialogOpen(true);
+            if (!canOpenProfileDialog(key)) return;
+
             setProfileDialog({ key, ctx });
+            updateClientProfileQuery(profileDialogQuery(key, ctx), 'push');
         },
-        [],
+        [canOpenProfileDialog],
     );
+    const closeProfileDialog = useCallback(() => {
+        setProfileDialog(null);
+        updateClientProfileQuery({ dialog: null, record: null }, 'replace');
+    }, []);
 
     useEffect(() => {
         setOpenGroup(groupForTab(tab));
@@ -1055,21 +1353,21 @@ export default function ClientShow({
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
     const updateProfileQuery = useCallback(
-        (values: Record<string, string | null>) => {
-            if (typeof window === 'undefined') return;
-
-            const url = new URL(window.location.href);
-            Object.entries(values).forEach(([key, value]) => {
-                if (value === null) {
-                    url.searchParams.delete(key);
-                } else {
-                    url.searchParams.set(key, value);
-                }
-            });
-            window.history.replaceState({}, '', url.toString());
-        },
+        (
+            values: Record<string, string | null>,
+            mode: 'push' | 'replace' = 'push',
+        ) => updateClientProfileQuery(values, mode),
         [],
     );
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const requested =
+            new URLSearchParams(window.location.search).get('tab') ?? 'profile';
+        const canonical = canonicalProfileTab(requested);
+        if (canonical !== requested) {
+            updateProfileQuery({ tab: canonical }, 'replace');
+        }
+    }, [updateProfileQuery]);
     const handleTabChange = useCallback(
         (newTab: TabKey) => {
             setTab(newTab);
@@ -1089,12 +1387,15 @@ export default function ClientShow({
         if (typeof window === 'undefined') return;
         const handlePop = () => {
             const params = new URLSearchParams(window.location.search);
-            const next = (params.get('tab') as TabKey) || 'profile';
+            const next = canonicalProfileTab(
+                (params.get('tab') as TabKey) || 'profile',
+            ) as TabKey;
             setTab(next);
+            setProfileDialog(readProfileDialogState(window.location.search));
         };
         window.addEventListener('popstate', handlePop);
         return () => window.removeEventListener('popstate', handlePop);
-    }, []);
+    }, [readProfileDialogState]);
     const openDailyNotes = useCallback(
         (filter: DailyNotesFilter = 'all') => {
             setDailyNotesFilter(filter);
@@ -1128,14 +1429,14 @@ export default function ClientShow({
             }
 
             const key = event.key.toLowerCase();
-            if (event.shiftKey && key === 'n') {
+            if (event.shiftKey && key === 'n' && can.create_daily_note) {
                 event.preventDefault();
-                setDailyNoteOpen(true);
+                openProfileDialog('daily_note');
                 return;
             }
-            if (!event.shiftKey && key === 'n') {
+            if (!event.shiftKey && key === 'n' && can.create_quick_note) {
                 event.preventDefault();
-                setQuickNoteOpen(true);
+                openProfileDialog('quick_note');
                 return;
             }
             if (key === 'g') {
@@ -1159,7 +1460,15 @@ export default function ClientShow({
             window.removeEventListener('keydown', handleShortcut);
             window.clearTimeout(chordReset);
         };
-    }, [communicationNoteOpen, dailyNoteOpen, openDailyNotes, quickNoteOpen]);
+    }, [
+        communicationNoteOpen,
+        can.create_daily_note,
+        can.create_quick_note,
+        dailyNoteOpen,
+        openDailyNotes,
+        openProfileDialog,
+        quickNoteOpen,
+    ]);
 
     const respiteBookings = respite?.bookings ?? [];
     const respiteRequests = respite?.requests ?? [];
@@ -1205,9 +1514,10 @@ export default function ClientShow({
                 value: String(f.id),
                 label: f.name ?? f.purpose ?? `Fund #${f.id}`,
             })),
-            carePlanId: carePlansSummary?.active_plan?.id ?? null,
-            carePlanTitle: carePlansSummary?.active_plan?.title ?? null,
+            carePlanId: workingCarePlan?.id ?? null,
+            carePlanTitle: workingCarePlan?.title ?? null,
             onboardingWorkflowId: onboarding?.workflow?.id ?? null,
+            canSendFamilyChat: Boolean(can.send_family_chat),
         };
     }, [
         client.id,
@@ -1219,9 +1529,10 @@ export default function ClientShow({
         dailyNoteGoalOptions,
         pageProps.consent_type_options,
         pageProps.client_finance?.funds,
-        carePlansSummary?.active_plan?.id,
-        carePlansSummary?.active_plan?.title,
+        workingCarePlan?.id,
+        workingCarePlan?.title,
         onboarding?.workflow?.id,
+        can.send_family_chat,
     ]);
 
     // ── Grouped nav registry: 6 groups × first-class tabs ──
@@ -1258,6 +1569,14 @@ export default function ClientShow({
     const activeGroup =
         visibleGroups.find((g) => g.key === openGroup) ?? visibleGroups[0];
 
+    useEffect(() => {
+        const resolved = resolveVisibleProfileTab(tab, visibleGroups);
+        if (resolved === tab) return;
+
+        setTab(resolved as TabKey);
+        updateProfileQuery({ tab: resolved }, 'replace');
+    }, [tab, updateProfileQuery, visibleGroups]);
+
     // "/" or ⌘K opens the tab search palette.
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -1277,21 +1596,9 @@ export default function ClientShow({
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    const [showApptForm, setShowApptForm] = useState(false);
     const [respondingId, setRespondingId] = useState<number | null>(null);
     const [responseText, setResponseText] = useState('');
     const [assigningId, setAssigningId] = useState<number | null>(null);
-    const [apptData, setApptData] = useState({
-        title: '',
-        appointment_type: 'gp_visit',
-        starts_at: '',
-        ends_at: '',
-        location: '',
-        provider_name: '',
-        description: '',
-        share_with_family: true,
-    });
-    const [calendarEvent, setCalendarEvent] = useState<any>(null);
 
     return (
         <AppLayout
@@ -1670,10 +1977,10 @@ export default function ClientShow({
                                     ? 'critical'
                                     : 'warning',
                             icon: ListTodo,
-                            label: `${actionsReviewsSummary.open} open action${actionsReviewsSummary.open > 1 ? 's' : ''}`,
+                            label: `${actionsReviewsSummary.open}${actionsReviewsSummary.has_more ? '+' : ''} open action${actionsReviewsSummary.open > 1 ? 's' : ''}`,
                             detail:
                                 (actionsReviewsSummary.critical ?? 0) > 0
-                                    ? `${actionsReviewsSummary.critical} critical`
+                                    ? `${actionsReviewsSummary.critical} critical${actionsReviewsSummary.has_more ? ' shown' : ''}`
                                     : undefined,
                             onClick: () => handleTabChange('actions_reviews'),
                         });
@@ -1709,37 +2016,40 @@ export default function ClientShow({
                                 window.location.href = `tel:${client.phone}`;
                             },
                         });
-                    moreItems.push({
-                        key: 'visits',
-                        label: 'Visit requests',
-                        icon: Users,
-                        detail: pendingVisitCount
-                            ? `${pendingVisitCount} pending`
-                            : undefined,
-                        onSelect: () =>
-                            router.visit(
-                                `/operations/clients/${client.id}/visit-requests`,
-                            ),
-                    });
-                    moreItems.push({
-                        key: 'mar',
-                        label: 'Full MAR chart',
-                        icon: Pill,
-                        onSelect: () =>
-                            router.visit(
-                                `/operations/clients/${client.id}/mar`,
-                            ),
-                    });
-                    moreItems.push({
-                        key: 'medical',
-                        label: 'Medical record',
-                        icon: Heart,
-                        onSelect: () =>
-                            router.visit(
-                                `/operations/clients/${client.id}/medical`,
-                            ),
-                    });
-                    if (can.assign_workers || can.edit)
+                    if (can.navigate_family_portal)
+                        moreItems.push({
+                            key: 'visits',
+                            label: 'Visit requests',
+                            icon: Users,
+                            detail: pendingVisitCount
+                                ? `${pendingVisitCount} pending`
+                                : undefined,
+                            onSelect: () =>
+                                router.visit(
+                                    `/operations/clients/${client.id}/visit-requests`,
+                                ),
+                        });
+                    if (can.navigate_medical) {
+                        moreItems.push({
+                            key: 'mar',
+                            label: 'Full MAR chart',
+                            icon: Pill,
+                            onSelect: () =>
+                                router.visit(
+                                    `/operations/clients/${client.id}/mar`,
+                                ),
+                        });
+                        moreItems.push({
+                            key: 'medical',
+                            label: 'Medical record',
+                            icon: Heart,
+                            onSelect: () =>
+                                router.visit(
+                                    `/operations/clients/${client.id}/medical`,
+                                ),
+                        });
+                    }
+                    if (can.assign_workers)
                         moreItems.push({
                             key: 'workers',
                             label: 'Manage workers',
@@ -1747,7 +2057,7 @@ export default function ClientShow({
                             onSelect: () => handleTabChange('assignments'),
                         });
                     const clientSite = client.site;
-                    if (clientSite)
+                    if (clientSite && can.navigate_site)
                         moreItems.push({
                             key: 'site',
                             label: `Open ${clientSite.name}`,
@@ -1814,13 +2124,35 @@ export default function ClientShow({
                                             : '—',
                                     },
                                 ]}
-                                canEdit={Boolean(can.edit)}
+                                noteCapabilities={{
+                                    dailyNote: Boolean(can.create_daily_note),
+                                    quickNote: Boolean(can.create_quick_note),
+                                    communicationNote: Boolean(
+                                        can.create_communication_note,
+                                    ),
+                                }}
                                 onAddNote={(key) => openProfileDialog(key)}
-                                onChat={() => openProfileDialog('family_chat')}
-                                onEdit={() => setEditDialogOpen(true)}
-                                onOpenShift={() => handleTabChange('calendar')}
-                                onOpenSafety={() =>
-                                    handleTabChange('risk_management')
+                                onChat={
+                                    can.view_family_chat
+                                        ? () => openProfileDialog('family_chat')
+                                        : undefined
+                                }
+                                onEdit={
+                                    can.update_client
+                                        ? () =>
+                                              openProfileDialog('edit_profile')
+                                        : undefined
+                                }
+                                onOpenShift={
+                                    can.navigate_calendar
+                                        ? () => handleTabChange('calendar')
+                                        : undefined
+                                }
+                                onOpenSafety={
+                                    can.navigate_risks
+                                        ? () =>
+                                              handleTabChange('risk_management')
+                                        : undefined
                                 }
                                 moreItems={moreItems}
                                 backLabel={
@@ -1831,10 +2163,8 @@ export default function ClientShow({
                                         groups={visibleGroups}
                                         openGroup={openGroup}
                                         activeTab={tab}
-                                        onOpenGroup={(key) =>
-                                            setOpenGroup(
-                                                key as ClientTabGroupKey,
-                                            )
+                                        onOpenGroup={(_key, targetTab) =>
+                                            handleTabChange(targetTab as TabKey)
                                         }
                                         onSearch={() => setPaletteOpen(true)}
                                     />
@@ -1843,7 +2173,7 @@ export default function ClientShow({
                             <AlertRibbon alerts={heroAlerts} />
 
                             {/* Hidden photo upload form */}
-                            {can.edit && (
+                            {can.update_client && (
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -1878,13 +2208,21 @@ export default function ClientShow({
                 <QuickNoteDialog
                     clientId={client.id}
                     open={quickNoteOpen}
-                    onOpenChange={setQuickNoteOpen}
+                    onOpenChange={(open) => {
+                        if (!open && profileDialog?.key === 'quick_note') {
+                            closeProfileDialog();
+                        }
+                    }}
                     onSubmitted={() => openDailyNotes('all')}
                 />
                 <DailyNoteWizard
                     clientId={client.id}
                     open={dailyNoteOpen}
-                    onOpenChange={setDailyNoteOpen}
+                    onOpenChange={(open) => {
+                        if (!open && profileDialog?.key === 'daily_note') {
+                            closeProfileDialog();
+                        }
+                    }}
                     shiftOptions={dailyNoteShiftOptions}
                     goalOptions={dailyNoteGoalOptions}
                     onSubmitted={() => openDailyNotes('all')}
@@ -1892,7 +2230,11 @@ export default function ClientShow({
                 <DailyNoteWizard
                     clientId={client.id}
                     open={communicationNoteOpen}
-                    onOpenChange={setCommunicationNoteOpen}
+                    onOpenChange={(open) => {
+                        if (!open && profileDialog?.key === 'comm_note') {
+                            closeProfileDialog();
+                        }
+                    }}
                     mode="communication"
                     shiftOptions={dailyNoteShiftOptions}
                     goalOptions={dailyNoteGoalOptions}
@@ -1950,7 +2292,7 @@ export default function ClientShow({
                 />
 
                 <ProfileDialogs
-                    dialog={profileDialog}
+                    dialog={authorizedProfileDialog}
                     onClose={() => {
                         if (profileDialog?.key === 'abc') {
                             setAbcRefreshToken((t) => t + 1);
@@ -1960,7 +2302,7 @@ export default function ClientShow({
                                 preserveState: true,
                             });
                         }
-                        setProfileDialog(null);
+                        closeProfileDialog();
                     }}
                     flowContext={flowContext}
                     medications={(medical?.medications ?? []) as any[]}
@@ -2041,64 +2383,88 @@ export default function ClientShow({
                                     keyWorkerName={
                                         (client as any).key_worker?.name ?? null
                                     }
-                                    canEdit={Boolean(can.edit)}
+                                    navigationCapabilities={{
+                                        dailyNotes: Boolean(
+                                            can.navigate_daily_notes,
+                                        ),
+                                        goals: Boolean(can.navigate_care_plans),
+                                        risks: Boolean(can.navigate_risks),
+                                        mar: Boolean(can.navigate_medical),
+                                        calendar: Boolean(
+                                            can.navigate_calendar,
+                                        ),
+                                    }}
                                     onTab={(key) =>
                                         handleTabChange(key as TabKey)
                                     }
-                                    onEditAbout={() => setEditDialogOpen(true)}
-                                    onRecordDose={() =>
-                                        openProfileDialog('emar')
+                                    onEditAbout={
+                                        can.update_client
+                                            ? () =>
+                                                  openProfileDialog(
+                                                      'edit_profile',
+                                                  )
+                                            : undefined
                                     }
-                                    onManageWorkers={() =>
-                                        handleTabChange('assignments')
+                                    onRecordDose={
+                                        can.record_medication_administration
+                                            ? () => openProfileDialog('emar')
+                                            : undefined
+                                    }
+                                    onManageWorkers={
+                                        can.assign_workers
+                                            ? () =>
+                                                  handleTabChange('assignments')
+                                            : undefined
                                     }
                                     riskLevelControl={
-                                        <Select
-                                            value={client.risk_level ?? ''}
-                                            onValueChange={(v) =>
-                                                router.patch(
-                                                    `/operations/clients/${client.id}/quick-update`,
-                                                    { risk_level: v },
-                                                    {
-                                                        preserveScroll: true,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
-                                                    client.risk_level ===
-                                                    'critical'
-                                                        ? 'bg-status-critical-bg text-status-critical'
-                                                        : client.risk_level ===
-                                                            'high'
-                                                          ? 'bg-status-critical-bg text-status-critical'
-                                                          : client.risk_level ===
-                                                              'medium'
-                                                            ? 'bg-status-warning-bg text-status-warning'
-                                                            : client.risk_level ===
-                                                                'low'
-                                                              ? 'bg-status-success-bg text-status-success'
-                                                              : 'bg-muted text-muted-foreground'
-                                                } rounded-full px-3`}
+                                        can.update_risk_level ? (
+                                            <Select
+                                                value={client.risk_level ?? ''}
+                                                onValueChange={(v) =>
+                                                    router.patch(
+                                                        `/operations/clients/${client.id}/quick-update`,
+                                                        { risk_level: v },
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    )
+                                                }
                                             >
-                                                <SelectValue placeholder="Set level..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="low">
-                                                    Low
-                                                </SelectItem>
-                                                <SelectItem value="medium">
-                                                    Medium
-                                                </SelectItem>
-                                                <SelectItem value="high">
-                                                    High
-                                                </SelectItem>
-                                                <SelectItem value="critical">
-                                                    Critical
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                                <SelectTrigger
+                                                    className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
+                                                        client.risk_level ===
+                                                        'critical'
+                                                            ? 'bg-status-critical-bg text-status-critical'
+                                                            : client.risk_level ===
+                                                                'high'
+                                                              ? 'bg-status-critical-bg text-status-critical'
+                                                              : client.risk_level ===
+                                                                  'medium'
+                                                                ? 'bg-status-warning-bg text-status-warning'
+                                                                : client.risk_level ===
+                                                                    'low'
+                                                                  ? 'bg-status-success-bg text-status-success'
+                                                                  : 'bg-muted text-muted-foreground'
+                                                    } rounded-full px-3`}
+                                                >
+                                                    <SelectValue placeholder="Set level..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="low">
+                                                        Low
+                                                    </SelectItem>
+                                                    <SelectItem value="medium">
+                                                        Medium
+                                                    </SelectItem>
+                                                    <SelectItem value="high">
+                                                        High
+                                                    </SelectItem>
+                                                    <SelectItem value="critical">
+                                                        Critical
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        ) : undefined
                                     }
                                 />
                             </>
@@ -2116,8 +2482,7 @@ export default function ClientShow({
                                             Onboarding Workflow
                                         </CardTitle>
                                         <div className="flex items-center gap-2">
-                                            {(can.manage_onboarding ||
-                                                can.edit) &&
+                                            {can.manage_onboarding_workflow &&
                                             onboarding.workflow.status !==
                                                 'completed' ? (
                                                 <Button
@@ -2233,7 +2598,7 @@ export default function ClientShow({
                                     <p className="text-sm text-muted-foreground">
                                         No onboarding workflow found.
                                     </p>
-                                    {(can.manage_onboarding || can.edit) && (
+                                    {can.create_onboarding_workflow && (
                                         <Button
                                             size="sm"
                                             className="mt-3"
@@ -2294,8 +2659,7 @@ export default function ClientShow({
                                             </div>
                                         </div>
                                         {!item.has_data &&
-                                            (can.manage_onboarding ||
-                                                can.edit) && (
+                                            can.manage_onboarding_checklist && (
                                                 <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                                                     <Checkbox
                                                         checked={item.override}
@@ -2464,8 +2828,7 @@ export default function ClientShow({
                                                         </Badge>
                                                         {step.status ===
                                                             'pending' &&
-                                                            (can.manage_onboarding ||
-                                                                can.edit) && (
+                                                            can.manage_onboarding_workflow && (
                                                                 <div className="flex gap-1">
                                                                     <Button
                                                                         size="sm"
@@ -2513,7 +2876,7 @@ export default function ClientShow({
                                 </CardContent>
                                 {/* Complete Onboarding Button */}
                                 {onboarding.workflow.status === 'in_progress' &&
-                                    (can.manage_onboarding || can.edit) &&
+                                    can.manage_onboarding_workflow &&
                                     (() => {
                                         const requiredSteps =
                                             onboarding.workflow.steps.filter(
@@ -2548,25 +2911,172 @@ export default function ClientShow({
                             </Card>
                         )}
 
-                        <Card className="mt-4 border-status-warning/30 bg-status-warning-bg">
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
-                                    <GraduationCap className="h-5 w-5" />
+                        <Card className="mt-4">
+                            <CardHeader>
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status-info-bg text-status-info">
+                                            <GraduationCap className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-base">
+                                                Staff preparation
+                                            </CardTitle>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                Canonical HR onboarding and
+                                                induction readiness for support
+                                                workers assigned to this client.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {can.view_hr_onboarding ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            asChild
+                                        >
+                                            <Link href="/hr/onboarding">
+                                                Open HR onboarding
+                                            </Link>
+                                        </Button>
+                                    ) : null}
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium">
-                                        Staff Preparation
+                            </CardHeader>
+                            <CardContent>
+                                {!can.view_hr_onboarding ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        HR onboarding readiness is available to
+                                        authorised HR viewers. Client onboarding
+                                        remains available above.
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Staff training status and induction
-                                        progress for assigned support workers
-                                        will be shown here once HR integration
-                                        is complete.
+                                ) : !staffPreparation ||
+                                  staffPreparation.summary.assigned === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No support workers are assigned, so
+                                        there is no staff-preparation cohort
+                                        yet.
                                     </p>
-                                </div>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/hr">Open HR</Link>
-                                </Button>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                            {[
+                                                [
+                                                    'Assigned',
+                                                    staffPreparation.summary
+                                                        .assigned,
+                                                ],
+                                                [
+                                                    'Prepared',
+                                                    staffPreparation.summary
+                                                        .prepared,
+                                                ],
+                                                [
+                                                    'In progress',
+                                                    staffPreparation.summary
+                                                        .in_progress,
+                                                ],
+                                                [
+                                                    'Attention',
+                                                    staffPreparation.summary
+                                                        .needs_attention,
+                                                ],
+                                            ].map(([label, value]) => (
+                                                <div
+                                                    key={String(label)}
+                                                    className="rounded-lg border p-3"
+                                                >
+                                                    <div className="text-lg font-semibold">
+                                                        {value}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {label}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="divide-y rounded-lg border">
+                                            {staffPreparation.workers.map(
+                                                (worker) => {
+                                                    const statusLabel =
+                                                        worker.status ===
+                                                        'completed'
+                                                            ? 'Prepared'
+                                                            : worker.status ===
+                                                                'in_progress'
+                                                              ? 'In progress'
+                                                              : worker.status ===
+                                                                  'pending'
+                                                                ? 'Pending'
+                                                                : worker.status ===
+                                                                    'not_linked'
+                                                                  ? 'No HR profile'
+                                                                  : worker.status ===
+                                                                      'not_started'
+                                                                    ? 'No checklist'
+                                                                    : worker.status.replace(
+                                                                          '_',
+                                                                          ' ',
+                                                                      );
+                                                    return (
+                                                        <div
+                                                            key={worker.user_id}
+                                                            className="flex flex-wrap items-center justify-between gap-3 p-3"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-medium">
+                                                                    {
+                                                                        worker.name
+                                                                    }
+                                                                </p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {worker.role ??
+                                                                        'Assigned support worker'}
+                                                                    {worker.tasks_total >
+                                                                    0
+                                                                        ? ` · ${worker.tasks_completed}/${worker.tasks_total} tasks`
+                                                                        : ''}
+                                                                    {worker.is_overdue
+                                                                        ? ' · Overdue'
+                                                                        : ''}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge
+                                                                    variant={
+                                                                        worker.status ===
+                                                                        'completed'
+                                                                            ? 'secondary'
+                                                                            : worker.is_overdue
+                                                                              ? 'destructive'
+                                                                              : 'outline'
+                                                                    }
+                                                                    className="capitalize"
+                                                                >
+                                                                    {
+                                                                        statusLabel
+                                                                    }
+                                                                </Badge>
+                                                                {worker.checklist_id ? (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        asChild
+                                                                    >
+                                                                        <Link
+                                                                            href={`/hr/onboarding/${worker.checklist_id}`}
+                                                                        >
+                                                                            View
+                                                                        </Link>
+                                                                    </Button>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -3129,13 +3639,17 @@ export default function ClientShow({
                                     </p>
                                 </div>
                             </div>
-                            <Button
-                                onClick={() => openProfileDialog('appointment')}
-                                data-test="calendar-new-appointment"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New appointment
-                            </Button>
+                            {canCreateAppointment ? (
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('appointment')
+                                    }
+                                    data-test="calendar-new-appointment"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New appointment
+                                </Button>
+                            ) : null}
                         </div>
                         <ClientCalendarTab
                             clientId={client.id}
@@ -3143,6 +3657,7 @@ export default function ClientShow({
                             initialEvents={
                                 (pageProps as any).calendar_events ?? []
                             }
+                            canCreate={canCreateAppointment}
                         />
                     </div>
                 )}
@@ -3155,13 +3670,20 @@ export default function ClientShow({
                         canReview={Boolean(progressNotesCan.review)}
                         canUpdate={Boolean(progressNotesCan.update)}
                         currentUserId={auth?.user?.id}
-                        onCreateDaily={() => setDailyNoteOpen(true)}
-                        onCreateQuick={() => setQuickNoteOpen(true)}
+                        onCreateDaily={
+                            can.create_daily_note
+                                ? () => openProfileDialog('daily_note')
+                                : undefined
+                        }
+                        onCreateQuick={
+                            can.create_quick_note
+                                ? () => openProfileDialog('quick_note')
+                                : undefined
+                        }
                         filterPreset={dailyNotesFilter}
                         onFilterChange={setDailyNotesFilter}
                         onShowReviewQueue={() => openDailyNotes('flagged')}
                         isLoading={!hasClientDailyNotesProp}
-                        legacyProgressNotes={clientProgressNotes}
                     />
                 )}
 
@@ -3170,7 +3692,16 @@ export default function ClientShow({
                         notes={communicationNotes}
                         familyNotes={familyNotes}
                         familyNotesOpenCount={familyNotesOpenCount}
-                        onCreate={() => setCommunicationNoteOpen(true)}
+                        coverage={{
+                            total: dailyNotesSummary.communication,
+                            loaded: dailyNotesSummary.communication_loaded,
+                            has_more: dailyNotesSummary.communication_has_more,
+                        }}
+                        onCreate={
+                            can.create_communication_note
+                                ? () => openProfileDialog('comm_note')
+                                : undefined
+                        }
                         canReview={Boolean(progressNotesCan.review)}
                         canUpdate={Boolean(progressNotesCan.update)}
                         onMarkReviewed={(noteId) =>
@@ -3271,7 +3802,9 @@ export default function ClientShow({
                             ((pageProps as any).next_of_kins ?? []) as any
                         }
                         onEdit={
-                            can.edit ? () => setEditDialogOpen(true) : undefined
+                            can.edit
+                                ? () => openProfileDialog('edit_profile')
+                                : undefined
                         }
                     />
                 )}
@@ -3280,23 +3813,21 @@ export default function ClientShow({
                     <GoalsPathTab
                         clientId={client.id}
                         clientName={name}
-                        activePlanId={carePlansSummary?.active_plan?.id ?? null}
-                        goals={carePlansSummary?.active_plan?.goals ?? []}
+                        activePlanId={workingCarePlan?.id ?? null}
+                        goals={workingCarePlan?.goals ?? []}
                         lifeStory={(client as any).life_story}
                         strengthsAbilities={(client as any).strengths_abilities}
                         interestsHobbies={(client as any).interests_hobbies}
                         pathPlan={(pageProps as any).path_plan ?? null}
-                        canEdit={can.edit}
+                        canManageGoals={Boolean(can.manage_care_plan_goals)}
+                        canEditPath={Boolean(can.edit_path_plan)}
                         onAddGoal={() => openProfileDialog('goal')}
                         onManageGoal={(goal) =>
                             openProfileDialog('goal', { goal })
                         }
                         onEditPlan={() => {
-                            const pp =
-                                ((pageProps as any).path_plan ?? {}) as Record<
-                                    string,
-                                    unknown
-                                >;
+                            const pp = ((pageProps as any).path_plan ??
+                                {}) as Record<string, unknown>;
                             const toLines = (a: unknown) =>
                                 Array.isArray(a) ? a.join('\n') : '';
                             const day = (v: unknown) =>
@@ -3342,10 +3873,14 @@ export default function ClientShow({
                                 openProfileDialog('edit_risk', { risk })
                             }
                             homeHazards={(pageProps.homeHazards ?? []) as any}
-                            homeHazardDetail={(pageProps.homeHazardDetail ?? null) as any}
+                            homeHazardDetail={
+                                (pageProps.homeHazardDetail ?? null) as any
+                            }
                             homeName={(pageProps.homeName ?? null) as any}
                             homeSiteId={(pageProps.homeSiteId ?? null) as any}
-                            homeProcedures={(pageProps.homeProcedures ?? []) as any}
+                            homeProcedures={
+                                (pageProps.homeProcedures ?? []) as any
+                            }
                         />
 
                         {Boolean((can as any).view_hs_risk_assessments) && (
@@ -3353,17 +3888,36 @@ export default function ClientShow({
                                 <div className="mb-4 flex items-center gap-2">
                                     <ShieldAlert className="h-5 w-5 text-muted-foreground" />
                                     <div>
-                                        <h3 className="text-base font-semibold">Formal H&amp;S risk assessments</h3>
+                                        <h3 className="text-base font-semibold">
+                                            Formal H&amp;S risk assessments
+                                        </h3>
                                         <p className="text-xs text-muted-foreground">
-                                            ISO 31000 / SafePlus 5×5 assessments attached to this client — separate from the care-risk list above.
+                                            ISO 31000 / SafePlus 5×5 assessments
+                                            attached to this client — separate
+                                            from the care-risk list above.
                                         </p>
                                     </div>
                                 </div>
                                 <RaRegisterSection
-                                    assessments={(pageProps.hs_risk_assessments ?? []) as RaRow[]}
-                                    pickers={(pageProps.ra_pickers ?? { sites: [], clients: [], events: [] }) as RaPickers}
-                                    canManage={Boolean((can as any).manage_hs_risk_assessments)}
-                                    lockedAssessable={{ type: 'client', id: client.id, name: `${client.first_name} ${client.last_name}`.trim() }}
+                                    assessments={
+                                        (pageProps.hs_risk_assessments ??
+                                            []) as RaRow[]
+                                    }
+                                    pickers={
+                                        (pageProps.ra_pickers ?? {
+                                            sites: [],
+                                            clients: [],
+                                            events: [],
+                                        }) as RaPickers
+                                    }
+                                    canManage={Boolean(
+                                        (can as any).manage_hs_risk_assessments,
+                                    )}
+                                    lockedAssessable={{
+                                        type: 'client',
+                                        id: client.id,
+                                        name: `${client.first_name} ${client.last_name}`.trim(),
+                                    }}
                                 />
                             </div>
                         )}
@@ -3494,7 +4048,9 @@ export default function ClientShow({
                                 []) as any
                         }
                         canManage={Boolean(can.edit)}
-                        onRequestLeave={() => openProfileDialog('request_leave')}
+                        onRequestLeave={() =>
+                            openProfileDialog('request_leave')
+                        }
                         onPlanExcursion={() =>
                             openProfileDialog('plan_excursion')
                         }
@@ -3571,7 +4127,7 @@ export default function ClientShow({
 
                                 {/* Overall Budget Bar */}
                                 {totalBudget > 0 && (
-                                    <Card className="bg-primary/10 border-primary">
+                                    <Card className="border-primary bg-primary/10">
                                         <CardContent className="p-4">
                                             <div className="mb-2 flex items-center justify-between">
                                                 <span className="text-sm font-semibold">
@@ -3872,6 +4428,7 @@ export default function ClientShow({
                             clientId={client.id}
                             events={events}
                             handover={handover}
+                            summary={timelineSummary}
                             canCreateNote={Boolean(can.create_note)}
                             canPinHandover={Boolean(can.pin_handover)}
                             auth={auth}
@@ -4133,7 +4690,7 @@ export default function ClientShow({
                                                                     </p>
                                                                 )}
                                                                 {note.assigned_shift && (
-                                                                    <div className="bg-primary/10 mt-1 rounded-md border border-primary px-2 py-1 text-xs text-primary">
+                                                                    <div className="mt-1 rounded-md border border-primary bg-primary/10 px-2 py-1 text-xs text-primary">
                                                                         <p className="font-medium">
                                                                             📋
                                                                             Assigned
@@ -4229,43 +4786,23 @@ export default function ClientShow({
                                                             </div>
 
                                                             {/* Staff actions */}
-                                                            {[
-                                                                'open',
-                                                                'in_progress',
-                                                            ].includes(
-                                                                note.status,
-                                                            ) && (
-                                                                <div className="flex shrink-0 flex-col gap-1">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-7 gap-1 text-[10px] text-status-success"
-                                                                        onClick={() =>
-                                                                            router.post(
-                                                                                `/clients/${client.id}/family-notes/${note.id}/status`,
-                                                                                {
-                                                                                    status: 'completed',
-                                                                                },
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Check className="h-3 w-3" />
-                                                                        Done
-                                                                    </Button>
-                                                                    {note.status ===
-                                                                        'open' && (
+                                                            {can.manage_family_notes &&
+                                                                [
+                                                                    'open',
+                                                                    'in_progress',
+                                                                ].includes(
+                                                                    note.status,
+                                                                ) && (
+                                                                    <div className="flex shrink-0 flex-col gap-1">
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="h-7 gap-1 text-[10px] text-status-warning"
+                                                                            className="h-7 gap-1 text-[10px] text-status-success"
                                                                             onClick={() =>
                                                                                 router.post(
                                                                                     `/clients/${client.id}/family-notes/${note.id}/status`,
                                                                                     {
-                                                                                        status: 'in_progress',
+                                                                                        status: 'completed',
                                                                                     },
                                                                                     {
                                                                                         preserveScroll: true,
@@ -4273,185 +4810,209 @@ export default function ClientShow({
                                                                                 )
                                                                             }
                                                                         >
-                                                                            <Clock className="h-3 w-3" />
-                                                                            Start
+                                                                            <Check className="h-3 w-3" />
+                                                                            Done
                                                                         </Button>
-                                                                    )}
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-7 gap-1 text-[10px]"
-                                                                        onClick={() => {
-                                                                            setRespondingId(
-                                                                                respondingId ===
-                                                                                    note.id
-                                                                                    ? null
-                                                                                    : note.id,
-                                                                            );
-                                                                            setResponseText(
-                                                                                '',
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <MsgIcon className="h-3 w-3" />
-                                                                        Reply
-                                                                    </Button>
-                                                                    {!note.assigned_to_shift_id && (
+                                                                        {note.status ===
+                                                                            'open' && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-7 gap-1 text-[10px] text-status-warning"
+                                                                                onClick={() =>
+                                                                                    router.post(
+                                                                                        `/clients/${client.id}/family-notes/${note.id}/status`,
+                                                                                        {
+                                                                                            status: 'in_progress',
+                                                                                        },
+                                                                                        {
+                                                                                            preserveScroll: true,
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Clock className="h-3 w-3" />
+                                                                                Start
+                                                                            </Button>
+                                                                        )}
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="h-7 gap-1 text-[10px] text-primary"
-                                                                            onClick={() =>
-                                                                                setAssigningId(
-                                                                                    assigningId ===
+                                                                            className="h-7 gap-1 text-[10px]"
+                                                                            onClick={() => {
+                                                                                setRespondingId(
+                                                                                    respondingId ===
                                                                                         note.id
                                                                                         ? null
                                                                                         : note.id,
-                                                                                )
-                                                                            }
+                                                                                );
+                                                                                setResponseText(
+                                                                                    '',
+                                                                                );
+                                                                            }}
                                                                         >
-                                                                            <ListTodo className="h-3 w-3" />
-                                                                            Shift
+                                                                            <MsgIcon className="h-3 w-3" />
+                                                                            Reply
                                                                         </Button>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                                        {!note.assigned_to_shift_id && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-7 gap-1 text-[10px] text-primary"
+                                                                                onClick={() =>
+                                                                                    setAssigningId(
+                                                                                        assigningId ===
+                                                                                            note.id
+                                                                                            ? null
+                                                                                            : note.id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <ListTodo className="h-3 w-3" />
+                                                                                Shift
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                         </div>
 
                                                         {/* Response form */}
-                                                        {respondingId ===
-                                                            note.id && (
-                                                            <div className="mt-3 flex gap-2">
-                                                                <Input
-                                                                    className="h-8 text-xs"
-                                                                    placeholder="Write a response..."
-                                                                    value={
-                                                                        responseText
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        setResponseText(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="h-8"
-                                                                    disabled={
-                                                                        !responseText.trim()
-                                                                    }
-                                                                    onClick={() => {
-                                                                        router.post(
-                                                                            `/clients/${client.id}/family-notes/${note.id}/respond`,
-                                                                            {
-                                                                                staff_response:
-                                                                                    responseText,
-                                                                            },
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        );
-                                                                        setRespondingId(
-                                                                            null,
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    Send
-                                                                </Button>
-                                                            </div>
-                                                        )}
+                                                        {can.manage_family_notes &&
+                                                            respondingId ===
+                                                                note.id && (
+                                                                <div className="mt-3 flex gap-2">
+                                                                    <Input
+                                                                        className="h-8 text-xs"
+                                                                        placeholder="Write a response..."
+                                                                        value={
+                                                                            responseText
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setResponseText(
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <Button
+                                                                        size="sm"
+                                                                        className="h-8"
+                                                                        disabled={
+                                                                            !responseText.trim()
+                                                                        }
+                                                                        onClick={() => {
+                                                                            router.post(
+                                                                                `/clients/${client.id}/family-notes/${note.id}/respond`,
+                                                                                {
+                                                                                    staff_response:
+                                                                                        responseText,
+                                                                                },
+                                                                                {
+                                                                                    preserveScroll: true,
+                                                                                },
+                                                                            );
+                                                                            setRespondingId(
+                                                                                null,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        Send
+                                                                    </Button>
+                                                                </div>
+                                                            )}
 
                                                         {/* Assign to shift */}
-                                                        {assigningId ===
-                                                            note.id && (
-                                                            <div className="mt-3 text-xs text-muted-foreground">
-                                                                <p className="mb-1 font-medium">
-                                                                    Assign to
-                                                                    upcoming
-                                                                    shift:
-                                                                </p>
-                                                                {(() => {
-                                                                    const clientShifts =
-                                                                        (
-                                                                            events ??
-                                                                            []
-                                                                        )
-                                                                            .filter(
-                                                                                (
-                                                                                    e: any,
-                                                                                ) =>
-                                                                                    e.type ===
-                                                                                        'shift' &&
-                                                                                    new Date(
-                                                                                        e.occurred_at,
-                                                                                    ) >
-                                                                                        new Date(),
+                                                        {can.manage_family_notes &&
+                                                            assigningId ===
+                                                                note.id && (
+                                                                <div className="mt-3 text-xs text-muted-foreground">
+                                                                    <p className="mb-1 font-medium">
+                                                                        Assign
+                                                                        to
+                                                                        upcoming
+                                                                        shift:
+                                                                    </p>
+                                                                    {(() => {
+                                                                        const clientShifts =
+                                                                            (
+                                                                                events ??
+                                                                                []
                                                                             )
-                                                                            .slice(
-                                                                                0,
-                                                                                5,
-                                                                            );
-                                                                    return clientShifts.length >
-                                                                        0 ? (
-                                                                        <div className="flex flex-wrap gap-1">
-                                                                            {clientShifts.map(
-                                                                                (
-                                                                                    s: any,
-                                                                                ) => (
-                                                                                    <Button
-                                                                                        key={
-                                                                                            s.id
-                                                                                        }
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                        className="h-7 text-[10px]"
-                                                                                        onClick={() => {
-                                                                                            router.post(
-                                                                                                `/clients/${client.id}/family-notes/${note.id}/assign-shift`,
+                                                                                .filter(
+                                                                                    (
+                                                                                        e: any,
+                                                                                    ) =>
+                                                                                        e.type ===
+                                                                                            'shift' &&
+                                                                                        new Date(
+                                                                                            e.occurred_at,
+                                                                                        ) >
+                                                                                            new Date(),
+                                                                                )
+                                                                                .slice(
+                                                                                    0,
+                                                                                    5,
+                                                                                );
+                                                                        return clientShifts.length >
+                                                                            0 ? (
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {clientShifts.map(
+                                                                                    (
+                                                                                        s: any,
+                                                                                    ) => (
+                                                                                        <Button
+                                                                                            key={
+                                                                                                s.id
+                                                                                            }
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 text-[10px]"
+                                                                                            onClick={() => {
+                                                                                                router.post(
+                                                                                                    `/clients/${client.id}/family-notes/${note.id}/assign-shift`,
+                                                                                                    {
+                                                                                                        shift_id:
+                                                                                                            s.shift_id ||
+                                                                                                            s.id,
+                                                                                                    },
+                                                                                                    {
+                                                                                                        preserveScroll: true,
+                                                                                                    },
+                                                                                                );
+                                                                                                setAssigningId(
+                                                                                                    null,
+                                                                                                );
+                                                                                            }}
+                                                                                        >
+                                                                                            {new Date(
+                                                                                                s.occurred_at,
+                                                                                            ).toLocaleDateString(
+                                                                                                'en-NZ',
                                                                                                 {
-                                                                                                    shift_id:
-                                                                                                        s.shift_id ||
-                                                                                                        s.id,
+                                                                                                    weekday:
+                                                                                                        'short',
+                                                                                                    day: 'numeric',
+                                                                                                    month: 'short',
                                                                                                 },
-                                                                                                {
-                                                                                                    preserveScroll: true,
-                                                                                                },
-                                                                                            );
-                                                                                            setAssigningId(
-                                                                                                null,
-                                                                                            );
-                                                                                        }}
-                                                                                    >
-                                                                                        {new Date(
-                                                                                            s.occurred_at,
-                                                                                        ).toLocaleDateString(
-                                                                                            'en-NZ',
-                                                                                            {
-                                                                                                weekday:
-                                                                                                    'short',
-                                                                                                day: 'numeric',
-                                                                                                month: 'short',
-                                                                                            },
-                                                                                        )}
-                                                                                    </Button>
-                                                                                ),
-                                                                            )}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <p>
-                                                                            No
-                                                                            upcoming
-                                                                            shifts
-                                                                            found.
-                                                                        </p>
-                                                                    );
-                                                                })()}
-                                                            </div>
-                                                        )}
+                                                                                            )}
+                                                                                        </Button>
+                                                                                    ),
+                                                                                )}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p>
+                                                                                No
+                                                                                upcoming
+                                                                                shifts
+                                                                                found.
+                                                                            </p>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
                                                     </CardContent>
                                                 </Card>
                                             );
@@ -5112,7 +5673,7 @@ export default function ClientShow({
                                             </div>
                                         </CardContent>
                                     </Card>
-                                    <Card className="bg-primary/10 border dark:bg-primary/20">
+                                    <Card className="border bg-primary/10 dark:bg-primary/20">
                                         <CardContent className="p-4">
                                             <div className="text-2xl font-bold text-primary dark:text-primary">
                                                 {ts.outings_30d}
@@ -5534,7 +6095,11 @@ export default function ClientShow({
             <ClientEditDialog
                 clientId={client.id}
                 open={editDialogOpen}
-                onOpenChange={setEditDialogOpen}
+                onOpenChange={(open) => {
+                    if (!open && profileDialog?.key === 'edit_profile') {
+                        closeProfileDialog();
+                    }
+                }}
             />
 
             {createShiftLauncher.dialog}

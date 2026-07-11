@@ -30,15 +30,12 @@ import {
     FileCheck,
     FileText,
     FileWarning,
-    Flag,
     FolderOpen,
-    Gauge,
     HeartPulse,
     Home,
     LayoutGrid,
     Leaf,
     ListChecks,
-    ListOrdered,
     ListPlus,
     ListTodo,
     MapPin,
@@ -96,6 +93,7 @@ export type ProfileFlowContext = {
     carePlanId: number | null;
     carePlanTitle: string | null;
     onboardingWorkflowId: number | null;
+    canSendFamilyChat: boolean;
     /** Per-flow context passed at openDialog() time (e.g. prefill values). */
     dialog?: Record<string, unknown>;
 };
@@ -107,6 +105,21 @@ const opt = (v: unknown): string | undefined => (str(v) ? str(v) : undefined);
 const num = (v: unknown): number | undefined => {
     const parsed = parseFloat(String(v ?? '').replace(/[^0-9.-]/g, ''));
     return Number.isFinite(parsed) ? parsed : undefined;
+};
+const newIdempotencyKey = (): string => {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+    }
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+        /[xy]/g,
+        (character) => {
+            const random = Math.floor(Math.random() * 16);
+            const value = character === 'x' ? random : (random & 0x3) | 0x8;
+
+            return value.toString(16);
+        },
+    );
 };
 
 /** Inertia POST/PUT with flash-aware completion (see reference_inertia_flash_error). */
@@ -691,7 +704,11 @@ const editPathPlan: FlowFactory = (ctx) => ({
                     rows: 3,
                     full: true,
                 },
-                { key: 'north_star', label: 'North star (short statement)', full: true },
+                {
+                    key: 'north_star',
+                    label: 'North star (short statement)',
+                    full: true,
+                },
             ],
         },
         {
@@ -1092,6 +1109,7 @@ const transaction: FlowFactory = (ctx) => ({
     title: 'New transaction',
     sub: 'Personal funds',
     submitLabel: 'Save transaction',
+    initialValues: () => ({ idempotency_key: newIdempotencyKey() }),
     steps: [
         {
             key: 'details',
@@ -1142,6 +1160,11 @@ const transaction: FlowFactory = (ctx) => ({
                     required: true,
                     full: true,
                 },
+                {
+                    key: 'idempotency_key',
+                    label: 'Submission key',
+                    when: () => false,
+                },
             ],
         },
         {
@@ -1175,9 +1198,10 @@ const transaction: FlowFactory = (ctx) => ({
             `/operations/client-funds/${fundId}/transactions`,
             {
                 type: str(values.type) || 'debit',
-                amount: num(values.amount),
+                amount: str(values.amount),
                 description: str(values.description),
                 reference: opt(values.reference),
+                idempotency_key: str(values.idempotency_key),
             },
             helpers,
             'Transaction saved',

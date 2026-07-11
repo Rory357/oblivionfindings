@@ -6,8 +6,10 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Enums\Medication\NotGivenReason;
 use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
@@ -19,8 +21,11 @@ use Illuminate\Support\Facades\Hash;
 class EnhancedMarService
 {
     protected MarScheduleService $scheduleService;
+
     protected MedicationSafetyService $safetyService;
+
     protected MedicationScanVerificationService $scanVerificationService;
+
     protected MedicationRuleService $ruleService;
 
     public function __construct(
@@ -43,7 +48,7 @@ class EnhancedMarService
         $date = $date->copy()->timezone($this->scheduleService->workerTimezone())->startOfDay();
         $now = ($now ?? now())->copy()->timezone($this->scheduleService->workerTimezone());
         $isToday = $date->isSameDay($now);
-        
+
         // Get client's allergies for safety display
         $allergies = $client->medicationAllergies()
             ->whereNull('deleted_at')
@@ -95,9 +100,9 @@ class EnhancedMarService
 
         foreach ($medications as $medication) {
             // Build scheduled doses for non-PRN medications
-            if (!$medication->is_prn) {
+            if (! $medication->is_prn) {
                 $scheduledTimes = $this->scheduleService->scheduledTimesForDate($medication, $date);
-                
+
                 foreach ($scheduledTimes as $scheduledFor) {
                     $row = $this->buildScheduledRow($medication, $scheduledFor, $now, $date, $client, $activeShiftId);
                     $scheduledRows[] = $row;
@@ -288,7 +293,7 @@ class EnhancedMarService
     ): array {
         // Get PRN history
         $prnHistory = $this->safetyService->getPrnHistory($medication, 24);
-        
+
         // Perform safety check
         $safetyCheck = $this->safetyService->performSafetyCheck($client, $medication, $now);
         $adminRules = $this->ruleService->requirementsFor($medication);
@@ -305,7 +310,7 @@ class EnhancedMarService
             'is_near_limit' => $medication->isPrnNearLimit(),
             'is_over_limit' => $medication->isPrnOverLimit(),
             'is_blocked' => $safetyCheck['blocked'],
-            'can_record' => !$safetyCheck['blocked'] && $medication->isAdministrable(),
+            'can_record' => ! $safetyCheck['blocked'] && $medication->isAdministrable(),
             'requires_witness' => $medication->requiresWitness() || $adminRules['requires_countersign'],
             'safety_check' => $safetyCheck,
         ];
@@ -401,7 +406,7 @@ class EnhancedMarService
             return 'completed';
         }
 
-        if (!$isToday) {
+        if (! $isToday) {
             return $scheduledFor->isPast() ? 'missed_auto' : 'future';
         }
 
@@ -423,6 +428,7 @@ class EnhancedMarService
         if ($diff > $lateAfterMinutes && $diff <= $missAfterMinutes) {
             return 'late';
         }
+
         return 'missed_auto';
     }
 
@@ -538,7 +544,7 @@ class EnhancedMarService
             'prn' => $prnStats,
             'controlled_count' => $controlledCount,
             'history_count' => count($history),
-            'completion_percentage' => $scheduledStats['total'] > 0 
+            'completion_percentage' => $scheduledStats['total'] > 0
                 ? round(($scheduledStats['completed'] / $scheduledStats['total']) * 100, 1)
                 : 0,
         ];
@@ -554,6 +560,17 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        if ($shiftId !== null && ! Shift::query()
+            ->whereKey($shiftId)
+            ->where('client_id', $client->id)
+            ->exists()) {
+            return [
+                'success' => false,
+                'error' => 'The selected shift does not belong to this client.',
+                'error_field' => 'shift_id',
+            ];
+        }
+
         if (! $medication->isAdministrable()) {
             return [
                 'success' => false,
@@ -596,7 +613,7 @@ class EnhancedMarService
             $data['dose_given'] ?? null
         );
 
-        if ($safetyCheck['blocked'] && !($data['override_safety'] ?? false)) {
+        if ($safetyCheck['blocked'] && ! ($data['override_safety'] ?? false)) {
             // A blocked PRN over its 24h limit is an incident-worthy event no
             // matter which surface attempted it (MAR wizard, My Day, guided
             // round). Fire it here — the shared choke point — deduped so a
@@ -633,7 +650,7 @@ class EnhancedMarService
             : now($this->scheduleService->workerTimezone());
         $windowCheck = null;
 
-        if ($scheduledFor && !$medication->is_prn) {
+        if ($scheduledFor && ! $medication->is_prn) {
             $windowCheck = $this->safetyService->validateTimeWindow(
                 $scheduledFor,
                 $adminAt,
@@ -641,10 +658,10 @@ class EnhancedMarService
                 $this->scheduleService->windowAfterMinutes()
             );
 
-            if (!$windowCheck['valid'] && empty($data['reason']) && !($data['override_window'] ?? false)) {
+            if (! $windowCheck['valid'] && empty($data['reason']) && ! ($data['override_window'] ?? false)) {
                 return [
                     'success' => false,
-                    'error' => 'Outside time window: ' . $windowCheck['message'] . '. Please provide a reason.',
+                    'error' => 'Outside time window: '.$windowCheck['message'].'. Please provide a reason.',
                     'error_field' => 'reason',
                     'time_window' => $windowCheck,
                 ];
@@ -652,6 +669,23 @@ class EnhancedMarService
         }
 
         $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation) {
+            $shift = null;
+            if ($shiftId !== null) {
+                $shift = Shift::query()
+                    ->whereKey($shiftId)
+                    ->where('client_id', $client->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $shift) {
+                    return [
+                        'success' => false,
+                        'error' => 'The selected shift does not belong to this client.',
+                        'error_field' => 'shift_id',
+                    ];
+                }
+            }
+
             // Re-fetch medication with lock to prevent race conditions
             $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
 
@@ -692,7 +726,7 @@ class EnhancedMarService
             }
 
             // Create administration record
-            $admin = new ClientMedicationAdministration();
+            $admin = new ClientMedicationAdministration;
             $admin->client_id = $client->id;
             $admin->client_medication_id = $medication->id;
             $admin->shift_id = $shiftId;
@@ -716,9 +750,8 @@ class EnhancedMarService
             $admin->outcome = $data['outcome'] ?? null;
             $admin->site = $data['site'] ?? null;
 
-            if ($shiftId) {
-                $shift = Shift::find($shiftId);
-                $admin->service_context_id = $shift?->service_context_id;
+            if ($shift) {
+                $admin->service_context_id = $shift->service_context_id;
             }
 
             if (! $admin->service_context_id) {
@@ -859,7 +892,7 @@ class EnhancedMarService
             return null;
         }
 
-        $latest = \App\Models\MedicationCompetencyAssessment::query()
+        $latest = MedicationCompetencyAssessment::query()
             ->where('user_id', $userId)
             ->orderByDesc('assessment_date')
             ->orderByDesc('id')
@@ -1024,7 +1057,7 @@ class EnhancedMarService
         }
 
         // Create controlled drug register entry
-        \App\Models\ClientControlledDrugEntry::create([
+        ClientControlledDrugEntry::create([
             'client_id' => $admin->client_id,
             'client_medication_id' => $medication->id,
             'shift_id' => $admin->shift_id,
@@ -1050,7 +1083,7 @@ class EnhancedMarService
         $shift = Shift::with('client')->findOrFail($shiftId);
         $client = $shift->client;
 
-        if (!$client) {
+        if (! $client) {
             return ['error' => 'No client associated with this shift'];
         }
 

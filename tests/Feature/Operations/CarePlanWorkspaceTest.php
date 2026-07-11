@@ -1,11 +1,17 @@
 <?php
 
 use App\Models\CarePlan;
+use App\Models\CarePlanGoal;
 use App\Models\CarePlanSignOff;
 use App\Models\Client;
+use App\Models\ClientNote;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceAgreement;
+use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Timeline\TimelineEmitter;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 function grantCpPerms(User $user, array $keys): void
 {
@@ -110,6 +116,111 @@ it('blocks activating a plan with no goals or domains', function () {
     expect($plan->fresh()->status)->toBe('draft');
 });
 
+it('blocks creating an active plan with no goals or structured domains', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.create']);
+    $client = makeCpClient($user);
+
+    $this->actingAs($user)
+        ->post('/operations/care-plans', [
+            'client_id' => $client->id,
+            'title' => 'Structurally empty active plan',
+            'plan_type' => 'support_plan',
+            'status' => 'active',
+            'content' => ['domains' => []],
+        ])
+        ->assertSessionHasErrors('goals');
+
+    expect(CarePlan::query()
+        ->where('client_id', $client->id)
+        ->where('title', 'Structurally empty active plan')
+        ->exists())->toBeFalse();
+});
+
+it('does not reparent a care plan or its goals and notes to another same-organisation client', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.update']);
+    $originalClient = makeCpClient($user);
+    $otherClient = makeCpClient($user);
+    $plan = makeCpPlan($user, $originalClient, ['status' => 'draft']);
+    $goal = CarePlanGoal::query()->create([
+        'organization_id' => 1,
+        'care_plan_id' => $plan->id,
+        'client_id' => $originalClient->id,
+        'title' => 'Keep this goal with the original client',
+        'category' => 'daily_living',
+        'priority' => 'medium',
+        'created_by' => $user->id,
+    ]);
+    $note = ClientNote::query()->create([
+        'organization_id' => 1,
+        'client_id' => $originalClient->id,
+        'care_plan_goal_id' => $goal->id,
+        'user_id' => $user->id,
+        'type' => 'progress_note',
+        'body' => 'Keep this note with the original client',
+        'visibility' => 'internal',
+    ]);
+
+    $this->actingAs($user)
+        ->put("/operations/care-plans/{$plan->id}", [
+            'client_id' => $otherClient->id,
+        ])
+        ->assertSessionHasErrors('client_id');
+
+    expect($plan->fresh()->client_id)->toBe($originalClient->id)
+        ->and($goal->fresh()->client_id)->toBe($originalClient->id)
+        ->and($note->fresh()->client_id)->toBe($originalClient->id)
+        ->and($note->fresh()->care_plan_goal_id)->toBe($goal->id);
+});
+
+it('binds care plan funding agreements to the plan client and organisation', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.create', 'care_plans.update']);
+    $client = makeCpClient($user);
+    $otherClient = makeCpClient($user);
+    $ownAgreement = ServiceAgreement::factory()->create([
+        'organization_id' => 1,
+        'client_id' => $client->id,
+        'title' => 'Own service agreement',
+    ]);
+    $otherAgreement = ServiceAgreement::factory()->create([
+        'organization_id' => 1,
+        'client_id' => $otherClient->id,
+        'title' => 'Other client service agreement',
+    ]);
+
+    $this->actingAs($user)
+        ->post('/operations/care-plans', [
+            'client_id' => $client->id,
+            'title' => 'Invalid agreement plan',
+            'plan_type' => 'support_plan',
+            'status' => 'draft',
+            'content' => ['funding' => ['service_agreement_id' => $otherAgreement->id]],
+        ])
+        ->assertSessionHasErrors('content.funding.service_agreement_id');
+
+    $this->actingAs($user)
+        ->post('/operations/care-plans', [
+            'client_id' => $client->id,
+            'title' => 'Valid agreement plan',
+            'plan_type' => 'support_plan',
+            'status' => 'draft',
+            'content' => ['funding' => ['service_agreement_id' => $ownAgreement->id]],
+        ])
+        ->assertRedirect("/operations/clients/{$client->id}?tab=care_plans");
+
+    $plan = CarePlan::query()->where('title', 'Valid agreement plan')->sole();
+    $this->actingAs($user)
+        ->put("/operations/care-plans/{$plan->id}", [
+            'content' => ['funding' => ['service_agreement_id' => $otherAgreement->id]],
+        ])
+        ->assertSessionHasErrors('content.funding.service_agreement_id');
+
+    expect((int) data_get($plan->fresh()->content, 'funding.service_agreement_id'))
+        ->toBe($ownAgreement->id);
+});
+
 it('records and removes a sign-off', function () {
     $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.update']);
@@ -133,6 +244,63 @@ it('records and removes a sign-off', function () {
         ->delete("/operations/care-plans/{$plan->id}/sign-offs/{$signOff->id}")
         ->assertRedirect();
     expect(CarePlanSignOff::query()->find($signOff->id))->toBeNull();
+});
+
+it('records repeated care plan sign-offs with each canonical sign-off as the timeline source', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.update']);
+    $client = makeCpClient($user);
+    $plan = makeCpPlan($user, $client);
+
+    foreach ([
+        ['party_role' => 'client', 'party_name' => 'Tane Client'],
+        ['party_role' => 'whanau', 'party_name' => 'Hana Whanau'],
+    ] as $signatory) {
+        $this->actingAs($user)
+            ->post("/operations/care-plans/{$plan->id}/sign-offs", [
+                ...$signatory,
+                'agreed_on' => '2026-07-10',
+                'method' => 'in_person',
+            ])
+            ->assertRedirect();
+    }
+
+    $signOffs = CarePlanSignOff::query()
+        ->where('care_plan_id', $plan->id)
+        ->orderBy('id')
+        ->get();
+    $events = TimelineEvent::query()
+        ->where('type', 'care_plan_signed_off')
+        ->where('source_type', CarePlanSignOff::class)
+        ->orderBy('source_id')
+        ->get();
+
+    expect($signOffs)->toHaveCount(2)
+        ->and($events)->toHaveCount(2)
+        ->and($events->pluck('source_id')->all())->toBe($signOffs->pluck('id')->all())
+        ->and($events->pluck('meta.care_plan_id')->unique()->all())->toBe([$plan->id]);
+});
+
+it('rolls back a care plan sign-off when timeline emission fails', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.update']);
+    $client = makeCpClient($user);
+    $plan = makeCpPlan($user, $client);
+    $emitter = Mockery::mock(TimelineEmitter::class);
+    $emitter->shouldReceive('record')
+        ->once()
+        ->andThrow(new RuntimeException('Timeline unavailable'));
+    $this->app->instance(TimelineEmitter::class, $emitter);
+    $this->withoutExceptionHandling();
+
+    expect(fn () => $this->actingAs($user)
+        ->post("/operations/care-plans/{$plan->id}/sign-offs", [
+            'party_role' => 'client',
+            'party_name' => 'Rollback signatory',
+            'agreed_on' => '2026-07-10',
+        ]))->toThrow(RuntimeException::class, 'Timeline unavailable');
+
+    expect(CarePlanSignOff::query()->where('care_plan_id', $plan->id)->count())->toBe(0);
 });
 
 it('rejects an invalid sign-off role', function () {
@@ -184,6 +352,36 @@ it('exports a plan as a PDF', function () {
     $resp = $this->actingAs($user)->get("/operations/care-plans/{$plan->id}/pdf");
     $resp->assertOk();
     expect($resp->headers->get('content-type'))->toContain('application/pdf');
+});
+
+it('does not bind another clients service agreement into a legacy care plan PDF', function () {
+    $user = User::factory()->create(['organization_id' => 1]);
+    grantCpPerms($user, ['care_plans.viewAny']);
+    $client = makeCpClient($user);
+    $otherClient = makeCpClient($user);
+    $otherAgreement = ServiceAgreement::factory()->create([
+        'organization_id' => 1,
+        'client_id' => $otherClient->id,
+        'title' => 'Private agreement for another client',
+    ]);
+    $plan = makeCpPlan($user, $client, [
+        'content' => [
+            'funding' => ['service_agreement_id' => $otherAgreement->id],
+        ],
+    ]);
+
+    Pdf::shouldReceive('loadView')
+        ->once()
+        ->withArgs(fn (string $view, array $data) => $view === 'pdf.care-plan'
+            && $data['plan']->is($plan)
+            && $data['agreement'] === null)
+        ->andReturnSelf();
+    Pdf::shouldReceive('setPaper')->once()->with('A4')->andReturnSelf();
+    Pdf::shouldReceive('download')->once()->andReturn(response('PDF'));
+
+    $this->actingAs($user)
+        ->get("/operations/care-plans/{$plan->id}/pdf")
+        ->assertOk();
 });
 
 it('forbids PDF export without view permission', function () {

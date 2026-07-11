@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\ClientBowelEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
+use App\Models\ClientNote;
+use App\Models\RespiteBooking;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
@@ -161,13 +163,13 @@ class ClientProfileDataGapsBuildTest extends TestCase
             ])
             ->assertRedirect();
 
-        \App\Models\RespiteBooking::factory()->create([
+        RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
             'start_at' => now()->subDays(10)->startOfDay(),
             'end_at' => now()->subDays(1)->startOfDay(),
             'status' => 'completed',
         ]);
-        \App\Models\RespiteBooking::factory()->create([
+        RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
             'start_at' => now()->addDays(7)->startOfDay(),
             'end_at' => now()->addDays(9)->startOfDay(),
@@ -261,14 +263,14 @@ class ClientProfileDataGapsBuildTest extends TestCase
 
     public function test_profile_exposes_assignable_workers_for_worker_editor(): void
     {
-        $assigned = User::factory()->create(['name' => 'Assigned Worker', 'email' => 'assigned@example.test']);
-        $available = User::factory()->create(['name' => 'Available Worker', 'email' => 'available@example.test']);
+        $assigned = User::factory()->create(['name' => 'Assigned Worker', 'email' => 'assigned@example.test', 'role' => 'support_worker']);
+        $available = User::factory()->create(['name' => 'Available Worker', 'email' => 'available@example.test', 'role' => 'support_worker']);
         $this->client->supportWorkers()->attach($assigned->id);
 
         $this->actingAs($this->admin)
             ->get("/operations/clients/{$this->client->id}")
             ->assertInertia(fn (Assert $page) => $page
-                ->has('assignable_workers', 3)
+                ->has('assignable_workers', 2)
                 ->where('assignable_workers.0.name', 'Assigned Worker')
                 ->where('assignable_workers.1.name', 'Available Worker'));
     }
@@ -298,7 +300,7 @@ class ClientProfileDataGapsBuildTest extends TestCase
             ])
             ->assertRedirect();
 
-        $note = \App\Models\ClientNote::query()->where('client_id', $this->client->id)->latest('id')->firstOrFail();
+        $note = ClientNote::query()->where('client_id', $this->client->id)->latest('id')->firstOrFail();
         $this->assertTrue($note->occurred_at->equalTo($expected));
         $this->assertTrue($note->follow_up_due_at->equalTo($expected));
     }

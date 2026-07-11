@@ -14,7 +14,8 @@ class ConsentRequestPolicy
 
     public function view(User $user, ConsentRequest $request): bool
     {
-        return $user->canDo('consents.viewAny');
+        return $user->canDo('consents.viewAny')
+            && $user->can('view', $request->client);
     }
 
     public function create(User $user): bool
@@ -24,7 +25,8 @@ class ConsentRequestPolicy
 
     public function cancel(User $user, ConsentRequest $request): bool
     {
-        return $user->canDo('consents.request') && $request->isPending();
+        return $user->canDo('consents.request')
+            && $user->can('view', $request->client);
     }
 
     public function respond(User $user, ConsentRequest $request): bool

@@ -22,6 +22,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ClientMedicalController extends Controller
 {
@@ -409,7 +410,12 @@ class ClientMedicalController extends Controller
             'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
-            'shift_id' => ['nullable', 'integer'],
+            'shift_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('shifts', 'id')
+                    ->where(fn ($query) => $query->where('client_id', $client->id)),
+            ],
             'witnessed_by' => ['nullable', 'integer'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],

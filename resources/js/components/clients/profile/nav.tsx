@@ -57,9 +57,20 @@ export function GroupPillRail({
     groups: ProfileNavGroup[];
     openGroup: string;
     activeTab: string;
-    onOpenGroup: (key: string) => void;
+    onOpenGroup: (key: string, tabKey: string) => void;
     onSearch: () => void;
 }) {
+    const rememberedTabs = useRef<Record<string, string>>({});
+
+    useEffect(() => {
+        const activeGroup = groups.find((group) =>
+            group.tabs.some((tab) => tab.key === activeTab),
+        );
+        if (activeGroup) {
+            rememberedTabs.current[activeGroup.key] = activeTab;
+        }
+    }, [activeTab, groups]);
+
     return (
         <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-2.5">
             {groups.map((g) => {
@@ -70,7 +81,15 @@ export function GroupPillRail({
                     <button
                         key={g.key}
                         type="button"
-                        onClick={() => onOpenGroup(g.key)}
+                        onClick={() => {
+                            const remembered = rememberedTabs.current[g.key];
+                            const target = g.tabs.some(
+                                (tab) => tab.key === remembered,
+                            )
+                                ? remembered
+                                : g.tabs[0]?.key;
+                            if (target) onOpenGroup(g.key, target);
+                        }}
                         aria-pressed={isOpen}
                         data-test={`client-group-${g.key}`}
                         className={cn(
@@ -115,7 +134,11 @@ export function TierTwoTabs({
     activeTab: string;
     onTab: (key: string) => void;
     /** Render a navigation tab (with href) as an anchor — keeps Inertia links. */
-    renderLink: (tab: ProfileNavTab, className: string, inner: ReactNode) => ReactNode;
+    renderLink: (
+        tab: ProfileNavTab,
+        className: string,
+        inner: ReactNode,
+    ) => ReactNode;
 }) {
     return (
         <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/85 px-4 backdrop-blur md:-mx-6 md:px-6">
@@ -214,7 +237,7 @@ export function TabSearchPalette({
             aria-label="Jump to a section"
         >
             <div
-                className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2 motion-safe:duration-200"
+                className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl motion-safe:animate-in motion-safe:duration-200 motion-safe:fade-in-0 motion-safe:slide-in-from-top-2"
                 onMouseDown={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center gap-2 border-b border-border px-4">

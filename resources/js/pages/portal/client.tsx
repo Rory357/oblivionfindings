@@ -18,10 +18,10 @@ type Props = {
         avatar?: string | null;
         profile_photo_url?: string | null;
     };
-    profile: any | null;
-    medications: Array<any>;
-    conditions: Array<any>;
-    emergency_contacts: Array<any>;
+    profile?: any | null;
+    medications?: Array<any>;
+    conditions?: Array<any>;
+    emergency_contacts?: Array<any>;
     documents: Array<any>;
     incidents: Array<any>;
     events: Array<any>;
@@ -33,15 +33,19 @@ type Props = {
         expires_at?: string | null;
     } | null;
     rag_answer?: { text: string | null; sources?: Array<any> } | null;
-    can?: { viewIncidents: boolean; downloadIncidentAttachments: boolean };
+    can?: {
+        viewIncidents: boolean;
+        downloadIncidentAttachments: boolean;
+        askRag: boolean;
+    };
 };
 
 export default function PortalClient({
     client,
-    profile,
-    medications,
-    conditions,
-    emergency_contacts,
+    profile = null,
+    medications = [],
+    conditions = [],
+    emergency_contacts = [],
     documents,
     incidents,
     events,
@@ -461,74 +465,85 @@ export default function PortalClient({
                     </Card>
 
                     {/* RIGHT COLUMN */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Ask about {name}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <form onSubmit={submit} className="space-y-2">
-                                <Label htmlFor="q">Question</Label>
-                                <Input
-                                    id="q"
-                                    value={form.data.question}
-                                    onChange={(e) =>
-                                        form.setData('question', e.target.value)
-                                    }
-                                    placeholder="e.g., What happened at the last appointment?"
-                                />
-
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        form.processing ||
-                                        !form.data.question.trim()
-                                    }
+                    {can?.askRag ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle
+                                    className="text-base"
+                                    role="heading"
+                                    aria-level={2}
                                 >
-                                    Ask
-                                </Button>
-                            </form>
+                                    Ask about {name}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <form onSubmit={submit} className="space-y-2">
+                                    <Label htmlFor="q">Question</Label>
+                                    <Input
+                                        id="q"
+                                        value={form.data.question}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'question',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g., What happened at the last appointment?"
+                                    />
 
-                            {rag_answer?.text && (
-                                /* eslint-disable-next-line no-restricted-syntax -- RAG answer panel is a compact result surface inside the ask widget. */
-                                <div className="rounded-md border bg-card p-3 text-sm whitespace-pre-wrap">
-                                    {rag_answer.text}
-                                </div>
-                            )}
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            form.processing ||
+                                            !form.data.question.trim()
+                                        }
+                                    >
+                                        Ask
+                                    </Button>
+                                </form>
 
-                            {!!rag_answer?.sources?.length && (
-                                /* eslint-disable-next-line no-restricted-syntax -- Source snippets are compact result surfaces inside the ask widget. */
-                                <div className="rounded-md border bg-card p-3">
-                                    <div className="text-xs font-medium text-muted-foreground">
-                                        Sources
+                                {rag_answer?.text && (
+                                    /* eslint-disable-next-line no-restricted-syntax -- RAG answer panel is a compact result surface inside the ask widget. */
+                                    <div className="rounded-md border bg-card p-3 text-sm whitespace-pre-wrap">
+                                        {rag_answer.text}
                                     </div>
-                                    <div className="mt-2 space-y-2">
-                                        {rag_answer.sources.map((s, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="rounded-md border p-2"
-                                            >
-                                                <div className="text-xs text-muted-foreground">
-                                                    {s.filename ||
-                                                        s.file_id ||
-                                                        'Source'}
-                                                </div>
-                                                <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
-                                                    {s.text}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="text-xs text-muted-foreground">
-                                Answers are generated from the client timeline +
-                                medical details.
-                            </div>
-                        </CardContent>
-                    </Card>
+                                {!!rag_answer?.sources?.length && (
+                                    /* eslint-disable-next-line no-restricted-syntax -- Source snippets are compact result surfaces inside the ask widget. */
+                                    <div className="rounded-md border bg-card p-3">
+                                        <div className="text-xs font-medium text-muted-foreground">
+                                            Sources
+                                        </div>
+                                        <div className="mt-2 space-y-2">
+                                            {rag_answer.sources.map(
+                                                (s, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="rounded-md border p-2"
+                                                    >
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {s.filename ||
+                                                                s.file_id ||
+                                                                'Source'}
+                                                        </div>
+                                                        <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                            {s.text}
+                                                        </div>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="text-xs text-muted-foreground">
+                                    Answers are generated from the client
+                                    timeline + medical details.
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
                 </div>
 
                 <Card>

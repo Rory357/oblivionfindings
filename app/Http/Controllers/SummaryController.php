@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateSummaryJob;
 use App\Models\Client;
+use App\Models\Site;
 use App\Models\Summary;
 use App\Models\User;
 use Carbon\Carbon;
@@ -15,6 +16,7 @@ class SummaryController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+
         return $this->staff($request, $user);
     }
 
@@ -22,9 +24,11 @@ class SummaryController extends Controller
     {
         $viewer = $request->user();
         abort_unless($viewer, 403);
+        abort_if($viewer->hasRole('client', 'next_of_kin'), 403);
 
         if ($viewer->id !== $user->id) {
             abort_unless($viewer->canDo('summaries.viewAny') || $viewer->canDo('timeline.viewAny') || $viewer->canDo('staff.viewAny'), 403);
+            abort_unless($this->sharesOrganization($viewer, $user), 403);
         }
 
         $range = $this->parseRange($request);
@@ -47,6 +51,7 @@ class SummaryController extends Controller
     {
         $viewer = $request->user();
         abort_unless($viewer, 403);
+        abort_if($viewer->hasRole('client', 'next_of_kin'), 403);
         $this->authorize('view', $client);
 
         $range = $this->parseRange($request);
@@ -59,7 +64,7 @@ class SummaryController extends Controller
             ->first();
 
         return inertia('summaries/index', [
-            'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name . ' ' . $client->last_name)],
+            'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)],
             'range' => ['from' => $range['from']->toISOString(), 'to' => $range['to']->toISOString()],
             'summary' => $summary ? $this->dto($summary) : null,
         ]);
@@ -69,26 +74,21 @@ class SummaryController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_if($user->hasRole('client', 'next_of_kin'), 403);
 
         $data = $request->validate([
             'scope_type' => ['required', 'in:staff,client,site'],
             'scope_id' => ['required', 'integer'],
             'from' => ['required', 'date'],
-            'to' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
         ]);
 
-        // Staff permissions
-        $allowed = $user->canDo('summaries.generate');
-
-        // Portal users (client/next_of_kin): allow generating summaries only for their linked client
-        if (!$allowed && $data['scope_type'] === 'client' && $user->hasRole('client', 'next_of_kin')) {
-            $client = Client::find((int) $data['scope_id']);
-            if ($client && $user->canAccessClientPortal($client)) {
-                $allowed = true;
-            }
-        }
-
-        abort_unless($allowed, 403);
+        abort_unless($user->canDo('summaries.generate'), 403);
+        $this->authorizeGenerationScope(
+            $user,
+            $data['scope_type'],
+            (int) $data['scope_id'],
+        );
 
         GenerateSummaryJob::dispatch(
             $data['scope_type'],
@@ -101,6 +101,21 @@ class SummaryController extends Controller
         return back()->with('status', 'Summary generation queued.');
     }
 
+    private function authorizeGenerationScope(User $user, string $scopeType, int $scopeId): void
+    {
+        if ($scopeType === 'client') {
+            $this->authorize('view', Client::query()->findOrFail($scopeId));
+
+            return;
+        }
+
+        $target = $scopeType === 'staff'
+            ? User::query()->findOrFail($scopeId)
+            : Site::query()->findOrFail($scopeId);
+
+        abort_unless($this->sharesOrganization($user, $target), 403);
+    }
+
     private function parseRange(Request $request): array
     {
         $from = $request->query('from') ? Carbon::parse($request->query('from')) : now()->startOfDay();
@@ -111,6 +126,7 @@ class SummaryController extends Controller
         if ($to->diffInDays($from) > 60) {
             $to = (clone $from)->addDays(60);
         }
+
         return compact('from', 'to');
     }
 
@@ -126,5 +142,12 @@ class SummaryController extends Controller
             'summary_text' => $s->summary_text,
             'generated_at' => $s->generated_at?->toISOString(),
         ];
+    }
+
+    private function sharesOrganization(User $viewer, User|Site $target): bool
+    {
+        return $viewer->organization_id === null
+            || $target->organization_id === null
+            || (int) $viewer->organization_id === (int) $target->organization_id;
     }
 }

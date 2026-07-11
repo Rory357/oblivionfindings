@@ -60,6 +60,7 @@ class ConsentRequest extends Model
         'requested_by_user_id',
         'recipient_user_id',
         'recipient_relationship',
+        'authority_next_of_kin_id',
         'triggering_subject_type',
         'triggering_subject_id',
         'purpose',
@@ -111,6 +112,11 @@ class ConsentRequest extends Model
     public function recipient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recipient_user_id');
+    }
+
+    public function authorityNextOfKin(): BelongsTo
+    {
+        return $this->belongsTo(NextOfKin::class, 'authority_next_of_kin_id');
     }
 
     public function triggeringSubject(): MorphTo
@@ -177,7 +183,8 @@ class ConsentRequest extends Model
 
     public function authorityToConsent(): string
     {
-        return in_array($this->recipient_relationship, self::AUTHORISED_SUBSTITUTE_RELATIONS, true)
+        return $this->authority_next_of_kin_id !== null
+            && in_array($this->recipient_relationship, self::AUTHORISED_SUBSTITUTE_RELATIONS, true)
             ? 'substitute'
             : ($this->recipient_relationship === self::RELATION_SELF ? 'self' : 'informational_only');
     }

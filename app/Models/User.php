@@ -2,6 +2,17 @@
 
 namespace App\Models;
 
+use App\Domain\Governance\Models\BoardMember;
+use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrSupervisionNote;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Impersonate, Notifiable, TwoFactorAuthenticatable;
 
     /**
@@ -160,7 +171,7 @@ class User extends Authenticatable
     // ---------------------------
     public function assignedClients()
     {
-        return $this->belongsToMany(\App\Models\Client::class)->withTimestamps();
+        return $this->belongsToMany(Client::class)->withTimestamps();
     }
 
     /**
@@ -168,86 +179,97 @@ class User extends Authenticatable
      */
     public function sitesAsPrimaryContact()
     {
-        return $this->hasMany(\App\Models\Site::class, 'primary_contact_user_id');
+        return $this->hasMany(Site::class, 'primary_contact_user_id');
     }
 
     // Client portal access (client + next_of_kin)
     public function portalClients()
     {
-        return $this->belongsToMany(\App\Models\Client::class, 'client_portal_users')
+        return $this->belongsToMany(Client::class, 'client_portal_users')
             ->withPivot('relation')
             ->withTimestamps();
     }
 
     public function identities()
     {
-        return $this->hasMany(\App\Models\Identity::class);
+        return $this->hasMany(Identity::class);
     }
 
     public function pushSubscriptions()
     {
-        return $this->hasMany(\App\Models\UserPushSubscription::class);
+        return $this->hasMany(UserPushSubscription::class);
     }
 
-    public function canAccessClientPortal(\App\Models\Client $client): bool
+    public function canAccessClientPortal(Client $client): bool
     {
+        $userOrganizationId = $this->organization_id;
+        $clientOrganizationId = $client->organization_id;
+
+        if (
+            $userOrganizationId !== null
+            && $clientOrganizationId !== null
+            && (int) $userOrganizationId !== (int) $clientOrganizationId
+        ) {
+            return false;
+        }
+
         return $this->portalClients()->whereKey($client->id)->exists();
     }
 
     public function staffProfile()
     {
-        return $this->hasOne(\App\Models\Staff::class);
+        return $this->hasOne(Staff::class);
     }
 
     public function staffCredentials()
     {
-        return $this->hasMany(\App\Models\StaffCredential::class);
+        return $this->hasMany(StaffCredential::class);
     }
 
     public function staffTrainingRecords()
     {
-        return $this->hasMany(\App\Models\StaffTrainingRecord::class);
+        return $this->hasMany(StaffTrainingRecord::class);
     }
 
     public function staffBackgroundChecks()
     {
-        return $this->hasMany(\App\Models\StaffBackgroundCheck::class);
+        return $this->hasMany(StaffBackgroundCheck::class);
     }
 
     public function complianceStatuses()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrStaffComplianceStatus::class);
+        return $this->hasMany(HrStaffComplianceStatus::class);
     }
 
     public function staffAvailabilities()
     {
-        return $this->hasMany(\App\Models\StaffAvailability::class);
+        return $this->hasMany(StaffAvailability::class);
     }
 
     public function boardMember()
     {
-        return $this->hasOne(\App\Domain\Governance\Models\BoardMember::class)
+        return $this->hasOne(BoardMember::class)
             ->where('is_active', true);
     }
 
     public function shifts()
     {
-        return $this->hasMany(\App\Models\Shift::class);
+        return $this->hasMany(Shift::class);
     }
 
     public function staffAvailability()
     {
-        return $this->hasMany(\App\Models\StaffAvailability::class);
+        return $this->hasMany(StaffAvailability::class);
     }
 
     public function staffTimeOff()
     {
-        return $this->hasMany(\App\Models\StaffTimeOff::class);
+        return $this->hasMany(StaffTimeOff::class);
     }
 
     public function timesheets()
     {
-        return $this->hasMany(\App\Models\Timesheet::class);
+        return $this->hasMany(Timesheet::class);
     }
 
     // ---------------------------
@@ -256,47 +278,47 @@ class User extends Authenticatable
 
     public function hrEmployeeProfile()
     {
-        return $this->hasOne(\App\Domain\Hr\Models\HrEmployeeProfile::class);
+        return $this->hasOne(HrEmployeeProfile::class);
     }
 
     public function hrLeaveRequests()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrLeaveRequest::class);
+        return $this->hasMany(HrLeaveRequest::class);
     }
 
     public function hrLeaveBalances()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrLeaveBalance::class);
+        return $this->hasMany(HrLeaveBalance::class);
     }
 
     public function hrCases()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrCase::class, 'subject_user_id');
+        return $this->hasMany(HrCase::class, 'subject_user_id');
     }
 
     public function hrComplianceStatuses()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrStaffComplianceStatus::class);
+        return $this->hasMany(HrStaffComplianceStatus::class);
     }
 
     public function hrSupervisionNotes()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrSupervisionNote::class, 'staff_user_id');
+        return $this->hasMany(HrSupervisionNote::class, 'staff_user_id');
     }
 
     public function hrPerformanceReviews()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrPerformanceReview::class, 'staff_user_id');
+        return $this->hasMany(HrPerformanceReview::class, 'staff_user_id');
     }
 
     public function hrPolicyAttestations()
     {
-        return $this->hasMany(\App\Domain\Hr\Models\HrPolicyAttestation::class);
+        return $this->hasMany(HrPolicyAttestation::class);
     }
 
     public function hrDriverEligibility()
     {
-        return $this->hasOne(\App\Domain\Hr\Models\HrDriverEligibility::class);
+        return $this->hasOne(HrDriverEligibility::class);
     }
 
     // ---------------------------
@@ -305,23 +327,23 @@ class User extends Authenticatable
 
     public function roles()
     {
-        return $this->belongsToMany(\App\Models\Role::class, 'role_user');
+        return $this->belongsToMany(Role::class, 'role_user');
     }
 
     public function permissionOverrides()
     {
-        return $this->belongsToMany(\App\Models\Permission::class, 'permission_user')
+        return $this->belongsToMany(Permission::class, 'permission_user')
             ->withPivot('allowed');
     }
 
     public function notificationPreferences()
     {
-        return $this->hasMany(\App\Models\UserNotificationPreference::class);
+        return $this->hasMany(UserNotificationPreference::class);
     }
 
     public function breakGlassAccesses()
     {
-        return $this->hasMany(\App\Models\ClientBreakGlassAccess::class);
+        return $this->hasMany(ClientBreakGlassAccess::class);
     }
 
     public function hasRole(string ...$roles): bool

@@ -7,29 +7,47 @@ use App\Models\Client;
 use App\Models\ClientAssessment;
 use App\Models\ClientDocument;
 use App\Models\ClientNote;
+use App\Models\ClientPathPlan;
 use App\Models\ClientRisk;
 use App\Models\ConsentRequest;
 use App\Models\FamilyVisitRequest;
 use App\Models\User;
+use App\Services\Clients\ClientProfileSectionAccess;
 use Illuminate\Support\Collection;
 
 class ActionsAggregator
 {
+    private bool $hasMore = false;
+
     /**
      * @return array<int, array<string, mixed>>
      */
     public function forClient(Client $client, ?User $user): array
     {
-        return collect()
-            ->merge($this->followUps($client, $user))
-            ->merge($this->flaggedNotes($client, $user))
-            ->merge($this->expiringDocuments($client, $user))
-            ->merge($this->riskReviews($client, $user))
-            ->merge($this->carePlanReviews($client, $user))
-            ->merge($this->assessmentReviews($client, $user))
-            ->merge($this->pathPlanReviews($client, $user))
-            ->merge($this->consentRequests($client, $user))
-            ->merge($this->visitRequests($client, $user))
+        return $this->forClientWithCoverage($client, $user)['items'];
+    }
+
+    /** @return array{items: array<int, array<string, mixed>>, has_more: bool} */
+    public function forClientWithCoverage(Client $client, ?User $user): array
+    {
+        $this->hasMore = false;
+        $access = $user
+            ? app(ClientProfileSectionAccess::class)->for($user, $client)
+            : [];
+
+        $items = collect()
+            ->merge($this->followUps($client, (bool) ($access['notes'] ?? false)))
+            ->merge($this->flaggedNotes(
+                $client,
+                (bool) ($access['notes'] ?? false) && (bool) $user?->canDo('progress_notes.review'),
+            ))
+            ->merge($this->expiringDocuments($client, (bool) ($access['documents'] ?? false)))
+            ->merge($this->riskReviews($client, (bool) ($access['risks'] ?? false)))
+            ->merge($this->carePlanReviews($client, (bool) ($access['care_plans'] ?? false)))
+            ->merge($this->assessmentReviews($client, (bool) ($access['assessments'] ?? false)))
+            ->merge($this->pathPlanReviews($client, (bool) ($access['care_plans'] ?? false)))
+            ->merge($this->consentRequests($client, (bool) ($access['consents'] ?? false)))
+            ->merge($this->visitRequests($client, (bool) ($access['family_notes'] ?? false)))
             ->sortBy([
                 ['severity_rank', 'asc'],
                 ['due_at', 'asc'],
@@ -37,21 +55,28 @@ class ActionsAggregator
             ->map(fn (array $item) => collect($item)->except('severity_rank')->all())
             ->values()
             ->all();
+
+        return [
+            'items' => $items,
+            'has_more' => $this->hasMore,
+        ];
     }
 
-    private function followUps(Client $client, ?User $user): Collection
+    private function followUps(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('progress_notes.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
         return ClientNote::query()
             ->where('client_id', $client->id)
+            ->submitted()
             ->whereNotNull('follow_up_action')
             ->whereNull('follow_up_completed_at')
             ->orderBy('follow_up_due_at')
-            ->limit(20)
+            ->limit(21)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 20))
             ->map(function (ClientNote $note) use ($client) {
                 $overdue = $note->follow_up_due_at?->isPast() ?? false;
 
@@ -66,9 +91,9 @@ class ActionsAggregator
             });
     }
 
-    private function flaggedNotes(Client $client, ?User $user): Collection
+    private function flaggedNotes(Client $client, bool $canReview): Collection
     {
-        if (! $user?->canDo('progress_notes.review')) {
+        if (! $canReview) {
             return collect();
         }
 
@@ -76,8 +101,9 @@ class ActionsAggregator
             ->where('client_id', $client->id)
             ->reviewQueue()
             ->orderByDesc('created_at')
-            ->limit(20)
+            ->limit(21)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 20))
             ->map(fn (ClientNote $note) => $this->item(
                 type: 'flagged_note_review',
                 severity: 'warning',
@@ -88,9 +114,9 @@ class ActionsAggregator
             ));
     }
 
-    private function expiringDocuments(Client $client, ?User $user): Collection
+    private function expiringDocuments(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('clients.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
@@ -99,8 +125,9 @@ class ActionsAggregator
             ->whereNotNull('expiry_date')
             ->whereDate('expiry_date', '<=', now()->addDays(30))
             ->orderBy('expiry_date')
-            ->limit(20)
+            ->limit(21)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 20))
             ->map(fn (ClientDocument $document) => $this->item(
                 type: 'document_expiring',
                 severity: $document->expiry_date?->isPast() ? 'critical' : 'warning',
@@ -111,9 +138,9 @@ class ActionsAggregator
             ));
     }
 
-    private function riskReviews(Client $client, ?User $user): Collection
+    private function riskReviews(Client $client, bool $canView): Collection
     {
-        if (! ($user?->canDo('risks.viewAny') || $user?->canDo('risks.viewAssigned'))) {
+        if (! $canView) {
             return collect();
         }
 
@@ -123,8 +150,9 @@ class ActionsAggregator
             ->whereNotNull('review_date')
             ->whereDate('review_date', '<=', now()->addDays(7))
             ->orderBy('review_date')
-            ->limit(20)
+            ->limit(21)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 20))
             ->map(fn (ClientRisk $risk) => $this->item(
                 type: 'risk_review_due',
                 severity: $risk->review_date?->isPast() ? 'critical' : 'warning',
@@ -135,9 +163,9 @@ class ActionsAggregator
             ));
     }
 
-    private function carePlanReviews(Client $client, ?User $user): Collection
+    private function carePlanReviews(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('care_plans.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
@@ -147,8 +175,9 @@ class ActionsAggregator
             ->whereNotNull('next_review_at')
             ->whereDate('next_review_at', '<=', now()->addDays(7))
             ->orderBy('next_review_at')
-            ->limit(10)
+            ->limit(11)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 10))
             ->map(fn (CarePlan $plan) => $this->item(
                 type: 'care_plan_review_due',
                 severity: $plan->next_review_at?->isPast() ? 'critical' : 'warning',
@@ -159,19 +188,20 @@ class ActionsAggregator
             ));
     }
 
-    private function pathPlanReviews(Client $client, ?User $user): Collection
+    private function pathPlanReviews(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('clients.viewAny') && ! $user?->canDo('clients.viewAssigned')) {
+        if (! $canView) {
             return collect();
         }
 
-        return \App\Models\ClientPathPlan::query()
+        return ClientPathPlan::query()
             ->where('client_id', $client->id)
             ->whereNotNull('next_review_at')
             ->whereDate('next_review_at', '<=', now()->addDays(30))
             ->orderBy('next_review_at')
-            ->limit(5)
+            ->limit(6)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 5))
             ->map(fn ($plan) => $this->item(
                 type: 'path_plan_review_due',
                 severity: $plan->next_review_at?->isPast() ? 'critical' : 'warning',
@@ -182,9 +212,9 @@ class ActionsAggregator
             ));
     }
 
-    private function assessmentReviews(Client $client, ?User $user): Collection
+    private function assessmentReviews(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('clients.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
@@ -193,8 +223,9 @@ class ActionsAggregator
             ->whereNotNull('next_review_at')
             ->whereDate('next_review_at', '<=', now()->addDays(7))
             ->orderBy('next_review_at')
-            ->limit(10)
+            ->limit(11)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 10))
             ->map(fn (ClientAssessment $assessment) => $this->item(
                 type: 'assessment_due',
                 severity: $assessment->next_review_at?->isPast() ? 'critical' : 'warning',
@@ -205,9 +236,9 @@ class ActionsAggregator
             ));
     }
 
-    private function consentRequests(Client $client, ?User $user): Collection
+    private function consentRequests(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('consents.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
@@ -215,8 +246,9 @@ class ActionsAggregator
             ->where('client_id', $client->id)
             ->where('status', ConsentRequest::STATUS_PENDING)
             ->orderBy('expires_at')
-            ->limit(10)
+            ->limit(11)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 10))
             ->map(fn (ConsentRequest $request) => $this->item(
                 type: 'pending_consent_request',
                 severity: $request->expires_at?->isPast() ? 'critical' : 'info',
@@ -227,9 +259,9 @@ class ActionsAggregator
             ));
     }
 
-    private function visitRequests(Client $client, ?User $user): Collection
+    private function visitRequests(Client $client, bool $canView): Collection
     {
-        if (! $user?->canDo('family_portal.viewAny')) {
+        if (! $canView) {
             return collect();
         }
 
@@ -237,8 +269,9 @@ class ActionsAggregator
             ->where('client_id', $client->id)
             ->where('status', 'pending')
             ->orderBy('requested_date')
-            ->limit(10)
+            ->limit(11)
             ->get()
+            ->pipe(fn (Collection $items) => $this->cap($items, 10))
             ->map(fn (FamilyVisitRequest $request) => $this->item(
                 type: 'pending_visit_request',
                 severity: 'info',
@@ -271,6 +304,15 @@ class ActionsAggregator
             'deep_link' => $deepLink,
             'source_id' => $sourceId,
         ];
+    }
+
+    private function cap(Collection $items, int $limit): Collection
+    {
+        if ($items->count() > $limit) {
+            $this->hasMore = true;
+        }
+
+        return $items->take($limit);
     }
 
     /**

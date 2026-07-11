@@ -337,6 +337,7 @@ export default function CarePlanEdit({
                                 <Select
                                     value={data.status}
                                     onValueChange={(v) => setData('status', v)}
+                                    disabled={care_plan.status !== 'draft'}
                                 >
                                     <SelectTrigger
                                         id="status"
@@ -345,18 +346,27 @@ export default function CarePlanEdit({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="draft">
-                                            Draft
-                                        </SelectItem>
-                                        <SelectItem value="active">
-                                            Active
-                                        </SelectItem>
-                                        <SelectItem value="review">
-                                            Review
-                                        </SelectItem>
-                                        <SelectItem value="archived">
-                                            Archived
-                                        </SelectItem>
+                                        {care_plan.status === 'draft' ? (
+                                            <>
+                                                <SelectItem value="draft">
+                                                    Draft
+                                                </SelectItem>
+                                                <SelectItem value="active">
+                                                    Active
+                                                </SelectItem>
+                                            </>
+                                        ) : (
+                                            <SelectItem
+                                                value={care_plan.status}
+                                            >
+                                                {care_plan.status === 'review'
+                                                    ? 'In review'
+                                                    : care_plan.status ===
+                                                        'archived'
+                                                      ? 'Archived'
+                                                      : 'Active'}
+                                            </SelectItem>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>

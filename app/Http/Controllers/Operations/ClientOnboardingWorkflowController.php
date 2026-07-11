@@ -6,14 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientOnboardingStep;
 use App\Models\ClientOnboardingWorkflow;
+use App\Services\Clients\ClientOnboardingAccess;
+use App\Services\Clients\ClientWorkerEligibility;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ClientOnboardingWorkflowController extends Controller
 {
+    public function __construct(
+        private readonly ClientOnboardingAccess $access,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canViewWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canViewWorkflows($auth), 403);
 
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
@@ -40,7 +47,7 @@ class ClientOnboardingWorkflowController extends Controller
         $stats = [
             'active' => ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'in_progress')->count(),
             'completed_this_month' => ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'completed')->where('completed_at', '>=', now()->startOfMonth())->count(),
-            'overdue_steps' => ClientOnboardingStep::whereHas('workflow', fn($q) => $q->where('organization_id', $auth->organization_id)->where('status', 'in_progress'))->where('status', 'pending')->where('due_date', '<', now())->count(),
+            'overdue_steps' => ClientOnboardingStep::whereHas('workflow', fn ($q) => $q->where('organization_id', $auth->organization_id)->where('status', 'in_progress'))->where('status', 'pending')->where('due_date', '<', now())->count(),
             'avg_days' => (int) (ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'completed')->whereNotNull('completed_at')->selectRaw('AVG(DATEDIFF(completed_at, started_at)) as avg_days')->value('avg_days') ?? 0),
         ];
 
@@ -57,7 +64,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function show(Request $request, $workflow)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canViewWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canViewWorkflows($auth), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -72,7 +79,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function create(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
 
         $clients = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -88,10 +95,18 @@ class ClientOnboardingWorkflowController extends Controller
     public function store(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
 
         $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('clients', 'id')->where(
+                    fn ($query) => $auth->organization_id !== null
+                        ? $query->where('organization_id', $auth->organization_id)
+                        : $query,
+                ),
+            ],
         ]);
 
         $workflow = ClientOnboardingWorkflow::create([
@@ -126,16 +141,26 @@ class ClientOnboardingWorkflowController extends Controller
     public function storeStep(Request $request, $workflow)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canManageWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
         $workflowModel = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->with('client')
             ->findOrFail($workflow);
 
         $data = $request->validate([
             'step_name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:60'],
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to' => [
+                'bail',
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($workflowModel): void {
+                    if (! app(ClientWorkerEligibility::class)->contains($workflowModel->client, (int) $value)) {
+                        $fail('Choose an eligible assignee from this organisation.');
+                    }
+                },
+            ],
             'due_date' => ['nullable', 'date'],
             'is_required' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -155,7 +180,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function updateStep(Request $request, $workflow, $step)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canManageWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
         ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -178,10 +203,17 @@ class ClientOnboardingWorkflowController extends Controller
         return redirect()->back()->with('success', 'Step updated.');
     }
 
-    public function storeForClient(Request $request, \App\Models\Client $client)
+    public function storeForClient(Request $request, Client $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
+        $this->authorize('view', $client);
+        abort_if(
+            $auth->organization_id !== null
+                && $client->organization_id !== null
+                && (int) $auth->organization_id !== (int) $client->organization_id,
+            403,
+        );
 
         // Check if client already has an active workflow
         $existing = $client->onboardingWorkflows()
@@ -200,11 +232,17 @@ class ClientOnboardingWorkflowController extends Controller
     public function complete(Request $request, $workflow)
     {
         $auth = $request->user();
-        abort_unless($auth && $this->canManageWorkflows($auth), 403);
+        abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($workflow);
+
+        if ($workflow->steps()->where('is_required', true)->where('status', 'pending')->exists()) {
+            return back()->withErrors([
+                'workflow' => 'Complete or explicitly skip every required onboarding step first.',
+            ]);
+        }
 
         $workflow->update([
             'status' => 'completed',
@@ -214,26 +252,5 @@ class ClientOnboardingWorkflowController extends Controller
         $workflow->client->update(['status' => 'active']);
 
         return redirect()->back()->with('success', 'Onboarding workflow completed.');
-    }
-
-    private function canViewWorkflows($auth): bool
-    {
-        return $auth->canDo('onboarding.viewAny')
-            || $auth->canDo('onboarding.view')
-            || $auth->canDo('clients.viewAny');
-    }
-
-    private function canCreateWorkflows($auth): bool
-    {
-        return $auth->canDo('onboarding.create')
-            || $auth->canDo('clients.create')
-            || $auth->canDo('clients.update');
-    }
-
-    private function canManageWorkflows($auth): bool
-    {
-        return $auth->canDo('onboarding.edit')
-            || $auth->canDo('clients.create')
-            || $auth->canDo('clients.update');
     }
 }

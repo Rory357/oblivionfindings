@@ -13,6 +13,7 @@ class ClientFundTransaction extends Model
     protected $fillable = [
         'organization_id',
         'client_fund_id',
+        'idempotency_key',
         'transaction_type',
         'amount',
         'running_balance',

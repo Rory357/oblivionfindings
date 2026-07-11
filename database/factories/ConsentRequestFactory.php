@@ -22,7 +22,7 @@ class ConsentRequestFactory extends Factory
             'consent_type_id' => ConsentType::factory(),
             'requested_by_user_id' => User::factory(),
             'recipient_user_id' => User::factory(),
-            'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+            'recipient_relationship' => ConsentRequest::RELATION_NEXT_OF_KIN,
             'purpose' => 'Monitor location of personal tracker for safety after documented wandering incidents.',
             'least_restrictive_justification' => 'Alternatives (staffing increase, environmental mods) reviewed 2026-04-12; tracker is least restrictive.',
             'data_scope' => 'Immediate care team + on-call coordinator. Not shared with external parties.',

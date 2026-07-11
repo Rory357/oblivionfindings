@@ -3,17 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\User;
+use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ClientAssignmentController extends Controller
 {
-    public function edit(Request $request, Client $client)
-    {
+    public function edit(
+        Request $request,
+        Client $client,
+        ClientWorkerEligibility $eligibility,
+    ) {
         $this->authorize('update', $client);
 
-        $workers = User::staff()
+        $workers = $eligibility->query($client)
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -35,22 +38,33 @@ class ClientAssignmentController extends Controller
         return inertia('operations/clients/assignments', $payload);
     }
 
-    public function update(Request $request, Client $client)
-    {
+    public function update(
+        Request $request,
+        Client $client,
+        ClientWorkerEligibility $eligibility,
+    ) {
         $this->authorize('update', $client);
 
         $validated = $request->validate([
             'user_ids' => ['array'],
-            'user_ids.*' => ['integer', 'exists:users,id'],
+            'user_ids.*' => [
+                'bail',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($client, $eligibility): void {
+                    if (! $eligibility->contains($client, (int) $value)) {
+                        $fail('Choose an eligible worker from this organisation.');
+                    }
+                },
+            ],
         ]);
 
-        $allowedWorkerIds = User::staff()
+        $allowedWorkerIds = $eligibility->query($client)
             ->whereIn('id', $validated['user_ids'] ?? [])
             ->pluck('id')
             ->all();
 
-        $oldAssignedIds = $client->supportWorkers()->pluck('users.id')->map(fn($id) => (int) $id);
-        $newAssignedIds = collect($allowedWorkerIds)->map(fn($id) => (int) $id);
+        $oldAssignedIds = $client->supportWorkers()->pluck('users.id')->map(fn ($id) => (int) $id);
+        $newAssignedIds = collect($allowedWorkerIds)->map(fn ($id) => (int) $id);
 
         $client->supportWorkers()->sync($allowedWorkerIds);
 
@@ -59,7 +73,7 @@ class ClientAssignmentController extends Controller
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client assignments', $client, $client, [
             'title' => "Client assignments updated: {$client->first_name} {$client->last_name}",
-            'body' => 'Added worker IDs: ' . (count($added) ? implode(', ', $added) : 'none') . ' | Removed worker IDs: ' . (count($removed) ? implode(', ', $removed) : 'none'),
+            'body' => 'Added worker IDs: '.(count($added) ? implode(', ', $added) : 'none').' | Removed worker IDs: '.(count($removed) ? implode(', ', $removed) : 'none'),
             'url' => url("/operations/clients/{$client->id}/assignments"),
             // Explicitly notify newly assigned workers in addition to managers.
             'target_user_ids' => $added,

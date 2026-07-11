@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
@@ -86,6 +88,18 @@ class ClientPersonalAsset extends Model
         return $this->belongsTo(LocationHardware::class, 'tracker_hardware_id');
     }
 
+    /**
+     * Canonical device represented by the temporary LocationHardware bridge.
+     *
+     * client_personal_assets.tracker_hardware_id still references the legacy
+     * compatibility table, so profile mutations resolve a canonical Device and
+     * persist only its legacy_location_hardware_id until that bridge is retired.
+     */
+    public function trackerDevice(): HasOne
+    {
+        return $this->hasOne(Device::class, 'legacy_location_hardware_id', 'tracker_hardware_id');
+    }
+
     public function getPhotoUrlAttribute(): ?string
     {
         return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
@@ -104,7 +118,7 @@ class ClientPersonalAsset extends Model
     public function isWarrantyExpiringSoon(int $days = 30): bool
     {
         return $this->warranty_expires_at
-            && !$this->isWarrantyExpired()
+            && ! $this->isWarrantyExpired()
             && $this->warranty_expires_at->diffInDays(now()) <= $days;
     }
 

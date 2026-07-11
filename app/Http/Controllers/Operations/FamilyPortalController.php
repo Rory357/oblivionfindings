@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\FamilyPortalSetting;
+use App\Services\Portal\PortalClientSectionAccess;
 use Illuminate\Http\Request;
 
 class FamilyPortalController extends Controller
@@ -98,7 +98,8 @@ class FamilyPortalController extends Controller
             'notify_incident' => ['nullable', 'boolean'],
         ]);
 
-        $hasFamilyInformationConsent = $this->hasActiveFamilyInformationConsent($clientModel);
+        $hasFamilyInformationConsent = app(PortalClientSectionAccess::class)
+            ->hasActiveFamilyInformationConsent($clientModel);
         $showRespite = $data['show_respite'] ?? true;
         $showCareNotes = $data['show_care_notes'] ?? true;
         $showIncidents = $data['show_incidents'] ?? false;
@@ -142,24 +143,5 @@ class FamilyPortalController extends Controller
     {
         return $auth->canDo('family_portal.manage')
             || $auth->canDo('clients.update');
-    }
-
-    private function hasActiveFamilyInformationConsent(Client $client): bool
-    {
-        return ClientConsent::query()
-            ->active()
-            ->where('client_id', $client->id)
-            ->whereHas('consentType', function ($query) {
-                $query->where('name', 'Information Sharing with Whānau / Family')
-                    ->orWhere(function ($query) {
-                        $query->where('category', 'communication')
-                            ->where(function ($query) {
-                                $query->where('name', 'like', '%family%')
-                                    ->orWhere('name', 'like', '%whanau%')
-                                    ->orWhere('name', 'like', '%whānau%');
-                            });
-                    });
-            })
-            ->exists();
     }
 }

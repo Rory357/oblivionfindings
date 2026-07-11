@@ -43,6 +43,12 @@ export type ClientDailyNote = {
     appears_on_timeline?: boolean;
     author?: { id: number; name: string } | null;
     user_id?: number | null;
+    can?: {
+        update?: boolean;
+        delete?: boolean;
+        flag?: boolean;
+        review?: boolean;
+    };
 };
 
 function dateLabel(value?: string | null) {
@@ -62,7 +68,10 @@ function categoryLabel(value?: string | null) {
 /** Note-type badge meta — progress notes & handovers carry their own tone so
  * the type reads at a glance in the Daily Notes feed. */
 const NOTE_TYPE_META: Record<string, { label: string; className: string }> = {
-    daily_note: { label: 'Daily note', className: 'bg-muted text-muted-foreground' },
+    daily_note: {
+        label: 'Daily note',
+        className: 'bg-muted text-muted-foreground',
+    },
     quick: { label: 'Quick note', className: 'bg-muted text-muted-foreground' },
     note: { label: 'Note', className: 'bg-muted text-muted-foreground' },
     progress_note: {
@@ -266,7 +275,9 @@ export function DailyNoteEntry({
                     <UserRound className="h-3.5 w-3.5" />
                     {note.author?.name ?? 'Unknown worker'}
                 </span>
-                {canReview && note.is_flagged && !note.reviewed_at ? (
+                {(note.can?.review ?? canReview) &&
+                note.is_flagged &&
+                !note.reviewed_at ? (
                     <Button
                         type="button"
                         size="sm"
@@ -276,7 +287,9 @@ export function DailyNoteEntry({
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                         Mark Reviewed
                     </Button>
-                ) : canUpdate && note.is_flagged && note.reviewed_at ? (
+                ) : (note.can?.flag ?? canUpdate) &&
+                  note.is_flagged &&
+                  note.reviewed_at ? (
                     <Button
                         type="button"
                         size="sm"

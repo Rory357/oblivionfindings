@@ -1,10 +1,11 @@
 <?php
 
 use App\Http\Controllers\BreakGlassController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
-use App\Http\Controllers\ClientController;
 // Existing controllers (root namespace)
+use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
 use App\Http\Controllers\ClientMarController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ClientMedicalController;
 use App\Http\Controllers\ClientNoteController;
 use App\Http\Controllers\ClientOnboardingController;
 use App\Http\Controllers\ClientPersonalAssetController;
+use App\Http\Controllers\ClientPhotoMediaController;
 use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientRiskController;
@@ -25,17 +27,21 @@ use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Operations\ActivityFeedController;
 use App\Http\Controllers\Operations\CalendarSyncController;
-use App\Http\Controllers\Operations\CareNoteTemplateController;
 // New Operations controllers
+use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
 use App\Http\Controllers\Operations\ClientActionsController;
 use App\Http\Controllers\Operations\ClientConsentController;
 use App\Http\Controllers\Operations\ClientDailyNoteController;
+use App\Http\Controllers\Operations\ClientFamilyChatController;
 use App\Http\Controllers\Operations\ClientFundController;
+use App\Http\Controllers\Operations\ClientLeaveExcursionController;
 use App\Http\Controllers\Operations\ClientMealLogController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
+use App\Http\Controllers\Operations\ClientPathPlanController;
 use App\Http\Controllers\Operations\ClientRoutineController;
+use App\Http\Controllers\Operations\ClientTransportBookingController;
 use App\Http\Controllers\Operations\ConsentRequestController;
 use App\Http\Controllers\Operations\CustomFormController;
 use App\Http\Controllers\Operations\DashboardController;
@@ -52,12 +58,12 @@ use App\Http\Controllers\Operations\OpsNotificationController;
 use App\Http\Controllers\Operations\ProgressNoteController;
 use App\Http\Controllers\Operations\QualificationMatchController;
 use App\Http\Controllers\Operations\ReportController;
+use App\Http\Controllers\Operations\ReviewQueueController;
 use App\Http\Controllers\Operations\RosterSuggestionController;
 use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
 use App\Http\Controllers\Operations\ShiftReportController;
-use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
@@ -66,6 +72,7 @@ use App\Http\Controllers\StaffTimeOffController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\TimesheetController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -108,12 +115,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         // Client Location History (JSON)
         Route::get('/clients/{client}/location/history', [ClientController::class, 'locationHistory'])
             ->whereNumber('client')
+            ->middleware([
+                'permission:assets.telemetry.view',
+                'permission:fleet.viewAny|assets.viewAny|assets.viewAssigned',
+            ])
             ->name('operations.clients.location.history');
         Route::post('/clients/{client}/location/locate-now', [ClientController::class, 'locateNow'])
             ->whereNumber('client')
+            ->middleware('permission:fleet.manage|assets.trackers.manage')
             ->name('operations.clients.location.locate-now');
         Route::post('/clients/{client}/location/acknowledge-panic', [ClientController::class, 'acknowledgePanic'])
             ->whereNumber('client')
+            ->middleware('permission:fleet.manage|assets.trackers.manage')
             ->name('operations.clients.location.acknowledge-panic');
 
         // Documents
@@ -123,6 +136,17 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])
             ->whereNumber('client')
             ->name('operations.clients.documents.download');
+
+        // Client gallery bytes are private and always pass through the same
+        // client policy + profile-section authorization as the Photos tab.
+        Route::get('/clients/{client}/gallery-photos/{photo}/media', [ClientPhotoMediaController::class, 'staffMedia'])
+            ->whereNumber('client')
+            ->whereNumber('photo')
+            ->name('operations.clients.gallery-photos.media');
+        Route::get('/clients/{client}/gallery-photos/{photo}/thumbnail', [ClientPhotoMediaController::class, 'staffThumbnail'])
+            ->whereNumber('client')
+            ->whereNumber('photo')
+            ->name('operations.clients.gallery-photos.thumbnail');
 
         // Medical records
         Route::get('/clients/{client}/medical', [ClientMedicalController::class, 'show'])
@@ -139,6 +163,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
         // Consents (read)
         Route::get('/clients/{client}/consents', [ClientConsentController::class, 'index'])
+            ->middleware('permission:consents.viewAny')
             ->whereNumber('client')
             ->name('operations.clients.consents.index');
 
@@ -165,12 +190,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             });
 
         // Family chat (staff side of the portal whānau thread)
-        Route::get('/clients/{client}/family-chat', [\App\Http\Controllers\Operations\ClientFamilyChatController::class, 'show'])
+        Route::get('/clients/{client}/family-chat', [ClientFamilyChatController::class, 'show'])
             ->whereNumber('client')
             ->name('operations.clients.family-chat.show');
-        Route::post('/clients/{client}/family-chat', [\App\Http\Controllers\Operations\ClientFamilyChatController::class, 'store'])
+        Route::post('/clients/{client}/family-chat', [ClientFamilyChatController::class, 'store'])
             ->whereNumber('client')
             ->name('operations.clients.family-chat.store');
+
+        // RAG/AI queries have their own exact capabilities in the controller.
+        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
+            ->whereNumber('client')
+            ->middleware('throttle:ai-queries')
+            ->name('operations.clients.rag.ask');
 
         // The former mobile "care" page is retired (this is a web-only app).
         // Redirect the old URL to the full client profile so stale bookmarks or
@@ -189,8 +220,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Client onboarding workflow (from client profile)
     Route::post('/clients/{client}/onboarding-workflow', [ClientOnboardingWorkflowController::class, 'storeForClient'])
+        ->middleware('permission:onboarding.create|clients.create|clients.update')
         ->name('operations.clients.onboarding_workflow.store')
         ->whereNumber('client');
+
+    Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])
+        ->middleware('permission:clients.onboarding.manage|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.onboarding.toggle');
 
     // Client updates
     Route::middleware('permission:clients.update')->group(function () {
@@ -219,13 +256,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.gallery-photos.destroy');
 
         // Transport bookings (client profile Transport tab)
-        Route::post('/clients/{client}/transport-bookings', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'store'])
+        Route::post('/clients/{client}/transport-bookings', [ClientTransportBookingController::class, 'store'])
             ->whereNumber('client')
             ->name('operations.clients.transport-bookings.store');
-        Route::put('/clients/{client}/transport-bookings/{booking}', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'update'])
+        Route::put('/clients/{client}/transport-bookings/{booking}', [ClientTransportBookingController::class, 'update'])
             ->whereNumber('client')
             ->name('operations.clients.transport-bookings.update');
-        Route::delete('/clients/{client}/transport-bookings/{booking}', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'destroy'])
+        Route::delete('/clients/{client}/transport-bookings/{booking}', [ClientTransportBookingController::class, 'destroy'])
             ->whereNumber('client')
             ->name('operations.clients.transport-bookings.destroy');
 
@@ -285,17 +322,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::delete('/clients/{client}/portal-users/{user}', [ClientPortalUserController::class, 'destroy'])
             ->name('operations.clients.portal_users.destroy');
 
-        // RAG/AI queries
-        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
-            ->middleware('throttle:ai-queries')
-            ->name('operations.clients.rag.ask');
-
-        // Onboarding checklist
-        Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])
-            ->whereNumber('client')
-            ->name('operations.clients.onboarding.toggle')
-            ->middleware('permission:clients.onboarding.manage|clients.update');
-
         // Support plan
         Route::put('/clients/{client}/support-plan', [ClientSupportPlanController::class, 'update'])
             ->name('operations.clients.support_plan.update');
@@ -308,14 +334,19 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::delete('/clients/{client}/assessments/{assessment}', [ClientAssessmentController::class, 'destroy'])
             ->name('operations.clients.assessments.destroy');
 
-        // Consents
-        Route::post('/clients/{client}/consents', [ClientConsentController::class, 'store'])
-            ->whereNumber('client')
-            ->name('operations.clients.consents.store');
-        Route::post('/clients/{client}/consents/{consent}/withdraw', [ClientConsentController::class, 'withdraw'])
-            ->whereNumber('client')
-            ->name('operations.clients.consents.withdraw');
     });
+
+    // Consent mutations use the consent domain capabilities, not broad client
+    // editing. Controllers also authorize the parent client and nested record.
+    Route::post('/clients/{client}/consents', [ClientConsentController::class, 'store'])
+        ->middleware('permission:consents.record')
+        ->whereNumber('client')
+        ->name('operations.clients.consents.store');
+    Route::post('/clients/{client}/consents/{consent}/withdraw', [ClientConsentController::class, 'withdraw'])
+        ->middleware('permission:consents.withdraw|consents.manage')
+        ->whereNumber('client')
+        ->whereNumber('consent')
+        ->name('operations.clients.consents.withdraw');
 
     // Client assignments
     Route::middleware('permission:clients.assignments.update')->group(function () {
@@ -338,16 +369,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->whereNumber('client')
         ->name('operations.clients.daily-notes.index');
     Route::post('/clients/{client}/daily-notes', [ClientDailyNoteController::class, 'store'])
-        ->middleware('permission:progress_notes.create|timeline.create')
+        ->middleware('permission:progress_notes.create')
         ->whereNumber('client')
         ->name('operations.clients.daily-notes.store');
     Route::put('/clients/{client}/daily-notes/{note}', [ClientDailyNoteController::class, 'update'])
-        ->middleware('permission:progress_notes.update')
+        ->middleware('permission:progress_notes.create|progress_notes.update')
         ->whereNumber('client')
         ->whereNumber('note')
         ->name('operations.clients.daily-notes.update');
     Route::delete('/clients/{client}/daily-notes/{note}', [ClientDailyNoteController::class, 'destroy'])
-        ->middleware('permission:progress_notes.delete|progress_notes.update')
+        ->middleware('permission:progress_notes.create|progress_notes.delete|progress_notes.update')
         ->whereNumber('client')
         ->whereNumber('note')
         ->name('operations.clients.daily-notes.destroy');
@@ -471,46 +502,46 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.clients.actions.index');
 
     // Cross-client manager review dashboard (Phase 3 C2)
-    Route::get('/review-queue', [\App\Http\Controllers\Operations\ReviewQueueController::class, 'index'])
+    Route::get('/review-queue', [ReviewQueueController::class, 'index'])
         ->middleware('permission:progress_notes.review')
         ->name('operations.review_queue.index');
 
     // PATH plan upsert + delete (Phase 3 follow-up)
-    Route::post('/clients/{client}/path-plan', [\App\Http\Controllers\Operations\ClientPathPlanController::class, 'upsert'])
+    Route::post('/clients/{client}/path-plan', [ClientPathPlanController::class, 'upsert'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->name('operations.clients.path_plan.upsert');
-    Route::delete('/clients/{client}/path-plan/{plan}', [\App\Http\Controllers\Operations\ClientPathPlanController::class, 'destroy'])
+    Route::delete('/clients/{client}/path-plan/{plan}', [ClientPathPlanController::class, 'destroy'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->whereNumber('plan')
         ->name('operations.clients.path_plan.destroy');
 
     // Leave & excursion requests
-    Route::post('/clients/{client}/leave', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'storeLeave'])
+    Route::post('/clients/{client}/leave', [ClientLeaveExcursionController::class, 'storeLeave'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->name('operations.clients.leave.store');
-    Route::put('/clients/{client}/leave/{leave}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'updateLeave'])
+    Route::put('/clients/{client}/leave/{leave}', [ClientLeaveExcursionController::class, 'updateLeave'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->whereNumber('leave')
         ->name('operations.clients.leave.update');
-    Route::delete('/clients/{client}/leave/{leave}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'destroyLeave'])
+    Route::delete('/clients/{client}/leave/{leave}', [ClientLeaveExcursionController::class, 'destroyLeave'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->whereNumber('leave')
         ->name('operations.clients.leave.destroy');
-    Route::post('/clients/{client}/excursions', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'storeExcursion'])
+    Route::post('/clients/{client}/excursions', [ClientLeaveExcursionController::class, 'storeExcursion'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->name('operations.clients.excursions.store');
-    Route::put('/clients/{client}/excursions/{excursion}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'updateExcursion'])
+    Route::put('/clients/{client}/excursions/{excursion}', [ClientLeaveExcursionController::class, 'updateExcursion'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->whereNumber('excursion')
         ->name('operations.clients.excursions.update');
-    Route::delete('/clients/{client}/excursions/{excursion}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'destroyExcursion'])
+    Route::delete('/clients/{client}/excursions/{excursion}', [ClientLeaveExcursionController::class, 'destroyExcursion'])
         ->middleware('permission:clients.update')
         ->whereNumber('client')
         ->whereNumber('excursion')
@@ -679,7 +710,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // write endpoints below stay (used by care-plan quick notes).
     // -------------------------------------------------------------------------
 
-    Route::get('/progress-notes', function (\Illuminate\Http\Request $request) {
+    Route::get('/progress-notes', function (Request $request) {
         if ($client = $request->query('client_id')) {
             return redirect("/operations/clients/{$client}?tab=progress_notes&type=progress", 301);
         }
@@ -985,7 +1016,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // redirects to /operations/timesheets?create=1 (the dialog auto-opens on
     // that query param), preserving any `shift_id` passed by callers like the
     // shift detail page.
-    Route::get('/timesheets/create', function (\Illuminate\Http\Request $request) {
+    Route::get('/timesheets/create', function (Request $request) {
         $query = ['create' => '1'];
         if ($request->query('shift_id')) {
             $query['shift_id'] = $request->query('shift_id');
@@ -1096,17 +1127,19 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Client Onboarding (Phase 7)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:clients.viewAny')->group(function () {
+    Route::middleware('permission:onboarding.viewAny|onboarding.view|clients.viewAny')->group(function () {
         Route::get('/onboarding', [ClientOnboardingWorkflowController::class, 'index'])->name('operations.onboarding.index');
     });
-    Route::middleware('permission:clients.create')->group(function () {
+    Route::middleware('permission:onboarding.create|clients.create|clients.update')->group(function () {
         Route::get('/onboarding/create', [ClientOnboardingWorkflowController::class, 'create'])->name('operations.onboarding.create');
         Route::post('/onboarding', [ClientOnboardingWorkflowController::class, 'store'])->name('operations.onboarding.store');
+    });
+    Route::middleware('permission:onboarding.edit|clients.create|clients.update')->group(function () {
         Route::post('/onboarding/{workflow}/steps', [ClientOnboardingWorkflowController::class, 'storeStep'])->name('operations.onboarding.steps.store');
         Route::patch('/onboarding/{workflow}/steps/{step}', [ClientOnboardingWorkflowController::class, 'updateStep'])->name('operations.onboarding.steps.update');
         Route::post('/onboarding/{workflow}/complete', [ClientOnboardingWorkflowController::class, 'complete'])->name('operations.onboarding.complete');
     });
-    Route::middleware('permission:clients.viewAny')->group(function () {
+    Route::middleware('permission:onboarding.viewAny|onboarding.view|clients.viewAny')->group(function () {
         Route::get('/onboarding/{workflow}', [ClientOnboardingWorkflowController::class, 'show'])->name('operations.onboarding.show');
     });
 
@@ -1120,7 +1153,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::put('/client-funds/{fund}', [ClientFundController::class, 'update'])->name('operations.client_funds.update');
         Route::post('/client-funds/{fund}/transactions', [ClientFundController::class, 'addTransaction'])->name('operations.client_funds.transactions.store');
     });
-    Route::middleware('permission:clients.viewAny')->group(function () {
+    Route::middleware('permission:client_funds.manage')->group(function () {
         Route::get('/client-funds', [ClientFundController::class, 'index'])->name('operations.client_funds.index');
         Route::get('/client-funds/{fund}', [ClientFundController::class, 'show'])->name('operations.client_funds.show');
     });

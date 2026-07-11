@@ -21,6 +21,14 @@ type ClientTimelineTabProps = {
     clientId: number;
     events: Array<any>;
     handover: Array<any>;
+    summary?: {
+        total?: number;
+        loaded?: number;
+        has_more?: boolean;
+        pinned_handover_total?: number;
+        pinned_handover_loaded?: number;
+        pinned_handover_has_more?: boolean;
+    };
     canCreateNote: boolean;
     canPinHandover: boolean;
     auth?: unknown;
@@ -68,6 +76,7 @@ export function ClientTimelineTab({
     clientId,
     events,
     handover,
+    summary = {},
     canCreateNote,
     canPinHandover,
     auth,
@@ -155,6 +164,20 @@ export function ClientTimelineTab({
                 </div>
             </CardHeader>
             <CardContent className="space-y-2">
+                {summary.has_more ? (
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Showing the latest {summary.loaded ?? events.length} of{' '}
+                        {summary.total ?? events.length} timeline events.
+                    </p>
+                ) : null}
+                {summary.pinned_handover_has_more ? (
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Showing{' '}
+                        {summary.pinned_handover_loaded ?? handover.length} of{' '}
+                        {summary.pinned_handover_total ?? handover.length}{' '}
+                        pinned handover items.
+                    </p>
+                ) : null}
                 {handover.length ? (
                     <div className="rounded-md border p-3">
                         <div className="text-sm font-medium">

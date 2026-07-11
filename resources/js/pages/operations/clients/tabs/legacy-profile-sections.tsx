@@ -2672,10 +2672,12 @@ export function ClientCalendarTab({
     clientId,
     clientFirstName,
     initialEvents = [],
+    canCreate,
 }: {
     clientId: number;
     clientFirstName: string;
     initialEvents?: any[];
+    canCreate: boolean;
 }) {
     const calRef = useRef<FullCalendar>(null);
     const [currentView, setCurrentView] = useState<CalViewKey>('timeGridWeek');
@@ -2751,6 +2753,7 @@ export function ClientCalendarTab({
     );
 
     const submitAppointment = async () => {
+        if (!canCreate) return;
         if (!calForm.title.trim() || !calForm.starts_at) return;
         const token = (
             document.querySelector(
@@ -2772,6 +2775,7 @@ export function ClientCalendarTab({
     };
 
     const openCreateFromCtx = () => {
+        if (!canCreate) return;
         if (ctxMenu) {
             const end = new Date(ctxMenu.date);
             end.setHours(end.getHours() + 1);
@@ -2863,22 +2867,24 @@ export function ClientCalendarTab({
                             </Button>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() => {
-                                    setCalForm({
-                                        ...calForm,
-                                        starts_at: toLocalISO(new Date()),
-                                        ends_at: '',
-                                        title: '',
-                                    });
-                                    setCreateOpen(true);
-                                }}
-                            >
-                                <Plus className="h-3.5 w-3.5" />
-                                Schedule
-                            </Button>
+                            {canCreate ? (
+                                <Button
+                                    size="sm"
+                                    className="gap-1.5"
+                                    onClick={() => {
+                                        setCalForm({
+                                            ...calForm,
+                                            starts_at: toLocalISO(new Date()),
+                                            ends_at: '',
+                                            title: '',
+                                        });
+                                        setCreateOpen(true);
+                                    }}
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Schedule
+                                </Button>
+                            ) : null}
                             <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                 {CAL_VIEWS.map((v) => (
                                     <Button
@@ -2898,6 +2904,7 @@ export function ClientCalendarTab({
                     <div
                         className="overflow-hidden rounded-2xl border bg-card shadow-sm"
                         onContextMenu={(e) => {
+                            if (!canCreate) return;
                             const target = e.target as HTMLElement;
                             if (
                                 !target.closest(
@@ -2937,6 +2944,7 @@ export function ClientCalendarTab({
                                 setCurrentView(arg.view.type as CalViewKey);
                             }}
                             select={(arg) => {
+                                if (!canCreate) return;
                                 setCalForm({
                                     ...calForm,
                                     starts_at: toLocalISO(arg.start),
@@ -2959,8 +2967,8 @@ export function ClientCalendarTab({
                             allDaySlot={true}
                             nowIndicator={true}
                             eventContent={renderCalEventContent}
-                            selectable={true}
-                            selectMirror={true}
+                            selectable={canCreate}
+                            selectMirror={canCreate}
                             businessHours={{
                                 daysOfWeek: [1, 2, 3, 4, 5],
                                 startTime: '06:00',
@@ -2985,7 +2993,7 @@ export function ClientCalendarTab({
             </div>
 
             {/* Context Menu */}
-            {ctxMenu && (
+            {canCreate && ctxMenu && (
                 <div
                     className="calendar-context-menu"
                     style={{ top: ctxMenu.y, left: ctxMenu.x }}
@@ -3093,7 +3101,7 @@ export function ClientCalendarTab({
             )}
 
             {/* Create Appointment Dialog */}
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <Dialog open={canCreate && createOpen} onOpenChange={setCreateOpen}>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Schedule Appointment</DialogTitle>
