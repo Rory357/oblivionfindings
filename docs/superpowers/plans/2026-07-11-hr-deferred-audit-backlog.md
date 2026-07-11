@@ -70,7 +70,7 @@ git commit -m "docs(hr): start deferred backlog execution ledger"
 - Delete: `app/Domain/Hr/Models/HrAuditLog.php`
 - Delete: `app/Domain/Hr/Services/AuditService.php`
 
-- [ ] **Step 1: Write the audit isolation tests**
+- [x] **Step 1: Write the audit isolation tests**
 
 Add tests that create two organisations and canonical events, then assert:
 
@@ -87,13 +87,13 @@ expect(AuditLog::query()->where('organization_id', $orgTwo->id)->count())->toBe(
 
 Also test a global `User` auditable with explicit `organization_id` metadata, an actor-derived event, an unresolvable system event that remains null, and payroll profile default demotion metadata.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/CanonicalAuditOrganizationTest.php --compact`
 
 Expected: FAIL because `audit_logs.organization_id` does not exist and the HR viewer reads `hr_audit_log`.
 
-- [ ] **Step 3: Add the additive migration and model scope**
+- [x] **Step 3: Add the additive migration and model scope**
 
 The migration adds nullable `organization_id` plus `['organization_id', 'created_at']` index, then backfills from `users.organization_id` and `clients.organization_id` with joined updates. Add:
 
@@ -104,7 +104,7 @@ public function scopeForOrganization(Builder $query, int $organizationId): Build
 }
 ```
 
-- [ ] **Step 4: Resolve organisation on every canonical write**
+- [x] **Step 4: Resolve organisation on every canonical write**
 
 Implement deterministic resolution in `AuditLogger`:
 
@@ -118,15 +118,15 @@ $organizationId = $meta['organization_id']
 
 Persist the value and remove `organization_id` from sensitive free-form metadata only if duplicated.
 
-- [ ] **Step 5: Switch the HR viewer and payroll demotion audit**
+- [x] **Step 5: Switch the HR viewer and payroll demotion audit**
 
 Use `resolveHrTenantIdForUser()` or the module’s existing equivalent to scope `AuditLog`. Derive filters using `distinct()`. When a new default payroll profile demotes old defaults, write one `hr.payroll_export_profile.default_changed` event containing promoted and demoted IDs.
 
-- [ ] **Step 6: Remove unused legacy application classes**
+- [x] **Step 6: Remove unused legacy application classes**
 
 Delete the model/service only after `rg -n "HrAuditLog|AuditService" app tests` shows no remaining application caller. Keep the historical table migration.
 
-- [ ] **Step 7: Run GREEN and regressions**
+- [x] **Step 7: Run GREEN and regressions**
 
 Run:
 
@@ -138,7 +138,7 @@ git diff --check
 
 Expected: all pass, no cross-organisation rows.
 
-- [ ] **Step 8: Update ledger and commit**
+- [x] **Step 8: Update ledger and commit**
 
 ```powershell
 git add app database/migrations tests/Feature/Hr HR_DEFERRED_BACKLOG_PROGRESS.md

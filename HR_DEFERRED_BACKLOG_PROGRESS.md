@@ -24,8 +24,8 @@ Status: ⬜ not started · 🔶 in progress/blocked · ✅ verified complete · 
 
 | ID | Requirement | Status | RED evidence | GREEN evidence | Commit | Notes |
 |---|---|---:|---|---|---|---|
-| A1 | Canonical organisation-scoped HR audit viewer | ⬜ | — | — | — | Preserve legacy table only for rollback/history. |
-| A2 | Payroll export-profile default-demotion audit | ⬜ | — | — | — | Canonical event with promoted/demoted IDs. |
+| A1 | Canonical organisation-scoped HR audit viewer | ✅ | `CanonicalAuditOrganizationTest`: 3 failed / 1 passed; unknown `organization_id` column and unresolved organisation. Viewer null-label Vitest: 2 failed. | Focused: 4 passed / 28 assertions. Regression bundle: 10 passed / 80 assertions. Viewer Vitest: 2 passed. `npm run types`: exit 0. | `2c4f1f08` | Canonical store is scoped by organisation; legacy table retained only in migration history and unused classes removed. |
+| A2 | Payroll export-profile default-demotion audit | ✅ | `CanonicalAuditOrganizationTest`: no `hr.payroll_export_profile.default_changed` row. | Regression bundle: 10 passed / 80 assertions; promoted and demoted profile IDs asserted. | `2c4f1f08` | Store, update, and set-default paths emit one canonical event whenever existing defaults are demoted. |
 | E1 | Service CSV formula neutralisation | ⬜ | — | — | — | Preserve numeric machine fields. |
 | R1 | HR calendar event archive/restore | ⬜ | — | — | — | Retain attendees, reminders, attachments, and files. |
 | R2 | Salary-band deactivate/reactivate | ⬜ | — | — | — | Historical references remain resolvable. |
@@ -65,3 +65,7 @@ Status: ⬜ not started · 🔶 in progress/blocked · ✅ verified complete · 
 ### Run 1 — planning and isolated setup
 
 Design approved, written, self-reviewed, and committed. Implementation plan covers all 27 requirement IDs across 13 tasks and 70 checkpoints; placeholder and coverage scans are clean. Fresh-worktree setup exposed only generated-route, build-manifest, and ignored local `.env` prerequisites, not application regressions. The full HR baseline exited zero with 4,571 assertions; a fresh post-bootstrap probe confirmed the `.env` warning is eliminated. Task 1 is complete.
+
+### Run 2 — A1/A2 canonical audit store
+
+RED was deliberate and requirement-specific: 3 backend failures exposed the absent organisation column, unresolved write scope, and missing payroll demotion event; the neutral system-event assertion already passed. A separate 2-test Vitest RED captured the canonical viewer's null-auditable label edge. GREEN evidence is 4/4 focused backend tests (28 assertions), 10/10 planned backend regression tests (80 assertions), 2/2 focused viewer tests, clean PHP syntax, `npm run types` exit 0, `git diff --check` clean, and no remaining application reference to `HrAuditLog` or the retired HR `AuditService`. Implementation commit: `2c4f1f08`.
