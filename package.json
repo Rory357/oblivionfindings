@@ -8,7 +8,7 @@
         "dev": "vite",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
-        "lint": "eslint . --fix",
+        "lint": "eslint . --fix --max-warnings=0",
         "seed": "php artisan db:seed",
         "seed:fresh": "php artisan migrate:fresh --seed",
         "test": "vitest run",
