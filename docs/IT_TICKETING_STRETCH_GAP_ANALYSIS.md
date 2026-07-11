@@ -87,3 +87,31 @@ All buildable stretch items shipped on `claude/it-ticketing-stretch`; the S-loop
 Blockers and chosen defaults live in [IT_TICKETING_QUESTIONS.md](../IT_TICKETING_QUESTIONS.md):
 #5 (email-in deployment runbook), #6 (external fulfilment target). Everything else
 ships on documented NZ defaults.
+
+---
+
+## Deployment checkpoint (2026-07-11)
+
+- Fast-forwarded `main` from `271c39b2` to the verified ticketing head
+  `7899849c`, then pushed it to `origin/main`; local `main`, `origin/main`, and
+  the remote branch ref all matched `7899849cf58c0389b36bdc7734a39893db82d763`.
+- Fresh pre-publish release gates at that exact head: `tests/Feature/It`
+  **164 passed (1316 assertions)**; `npm run types` passed; lint reported
+  **0 errors / 737 warnings**; the client and SSR production builds both passed.
+- Deployed `/var/www/oblivionfindings` with
+  `scripts/deploy-server.sh --skip-nominatim --skip-queclink`. The detached
+  deployment recorded exit code **0**, and the staging checkout was clean at
+  `7899849c` with `HEAD == origin/main`.
+- Live terminal verification: all five ticketing migrations from
+  `2026_07_09_100001` through `2026_07_10_110001` are **Ran**; 36 ticketing and
+  mailbox routes were registered (including merge, approval, mailbox settings,
+  and poll-now); `it:check-sla`, `it:close-resolved`, and
+  `PollItMailboxJob` appeared in `schedule:list`.
+- The Vite manifest contained production chunks for the IT dashboard, ticket
+  workspace, and mailbox settings page. HTTP smoke returned **200** for
+  `/login` and the expected unauthenticated **302** from `/it` to `/login`.
+  Laravel reported staging, debug off, and maintenance mode off.
+- Authenticated post-deploy browser proof is intentionally **deferred** by the
+  crash-containment instruction. No Browser Use, Chrome, computer-use, or
+  Playwright was invoked for this checkpoint; no post-deploy visual claim is
+  made here.
