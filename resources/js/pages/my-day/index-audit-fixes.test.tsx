@@ -105,6 +105,7 @@ vi.mock('./components/date-popover', () => ({
 }));
 
 vi.mock('./_dialogs', () => ({
+    MealLogDialog: () => null,
     TimesheetReviewDialog: ({
         timesheet,
     }: {
