@@ -282,7 +282,7 @@ git commit -m "feat(hr): make offboarding links and asset tasks durable"
 - Modify: `app/Services/Operations/TimesheetHrSyncService.php`
 - Modify: `app/Domain/Hr/Services/BenefitsService.php`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 For a submitted linked `HrTimeEntry`, approve its timesheet and assert:
 
@@ -294,17 +294,17 @@ expect($timesheet->fresh()->hr_time_entry_id)->toBe($entry->id)
 
 Add repeated approval, conflicting link, and cross-organisation tests. Add a benefit mismatch test asserting zero enrolments and zero notifications.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/TimesheetHrIdentityTest.php tests/Feature/Hr/BenefitsServiceTenantBoundaryTest.php --compact`
 
 Expected: linked-entry test exposes duplicate identity; benefit mismatch writes a row.
 
-- [ ] **Step 3: Lock and reuse the linked time entry**
+- [x] **Step 3: Lock and reuse the linked time entry**
 
 Inside approval transaction, lock the linked entry; validate worker and tenant; update it in place. Only use the canonical `source_type/source_id` lookup when no valid link exists. Throw a validation error on conflict.
 
-- [ ] **Step 4: Add service-boundary benefit guard**
+- [x] **Step 4: Add service-boundary benefit guard**
 
 Before `DB::transaction`:
 
@@ -316,7 +316,7 @@ if ((int) $profile->tenant_id !== (int) $plan->tenant_id) {
 }
 ```
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/TimesheetHrIdentityTest.php tests/Feature/Hr/BenefitsServiceTenantBoundaryTest.php tests/Feature/Hr/ShiftPayrollBackboneIntegrationTest.php tests/Feature/Hr/BenefitsEnrollmentTest.php --compact
