@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\BenefitEnrolledNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class BenefitsService
 {
@@ -16,6 +17,12 @@ class BenefitsService
      */
     public function enrollEmployee(HrEmployeeProfile $profile, HrBenefitPlan $plan, array $data): HrBenefitEnrollment
     {
+        if ((int) $profile->tenant_id !== (int) $plan->tenant_id) {
+            throw ValidationException::withMessages([
+                'benefit_plan_id' => 'The benefit plan and employee must belong to the same organisation.',
+            ]);
+        }
+
         $enrollment = DB::transaction(function () use ($profile, $plan, $data) {
             $enrollment = HrBenefitEnrollment::create([
                 'tenant_id' => $profile->tenant_id,
