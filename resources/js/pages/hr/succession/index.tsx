@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, Shield, Trash2, Users } from 'lucide-react';
+import { Archive, Pencil, Plus, Shield, Users } from 'lucide-react';
 import { useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 
@@ -117,7 +117,7 @@ export default function SuccessionIndex({
         router.delete(`/hr/succession/${deleting.id}`, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Succession plan deleted.');
+                toast.success('Succession plan archived.');
                 setDeleting(null);
             },
         });
@@ -219,13 +219,13 @@ export default function SuccessionIndex({
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                                                            aria-label={`Delete ${plan.role_title}`}
+                                                            aria-label={`Archive ${plan.role_title}`}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setDeleting(plan);
                                                             }}
                                                         >
-                                                            <Trash2 className="h-3.5 w-3.5 text-status-critical" />
+                                                            <Archive className="h-3.5 w-3.5 text-muted-foreground" />
                                                         </Button>
                                                     </>
                                                 )}
@@ -291,20 +291,20 @@ export default function SuccessionIndex({
             >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Delete succession plan?</DialogTitle>
+                        <DialogTitle>Archive succession plan?</DialogTitle>
                         <DialogDescription>
-                            “{deleting?.role_title}” and its{' '}
+                            “{deleting?.role_title}” will leave the active pipeline.
+                            Its{' '}
                             {deleting?.candidates_count ?? 0} candidate assessment
-                            {(deleting?.candidates_count ?? 0) === 1 ? '' : 's'}{' '}
-                            will be removed. This can’t be undone.
+                            {(deleting?.candidates_count ?? 0) === 1 ? '' : 's'} will be retained.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setDeleting(null)}>
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete}>
-                            Delete plan
+                        <Button onClick={confirmDelete}>
+                            Archive plan
                         </Button>
                     </DialogFooter>
                 </DialogContent>

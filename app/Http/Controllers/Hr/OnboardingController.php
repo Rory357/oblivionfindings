@@ -603,9 +603,9 @@ class OnboardingController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
 
-        $checklist->delete();
+        $this->onboardingService->setChecklistStatus($checklist, 'archived');
 
-        return redirect()->route('hr.onboarding.index')->with('success', 'Checklist deleted.');
+        return redirect()->route('hr.onboarding.index')->with('success', 'Checklist archived.');
     }
 
     /* ================================================================== */

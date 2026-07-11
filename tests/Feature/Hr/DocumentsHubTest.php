@@ -214,7 +214,7 @@ test('the signature-due reminder sweep notifies and stamps once', function () {
     expect($sig->fresh()->reminder_sent_at)->not->toBeNull();
 });
 
-test('bulk operations move and delete documents', function () {
+test('bulk operations move and archive documents', function () {
     $a = makeDocument($this->profile->id);
     $b = makeDocument($this->profile->id);
 
@@ -226,5 +226,7 @@ test('bulk operations move and delete documents', function () {
     $this->actingAs($this->manager)
         ->post('/hr/documents/bulk-delete', ['ids' => [$a->id, $b->id]])
         ->assertSessionHas('success');
-    expect(HrDocument::query()->whereIn('id', [$a->id, $b->id])->count())->toBe(0);
+    expect(HrDocument::query()->whereIn('id', [$a->id, $b->id])->count())->toBe(2);
+    expect($a->fresh()->folder)->toBe('Archive');
+    expect($b->fresh()->folder)->toBe('Archive');
 });

@@ -688,7 +688,7 @@ class HrDocumentController extends Controller
     }
 
     /**
-     * Bulk delete documents.
+     * Bulk archive documents without discarding their files or audit history.
      */
     public function bulkDestroy(Request $request)
     {
@@ -708,13 +708,10 @@ class HrDocumentController extends Controller
             ->get();
 
         foreach ($documents as $document) {
-            if ($document->storage_path && Storage::disk($document->storage_disk ?? 'private')->exists($document->storage_path)) {
-                Storage::disk($document->storage_disk ?? 'private')->delete($document->storage_path);
-            }
-            $document->delete();
+            $document->update(['folder' => 'Archive']);
         }
 
-        return redirect()->back()->with('success', $documents->count() . ' document(s) deleted.');
+        return redirect()->back()->with('success', $documents->count() . ' document(s) archived.');
     }
 
     /**
@@ -785,7 +782,7 @@ class HrDocumentController extends Controller
     }
 
     /**
-     * Delete an HR document.
+     * Archive an HR document while retaining the stored file.
      */
     public function destroy(Request $request, HrDocument $document)
     {
@@ -795,13 +792,9 @@ class HrDocumentController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
-        if ($document->storage_path && $document->storage_disk) {
-            Storage::disk($document->storage_disk)->delete($document->storage_path);
-        }
+        $document->update(['folder' => 'Archive']);
 
-        $document->delete();
-
-        return redirect()->back()->with('success', 'Document deleted.');
+        return redirect()->back()->with('success', 'Document archived.');
     }
 
     /**
@@ -1101,13 +1094,9 @@ class HrDocumentController extends Controller
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
         abort_unless($document->employee_profile_id === $profile->id, 404);
 
-        if ($document->storage_path && Storage::disk($document->storage_disk ?? 'private')->exists($document->storage_path)) {
-            Storage::disk($document->storage_disk ?? 'private')->delete($document->storage_path);
-        }
+        $document->update(['folder' => 'Archive']);
 
-        $document->delete();
-
-        return redirect()->back()->with('success', 'Document deleted.');
+        return redirect()->back()->with('success', 'Document archived.');
     }
 
     /* ------------------------------------------------------------------ */

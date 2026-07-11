@@ -958,9 +958,9 @@ class WellbeingController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($actor);
         $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
-        $this->engagementService->deleteSurvey($survey);
+        $this->engagementService->archiveDraftSurvey($survey, $actor);
 
-        return redirect()->route('hr.wellbeing.index')->with('success', 'Draft survey deleted.');
+        return redirect()->route('hr.wellbeing.index')->with('success', 'Draft survey archived.');
     }
 
     public function exportSurvey(Request $request, HrEngagementSurvey $survey): StreamedResponse

@@ -423,7 +423,7 @@ export default function WellbeingIndex(props: PageProps) {
             items.push({ label: 'Duplicate', onClick: () => simplePost(`/hr/wellbeing/surveys/${s.id}/duplicate`, {}, 'Duplicated as draft') });
             items.push({ label: 'Export results (CSV)', onClick: () => window.open(`/hr/wellbeing/surveys/${s.id}/export`, '_blank') });
             if (s.status === 'closed') items.push({ label: 'Archive', onClick: () => simplePost(`/hr/wellbeing/surveys/${s.id}/archive`, {}, 'Survey archived') });
-            if (s.status === 'draft') items.push({ label: 'Delete draft', color: 'var(--crit)', onClick: () => router.delete(`/hr/wellbeing/surveys/${s.id}`, { preserveScroll: true, onSuccess: () => flash('Draft deleted') }) });
+            if (s.status === 'draft') items.push({ label: 'Archive draft', onClick: () => router.delete(`/hr/wellbeing/surveys/${s.id}`, { preserveScroll: true, onSuccess: () => flash('Draft archived') }) });
         }
         return items;
     };

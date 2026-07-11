@@ -25,6 +25,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    Archive,
     Download,
     FileText,
     Filter,
@@ -35,7 +36,6 @@ import {
     Lock,
     Pencil,
     Search,
-    Trash2,
     Upload,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -558,15 +558,15 @@ export default function StaffDocuments({
                                                                 type="button"
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                aria-label="Delete document"
+                                                                aria-label="Archive document"
                                                                 onClick={() =>
                                                                     setDeletingDoc(
                                                                         d,
                                                                     )
                                                                 }
-                                                                className="h-7 w-7 rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg"
+                                                                className="h-7 w-7 rounded-full bg-muted text-muted-foreground hover:bg-muted"
                                                             >
-                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                                <Archive className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
                                                     )}
@@ -761,15 +761,15 @@ export default function StaffDocuments({
                                                                     type="button"
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    aria-label="Delete document"
+                                                                    aria-label="Archive document"
                                                                     onClick={() =>
                                                                         setDeletingDoc(
                                                                             d,
                                                                         )
                                                                     }
-                                                                    className="h-7 w-7 rounded-lg hover:bg-status-critical-bg"
+                                                                    className="h-7 w-7 rounded-lg hover:bg-muted"
                                                                 >
-                                                                    <Trash2 className="h-3.5 w-3.5 text-status-critical" />
+                                                                    <Archive className="h-3.5 w-3.5 text-muted-foreground" />
                                                                 </Button>
                                                             </>
                                                         )}
@@ -1139,18 +1139,18 @@ export default function StaffDocuments({
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation */}
+            {/* Archive confirmation */}
             <Dialog
                 open={!!deletingDoc}
                 onOpenChange={(v) => !v && setDeletingDoc(null)}
             >
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Delete Document</DialogTitle>
+                        <DialogTitle>Archive document</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete &quot;
+                            Move &quot;
                             {deletingDoc?.title || deletingDoc?.original_name}
-                            &quot;? This cannot be undone.
+                            &quot; to the Archive folder while retaining its file and history?
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -1161,7 +1161,6 @@ export default function StaffDocuments({
                             Cancel
                         </Button>
                         <Button
-                            variant="destructive"
                             onClick={() => {
                                 if (deletingDoc)
                                     router.delete(
@@ -1174,7 +1173,7 @@ export default function StaffDocuments({
                                     );
                             }}
                         >
-                            Delete
+                            Archive
                         </Button>
                     </DialogFooter>
                 </DialogContent>

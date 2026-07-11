@@ -309,16 +309,16 @@ class SuccessionController extends Controller
     }
 
     /**
-     * Delete a succession plan (and its candidates via cascade).
+     * Archive a succession plan while retaining its candidate history.
      */
     public function destroy(Request $request, HrSuccessionPlan $plan)
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $plan->delete();
+        $plan->update(['is_active' => false]);
 
-        return redirect()->route('hr.succession.index')->with('success', 'Succession plan deleted.');
+        return redirect()->route('hr.succession.index')->with('success', 'Succession plan archived.');
     }
 
     /**

@@ -184,7 +184,7 @@ test('EAP referral is recorded', function () {
     expect($referral->consent_given)->toBeTrue();
 });
 
-test('survey can be duplicated, archived, and a draft deleted', function () {
+test('survey can be duplicated and both closed and draft surveys archived', function () {
     $published = HrEngagementSurvey::query()->create([
         'tenant_id' => 1,
         'title' => 'June pulse',
@@ -215,7 +215,8 @@ test('survey can be duplicated, archived, and a draft deleted', function () {
     expect($closed->fresh()->status)->toBe('archived');
 
     $this->actingAs($this->manager)->delete("/hr/wellbeing/surveys/{$copy->id}")->assertRedirect();
-    expect(HrEngagementSurvey::query()->whereKey($copy->id)->exists())->toBeFalse();
+    expect($copy->fresh()->status)->toBe('archived');
+    expect($copy->questions()->count())->toBe(1);
 });
 
 test('index exposes hero summary, needs and employee view props', function () {
