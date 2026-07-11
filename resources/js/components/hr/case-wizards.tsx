@@ -48,6 +48,7 @@ import {
     type WizardStep,
 } from '@/components/hr/wizard';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,6 +65,17 @@ export type CaseStaffOption = {
 };
 
 export type CaseOption = { value: string; label: string };
+
+export type CaseIncidentOption = {
+    id: number;
+    reference: string;
+    title: string;
+    type: string;
+    severity: string;
+    status: string;
+    occurred_at: string | null;
+    client: string | null;
+};
 
 export type GoodFaithCheckOption = { key: string; label: string };
 
@@ -241,12 +253,14 @@ export function NewCaseWizard({
     staff,
     caseTypes,
     severities,
+    incidents,
     onClose,
     initial,
 }: {
     staff: CaseStaffOption[];
     caseTypes: CaseOption[];
     severities: CaseOption[];
+    incidents: CaseIncidentOption[];
     onClose: () => void;
     /** Optional safe prefill (e.g. escalating from an unsuccessful PIP). */
     initial?: {
@@ -266,10 +280,23 @@ export function NewCaseWizard({
         description: initial?.description ?? '',
         assigned_to: '',
         is_confidential: false as boolean,
+        linked_incident_ids: [] as number[],
     });
 
     const subject = staff.find((s) => String(s.id) === form.data.user_id) ?? null;
     const assignee = staff.find((s) => String(s.id) === form.data.assigned_to) ?? null;
+    const linkedIncidents = incidents.filter((incident) =>
+        form.data.linked_incident_ids.includes(incident.id),
+    );
+
+    const toggleIncident = (incidentId: number) => {
+        form.setData(
+            'linked_incident_ids',
+            form.data.linked_incident_ids.includes(incidentId)
+                ? form.data.linked_incident_ids.filter((id) => id !== incidentId)
+                : [...form.data.linked_incident_ids, incidentId],
+        );
+    };
 
     const detailsValid =
         form.data.case_type !== '' && form.data.severity !== '' && form.data.title.trim() !== '';
@@ -444,6 +471,59 @@ export function NewCaseWizard({
                             </span>
                         </span>
                     </label>
+                    <div className="mt-4">
+                        <Field
+                            label="Linked incidents"
+                            hint="optional — read-only references"
+                            error={form.errors.linked_incident_ids}
+                        >
+                            {incidents.length > 0 ? (
+                                <Card className="max-h-56 space-y-2 overflow-y-auto p-2">
+                                    {incidents.map((incident) => {
+                                        const checked =
+                                            form.data.linked_incident_ids.includes(
+                                                incident.id,
+                                            );
+
+                                        return (
+                                            <label
+                                                key={incident.id}
+                                                className="flex cursor-pointer items-start gap-3 rounded-lg p-2.5 hover:bg-muted/60"
+                                            >
+                                                <Checkbox
+                                                    checked={checked}
+                                                    onCheckedChange={() =>
+                                                        toggleIncident(incident.id)
+                                                    }
+                                                    className="mt-0.5"
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block text-sm font-medium">
+                                                        {incident.reference} —{' '}
+                                                        {incident.title}
+                                                    </span>
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        {incident.client ??
+                                                            'Unknown client'}{' '}
+                                                        · {incident.severity} ·{' '}
+                                                        {incident.status.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </Card>
+                            ) : (
+                                <InfoCard icon={AlertTriangle}>
+                                    No incidents are available for this
+                                    organisation.
+                                </InfoCard>
+                            )}
+                        </Field>
+                    </div>
                 </WizardStepPane>
             )}
 
@@ -471,6 +551,19 @@ export function NewCaseWizard({
                                 value={form.data.is_confidential ? 'Yes — restricted visibility' : 'No'}
                             />
                             <ReviewRow label="Description" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Linked incidents"
+                                value={
+                                    linkedIncidents.length > 0
+                                        ? linkedIncidents
+                                              .map(
+                                                  (incident) =>
+                                                      incident.reference,
+                                              )
+                                              .join(', ')
+                                        : 'None'
+                                }
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

@@ -1,5 +1,6 @@
 import {
     NewCaseWizard,
+    type CaseIncidentOption,
     type CaseOption,
     type CaseStaffOption,
 } from '@/components/hr/case-wizards';
@@ -97,6 +98,7 @@ type Props = {
     staff: CaseStaffOption[];
     caseTypes: CaseOption[];
     severities: CaseOption[];
+    incidents: CaseIncidentOption[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -174,6 +176,7 @@ export default function HrCasesIndex({
     staff,
     caseTypes,
     severities,
+    incidents,
 }: Props) {
     // Open the New-case wizard on mount when deep-linked via ?new (the old
     // GET /hr/cases/create route redirects here with that param). Optional
@@ -638,6 +641,7 @@ export default function HrCasesIndex({
                     staff={staff}
                     caseTypes={caseTypes}
                     severities={severities}
+                    incidents={incidents}
                     onClose={() => setWizardOpen(false)}
                     initial={wizardPrefill ?? undefined}
                 />
