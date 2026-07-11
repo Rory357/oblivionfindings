@@ -891,13 +891,13 @@ function DerivedContactRow({
                             Not set
                         </span>
                         {emptyCta && onAdd && (
-                            <button
+                            <Button unstyled
                                 type="button"
                                 onClick={onAdd}
                                 className="text-sm font-medium text-primary hover:underline"
                             >
                                 {emptyCta} →
-                            </button>
+                            </Button>
                         )}
                     </div>
                 )}
@@ -5120,7 +5120,7 @@ function ClientCard({
                     </div>
                 </div>
                 {canEdit && (
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -5131,7 +5131,7 @@ function ClientCard({
                         className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-muted hover:text-status-critical"
                     >
                         <Link2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -5148,7 +5148,7 @@ function ClientCard({
                         <span className="truncate">
                             Room: {client.room.name}
                             {canAssignRoom && onAssignRoom && (
-                                <button
+                                <Button unstyled
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -5157,11 +5157,11 @@ function ClientCard({
                                     className="ml-2 text-primary underline-offset-2 hover:underline"
                                 >
                                     Change
-                                </button>
+                                </Button>
                             )}
                         </span>
                     ) : canAssignRoom && onAssignRoom ? (
-                        <button
+                        <Button unstyled
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -5170,7 +5170,7 @@ function ClientCard({
                             className="text-primary underline-offset-2 hover:underline"
                         >
                             Assign room
-                        </button>
+                        </Button>
                     ) : (
                         <span className="italic">No room</span>
                     )}
@@ -5742,7 +5742,7 @@ function RoomSection({
                 </h4>
             </div>
             {count === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
+                <Card unstyled className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
                     <Icon className={`h-5 w-5 ${iconCls} opacity-60`} />
                     <p className="mt-2 text-xs font-medium">{empty.label}</p>
                     <p className="mt-1 max-w-xs text-[11px] text-muted-foreground">
@@ -5759,7 +5759,7 @@ function RoomSection({
                             {empty.ctaLabel}
                         </Button>
                     )}
-                </div>
+                </Card>
             ) : (
                 <div className="grid gap-3 2xl:grid-cols-2">{children}</div>
             )}
@@ -5890,11 +5890,11 @@ function BedroomCard({
             </div>
 
             {!isAssignable ? (
-                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                <Card unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
                     Shared space — no client occupant
-                </div>
+                </Card>
             ) : occupant ? (
-                <div className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5">
+                <Card unstyled className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5">
                     <Avatar className="size-8">
                         {occupant.profile_photo_url && (
                             <AvatarImage
@@ -5914,11 +5914,11 @@ function BedroomCard({
                             Occupant
                         </p>
                     </div>
-                </div>
+                </Card>
             ) : (
-                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                <Card unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
                     No occupant
-                </div>
+                </Card>
             )}
 
             {room.notes && (

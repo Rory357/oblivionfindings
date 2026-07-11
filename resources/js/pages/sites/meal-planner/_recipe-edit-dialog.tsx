@@ -248,7 +248,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                             const Icon = opt.icon;
                             const active = data.scope === opt.value;
                             return (
-                                <button
+                                <Button unstyled
                                     key={opt.value}
                                     type="button"
                                     onClick={() => patch({ scope: opt.value })}
@@ -265,7 +265,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                                         <span className="block truncate text-sm font-medium">{opt.title}</span>
                                         <span className="block text-xs text-muted-foreground">{opt.description}</span>
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -282,7 +282,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                                 const sel = data.tag_ids.includes(t.id);
                                 const critical = t.severity === 'critical';
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={t.id}
                                         type="button"
                                         aria-pressed={sel}
@@ -295,7 +295,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                                     >
                                         <ShieldAlert className="h-3 w-3" aria-hidden="true" /> {t.label}
                                         {critical && <span className="rounded-full bg-status-critical px-1 text-[8.5px] font-bold uppercase leading-tight text-white">Critical</span>}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -307,7 +307,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                             {dietaryTagOpts.map((t) => {
                                 const sel = data.tag_ids.includes(t.id);
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={t.id}
                                         type="button"
                                         aria-pressed={sel}
@@ -319,7 +319,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                                         )}
                                     >
                                         {t.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>

@@ -16,6 +16,7 @@ import {
     type PlanPin,
     type Taxonomy,
 } from './_types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // Re-export for backwards compatibility with importers that pulled types from
 // this module before the dedicated `_types.ts` existed.
@@ -337,9 +338,9 @@ export function PlanThumbnail({
                 })}
             </svg>
             {showScale && (
-            <div className="pointer-events-none absolute right-2 bottom-2 rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
+            <GuardrailCard unstyled className="pointer-events-none absolute right-2 bottom-2 rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
                     Scale: {formatMeters(100, mpu)} ≈ 100 units
-                </div>
+                </GuardrailCard>
             )}
         </div>
     );

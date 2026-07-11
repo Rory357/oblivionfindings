@@ -381,7 +381,7 @@ function Segmented<T extends string>({
             {options.map((o) => {
                 const active = value === o.value;
                 return (
-                    <button
+                    <Button unstyled
                         key={o.value}
                         type="button"
                         onClick={() => onChange(o.value)}
@@ -397,7 +397,7 @@ function Segmented<T extends string>({
                         )}
                     >
                         {o.label}
-                    </button>
+                    </Button>
                 );
             })}
         </div>

@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmAction } from '../_confirm-action';
 import { buildRecipeMap, conflictsFor, MEAL_SLOTS, SLOT_ICON, SLOT_LABEL, toIsoDate, type MealSlot, type PlanEntry, type RecipeFull, type RecipeMap, type Resident, type WeekTemplate, type WeekTemplateMeal } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -80,14 +81,14 @@ export default function TemplatesPanel({ siteId, templates, recipes, residents, 
             </div>
 
             {templates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+                <GuardrailCard unstyled className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
                     <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sites-bg text-sites-deep"><LayoutTemplate className="h-7 w-7" /></span>
                     <div>
                         <div className="text-[15px] font-semibold text-foreground">No templates yet</div>
                         <div className="mt-0.5 text-[13px] text-muted-foreground">Build a reusable week to speed up planning.</div>
                     </div>
                     {canManage && <Button size="sm" onClick={() => setBuilder({ open: true, initial: null })}><Plus className="mr-1.5 h-[15px] w-[15px]" /> Build your first template</Button>}
-                </div>
+                </GuardrailCard>
             ) : (
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {templates.map((t) => {
@@ -96,7 +97,7 @@ export default function TemplatesPanel({ siteId, templates, recipes, residents, 
                         const daysUsed = byDay.filter((d) => d.length > 0).length;
                         const slotsUsed = Array.from(new Set(t.meals.map((m) => m.slot))).sort((a, b) => MEAL_SLOTS.indexOf(a) - MEAL_SLOTS.indexOf(b));
                         return (
-                            <div key={t.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                            <GuardrailCard unstyled key={t.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                                 <div className="flex items-start gap-3 border-b border-border bg-gradient-to-br from-sites-bg/50 to-transparent p-4">
                                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sites text-primary-foreground"><LayoutTemplate className="h-5 w-5" /></span>
                                     <div className="min-w-0">
@@ -148,7 +149,7 @@ export default function TemplatesPanel({ siteId, templates, recipes, residents, 
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </GuardrailCard>
                         );
                     })}
                 </div>
@@ -187,14 +188,14 @@ function ApplyTemplateDialog({ tpl, weekLabel, rangeLabel, residents, recipeMap,
                     </div>
                 )}
                 <div className="space-y-2">
-                    <button type="button" onClick={() => setMode('replace')} className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all', mode === 'replace' ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:bg-accent')}>
+                    <Button unstyled type="button" onClick={() => setMode('replace')} className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all', mode === 'replace' ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:bg-accent')}>
                         <RefreshCw className={cn('mt-0.5 h-4 w-4', mode === 'replace' ? 'text-primary' : 'text-muted-foreground')} />
                         <div><div className="text-[13.5px] font-medium text-foreground">Replace the week</div><div className="text-[12px] text-muted-foreground">Clears existing meals, then applies the template.</div></div>
-                    </button>
-                    <button type="button" onClick={() => setMode('merge')} className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all', mode === 'merge' ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:bg-accent')}>
+                    </Button>
+                    <Button unstyled type="button" onClick={() => setMode('merge')} className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all', mode === 'merge' ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:bg-accent')}>
                         <Plus className={cn('mt-0.5 h-4 w-4', mode === 'merge' ? 'text-primary' : 'text-muted-foreground')} />
                         <div><div className="text-[13.5px] font-medium text-foreground">Add to the week</div><div className="text-[12px] text-muted-foreground">Keeps existing meals and adds the template on top.</div></div>
-                    </button>
+                    </Button>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -322,8 +323,8 @@ export function TemplateBuilderDialog({ siteId, recipes, initial, onClose, onSav
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-[11.5px] font-semibold leading-tight text-foreground">{SLOT_LABEL[slot]}</div>
                                                 <div className="flex items-center gap-1.5">
-                                                    <button type="button" onClick={() => setFillRow(fillRow === slot ? null : slot)} className="text-[10px] font-medium text-primary hover:underline">Fill all</button>
-                                                    {slots.length > 1 && <button type="button" onClick={() => removeSlot(slot)} className="text-[10px] text-muted-foreground hover:text-status-critical">Remove</button>}
+                                                    <Button unstyled type="button" onClick={() => setFillRow(fillRow === slot ? null : slot)} className="text-[10px] font-medium text-primary hover:underline">Fill all</Button>
+                                                    {slots.length > 1 && <Button unstyled type="button" onClick={() => removeSlot(slot)} className="text-[10px] text-muted-foreground hover:text-status-critical">Remove</Button>}
                                                 </div>
                                                 {fillRow === slot && (
                                                     <div className="mt-1">
@@ -348,18 +349,18 @@ export function TemplateBuilderDialog({ siteId, recipes, initial, onClose, onSav
                                                         </Select>
                                                     ) : cell ? (
                                                         <div className="flex h-full flex-col rounded-md border border-sites/30 bg-sites-bg/50 px-1.5 py-1">
-                                                            <button type="button" onClick={() => setEditing(key)} className="line-clamp-2 flex-1 text-left text-[11px] font-medium leading-tight text-sites-deep">{recipeName(cell.recipe_id)}</button>
+                                                            <Button unstyled type="button" onClick={() => setEditing(key)} className="line-clamp-2 flex-1 text-left text-[11px] font-medium leading-tight text-sites-deep">{recipeName(cell.recipe_id)}</Button>
                                                             <div className="mt-0.5 flex items-center justify-between">
                                                                 <div className="flex items-center gap-0.5">
-                                                                    <button type="button" aria-label="Decrease servings" onClick={() => setServings(day, slot, cell.servings - 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Minus className="h-3 w-3" /></button>
+                                                                    <Button unstyled type="button" aria-label="Decrease servings" onClick={() => setServings(day, slot, cell.servings - 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Minus className="h-3 w-3" /></Button>
                                                                     <span className="w-4 text-center text-[10px] font-semibold tabular-nums text-foreground">{cell.servings}</span>
-                                                                    <button type="button" aria-label="Increase servings" onClick={() => setServings(day, slot, cell.servings + 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Plus className="h-3 w-3" /></button>
+                                                                    <Button unstyled type="button" aria-label="Increase servings" onClick={() => setServings(day, slot, cell.servings + 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Plus className="h-3 w-3" /></Button>
                                                                 </div>
-                                                                <button type="button" aria-label="Clear meal" onClick={() => clearCell(day, slot)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-status-critical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></button>
+                                                                <Button unstyled type="button" aria-label="Clear meal" onClick={() => clearCell(day, slot)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-status-critical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></Button>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <button type="button" onClick={() => setEditing(key)} className="flex h-full min-h-[50px] w-full items-center justify-center rounded-md border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary"><Plus className="h-3.5 w-3.5" /></button>
+                                                        <Button unstyled type="button" onClick={() => setEditing(key)} className="flex h-full min-h-[50px] w-full items-center justify-center rounded-md border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary"><Plus className="h-3.5 w-3.5" /></Button>
                                                     )}
                                                 </div>
                                             );
@@ -374,7 +375,7 @@ export function TemplateBuilderDialog({ siteId, recipes, initial, onClose, onSav
                         <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[12px] text-muted-foreground">Add meal slot:</span>
                             {availableSlots.map((s) => (
-                                <button key={s} type="button" onClick={() => addSlot(s)} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"><Plus className="h-3 w-3" /> {SLOT_LABEL[s]}</button>
+                                <Button unstyled key={s} type="button" onClick={() => addSlot(s)} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"><Plus className="h-3 w-3" /> {SLOT_LABEL[s]}</Button>
                             ))}
                         </div>
                     )}

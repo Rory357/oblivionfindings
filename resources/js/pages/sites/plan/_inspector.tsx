@@ -256,7 +256,7 @@ export default function PlanInspector({
                                         key={room.id}
                                                 className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             className="block w-full text-left"
                                             onClick={() =>
@@ -285,7 +285,7 @@ export default function PlanInspector({
                                                     Free-form label
                                                 </span>
                                             )}
-                                        </button>
+                                        </Button>
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             <RoomLinkPopover
                                                 roomId={room.id}
@@ -369,7 +369,7 @@ export default function PlanInspector({
                                                 className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
-                                            <button
+                                            <Button unstyled
                                                 type="button"
                                                 className="block flex-1 text-left"
                                                 onClick={() =>
@@ -417,7 +417,7 @@ export default function PlanInspector({
                                                         </Badge>
                                                     )}
                                                 </div>
-                                            </button>
+                                            </Button>
                                             <Button
                                                 type="button"
                                                 size="icon"
@@ -1244,7 +1244,7 @@ function PinKindPicker({
                                     const Icon = resolveIcon(kind.icon);
                                     const active = pin.kind === kindKey;
                                     return (
-                                        <button
+                                        <Button unstyled
                                             key={kindKey}
                                             type="button"
                                             onClick={() => changeKind(kindKey)}
@@ -1263,7 +1263,7 @@ function PinKindPicker({
                                             <span className="line-clamp-2 text-center leading-tight">
                                                 {kind.label}
                                             </span>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>

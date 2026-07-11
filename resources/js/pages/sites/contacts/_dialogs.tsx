@@ -22,6 +22,7 @@ import {
     type ContactTypeDef,
     type ContactTypeKey,
 } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // Re-export so existing call sites that imported these from `_dialogs` keep
 // working without changes. The single source of truth lives in `_helpers.ts`.
@@ -71,7 +72,7 @@ function ContactTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <button
+                    <Button unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -99,7 +100,7 @@ function ContactTypePicker({
                                 {t.description}
                             </span>
                         </span>
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -532,7 +533,7 @@ function ContactDetailRow({
     href?: string;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">{label}</p>
@@ -551,7 +552,7 @@ function ContactDetailRow({
                     <p className="text-sm text-muted-foreground">—</p>
                 )}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 

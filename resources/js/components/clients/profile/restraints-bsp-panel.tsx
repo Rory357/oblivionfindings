@@ -6,6 +6,7 @@ import { CHIP, REVIEW_STATE_META, severityMeta, titleCase, typeMeta, whenLabel, 
 import { router } from '@inertiajs/react';
 import { AlertTriangle, BookOpen, ChevronRight, HeartPulse, ShieldAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 type ActivePlan = { id: number; reference: string; title: string; status: string; review_date: string | null; review_state: 'ok' | 'due' | 'overdue' };
 type RecentEvent = { id: number; reference: string; restraint_type: string; severity: string; started_at: string | null; within_support_plan: boolean; injury_occurred: boolean; reviewed_at: string | null };
@@ -52,18 +53,18 @@ export function RestraintsBspPanel({ clientId }: { clientId: number }) {
                         <div className="text-xs text-muted-foreground">{summary.total_events} restraint event{summary.total_events === 1 ? '' : 's'} on record</div>
                     </div>
                 </div>
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => router.visit(`/health-safety/restraints?client_id=${clientId}`)}
                     className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
                 >
                     Open register <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                </GuardrailButton>
             </div>
 
             {/* Active BSP */}
             {plan ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => router.visit(`/health-safety/restraints?lens=plans&plan=${plan.id}`)}
                     className="mb-3 flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 p-3 text-left transition-colors hover:border-primary/40"
@@ -80,7 +81,7 @@ export function RestraintsBspPanel({ clientId }: { clientId: number }) {
                     {reviewState && plan.review_state !== 'ok' ? (
                         <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${CHIP[reviewState.tone]}`}>{reviewState.label}</span>
                     ) : null}
-                </button>
+                </GuardrailButton>
             ) : (
                 <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-dashed border-status-warning/40 bg-status-warning-bg/40 p-3 text-[13px] text-status-warning">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -96,7 +97,7 @@ export function RestraintsBspPanel({ clientId }: { clientId: number }) {
                         const type = typeMeta(e.restraint_type);
                         const sev = severityMeta(e.severity);
                         return (
-                            <button
+                            <GuardrailButton unstyled
                                 key={e.id}
                                 type="button"
                                 onClick={() => router.visit(`/health-safety/restraints?event=${e.id}`)}
@@ -114,7 +115,7 @@ export function RestraintsBspPanel({ clientId }: { clientId: number }) {
                                     {!e.within_support_plan ? <AlertTriangle className="h-3.5 w-3.5 text-status-critical" /> : null}
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${CHIP[sev.tone as ChipTone]}`}>{sev.label}</span>
                                 </div>
-                            </button>
+                            </GuardrailButton>
                         );
                     })}
                 </div>

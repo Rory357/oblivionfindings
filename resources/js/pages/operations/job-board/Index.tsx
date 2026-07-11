@@ -16,6 +16,7 @@ import type {
 } from '@/components/job-board/types';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type PaginatedJobs = {
     data: JobPost[];
@@ -310,7 +311,7 @@ export default function JobBoardIndex({
 
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
                         {visibleJobs.length === 0 ? (
-                            <div className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground">
+                            <GuardrailCard unstyled className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground">
                                 <Briefcase className="mx-auto mb-3 h-8 w-8 opacity-40" />
                                 <h3 className="m-0 mb-1 text-base font-semibold text-foreground">
                                     No shifts match those filters
@@ -319,7 +320,7 @@ export default function JobBoardIndex({
                                     Try widening your date range, clearing a skill
                                     filter, or switching to "All open".
                                 </p>
-                            </div>
+                            </GuardrailCard>
                         ) : (
                             visibleJobs.map((job) => (
                                 <JobCard

@@ -402,7 +402,7 @@ function RunInput({
     if (item.response_type === 'photo') {
         const has = value === 'photo';
         return (
-            <button
+            <Button unstyled
                 type="button"
                 disabled={readOnly}
                 onClick={() => onChange(has ? '' : 'photo')}
@@ -413,7 +413,7 @@ function RunInput({
             >
                 {has ? <CheckCircle2 className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
                 {has ? 'Photo attached' : 'Add photo'}
-            </button>
+            </Button>
         );
     }
     // yes_no / yes_no_na / pass_fail
@@ -431,7 +431,7 @@ function RunInput({
                 const positive = o === 'yes' || o === 'pass';
                 const negative = o === 'no' || o === 'fail';
                 return (
-                    <button
+                    <Button unstyled
                         key={o}
                         type="button"
                         disabled={readOnly}
@@ -457,7 +457,7 @@ function RunInput({
                             )
                         ) : null}
                         {labels[o]}
-                    </button>
+                    </Button>
                 );
             })}
         </div>

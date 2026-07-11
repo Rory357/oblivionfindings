@@ -59,6 +59,7 @@ import {
     type Interaction,
     type LayerKey,
 } from './_use-plan-editor';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     layout: PlanLayout;
@@ -1641,7 +1642,7 @@ export default function PlanCanvas(props: Props) {
     }
 
     return (
-        <div
+        <GuardrailCard unstyled
             className="relative h-full min-h-[420px] overflow-hidden rounded-md border bg-white"
             data-test="site-plan-canvas"
         >
@@ -2924,7 +2925,7 @@ export default function PlanCanvas(props: Props) {
             </svg>
 
             <div className="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
-                <div className="rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                <GuardrailCard unstyled className="rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
                     Scale: 1 m ≈ {(1 / mpu).toFixed(0)} units · grid{' '}
                     {layout.grid?.size ?? 10}
                     {layout.grid?.snap === false
@@ -2933,7 +2934,7 @@ export default function PlanCanvas(props: Props) {
                           ? ' · Alt unsnapped'
                           : ''}
                     {selection.length > 1 && ` · ${selection.length} selected`}
-                </div>
+                </GuardrailCard>
                 {selection.length > 1 && (
                     <div
                         className="rounded-md border bg-status-info-bg px-2 py-1 text-xs text-status-info shadow-sm"
@@ -3062,7 +3063,7 @@ export default function PlanCanvas(props: Props) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
-        </div>
+        </GuardrailCard>
     );
 }
 

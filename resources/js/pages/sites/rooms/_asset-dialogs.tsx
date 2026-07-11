@@ -15,6 +15,7 @@ import { router } from '@inertiajs/react';
 import { Loader2, Package } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { type RoomRecord } from './_dialogs';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type AssetForPicker = {
     id: number;
@@ -117,7 +118,7 @@ function AssignAssetBody({
                     />
                 </div>
 
-                <div className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+                <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
                     {filtered.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                             {assets.length === 0
@@ -130,7 +131,7 @@ function AssignAssetBody({
                                 const active = selectedId === a.id;
                                 return (
                                     <li key={a.id}>
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             onClick={() => setSelectedId(a.id)}
                                             className={cn(
@@ -167,13 +168,13 @@ function AssignAssetBody({
                                                     {a.status}
                                                 </Badge>
                                             )}
-                                        </button>
+                                        </Button>
                                     </li>
                                 );
                             })}
                         </ul>
                     )}
-                </div>
+                </GuardrailCard>
             </div>
 
             <DialogFooter className="mt-4">

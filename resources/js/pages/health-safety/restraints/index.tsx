@@ -431,14 +431,14 @@ function HeroBadge({ icon: Icon, tone, children }: { icon: LucideIcon; tone: Chi
 
 function LensButton({ active, icon: Icon, label, onClick }: { active: boolean; icon: LucideIcon; label: string; onClick: () => void }) {
     return (
-        <button
+        <Button unstyled
             type="button"
             aria-pressed={active}
             onClick={onClick}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
         >
             <Icon className="h-4 w-4" /> {label}
-        </button>
+        </Button>
     );
 }
 

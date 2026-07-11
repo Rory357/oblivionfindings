@@ -41,6 +41,7 @@ import {
     UserPlus,
 } from 'lucide-react';
 import { useMemo, useState, type ComponentType } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -486,7 +487,7 @@ function LinkExistingForm({
                 />
             </div>
 
-            <div className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+            <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
                 {filtered.length === 0 ? (
                     <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                         No clients match "{query}".
@@ -498,7 +499,7 @@ function LinkExistingForm({
                             const status = getClientStatusStyle(c.status);
                             return (
                                 <li key={c.id}>
-                                    <button
+                                    <Button unstyled
                                         type="button"
                                         onClick={() => setSelectedId(c.id)}
                                         className={cn(
@@ -532,13 +533,13 @@ function LinkExistingForm({
                                         >
                                             {status.label}
                                         </Badge>
-                                    </button>
+                                    </Button>
                                 </li>
                             );
                         })}
                     </ul>
                 )}
-            </div>
+            </GuardrailCard>
 
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>
@@ -776,7 +777,7 @@ function DetailRow({
     value?: string | null;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">{label}</p>
@@ -786,7 +787,7 @@ function DetailRow({
                     <p className="text-sm text-muted-foreground">—</p>
                 )}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -800,7 +801,7 @@ function RoomRow({
     onAssign?: () => void;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
             <DoorOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">Room</p>
@@ -821,7 +822,7 @@ function RoomRow({
                     {roomName ? 'Change' : 'Assign'}
                 </Button>
             )}
-        </div>
+        </GuardrailCard>
     );
 }
 

@@ -64,6 +64,7 @@ import {
     AssignAssetDialog,
     type AssetForPicker,
 } from './_asset-dialogs';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Types (match SiteRoomController::index payload) ──────────────────────
 
@@ -705,12 +706,12 @@ function RoomSection({
                 </h4>
             </div>
             {count === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
+                <GuardrailCard unstyled className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
                     <Icon className={cn('h-5 w-5', iconCls, 'opacity-60')} />
                     <p className="mt-2 max-w-xs text-[11px] text-muted-foreground">
                         {emptyHint}
                     </p>
-                </div>
+                </GuardrailCard>
             ) : (
                 <div className="grid gap-3">{children}</div>
             )}
@@ -773,7 +774,7 @@ function SortableRoomCard({
                 >
                     <GripVertical className="h-4 w-4" />
                 </button>
-                <button
+                <Button unstyled
                     type="button"
                     onClick={onOpen}
                     className="min-w-0 flex-1 text-left"
@@ -840,11 +841,11 @@ function SortableRoomCard({
                             </span>
                         )}
                     </div>
-                </button>
+                </Button>
             </div>
 
             {isAssignable && occupant && (
-                <button
+                <Button unstyled
                     type="button"
                     onClick={onOpen}
                     className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5 text-left"
@@ -870,19 +871,19 @@ function SortableRoomCard({
                                 : occupant.status ?? 'Occupant'}
                         </p>
                     </div>
-                </button>
+                </Button>
             )}
 
             {isAssignable && !occupant && (
-                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
+                <GuardrailCard unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
                     No occupant
-                </div>
+                </GuardrailCard>
             )}
 
             {!isAssignable && (
-                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
+                <GuardrailCard unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
                     Shared space — no client occupant
-                </div>
+                </GuardrailCard>
             )}
 
             <div className="flex flex-wrap items-center justify-end gap-1.5 border-t pt-2">
@@ -1053,7 +1054,7 @@ function RoomDrawer({
 
                             {room.assigned_client ? (
                                 <DrawerSection title="Occupant">
-                                    <div className="flex items-center gap-3 rounded-xl border bg-card/40 p-3">
+                                    <GuardrailCard unstyled className="flex items-center gap-3 rounded-xl border bg-card/40 p-3">
                                         <Avatar className="size-10">
                                             {room.assigned_client
                                                 .profile_photo_url && (
@@ -1108,7 +1109,7 @@ function RoomDrawer({
                                                 Profile
                                             </a>
                                         </Button>
-                                    </div>
+                                    </GuardrailCard>
                                 </DrawerSection>
                             ) : (
                                 room.is_assignable && (

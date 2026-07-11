@@ -272,13 +272,13 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can,
                                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <button
+                                                            <Button unstyled
                                                                 type="button"
                                                                 onClick={() => openWorkspace(alert.id)}
                                                                 className="truncate text-left font-semibold hover:underline"
                                                             >
                                                                 {alert.alert_type}
-                                                            </button>
+                                                            </Button>
                                                             {alert.client_name && (
                                                                 <span className="truncate text-xs text-muted-foreground">
                                                                     - {alert.client_name}
@@ -366,7 +366,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can,
                                                             {formatFollowupDate(note.followup_at)}
                                                         </span>
                                                         {note.alert && (
-                                                            <button
+                                                            <Button unstyled
                                                                 type="button"
                                                                 onClick={() => openWorkspace(note.alert!.id)}
                                                                 className="flex items-center gap-1 text-xs text-primary hover:underline"
@@ -375,7 +375,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can,
                                                                 <Badge className={`text-xs ${severityColors[note.alert.severity] ?? ''}`}>
                                                                     {note.alert.severity}
                                                                 </Badge>
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                     </div>
                                                 </div>

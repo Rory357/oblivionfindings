@@ -90,9 +90,9 @@ export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; on
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">Sensor → operator confirm → drafts a FleetIncident · wired when the telematics build-out lands. Mirrors the client-incident fall-detected flow.</p>
                     </div>
-                    <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                    <Button unstyled type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
                         <X className="h-5 w-5" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Step dots */}

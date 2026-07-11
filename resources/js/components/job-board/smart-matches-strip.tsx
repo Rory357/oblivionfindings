@@ -1,6 +1,7 @@
 import { Check, Hand, Sparkles } from 'lucide-react';
 
 import type { JobPost } from './types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 interface SmartMatchesStripProps {
     jobs: JobPost[];
@@ -38,13 +39,13 @@ export function SmartMatchesStrip({
                     </span>
                 </div>
                 {onSeeAll && totalMatches > jobs.length ? (
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         className="text-xs font-semibold text-primary hover:underline"
                         onClick={onSeeAll}
                     >
                         See all {totalMatches} matches →
-                    </button>
+                    </GuardrailButton>
                 ) : null}
             </header>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -52,7 +53,7 @@ export function SmartMatchesStrip({
                     const total = job.required_skills.length;
                     const location = job.location?.split(' · ')[0] ?? '';
                     return (
-                        <button
+                        <GuardrailButton unstyled
                             key={job.id}
                             type="button"
                             data-test="job-board-quick-claim"
@@ -97,7 +98,7 @@ export function SmartMatchesStrip({
                                 <Hand className="h-2.5 w-2.5" strokeWidth={2.5} />
                                 Quick claim
                             </span>
-                        </button>
+                        </GuardrailButton>
                     );
                 })}
             </div>

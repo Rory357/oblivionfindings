@@ -20,6 +20,7 @@ import { useChecklistConfig } from './context';
 import type { WeekInfo } from './hero-footer';
 import { Dropdown, SearchInput, StatusBadge, type DropdownOption } from './primitives';
 import type { ChecklistStats, SiteRef } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export function ChecklistsEmbeddedHeader({
     stats,
@@ -68,7 +69,7 @@ export function ChecklistsEmbeddedHeader({
     ];
 
     return (
-        <div className="rounded-xl border bg-card p-3">
+        <GuardrailCard unstyled className="rounded-xl border bg-card p-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -119,15 +120,15 @@ export function ChecklistsEmbeddedHeader({
 
             <div className="mt-3 flex flex-col gap-2 border-t pt-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={onPrevWeek}
                         className="inline-flex h-9 items-center gap-1 rounded-md border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent/50"
                     >
                         <ChevronLeft className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">{week.prevLabel}</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                         ref={weekBtnRef}
                         type="button"
                         onClick={() => setPickerOpen((value) => !value)}
@@ -141,15 +142,15 @@ export function ChecklistsEmbeddedHeader({
                             <span className="text-muted-foreground"> · {week.range}</span>
                         </span>
                         <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                         type="button"
                         onClick={onNextWeek}
                         className="inline-flex h-9 items-center gap-1 rounded-md border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent/50"
                     >
                         <span className="hidden sm:inline">{week.nextLabel}</span>
                         <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                     {pickerOpen ? (
                         <WeekPicker
                             selectedWeekStart={selectedWeekStart}
@@ -183,6 +184,6 @@ export function ChecklistsEmbeddedHeader({
                     />
                 </div>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }

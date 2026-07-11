@@ -4,6 +4,7 @@ import StaffStatus from '@/components/staff-status';
 import { cn } from '@/lib/utils';
 
 import type { RosterShift } from './types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -148,7 +149,7 @@ export default function WeekGridOverview({
                             ) : (
                                 <div className="flex flex-col gap-1.5">
                                     {shifts.map((shift) => (
-                                        <button
+                                        <GuardrailButton unstyled
                                             key={shift.id}
                                             type="button"
                                             onClick={() => onSelect(shift)}
@@ -168,7 +169,7 @@ export default function WeekGridOverview({
                                                 {shift.client?.name ??
                                                     'Unassigned'}
                                             </span>
-                                        </button>
+                                        </GuardrailButton>
                                     ))}
                                 </div>
                             )}

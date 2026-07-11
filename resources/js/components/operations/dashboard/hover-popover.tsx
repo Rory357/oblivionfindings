@@ -23,6 +23,7 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 import type { HoverPopoverContent } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const ICON_MAP: Record<string, LucideIcon> = {
     'alert-triangle': AlertTriangle,
@@ -105,7 +106,7 @@ export function HoverPopover({
     const headerTone = TONE[content.tone] ?? TONE.info;
 
     return createPortal(
-        <div
+        <GuardrailCard unstyled
             ref={popRef}
             role="dialog"
             onMouseEnter={onMouseEnter}
@@ -178,7 +179,7 @@ export function HoverPopover({
                     <ArrowRight className="h-3 w-3" />
                 </Link>
             </div>
-        </div>,
+        </GuardrailCard>,
         document.body,
     );
 }

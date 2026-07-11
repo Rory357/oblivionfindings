@@ -63,6 +63,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRef, useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors AlertWorkspaceService::build()                      */
@@ -571,8 +572,8 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
     };
 
     return (
-        <div className="rounded-lg border border-sidebar-border bg-background/40 p-2.5">
-            <button
+        <GuardrailCard unstyled className="rounded-lg border border-sidebar-border bg-background/40 p-2.5">
+            <Button unstyled
                 type="button"
                 onClick={toggle}
                 disabled={busy}
@@ -580,7 +581,7 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
             >
                 <Eye className={`h-3.5 w-3.5 ${d.is_watching ? 'text-primary' : 'text-muted-foreground'}`} />
                 {d.is_watching ? 'Watching' : 'Watch this alert'}
-            </button>
+            </Button>
 
             {d.watchers.length ? (
                 <ul className="mt-2 flex flex-col gap-1">
@@ -588,14 +589,14 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
                         <li key={w.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                             <span className="min-w-0 flex-1 truncate">{w.user_name}</span>
                             {d.can.manage ? (
-                                <button
+                                <Button unstyled
                                     type="button"
                                     onClick={() => removeWatcher(w.user_id)}
                                     className="text-muted-foreground/60 hover:text-status-critical"
                                     aria-label={`Remove ${w.user_name}`}
                                 >
                                     <X className="h-3 w-3" />
-                                </button>
+                                </Button>
                             ) : null}
                         </li>
                     ))}
@@ -623,16 +624,16 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
                         </div>
                     </div>
                 ) : addable.length ? (
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={() => setAdding(true)}
                         className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                     >
                         <UserPlus className="h-3 w-3" /> Add watcher
-                    </button>
+                    </Button>
                 ) : null
             ) : null}
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -887,7 +888,7 @@ function SnoozePane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void
                     {SNOOZE_WINDOWS.map((w) => {
                         const active = form.data.window === w.value;
                         return (
-                            <button
+                            <Button unstyled
                                 key={w.value}
                                 type="button"
                                 onClick={() => form.setData('window', w.value)}
@@ -895,7 +896,7 @@ function SnoozePane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () => void
                             >
                                 <p className="text-sm font-medium text-foreground">{w.label}</p>
                                 <p className="text-xs text-muted-foreground">{w.hint}</p>
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>
@@ -1011,14 +1012,14 @@ function SensorDismissPane({ d, onDone }: { d: AlertWorkspaceDetail; onDone: () 
             <Field label="Why is this a false positive?" required>
                 <div className="flex flex-wrap gap-2">
                     {DISMISS_REASONS.map((r) => (
-                        <button
+                        <Button unstyled
                             key={r}
                             type="button"
                             onClick={() => setReason(r)}
                             className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${reason === r ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
                         >
                             {r}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             </Field>
@@ -1899,9 +1900,9 @@ function TaskRow({ d, t, dragHandle }: { d: AlertWorkspaceDetail; t: AlertWorksp
                         addingSub ? (
                             <AddSubtaskForm alertId={d.alert.id} parentId={t.id} onDone={() => setAddingSub(false)} />
                         ) : (
-                            <button type="button" onClick={() => setAddingSub(true)} className="self-start text-xs font-medium text-primary hover:underline">
+                            <Button unstyled type="button" onClick={() => setAddingSub(true)} className="self-start text-xs font-medium text-primary hover:underline">
                                 + Add subtask
-                            </button>
+                            </Button>
                         )
                     ) : null}
                 </div>
@@ -2294,9 +2295,9 @@ function DiscussionThread({ d, thread }: { d: AlertWorkspaceDetail; thread: Aler
                         <DiscussionComposer alertId={d.alert.id} parentId={thread.id} onDone={() => setReplying(false)} />
                     </div>
                 ) : (
-                    <button type="button" onClick={() => setReplying(true)} className="mt-1.5 text-xs font-medium text-primary hover:underline">
+                    <Button unstyled type="button" onClick={() => setReplying(true)} className="mt-1.5 text-xs font-medium text-primary hover:underline">
                         Reply
-                    </button>
+                    </Button>
                 )
             ) : null}
         </div>
@@ -2341,9 +2342,9 @@ function DiscussionEntry({ entry, canManage }: { entry: { id: number; content: s
                     {entry.edited_at ? ' · edited' : ''}
                 </span>
                 {!deleted && isOwner ? (
-                    <button type="button" onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">
+                    <Button unstyled type="button" onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">
                         Edit
-                    </button>
+                    </Button>
                 ) : null}
                 {!deleted && (isOwner || canManage) ? (
                     <ConfirmChip label="Delete" icon={Trash2} destructive onConfirm={() => router.delete(`/control-room/discussions/${entry.id}`, { preserveScroll: true })} />

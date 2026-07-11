@@ -29,6 +29,7 @@ import {
     UserX,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Shared types ──────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ function AssignableToggle({
     onChange: (v: boolean) => void;
 }) {
     return (
-        <div className="flex items-start gap-3 rounded-lg border bg-background/40 p-3">
+        <GuardrailCard unstyled className="flex items-start gap-3 rounded-lg border bg-background/40 p-3">
             <Checkbox
                 id={id}
                 checked={value}
@@ -245,7 +246,7 @@ function AssignableToggle({
                     hallways. Only assignable rooms can have a client occupant.
                 </p>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -508,7 +509,7 @@ export function ShowRoomDialog({
 
                 <div className="space-y-3 px-6 pb-2 pt-4">
                 {occupant ? (
-                    <div className="rounded-xl border bg-card/40 p-3">
+                    <GuardrailCard unstyled className="rounded-xl border bg-card/40 p-3">
                         <div className="flex items-center gap-3">
                             <Avatar className="size-11 shrink-0">
                                 {occupant.profile_photo_url && (
@@ -544,7 +545,7 @@ export function ShowRoomDialog({
                                 Open {occupant.first_name}'s profile
                             </a>
                         </Button>
-                    </div>
+                    </GuardrailCard>
                 ) : (
                     <div className="rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
                         No client assigned yet.
@@ -561,7 +562,7 @@ export function ShowRoomDialog({
                 )}
 
                 {room.history && room.history.length > 0 && (
-                    <div className="rounded-xl border bg-card/40">
+                    <GuardrailCard unstyled className="rounded-xl border bg-card/40">
                         <p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground">
                             <History className="h-3 w-3" />
                             Assignment history
@@ -594,7 +595,7 @@ export function ShowRoomDialog({
                                 );
                             })}
                         </ul>
-                    </div>
+                    </GuardrailCard>
                 )}
 
                 </div>
@@ -777,7 +778,7 @@ function AssignClientBody({
                     />
                 </div>
 
-                <div className="max-h-60 overflow-y-auto rounded-xl border bg-card/40">
+                <GuardrailCard unstyled className="max-h-60 overflow-y-auto rounded-xl border bg-card/40">
                     {filtered.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                             {clients.length === 0
@@ -792,7 +793,7 @@ function AssignClientBody({
                                     c.room && c.room.id !== room.id;
                                 return (
                                     <li key={c.id}>
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             onClick={() => setSelectedId(c.id)}
                                             className={cn(
@@ -839,13 +840,13 @@ function AssignClientBody({
                                                     {c.status}
                                                 </Badge>
                                             )}
-                                        </button>
+                                        </Button>
                                     </li>
                                 );
                             })}
                         </ul>
                     )}
-                </div>
+                </GuardrailCard>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -1018,7 +1019,7 @@ function AssignRoomBody({
             </DialogHeader>
 
             <div className="mt-3 space-y-3">
-                <div className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+                <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
                     {pickable.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                             No bedrooms available — every active room already
@@ -1031,7 +1032,7 @@ function AssignRoomBody({
                                 const isCurrent = r.id === currentRoomId;
                                 return (
                                     <li key={r.id}>
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             onClick={() => setSelectedId(r.id)}
                                             className={cn(
@@ -1069,13 +1070,13 @@ function AssignRoomBody({
                                                     ? 'Current'
                                                     : 'Available'}
                                             </Badge>
-                                        </button>
+                                        </Button>
                                     </li>
                                 );
                             })}
                         </ul>
                     )}
-                </div>
+                </GuardrailCard>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div>

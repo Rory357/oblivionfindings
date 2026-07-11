@@ -27,6 +27,7 @@ import {
 } from './components/shared';
 import { ShiftNotesHero } from './components/shift-notes-hero';
 import { Toolbar } from './components/toolbar';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 type Props = {
     notes: ShiftNote[];
@@ -250,13 +251,13 @@ export default function ShiftNotesIndex({
                                     month: 'long',
                                 })}
                             </span>
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => setSelectedDay(null)}
                                 className="font-medium text-primary hover:underline"
                             >
                                 ← Back to whole week
-                            </button>
+                            </GuardrailButton>
                         </div>
                     ) : null}
 

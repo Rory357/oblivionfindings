@@ -23,6 +23,8 @@ import {
 import type { ComponentType } from 'react';
 import { fmtRange, Pill, relTime, type Tone } from '../shared';
 import type { RespiteTab, RespiteWorkspaceData } from '../types';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const TONE_BG: Record<Tone, string> = {
     success: 'bg-status-success-bg text-status-success',
@@ -240,7 +242,7 @@ export function OverviewPane({
                             key={s.label}
                             className="flex flex-1 items-stretch"
                         >
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => goTab(s.tab)}
                                 className="flex-1 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
@@ -262,7 +264,7 @@ export function OverviewPane({
                                 <div className="text-[11.5px] text-muted-foreground">
                                     {s.sub}
                                 </div>
-                            </button>
+                            </GuardrailButton>
                             {i < stages.length - 1 ? (
                                 <div className="flex items-center px-1 text-muted-foreground/50">
                                     <ArrowRight className="h-5 w-5" />
@@ -285,7 +287,7 @@ export function OverviewPane({
                     </div>
                     <div className="grid gap-2">
                         {actions.slice(0, 8).map((a, i) => (
-                            <div
+                            <GuardrailCard unstyled
                                 key={i}
                                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
                             >
@@ -305,14 +307,14 @@ export function OverviewPane({
                                         {a.sub}
                                     </div>
                                 </div>
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => goTab(a.tab)}
                                     className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-muted"
                                 >
                                     Open <ArrowRight className="h-3 w-3" />
-                                </button>
-                            </div>
+                                </GuardrailButton>
+                            </GuardrailCard>
                         ))}
                         {actions.length === 0 ? (
                             <div className="px-2 py-10 text-center">

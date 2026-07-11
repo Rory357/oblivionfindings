@@ -15,6 +15,7 @@ import {
     type DoorSubkind,
     type Taxonomy,
 } from './_types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type ToolValue = string; // '__room' | '__wall' | ... | kind value
 // Re-exported for legacy consumers (sites/show.tsx); the type is now permissive.
@@ -103,7 +104,7 @@ export default function ToolPalette({
     }
 
     return (
-        <div className="space-y-2 rounded-md border bg-white p-2">
+        <GuardrailCard unstyled className="space-y-2 rounded-md border bg-white p-2">
             <div>
                 <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                     Selection
@@ -201,7 +202,7 @@ export default function ToolPalette({
                                                         DOOR_SUBKIND_LABELS,
                                                     ) as [DoorSubkind, string][]
                                                 ).map(([value, label]) => (
-                                                    <button
+                                                    <Button unstyled
                                                         key={value}
                                                         type="button"
                                                         className={cn(
@@ -220,7 +221,7 @@ export default function ToolPalette({
                                                         data-test={`site-plan-door-subkind-${value}`}
                                                     >
                                                         {label}
-                                                    </button>
+                                                    </Button>
                                                 ))}
                                             </PopoverContent>
                                         </Popover>
@@ -354,7 +355,7 @@ export default function ToolPalette({
                                         <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                             {kind.label} type
                                         </div>
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             className={cn(
                                                 'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted',
@@ -367,9 +368,9 @@ export default function ToolPalette({
                                             }
                                         >
                                             Generic
-                                        </button>
+                                        </Button>
                                         {subkinds.map((sub) => (
-                                            <button
+                                            <Button unstyled
                                                 key={sub.value}
                                                 type="button"
                                                 className={cn(
@@ -387,7 +388,7 @@ export default function ToolPalette({
                                                 }
                                             >
                                                 {sub.label}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </PopoverContent>
                                 </Popover>
@@ -423,6 +424,6 @@ export default function ToolPalette({
                     </div>
                 </div>
             )}
-        </div>
+        </GuardrailCard>
     );
 }

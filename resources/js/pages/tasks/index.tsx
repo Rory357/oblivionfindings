@@ -477,7 +477,7 @@ export default function TasksIndex({
                 <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Task views" />
 
                 {/* ── Filter bar ── */}
-                <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                <Card unstyled className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
                     <div className="relative min-w-[240px] flex-1">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -493,7 +493,7 @@ export default function TasksIndex({
                         <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 text-xs font-medium text-muted-foreground">
                             <Bookmark className="h-3 w-3" />
                             Default view
-                            <button
+                            <Button unstyled
                                 type="button"
                                 aria-label="Clear default view"
                                 title="Clear default view"
@@ -501,7 +501,7 @@ export default function TasksIndex({
                                 className="-mr-1 rounded-full p-0.5 transition-colors hover:bg-background hover:text-foreground"
                             >
                                 <X className="h-3 w-3" />
-                            </button>
+                            </Button>
                         </span>
                     ) : null}
 
@@ -532,7 +532,7 @@ export default function TasksIndex({
                         {SEVERITIES.map((s) => {
                             const active = (filters.severity ?? []).includes(s.key);
                             return (
-                                <button
+                                <Button unstyled
                                     key={s.key}
                                     type="button"
                                     aria-pressed={active}
@@ -543,7 +543,7 @@ export default function TasksIndex({
                                     )}
                                 >
                                     {s.label}
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -570,7 +570,7 @@ export default function TasksIndex({
                     <span className="ml-auto pr-1 text-xs text-muted-foreground tabular-nums">
                         {total} in view
                     </span>
-                </div>
+                </Card>
 
                 {/* ── Queue ── */}
                 <Card>
@@ -672,7 +672,7 @@ export default function TasksIndex({
 
                 {/* ── Pager ── */}
                 {total > 0 ? (
-                    <div
+                    <Card unstyled
                         data-test="tasks-pager"
                         className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2"
                     >
@@ -701,7 +701,7 @@ export default function TasksIndex({
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
                         </div>
-                    </div>
+                    </Card>
                 ) : null}
             </div>
 

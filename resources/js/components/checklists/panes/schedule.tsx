@@ -5,6 +5,8 @@ import { catColorVar } from '../category';
 import { useChecklistConfig, type PaneCtx } from '../context';
 import { useRunContextMenu } from '../context-menu';
 import type { ChecklistRun } from '../types';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // Local-date math only — toISOString() would shift the day back in NZ (UTC+12/13).
 function addDays(iso: string, n: number): string {
@@ -26,7 +28,7 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
     })} – ${new Date(`${weekEnd}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`;
 
     return (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
                 <div>
                     <h3 className="text-base font-semibold">Schedule</h3>
@@ -68,7 +70,7 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
                                     const isOverdue =
                                         r.scheduled_date != null && r.scheduled_date < today && r.status !== 'completed';
                                     return (
-                                        <button
+                                        <GuardrailButton unstyled
                                             key={`${r.id}-${ds}`}
                                             type="button"
                                             onClick={() => openRun(r.id)}
@@ -87,7 +89,7 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
                                             <span className="truncate text-[10px] text-muted-foreground">
                                                 {r.site?.name}
                                             </span>
-                                        </button>
+                                        </GuardrailButton>
                                     );
                                 })}
                                 {show.length === 0 ? (
@@ -99,6 +101,6 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
                 })}
             </div>
             {menu.element}
-        </div>
+        </GuardrailCard>
     );
 }

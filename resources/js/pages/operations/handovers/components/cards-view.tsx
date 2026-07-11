@@ -31,6 +31,7 @@ import {
     relTime,
     ymd,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function EmptyState() {
     return (
@@ -130,24 +131,24 @@ function HandoverCard({
                 >
                     <StatusPill status={h.status} />
                     {h.status === 'draft' && h.can_submit ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={() => onSubmit(h)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
                         >
                             <Send className="h-3.5 w-3.5" />
                             Submit
-                        </button>
+                        </GuardrailButton>
                     ) : null}
                     {h.status === 'submitted' && h.can_acknowledge ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={() => onAcknowledge(h)}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                         >
                             <Check className="h-3.5 w-3.5" />
                             Acknowledge
-                        </button>
+                        </GuardrailButton>
                     ) : null}
                 </div>
             </div>

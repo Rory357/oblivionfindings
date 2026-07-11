@@ -21,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type EditAvailabilityBlock = {
     id: number;
@@ -229,7 +230,7 @@ export function EditAvailabilityDialog({
 
                     <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
                         {grouped.map((g) => (
-                            <div
+                            <GuardrailCard unstyled
                                 key={g.day}
                                 className="grid grid-cols-[60px_1fr] items-start gap-3 rounded-md border border-border bg-card px-3 py-2"
                             >
@@ -255,7 +256,7 @@ export function EditAvailabilityDialog({
                                             >
                                                 <Clock className="h-3 w-3 text-status-success" />
                                                 {b.start_time}–{b.end_time}
-                                                <button
+                                                <Button unstyled
                                                     type="button"
                                                     onClick={() => handleRemove(b)}
                                                     disabled={deletingId === b.id}
@@ -267,12 +268,12 @@ export function EditAvailabilityDialog({
                                                     ) : (
                                                         <Trash2 className="h-3 w-3" />
                                                     )}
-                                                </button>
+                                                </Button>
                                             </span>
                                         ))
                                     )}
                                 </div>
-                            </div>
+                            </GuardrailCard>
                         ))}
                     </div>
                 </div>

@@ -6,6 +6,7 @@ import type {
 } from 'react';
 
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type RosterTabTone =
     | 'primary'
@@ -112,7 +113,7 @@ export function TabStrip({
                 const active = value === t.id;
                 const Icon = t.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={t.id}
                         type="button"
                         role="tab"
@@ -152,7 +153,7 @@ export function TabStrip({
                                 aria-hidden="true"
                             />
                         ) : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
             {trailing}

@@ -48,6 +48,8 @@ import {
 } from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Client = {
     id: number;
@@ -838,7 +840,7 @@ export function CreateShiftDialog({
                                 const active = i === stepIndex;
                                 const done = i < stepIndex;
                                 return (
-                                    <button
+                                    <GuardrailButton unstyled
                                         key={s.key}
                                         type="button"
                                         onClick={() => {
@@ -876,11 +878,11 @@ export function CreateShiftDialog({
                                                 {s.blurb}
                                             </span>
                                         </span>
-                                    </button>
+                                    </GuardrailButton>
                                 );
                             })}
                         </div>
-                        <div className="mt-3 rounded-lg border border-border bg-card p-3">
+                        <GuardrailCard unstyled className="mt-3 rounded-lg border border-border bg-card p-3">
                             <div className="flex items-center justify-between text-[11.5px] font-semibold">
                                 <span>Shift readiness</span>
                                 <span className="tabular-nums">
@@ -893,7 +895,7 @@ export function CreateShiftDialog({
                                     style={{ width: `${readinessPct}%` }}
                                 />
                             </div>
-                        </div>
+                        </GuardrailCard>
                     </aside>
 
                     {/* Main panel */}
@@ -917,14 +919,14 @@ export function CreateShiftDialog({
                                     </kbd>
                                     <span>to continue</span>
                                 </span>
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close dialog"
                                     className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                                 >
                                     <X className="h-4.5 w-4.5" />
-                                </button>
+                                </GuardrailButton>
                             </div>
                         </header>
                         <div className="h-[3px] shrink-0 bg-muted">
@@ -944,7 +946,7 @@ export function CreateShiftDialog({
 
                             {(cur.key === 'people' || cur.key === 'review') &&
                             form.data.user_id ? (
-                                <div className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
+                                <GuardrailCard unstyled className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
                                             <div className="text-sm font-semibold text-foreground">
@@ -988,7 +990,7 @@ export function CreateShiftDialog({
                                             title="Staff eligibility warnings"
                                         />
                                     ) : null}
-                                </div>
+                                </GuardrailCard>
                             ) : null}
 
                             {cur.key === 'type' ? (
@@ -1222,7 +1224,7 @@ export function CreateShiftDialog({
                                                                 d,
                                                             );
                                                         return (
-                                                            <button
+                                                            <GuardrailButton unstyled
                                                                 key={d}
                                                                 type="button"
                                                                 onClick={() =>
@@ -1242,7 +1244,7 @@ export function CreateShiftDialog({
                                                                         d
                                                                     ]
                                                                 }
-                                                            </button>
+                                                            </GuardrailButton>
                                                         );
                                                     })}
                                                 </div>
@@ -1312,18 +1314,18 @@ export function CreateShiftDialog({
                                                 </span>
                                             </label>
                                             {form.data.tasks.length > 0 ? (
-                                                <button
+                                                <GuardrailButton unstyled
                                                     type="button"
                                                     onClick={addTask}
                                                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
                                                 >
                                                     <Plus className="h-3.5 w-3.5" />{' '}
                                                     Add
-                                                </button>
+                                                </GuardrailButton>
                                             ) : null}
                                         </div>
                                         {form.data.tasks.length === 0 ? (
-                                            <button
+                                            <GuardrailButton unstyled
                                                 type="button"
                                                 onClick={addTask}
                                                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -1331,7 +1333,7 @@ export function CreateShiftDialog({
                                                 <Plus className="h-3.5 w-3.5" />
                                                 Add the first task — e.g.
                                                 “Morning medication round”
-                                            </button>
+                                            </GuardrailButton>
                                         ) : (
                                             <ul className="space-y-1.5">
                                                 {form.data.tasks.map((t, i) => (
@@ -1393,7 +1395,7 @@ export function CreateShiftDialog({
                                                                 }
                                                             />
                                                         ) : null}
-                                                        <button
+                                                        <GuardrailButton unstyled
                                                             type="button"
                                                             onClick={() =>
                                                                 removeTask(i)
@@ -1402,7 +1404,7 @@ export function CreateShiftDialog({
                                                             aria-label={`Remove task ${i + 1}`}
                                                         >
                                                             <Trash className="h-4 w-4" />
-                                                        </button>
+                                                        </GuardrailButton>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -1582,24 +1584,24 @@ export function CreateShiftDialog({
                         <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
                             <div>
                                 {stepIndex > 0 ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={goBack}
                                         className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                         Back
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onClose}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Cancel
-                                </button>
+                                </GuardrailButton>
                                 {cur.key === 'review' ? (
                                     <button
                                         type="submit"
@@ -1729,13 +1731,13 @@ function ReviewRow({
                 </dt>
                 <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
             </div>
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={onEdit}
                 className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/5"
             >
                 Edit
-            </button>
+            </GuardrailButton>
         </div>
     );
 }
@@ -1754,7 +1756,7 @@ function ShiftTypePicker({
                 const accent = SHIFT_TYPE_ACCENT_CLASSES[t.accent];
                 const Icon = t.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -1784,7 +1786,7 @@ function ShiftTypePicker({
                                 <Check className="h-3 w-3" strokeWidth={3} />
                             </span>
                         ) : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -1894,7 +1896,7 @@ function StatusPicker({
                 const active = value === o.key;
                 const Icon = o.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
@@ -1924,7 +1926,7 @@ function StatusPicker({
                                 {o.hint}
                             </span>
                         </span>
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -1941,7 +1943,7 @@ function Toggle({
     ariaLabel?: string;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             role="switch"
             aria-checked={value}
@@ -1958,7 +1960,7 @@ function Toggle({
                     value ? 'translate-x-4' : 'translate-x-0.5',
                 ].join(' ')}
             />
-        </button>
+        </GuardrailButton>
     );
 }
 

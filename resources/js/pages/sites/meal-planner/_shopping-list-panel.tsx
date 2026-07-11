@@ -26,6 +26,7 @@ import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { ConfirmAction } from '../_confirm-action';
 import { formatMoneyFromCents as money, formatQty, type ShoppingList, type ShoppingListItem, type SiteInfo } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     siteId: number;
@@ -114,24 +115,24 @@ export default function ShoppingListPanel({ siteId, site, lists, canManage, prod
                     onExportPrint={() => setPrintList(draft)}
                 />
             ) : (
-                <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card p-10 text-center">
+                <GuardrailCard unstyled className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card p-10 text-center">
                     <div className="rounded-full bg-sites-bg p-3 text-sites-deep"><ShoppingCart className="h-6 w-6" /></div>
                     <div>
                         <div className="font-medium text-foreground">No draft shopping list yet</div>
                         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Generate one from this week's planned meals plus anything below par level. Manual items survive future regenerations.</p>
                     </div>
                     {canManage && <Button onClick={onGenerate}><RefreshCw className="mr-2 h-4 w-4" /> Generate now</Button>}
-                </div>
+                </GuardrailCard>
             )}
 
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
-                <button type="button" className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium hover:bg-accent" onClick={() => setHistoryOpen((v) => !v)}>
+            <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
+                <Button unstyled type="button" className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium hover:bg-accent" onClick={() => setHistoryOpen((v) => !v)}>
                     <span className="flex items-center gap-2">
                         {historyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         Past lists ({past.length})
                     </span>
                     <span className="text-xs text-muted-foreground">Ordered &amp; received history</span>
-                </button>
+                </Button>
                 {historyOpen && (
                     <div className="border-t border-border bg-muted/10 p-2">
                         {past.length === 0 ? (
@@ -145,7 +146,7 @@ export default function ShoppingListPanel({ siteId, site, lists, canManage, prod
                         )}
                     </div>
                 )}
-            </div>
+            </GuardrailCard>
 
             {viewList && <ViewListDialog list={viewList} onClose={() => setViewList(null)} />}
             {printList && <BrandedListPrintDoc list={printList} site={site} />}
@@ -231,7 +232,7 @@ function DraftCard({ siteId, list, canManage, products, showAdd, setShowAdd, onG
     }
 
     return (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="border-b border-border bg-gradient-to-br from-sites-bg/60 to-transparent p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
@@ -272,8 +273,8 @@ function DraftCard({ siteId, list, canManage, products, showAdd, setShowAdd, onG
                             <Button ref={exportBtnRef} size="sm" variant="outline" aria-haspopup="menu" aria-expanded={exportOpen} aria-controls={exportOpen ? exportMenuId : undefined} onClick={() => setExportOpen((v) => !v)}><Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Export <ChevronDown className="ml-1 h-3 w-3" aria-hidden="true" /></Button>
                             {exportOpen && (
                                 <div ref={exportMenuRef} id={exportMenuId} role="menu" aria-label="Export shopping list" onKeyDown={onExportMenuKeyDown} className="animate-pop absolute left-0 z-50 mt-1.5 w-[210px] overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-float">
-                                    <button type="button" role="menuitem" onClick={() => { onExportPrint(); closeExport(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"><FileText className="h-[15px] w-[15px] text-muted-foreground" aria-hidden="true" /> Download PDF (branded)</button>
-                                    <button type="button" role="menuitem" onClick={() => { exportCsv(list, null); closeExport(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"><FileSpreadsheet className="h-[15px] w-[15px] text-muted-foreground" aria-hidden="true" /> Export for Excel (.csv)</button>
+                                    <Button unstyled type="button" role="menuitem" onClick={() => { onExportPrint(); closeExport(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"><FileText className="h-[15px] w-[15px] text-muted-foreground" aria-hidden="true" /> Download PDF (branded)</Button>
+                                    <Button unstyled type="button" role="menuitem" onClick={() => { exportCsv(list, null); closeExport(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"><FileSpreadsheet className="h-[15px] w-[15px] text-muted-foreground" aria-hidden="true" /> Export for Excel (.csv)</Button>
                                 </div>
                             )}
                         </div>
@@ -308,7 +309,7 @@ function DraftCard({ siteId, list, canManage, products, showAdd, setShowAdd, onG
                     })}
                 </div>
             )}
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -327,9 +328,9 @@ function ItemRow({ siteId, listId, item, canManage, checked, onToggle, onChanged
 
     return (
         <li className={cn('flex items-center gap-3 px-4 py-2.5', checked ? 'bg-status-success-bg/30' : 'hover:bg-accent/30')}>
-            <button type="button" onClick={onToggle} aria-pressed={checked} aria-label={checked ? `Untick ${name}` : `Tick off ${name}`} className={cn('flex h-6 w-6 flex-none items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', checked ? 'border-status-success bg-status-success text-white' : 'border-muted-foreground/30 hover:border-sites')}>
+            <Button unstyled type="button" onClick={onToggle} aria-pressed={checked} aria-label={checked ? `Untick ${name}` : `Tick off ${name}`} className={cn('flex h-6 w-6 flex-none items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', checked ? 'border-status-success bg-status-success text-white' : 'border-muted-foreground/30 hover:border-sites')}>
                 {checked && <Check className="h-3.5 w-3.5" />}
-            </button>
+            </Button>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                     <span className={cn('truncate text-sm font-medium', checked ? 'text-muted-foreground line-through' : 'text-foreground')}>{name}</span>
@@ -412,23 +413,23 @@ function HistoryRow({ list, onView, onPrint, onExportCsv }: { list: ShoppingList
     const items = list.items ?? [];
     const total = items.reduce((s, i) => s + (i.estimated_cost_cents ?? 0), 0);
     return (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
             <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', list.status === 'received' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground')}>
                 {list.status === 'received' ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
             </div>
-            <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
+            <Button unstyled type="button" onClick={onView} className="min-w-0 flex-1 text-left">
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground">{nzDate(list.covers_from)} → {nzDate(list.covers_to)}</span>
                     <span className={cn('rounded-full border px-1.5 py-px text-[10px] font-semibold capitalize', STATUS_BADGE[list.status])}>{list.status}</span>
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">{items.length} items{list.generated_by ? ` · ${list.generated_by.name}` : ''}{listProvenance(list) ? ` · ${listProvenance(list)}` : ''}</div>
-            </button>
+            </Button>
             <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{money(total)}</span>
             <div className="flex shrink-0 items-center gap-1">
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onPrint} aria-label="Print PDF"><Printer className="h-3.5 w-3.5" /></Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onExportCsv} aria-label="Export CSV"><FileSpreadsheet className="h-3.5 w-3.5" /></Button>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 

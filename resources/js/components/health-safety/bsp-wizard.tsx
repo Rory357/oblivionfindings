@@ -368,9 +368,9 @@ function TagListInput({
                         <span key={v} className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium', chipCls)}>
                             <Icon className="h-3 w-3" />
                             {v}
-                            <button type="button" aria-label={`Remove ${v}`} onClick={() => remove(v)} className="ml-0.5 opacity-70 hover:opacity-100">
+                            <Button unstyled type="button" aria-label={`Remove ${v}`} onClick={() => remove(v)} className="ml-0.5 opacity-70 hover:opacity-100">
                                 <X className="h-3 w-3" />
-                            </button>
+                            </Button>
                         </span>
                     ))}
                 </div>
@@ -395,9 +395,9 @@ function TagListInput({
             {remaining.length ? (
                 <div className="flex flex-wrap gap-1.5">
                     {remaining.map((s) => (
-                        <button key={s} type="button" onClick={() => add(s)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+                        <Button unstyled key={s} type="button" onClick={() => add(s)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
                             <Plus className="h-3 w-3" /> {s}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             ) : null}

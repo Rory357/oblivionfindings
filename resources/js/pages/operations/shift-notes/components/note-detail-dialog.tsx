@@ -38,6 +38,8 @@ import {
     shiftRole,
     typeMeta,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type CurrentUser = { id: number; name: string; is_manager: boolean };
 
@@ -45,7 +47,7 @@ const DAY_MS = 86400000;
 
 function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             role="switch"
             aria-checked={on}
@@ -61,7 +63,7 @@ function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
                     on ? 'translate-x-4' : 'translate-x-0.5',
                 )}
             />
-        </button>
+        </GuardrailButton>
     );
 }
 
@@ -252,14 +254,14 @@ export function NoteDetailDialog({
                             {fmtClock(note.created_at)}
                         </div>
                     </div>
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => onOpenChange(false)}
                         aria-label="Close"
                         className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                         <X className="h-4.5 w-4.5" />
-                    </button>
+                    </GuardrailButton>
                 </div>
 
                 {/* Body */}
@@ -425,41 +427,41 @@ export function NoteDetailDialog({
                         <>
                             <div className="flex items-center gap-2">
                                 {!note.reviewed_at ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={() => onReview(note)}
                                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                     >
                                         <Check className="h-3.5 w-3.5" />
                                         Mark reviewed
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onFlag(note)}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     <Flag className="h-3.5 w-3.5" />
                                     {note.is_flagged ? 'Unflag' : 'Flag'}
-                                </button>
+                                </GuardrailButton>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onOpenChange(false)}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Close
-                                </button>
+                                </GuardrailButton>
                                 {note.can_edit ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={() => setEditing(true)}
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                                     >
                                         <PenLine className="h-3.5 w-3.5" />
                                         {editLabel}
-                                    </button>
+                                    </GuardrailButton>
                                 ) : (
                                     <button
                                         type="button"
@@ -481,14 +483,14 @@ export function NoteDetailDialog({
                                     : `Editing as ${currentUser.name}`}
                             </div>
                             <div className="flex items-center gap-2">
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => setEditing(false)}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Cancel
-                                </button>
-                                <button
+                                </GuardrailButton>
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={save}
                                     disabled={saving || !draft.body.trim()}
@@ -496,7 +498,7 @@ export function NoteDetailDialog({
                                 >
                                     <Check className="h-3.5 w-3.5" />
                                     {saving ? 'Saving…' : 'Save changes'}
-                                </button>
+                                </GuardrailButton>
                             </div>
                         </>
                     )}
@@ -527,12 +529,12 @@ function ToggleRow({
     onToggle: () => void;
 }) {
     return (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5">
+        <GuardrailCard unstyled className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5">
             <span className="inline-flex items-center gap-2 text-[13px] font-medium">
                 {icon}
                 {label}
             </span>
             <Switch on={on} onClick={onToggle} />
-        </div>
+        </GuardrailCard>
     );
 }

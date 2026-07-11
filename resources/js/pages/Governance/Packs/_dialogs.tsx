@@ -106,7 +106,7 @@ export function GenerateBoardPackDialog({
                             const active = selectedId === m.id;
                             const hasAgenda = m.agenda_items_count > 0;
                             return (
-                                <button
+                                <Button unstyled
                                     key={m.id}
                                     type="button"
                                     onClick={() => setSelectedId(m.id)}
@@ -151,7 +151,7 @@ export function GenerateBoardPackDialog({
                                             </span>
                                         )}
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>

@@ -1002,7 +1002,7 @@ export default function ResidentTrackingIndex({
                             },
                         ] as const
                     ).map((t) => (
-                        <button
+                        <Button unstyled
                             key={t.key}
                             type="button"
                             onClick={() => switchTab(t.key)}
@@ -1014,7 +1014,7 @@ export default function ResidentTrackingIndex({
                             )}
                         >
                             {t.label}
-                        </button>
+                        </Button>
                     ))}
                 </div>
 

@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { formatRelativeTime } from '@/lib/fleet-utils';
 import { ChevronRight, Layers } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     center: { lat: number; lng: number };
@@ -91,8 +93,8 @@ export default function ResidentMap({
             )}
 
             {showLegend && geofences.length > 0 && (
-                <div className="absolute bottom-3 left-3 z-[400] max-w-[240px] rounded-md border border-border bg-background/95 shadow-sm backdrop-blur">
-                    <button
+                <GuardrailCard unstyled className="absolute bottom-3 left-3 z-[400] max-w-[240px] rounded-md border border-border bg-background/95 shadow-sm backdrop-blur">
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => setLegendOpen((v) => !v)}
                         className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/50"
@@ -104,7 +106,7 @@ export default function ResidentMap({
                         <ChevronRight
                             className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${legendOpen ? 'rotate-90' : ''}`}
                         />
-                    </button>
+                    </GuardrailButton>
                     {legendOpen && (
                         <div className="max-h-48 overflow-y-auto border-t px-3 py-2">
                             {geofences.map((gf) => (
@@ -126,7 +128,7 @@ export default function ResidentMap({
                             ))}
                         </div>
                     )}
-                </div>
+                </GuardrailCard>
             )}
         </div>
     );

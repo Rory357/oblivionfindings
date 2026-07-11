@@ -14,6 +14,7 @@ import {
     Plus,
     Users,
 } from 'lucide-react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type CommunicationNotesTabProps = {
     notes: ClientDailyNote[];
@@ -71,23 +72,23 @@ export function CommunicationNotesTab({
     return (
         <div className="space-y-6">
             <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border bg-card p-4">
+                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
                     <p className="text-xs text-muted-foreground">
                         Communication notes
                     </p>
                     <p className="mt-1 text-2xl font-semibold">
                         {notes.length}
                     </p>
-                </div>
-                <div className="rounded-lg border bg-card p-4">
+                </GuardrailCard>
+                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
                     <p className="text-xs text-muted-foreground">
                         Open family notes
                     </p>
                     <p className="mt-1 text-2xl font-semibold">
                         {familyNotesOpenCount}
                     </p>
-                </div>
-                <div className="rounded-lg border bg-card p-4">
+                </GuardrailCard>
+                <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
                     <p className="text-xs text-muted-foreground">
                         Completed this week
                     </p>
@@ -102,7 +103,7 @@ export function CommunicationNotesTab({
                             ).length
                         }
                     </p>
-                </div>
+                </GuardrailCard>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -145,7 +146,7 @@ export function CommunicationNotesTab({
                 </div>
 
                 <aside className="space-y-4">
-                    <div className="rounded-lg border bg-card p-4">
+                    <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
                         <h3 className="flex items-center gap-2 font-semibold">
                             <Users className="h-4 w-4 text-primary" />
                             Family Notes
@@ -190,7 +191,7 @@ export function CommunicationNotesTab({
                                 </p>
                             )}
                         </div>
-                    </div>
+                    </GuardrailCard>
 
                     <div className="rounded-lg border bg-status-success-bg p-4 text-sm text-status-success">
                         <div className="flex items-center gap-2 font-medium">

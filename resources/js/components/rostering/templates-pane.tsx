@@ -407,7 +407,7 @@ export function TemplatesPane({
                             { key: false, label: 'All' },
                             { key: true, label: 'Active' },
                         ].map((opt) => (
-                            <button
+                            <Button unstyled
                                 key={String(opt.key)}
                                 type="button"
                                 aria-pressed={activeOnly === opt.key}
@@ -420,7 +420,7 @@ export function TemplatesPane({
                                 )}
                             >
                                 {opt.label}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>

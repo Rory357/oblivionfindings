@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { type ActionTarget, LONE_WORKER_ROUTE } from './lone-worker-types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const INTERVAL_OPTIONS = [
     { value: '15', label: '15m' },
@@ -225,14 +226,14 @@ export function LoneWorkerActionForm({
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={onCancel}
                     className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                 >
                     Cancel
-                </button>
-                <button
+                </GuardrailButton>
+                <GuardrailButton unstyled
                     type="button"
                     onClick={submit}
                     disabled={form.processing}
@@ -240,7 +241,7 @@ export function LoneWorkerActionForm({
                 >
                     <meta.ctaIcon className="h-4 w-4" />
                     {meta.cta}
-                </button>
+                </GuardrailButton>
             </div>
         </div>
     );
@@ -274,14 +275,14 @@ export function LoneWorkerActionModal({
                 <DialogDescription className="sr-only">{META[target.kind].blurb}</DialogDescription>
                 <div className="flex items-center justify-between border-b border-border bg-muted/30 px-5 py-3">
                     <span className="text-xs font-medium tracking-wide text-muted-foreground">{subject}</span>
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={onClose}
                         className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         aria-label="Close"
                     >
                         <X className="h-4 w-4" />
-                    </button>
+                    </GuardrailButton>
                 </div>
                 <div className="px-5 py-5">
                     <LoneWorkerActionForm target={target} onDone={onClose} onCancel={onClose} />

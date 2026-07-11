@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import type { JobBoardScope } from './types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 interface ScopeTabsProps {
     scope: JobBoardScope;
@@ -78,7 +79,7 @@ export function ScopeTabs({
                 const Icon = tab.icon;
                 const isActive = scope === tab.id;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={tab.id}
                         type="button"
                         role="tab"
@@ -111,7 +112,7 @@ export function ScopeTabs({
                         >
                             {counts[tab.id] ?? 0}
                         </span>
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </nav>

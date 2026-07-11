@@ -3,6 +3,7 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import MyDay from './index';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const mocks = vi.hoisted(() => ({
     props: {} as Record<string, unknown>,
@@ -73,9 +74,9 @@ vi.mock('@/components/checklists/run-modal', () => ({
 
 vi.mock('./components/my-day-hero', () => ({
     MyDayHero: ({ onOpenTimesheet }: { onOpenTimesheet: () => void }) => (
-        <button type="button" onClick={onOpenTimesheet}>
+        <GuardrailButton unstyled type="button" onClick={onOpenTimesheet}>
             Today&apos;s timesheet
-        </button>
+        </GuardrailButton>
     ),
 }));
 

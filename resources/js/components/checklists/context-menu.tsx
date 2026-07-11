@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { initials } from './category';
 import { useChecklistConfig } from './context';
 import type { ChecklistRun } from './types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const MENU_W = 240;
 
@@ -130,7 +131,7 @@ function MenuItem({
     autoFocus?: boolean;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             role="menuitem"
             autoFocus={autoFocus}
@@ -144,21 +145,21 @@ function MenuItem({
         >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="flex-1 truncate font-medium">{label}</span>
-        </button>
+        </GuardrailButton>
     );
 }
 
 function SubHeader({ onBack, title }: { onBack: () => void; title: string }) {
     return (
         <div className="mb-1 flex items-center gap-2 px-1.5 py-1">
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={onBack}
                 className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                 aria-label="Back"
             >
                 <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
+            </GuardrailButton>
             <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {title}
             </span>
@@ -300,7 +301,7 @@ function RunContextMenu({
                         onChange={(e) => setDate(e.target.value)}
                         className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     />
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         disabled={busy || !date}
                         onClick={reschedule}
@@ -312,7 +313,7 @@ function RunContextMenu({
                             <Check className="h-3.5 w-3.5" />
                         )}
                         Move run
-                    </button>
+                    </GuardrailButton>
                 </div>
             ) : null}
 
@@ -333,7 +334,7 @@ function RunContextMenu({
                         />
                     </div>
                     <div className="mt-1.5 max-h-52 overflow-y-auto">
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             disabled={busy}
                             onClick={() => reassign(null)}
@@ -343,7 +344,7 @@ function RunContextMenu({
                                 <UserMinus className="h-3.5 w-3.5" />
                             </span>
                             Unassign
-                        </button>
+                        </GuardrailButton>
                         {filtered.length === 0 ? (
                             <div className="px-2 py-4 text-center text-xs text-muted-foreground">
                                 No staff found
@@ -352,7 +353,7 @@ function RunContextMenu({
                             filtered.map((u) => {
                                 const active = run.assigned_to_id === u.id;
                                 return (
-                                    <button
+                                    <GuardrailButton unstyled
                                         key={u.id}
                                         type="button"
                                         disabled={busy}
@@ -371,7 +372,7 @@ function RunContextMenu({
                                         {active ? (
                                             <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
                                         ) : null}
-                                    </button>
+                                    </GuardrailButton>
                                 );
                             })
                         )}
@@ -389,7 +390,7 @@ function RunContextMenu({
                         Mark this run as skipped for this cycle? It will stop
                         counting as due or overdue.
                     </p>
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         disabled={busy}
                         onClick={skip}
@@ -401,7 +402,7 @@ function RunContextMenu({
                             <SkipForward className="h-3.5 w-3.5" />
                         )}
                         Skip run
-                    </button>
+                    </GuardrailButton>
                 </div>
             ) : null}
         </FloatingMenu>

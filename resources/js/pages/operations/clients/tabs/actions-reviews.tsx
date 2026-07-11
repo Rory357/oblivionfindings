@@ -13,6 +13,7 @@ import {
     ListChecks,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type ClientActionReview = {
     type: string;
@@ -292,7 +293,7 @@ function Metric({
     tone: string;
 }) {
     return (
-        <div className="rounded-lg border bg-card p-4">
+        <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between gap-3">
                 <div>
                     <p className="text-xs text-muted-foreground">{label}</p>
@@ -302,6 +303,6 @@ function Metric({
                     <Icon className="h-5 w-5" />
                 </span>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }

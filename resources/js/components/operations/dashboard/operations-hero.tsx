@@ -161,7 +161,7 @@ export function OperationsHero({
             footer={
                 <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <button
+                        <Button unstyled
                             type="button"
                             onClick={() => onWeekChange(week.prev)}
                             className={cn(
@@ -171,8 +171,8 @@ export function OperationsHero({
                         >
                             <ChevronLeft className="h-3.5 w-3.5" />
                             Week {week.prev_number} · {week.prev_label}
-                        </button>
-                        <button
+                        </Button>
+                        <Button unstyled
                             ref={pickerBtnRef}
                             type="button"
                             onClick={() => setPickerOpen((v) => !v)}
@@ -183,22 +183,22 @@ export function OperationsHero({
                             <CalendarRange className="h-3.5 w-3.5" />
                             Week {week.number} · {week.start_label} → {week.end_label} · pick week
                             <ChevronDown className="h-3 w-3" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button unstyled
                             type="button"
                             onClick={() => onWeekChange(week.next)}
                             className="inline-flex items-center gap-1 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/20"
                         >
                             Week {week.next_number} · {week.next_label}
                             <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button unstyled
                             type="button"
                             onClick={() => onWeekChange(ymdLocal(startOfWeek(new Date())))}
                             className="inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/20 px-3.5 py-1.5 text-[12px] font-medium text-primary-foreground/85 hover:bg-primary-foreground/10"
                         >
                             <Zap className="h-3.5 w-3.5" /> Jump to today
-                        </button>
+                        </Button>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         <MultiEntityFilter

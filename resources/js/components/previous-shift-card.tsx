@@ -7,6 +7,7 @@ import { formatRelative, formatTime } from '@/lib/datetime';
 import { show as showShift } from '@/routes/operations/shifts';
 
 import type { RosterShift } from './roster/types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type PreviousShift = RosterShift & {
     handover_sent: boolean;
@@ -41,7 +42,7 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                     </p>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="flex items-center gap-2 font-medium">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 Handover
@@ -49,8 +50,8 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                             <p className="mt-1 text-muted-foreground">
                                 {shift.handover_sent ? 'Sent' : 'Missing'}
                             </p>
-                        </div>
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        </GuardrailCard>
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="flex items-center gap-2 font-medium">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                 Timesheet
@@ -58,8 +59,8 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                             <p className="mt-1 text-muted-foreground capitalize">
                                 {timesheetStatus.replace(/_/g, ' ')}
                             </p>
-                        </div>
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        </GuardrailCard>
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="flex items-center gap-2 font-medium">
                                 <ListTodo className="h-4 w-4 text-muted-foreground" />
                                 Tasks
@@ -67,7 +68,7 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                             <p className="mt-1 text-muted-foreground">
                                 {completedTasks}/{shift.tasks.length}
                             </p>
-                        </div>
+                        </GuardrailCard>
                     </div>
                 </div>
 

@@ -8,6 +8,7 @@ import { freqLabel, useChecklistConfig } from './context';
 import { useRunContextMenu } from './context-menu';
 import { CategoryIcon, Progress, StatusBadge } from './primitives';
 import type { ChecklistRun } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function actionFor(run: ChecklistRun, canRun: boolean) {
     if (run.status === 'completed') return { label: 'View', Icon: Eye, variant: 'ghost' as const };
@@ -99,7 +100,7 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
     const ActionIcon = action.Icon;
 
     return (
-        <div
+        <GuardrailCard unstyled
             className="flex flex-col rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:border-primary/40 hover:shadow-sm"
             onContextMenu={menu.open(run)}
         >
@@ -161,6 +162,6 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
                 </div>
             </div>
             {menu.element}
-        </div>
+        </GuardrailCard>
     );
 }

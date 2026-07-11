@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmAction } from '../_confirm-action';
 import { formatMoneyFromCents as money, formatQty, toNum, type InventoryItem } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     siteId: number;
@@ -36,7 +37,7 @@ function Tile({ icon: Icon, label, value, sub, tone }: { icon: typeof Package; l
         critical: 'bg-status-critical-bg text-status-critical',
     };
     return (
-        <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm">
+        <GuardrailCard unstyled className="flex items-start gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm">
             <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', toneClass[tone])}>
                 <Icon className="h-5 w-5" />
             </div>
@@ -45,7 +46,7 @@ function Tile({ icon: Icon, label, value, sub, tone }: { icon: typeof Package; l
                 <div className="text-xl font-bold tabular-nums text-foreground">{value}</div>
                 {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -126,7 +127,7 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div role="group" aria-label="Filter by category" className="flex flex-wrap items-center gap-1.5">
                     {categories.map((c) => (
-                        <button
+                        <Button unstyled
                             key={c}
                             type="button"
                             aria-pressed={c === cat}
@@ -134,7 +135,7 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
                             className={cn('rounded-full border px-3 py-1 text-[12px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', c === cat ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent')}
                         >
                             {c === 'all' ? 'All items' : c}
-                        </button>
+                        </Button>
                     ))}
                 </div>
                 {(canAdjust || canManageProducts) && (
@@ -148,7 +149,7 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
                 )}
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 <div className="nice-scroll overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
                         <caption className="sr-only">Inventory items</caption>
@@ -201,7 +202,7 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </GuardrailCard>
         </div>
     );
 }

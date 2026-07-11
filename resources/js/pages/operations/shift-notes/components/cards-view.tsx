@@ -31,6 +31,7 @@ import {
     typeMeta,
     ymd,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type NoteHandlers = {
     onOpen: (note: ShiftNote) => void;
@@ -63,23 +64,23 @@ export function EmptyState({
                     : 'Notes will appear here as support workers document their shifts.'}
             </p>
             {filtersActive ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={onClearFilters}
                     className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                 >
                     <X className="h-3.5 w-3.5" />
                     Clear filters
-                </button>
+                </GuardrailButton>
             ) : canCreate ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={onAddNote}
                     className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                     <Plus className="h-3.5 w-3.5" />
                     Add shift note
-                </button>
+                </GuardrailButton>
             ) : null}
         </div>
     );
@@ -99,7 +100,7 @@ function ExpandableBody({ text, max = 320 }: { text: string; max?: number }) {
             <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap text-foreground/90">
                 {open ? text : `${text.slice(0, max)}…`}
             </p>
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={(e) => {
                     e.stopPropagation();
@@ -108,7 +109,7 @@ function ExpandableBody({ text, max = 320 }: { text: string; max?: number }) {
                 className="mt-1 text-xs font-semibold text-primary hover:underline"
             >
                 {open ? 'Show less' : 'Show more'}
-            </button>
+            </GuardrailButton>
         </div>
     );
 }
@@ -123,7 +124,7 @@ function ActionButton({
     children: React.ReactNode;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={(e) => {
                 e.stopPropagation();
@@ -137,7 +138,7 @@ function ActionButton({
             )}
         >
             {children}
-        </button>
+        </GuardrailButton>
     );
 }
 
