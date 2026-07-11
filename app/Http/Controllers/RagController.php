@@ -19,16 +19,23 @@ class RagController extends Controller
         // on the client profile page, not the global query modal.
         abort_if($user->hasRole('client', 'next_of_kin'), 403);
 
-        // UI can always show the query bar, but the dropdown should only show
-        // clients this user can actually view.
+        $canAskAny = $user->canDo('rag.ask.any');
+        $canAskAssigned = $user->canDo('rag.ask.assigned');
+        abort_unless($canAskAny || $canAskAssigned, 403);
+
+        // The query picker is authorization data, so scope tenancy first and
+        // then apply the caller's exact RAG capability.
         $clients = Client::query();
 
-        if ($user->hasRole('support_worker')) {
-            $clients->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id));
-        } elseif ($user->hasRole('client', 'next_of_kin')) {
-            $clients->whereIn('id', $user->portalClients()->pluck('clients.id'));
-        } else {
-            // admin/manager: all clients (still guarded by ClientPolicy on ask)
+        if ($user->organization_id !== null) {
+            $clients->where('organization_id', $user->organization_id);
+        }
+
+        if (! $canAskAny) {
+            $clients->where(function ($query) use ($user) {
+                $query->where('key_worker_id', $user->id)
+                    ->orWhereHas('supportWorkers', fn ($supportWorkers) => $supportWorkers->whereKey($user->id));
+            });
         }
 
         $list = $clients
@@ -36,7 +43,7 @@ class RagController extends Controller
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn ($c) => [
                 'id' => $c->id,
-                'name' => trim($c->first_name . ' ' . $c->last_name),
+                'name' => trim($c->first_name.' '.$c->last_name),
             ])
             ->values();
 
@@ -75,16 +82,16 @@ class RagController extends Controller
         $client = Client::query()->findOrFail($data['client_id']);
         $this->authorize('view', $client);
 
-        if (!$openai->isEnabled()) {
+        if (! $openai->isEnabled()) {
             return response()->json([
                 'error' => 'LLM is not configured. Set OPENAI_API_KEY.',
             ], 422);
         }
 
         // Ensure per-client vector store exists
-        if (!$client->openai_vector_store_id) {
-            $vsId = $openai->createVectorStore('client_' . $client->id);
-            if (!$vsId) {
+        if (! $client->openai_vector_store_id) {
+            $vsId = $openai->createVectorStore('client_'.$client->id);
+            if (! $vsId) {
                 return response()->json(['error' => 'Unable to create vector store.'], 422);
             }
             $client->forceFill(['openai_vector_store_id' => $vsId])->save();
@@ -92,7 +99,7 @@ class RagController extends Controller
 
         // Build a fresh knowledge snapshot for this client (rolling)
         $md = $indexer->buildMarkdown($client, 120);
-        $path = 'rag/client_' . $client->id . '_latest.md';
+        $path = 'rag/client_'.$client->id.'_latest.md';
         Storage::disk('local')->put($path, $md);
         $abs = Storage::disk('local')->path($path);
 
@@ -102,12 +109,12 @@ class RagController extends Controller
             $openai->attachFileToVectorStore($client->openai_vector_store_id, $fileId);
         }
 
-        $systemHint = "You are an assistant for supported living operations. "
-            . "Answer using only the retrieved client context. "
-            . "If the answer is not in the context, say you don't know. "
-            . "Be concise, factual, and avoid speculation.";
+        $systemHint = 'You are an assistant for supported living operations. '
+            .'Answer using only the retrieved client context. '
+            ."If the answer is not in the context, say you don't know. "
+            .'Be concise, factual, and avoid speculation.';
 
-        $question = $systemHint . "\n\n" . $data['question'];
+        $question = $systemHint."\n\n".$data['question'];
 
         $model = (string) (config('llm.openai.model') ?: 'gpt-5');
         $result = $openai->askWithFileSearch($model, $question, [$client->openai_vector_store_id]);

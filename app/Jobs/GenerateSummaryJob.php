@@ -2,15 +2,20 @@
 
 namespace App\Jobs;
 
+use App\Models\Client;
+use App\Models\Site;
 use App\Models\Summary;
 use App\Models\TimelineEvent;
+use App\Models\User;
 use App\Services\Llm\LlmClient;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Gate;
 
 class GenerateSummaryJob implements ShouldQueue
 {
@@ -26,6 +31,8 @@ class GenerateSummaryJob implements ShouldQueue
 
     public function handle(): void
     {
+        $this->authorizeCurrentRequester();
+
         $start = Carbon::parse($this->periodStartIso);
         $end = Carbon::parse($this->periodEndIso);
 
@@ -78,6 +85,41 @@ class GenerateSummaryJob implements ShouldQueue
                 'generated_by' => $this->generatedByUserId,
             ]
         );
+    }
+
+    private function authorizeCurrentRequester(): void
+    {
+        if ($this->generatedByUserId === null) {
+            return;
+        }
+
+        $requester = User::query()->find($this->generatedByUserId);
+        if (! $requester
+            || $requester->hasRole('client', 'next_of_kin')
+            || ! $requester->canDo('summaries.generate')) {
+            throw new AuthorizationException('Summary generation is not authorized.');
+        }
+
+        $authorized = match ($this->scopeType) {
+            'client' => ($client = Client::query()->find($this->scopeId))
+                && Gate::forUser($requester)->allows('view', $client),
+            'staff' => ($staff = User::query()->find($this->scopeId))
+                && $this->sharesOrganization($requester->organization_id, $staff->organization_id),
+            'site' => ($site = Site::query()->find($this->scopeId))
+                && $this->sharesOrganization($requester->organization_id, $site->organization_id),
+            default => false,
+        };
+
+        if (! $authorized) {
+            throw new AuthorizationException('Summary scope is not authorized.');
+        }
+    }
+
+    private function sharesOrganization(?int $viewerOrganizationId, ?int $targetOrganizationId): bool
+    {
+        return $viewerOrganizationId === null
+            || $targetOrganizationId === null
+            || $viewerOrganizationId === $targetOrganizationId;
     }
 
     private function deterministicSummary($events, Carbon $start, Carbon $end): string

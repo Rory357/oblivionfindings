@@ -13,8 +13,14 @@ class ClientActionsController extends Controller
     {
         $this->authorize('view', $client);
 
+        $coverage = $aggregator->forClientWithCoverage($client, $request->user());
+
         return response()->json([
-            'data' => $aggregator->forClient($client, $request->user()),
+            'data' => $coverage['items'],
+            'meta' => [
+                'loaded' => count($coverage['items']),
+                'has_more' => $coverage['has_more'],
+            ],
         ]);
     }
 }

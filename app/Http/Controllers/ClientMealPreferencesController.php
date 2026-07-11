@@ -16,6 +16,7 @@ class ClientMealPreferencesController extends Controller
      */
     public function show(Client $client)
     {
+        $this->authorize('manageMeals', $client);
         $client->load(['mealDietaryTags', 'mealDislikes.product:id,name,default_unit']);
 
         return response()->json([
@@ -39,16 +40,19 @@ class ClientMealPreferencesController extends Controller
 
     public function syncTags(Request $request, Client $client)
     {
+        $this->authorize('manageMeals', $client);
         $data = $request->validate([
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'integer|exists:meal_dietary_tags,id',
         ]);
         $client->mealDietaryTags()->sync($data['tag_ids'] ?? []);
+
         return back()->with('status', 'Dietary tags updated');
     }
 
     public function storeDislike(Request $request, Client $client)
     {
+        $this->authorize('manageMeals', $client);
         $data = $request->validate([
             'product_id' => 'nullable|integer|exists:meal_products,id',
             'free_text_name' => 'nullable|string|max:255',
@@ -72,8 +76,10 @@ class ClientMealPreferencesController extends Controller
 
     public function destroyDislike(Client $client, ClientMealDislike $dislike)
     {
+        $this->authorize('manageMeals', $client);
         abort_unless($dislike->client_id === $client->id, 404);
         $dislike->delete();
+
         return back()->with('status', 'Dislike removed');
     }
 

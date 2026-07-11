@@ -303,6 +303,7 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
     grantPhaseTwoThreePermissions($manager, [
         'clients.viewAny',
         'clients.update',
+        'care_plans.viewAny',
     ]);
 
     $client = Client::factory()->create();
@@ -349,6 +350,7 @@ it('surfaces purchase requests and financial discrepancies on the client profile
     grantPhaseTwoThreePermissions($manager, [
         'clients.viewAny',
         'clients.update',
+        'client_funds.manage',
     ]);
 
     $client = Client::factory()->create();
@@ -501,12 +503,11 @@ it('migrates a legacy ProgressNote into a ClientNote idempotently', function () 
 
     $migrated = ClientNote::query()
         ->where('client_id', $client->id)
-        ->where('type', 'daily_note')
+        ->where('type', 'progress_note')
         ->first();
 
     expect($migrated)->not->toBeNull()
-        ->and(($migrated->attachments ?? [])['legacy_progress_note_id'] ?? null)
-        ->toBe($progress->id)
+        ->and($migrated->legacy_progress_note_id)->toBe($progress->id)
         ->and($migrated->mood_rating)->toBe(8)
         ->and($migrated->category)->toBe('activity');
 

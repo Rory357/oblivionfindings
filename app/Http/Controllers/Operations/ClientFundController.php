@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers\Operations;
 
+use App\Domain\Finance\Services\ClientFundTransactionService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientFund;
-use App\Models\ClientFundTransaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ClientFundController extends Controller
 {
+    public function __construct(
+        private readonly ClientFundTransactionService $fundTransactions,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -22,7 +29,7 @@ class ClientFundController extends Controller
         $search = trim((string) ($filters['q'] ?? ''));
 
         $funds = ClientFund::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('organization_id', $auth->organization_id)
             ->with(['client:id,first_name,last_name'])
             ->withCount('transactions')
             ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
@@ -52,13 +59,13 @@ class ClientFundController extends Controller
             ],
             'stats' => [
                 'total' => ClientFund::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('organization_id', $auth->organization_id)
                     ->count(),
                 'total_balance' => (float) ClientFund::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('organization_id', $auth->organization_id)
                     ->sum('balance'),
                 'low_balance_alerts' => ClientFund::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('organization_id', $auth->organization_id)
                     ->whereNotNull('low_balance_threshold')
                     ->whereColumn('balance', '<=', 'low_balance_threshold')
                     ->count(),
@@ -72,7 +79,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canViewFunds($auth), 403);
 
         $fund = ClientFund::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('organization_id', $auth->organization_id)
             ->with(['client:id,first_name,last_name', 'transactions' => fn ($q) => $q->orderByDesc('created_at')])
             ->findOrFail($fund);
 
@@ -87,7 +94,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
         $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('organization_id', $auth->organization_id)
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
             ->get();
@@ -103,25 +110,47 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
         $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('clients', 'id')
+                    ->where(fn ($query) => $query->where('organization_id', $auth->organization_id)),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'funding_source' => ['nullable', 'string', 'max:255'],
             'fund_type' => ['nullable', 'string', 'max:100'],
-            'total_budget' => ['required', 'numeric', 'min:0'],
-            'balance' => ['nullable', 'numeric'],
-            'low_balance_threshold' => ['nullable', 'numeric', 'min:0'],
+            'total_budget' => ['required', 'numeric', 'decimal:0,2', 'min:0'],
+            'balance' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
+            'low_balance_threshold' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        ClientFund::create([
-            'organization_id' => $auth->organization_id,
-            'client_id' => $data['client_id'],
-            'fund_name' => $data['name'],
-            'fund_type' => $data['fund_type'] ?? 'general',
-            'balance' => $data['balance'] ?? $data['total_budget'],
-            'low_balance_threshold' => $data['low_balance_threshold'] ?? null,
-            'notes' => trim(collect([$data['funding_source'] ?? null, $data['notes'] ?? null])->filter()->join("\n\n")) ?: null,
-        ]);
+        DB::transaction(function () use ($auth, $data): void {
+            $openingBalance = bcadd(
+                (string) ($data['balance'] ?? $data['total_budget']),
+                '0',
+                2,
+            );
+            $fund = ClientFund::query()->create([
+                'organization_id' => $auth->organization_id,
+                'client_id' => $data['client_id'],
+                'fund_name' => $data['name'],
+                'fund_type' => $data['fund_type'] ?? 'general',
+                'balance' => '0.00',
+                'low_balance_threshold' => $data['low_balance_threshold'] ?? null,
+                'notes' => trim(collect([$data['funding_source'] ?? null, $data['notes'] ?? null])->filter()->join("\n\n")) ?: null,
+            ]);
+
+            if (bccomp($openingBalance, '0.00', 2) > 0) {
+                $this->fundTransactions->record($fund, $auth, [
+                    'type' => 'credit',
+                    'amount' => $openingBalance,
+                    'description' => 'Opening balance',
+                    'reference' => null,
+                    'idempotency_key' => Str::uuid()->toString(),
+                ]);
+            }
+        }, 3);
 
         return redirect()->back()->with('success', 'Client fund created.');
     }
@@ -132,7 +161,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
         $fund = ClientFund::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('organization_id', $auth->organization_id)
             ->findOrFail($fund);
 
         $data = $request->validate([
@@ -159,47 +188,29 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
         $fund = ClientFund::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('organization_id', $auth->organization_id)
             ->findOrFail($fund);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'in:credit,debit'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount' => ['required', 'numeric', 'decimal:0,2', 'min:0.01'],
             'description' => ['required', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:255'],
+            'idempotency_key' => ['required', 'uuid'],
         ]);
 
-        $newBalance = $data['type'] === 'credit'
-            ? $fund->balance + $data['amount']
-            : $fund->balance - $data['amount'];
-
-        $fund->transactions()->create([
-            'organization_id' => $fund->organization_id,
-            'transaction_type' => $data['type'],
-            'amount' => $data['amount'],
-            'description' => $data['description'],
-            'reference' => $data['reference'] ?? null,
-            'running_balance' => $newBalance,
-            'transaction_date' => now()->toDateString(),
-            'recorded_by' => $auth->id,
-        ]);
-
-        $fund->update(['balance' => $newBalance]);
+        $this->fundTransactions->record($fund, $auth, $data);
 
         return redirect()->back()->with('success', 'Transaction recorded.');
     }
 
     private function canViewFunds($auth): bool
     {
-        return $auth->canDo('client_funds.viewAny')
-            || $auth->canDo('client_funds.view')
-            || $auth->canDo('clients.viewAny');
+        return $auth->canDo('client_funds.manage');
     }
 
     private function canManageFunds($auth): bool
     {
-        return $auth->canDo('client_funds.create')
-            || $auth->canDo('client_funds.edit')
-            || $auth->canDo('client_funds.manage');
+        return $auth->canDo('client_funds.manage');
     }
 }

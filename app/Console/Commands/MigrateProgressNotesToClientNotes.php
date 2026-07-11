@@ -4,14 +4,15 @@ namespace App\Console\Commands;
 
 use App\Models\ClientNote;
 use App\Models\ProgressNote;
+use App\Models\TimelineEvent;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Phase 2 data migration: copy every legacy `ProgressNote` row into the
- * canonical `ClientNote` table so the new Daily Notes surfaces become the
- * single source of truth. Idempotent: re-running only inserts rows that
- * are not yet linked by `meta.legacy_progress_note_id`.
+ * Copy the read-only ProgressNote archive into the canonical ClientNote
+ * table. The explicit legacy_progress_note_id column makes the operation
+ * idempotent without relying on mutable JSON metadata.
  */
 class MigrateProgressNotesToClientNotes extends Command
 {
@@ -26,29 +27,30 @@ class MigrateProgressNotesToClientNotes extends Command
         $dryRun = (bool) $this->option('dry-run');
         $chunkSize = max(1, (int) $this->option('chunk'));
 
-        $alreadySet = ClientNote::query()
-            ->whereNotNull('attachments')
-            ->whereRaw("JSON_EXTRACT(attachments, '$.legacy_progress_note_id') IS NOT NULL")
-            ->get(['attachments'])
-            ->map(function ($row) {
-                $value = ($row->attachments ?? [])['legacy_progress_note_id']
-                    ?? null;
-
-                return $value !== null ? (int) $value : null;
-            })
-            ->filter()
-            ->flip()
-            ->all();
-
         $migrated = 0;
         $skipped = 0;
 
-        ProgressNote::query()
+        ProgressNote::withTrashed()
             ->orderBy('id')
-            ->chunkById($chunkSize, function ($notes) use (&$migrated, &$skipped, $dryRun, $alreadySet) {
+            ->chunkById($chunkSize, function ($notes) use (&$migrated, &$skipped, $dryRun) {
                 foreach ($notes as $note) {
-                    if (isset($alreadySet[$note->id])) {
+                    $existing = $this->findExistingCanonical($note);
+
+                    if ($existing) {
                         $skipped++;
+
+                        if (! $dryRun) {
+                            if ($existing->legacy_progress_note_id === null) {
+                                ClientNote::withoutEvents(function () use ($existing, $note): void {
+                                    $existing->timestamps = false;
+                                    $existing->forceFill([
+                                        'legacy_progress_note_id' => $note->id,
+                                    ])->save();
+                                });
+                            }
+                            $this->upgradeJsonMarkerMigration($note, $existing);
+                            $this->synchronizeTimeline($note, $existing);
+                        }
 
                         continue;
                     }
@@ -66,7 +68,18 @@ class MigrateProgressNotesToClientNotes extends Command
                         continue;
                     }
 
-                    ClientNote::create($payload);
+                    DB::transaction(function () use ($payload, $note): void {
+                        $canonical = ClientNote::withoutEvents(function () use ($payload) {
+                            $canonical = new ClientNote;
+                            $canonical->timestamps = false;
+                            $canonical->forceFill($payload);
+                            $canonical->save();
+
+                            return $canonical;
+                        });
+
+                        $this->synchronizeTimeline($note, $canonical);
+                    });
                     $migrated++;
                 }
             });
@@ -90,36 +103,96 @@ class MigrateProgressNotesToClientNotes extends Command
         $visibility = $note->visibility === 'include_family' ? 'portal' : 'internal';
 
         return [
+            'legacy_progress_note_id' => $note->id,
             'client_id' => $note->client_id,
             'shift_id' => $note->shift_id,
+            'care_plan_goal_id' => $note->care_plan_goal_id,
             'user_id' => $note->author_id,
             'organization_id' => $note->organization_id,
-            'type' => 'daily_note',
-            'category' => match ($note->note_type) {
-                'shift_change', 'handover' => 'routine',
-                'medication' => 'health',
-                'incident', 'concern' => 'concern',
-                'activity', 'general' => 'activity',
-                'communication' => 'communication',
-                'goal_progress' => 'goal_progress',
-                default => 'other',
-            },
+            'type' => 'progress_note',
+            'category' => $note->note_type,
             'subject' => ucfirst(str_replace('_', ' ', (string) $note->note_type))
                 .($emotionText !== '' ? ' ('.$emotionText.')' : ''),
             'body' => $note->content,
             'occurred_at' => $note->created_at,
             'visibility' => $visibility,
+            'is_private' => $note->visibility === 'private',
             'is_flagged' => (bool) $note->is_flagged,
             'flagged_reason' => $note->flagged_reason,
+            'ai_summary' => $note->ai_summary,
             'mood_rating' => $note->mood_rating,
             'behaviour_tags' => $note->emotions,
             'appears_on_timeline' => true,
             'is_draft' => false,
-            'attachments' => [
-                'legacy_progress_note_id' => $note->id,
-                'migration_source' => 'progress_notes',
-                'migrated_at' => now()->toISOString(),
-            ],
+            'created_at' => $note->created_at,
+            'updated_at' => $note->updated_at,
+            'deleted_at' => $note->deleted_at,
         ];
+    }
+
+    private function synchronizeTimeline(ProgressNote $legacy, ClientNote $canonical): void
+    {
+        TimelineEvent::query()
+            ->where('source_type', ProgressNote::class)
+            ->where('source_id', $legacy->id)
+            ->update([
+                'source_type' => ClientNote::class,
+                'source_id' => $canonical->id,
+            ]);
+
+        if ($canonical->trashed()) {
+            app(TimelineEmitter::class)->retract($canonical);
+
+            return;
+        }
+
+        $projectedEventIds = TimelineEvent::query()
+            ->where('source_type', ClientNote::class)
+            ->where('source_id', $canonical->id)
+            ->where('meta->'.TimelineEmitter::PROJECTED_META_KEY, true)
+            ->orderBy('id')
+            ->pluck('id');
+        if ($projectedEventIds->count() > 1) {
+            TimelineEvent::query()
+                ->whereIn('id', $projectedEventIds->slice(1)->all())
+                ->delete();
+        }
+
+        app(TimelineEmitter::class)->project($canonical);
+    }
+
+    private function findExistingCanonical(ProgressNote $legacy): ?ClientNote
+    {
+        $canonical = ClientNote::withTrashed()
+            ->where('legacy_progress_note_id', $legacy->id)
+            ->first();
+
+        if ($canonical) {
+            return $canonical;
+        }
+
+        return ClientNote::withTrashed()
+            ->whereNotNull('attachments')
+            ->whereRaw(
+                "CAST(JSON_UNQUOTE(JSON_EXTRACT(attachments, '$.legacy_progress_note_id')) AS UNSIGNED) = ?",
+                [$legacy->id],
+            )
+            ->first();
+    }
+
+    private function upgradeJsonMarkerMigration(ProgressNote $legacy, ClientNote $canonical): void
+    {
+        if (($canonical->attachments['migration_source'] ?? null) !== 'progress_notes') {
+            return;
+        }
+
+        $payload = $this->mapProgressNoteToClientNote($legacy);
+        $payload['attachments'] = $canonical->attachments;
+
+        ClientNote::withoutEvents(function () use ($canonical, $payload): void {
+            $canonical->timestamps = false;
+            $canonical->forceFill($payload);
+            $canonical->save();
+        });
     }
 }

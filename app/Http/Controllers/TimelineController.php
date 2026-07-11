@@ -5,11 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\TimelineEvent;
 use App\Models\User;
-use Illuminate\Http\Request;
+use App\Services\Clients\ClientProfileSectionAccess;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class TimelineController extends Controller
 {
+    public function __construct(
+        protected ClientProfileSectionAccess $sectionAccess,
+    ) {}
+
     public function my(Request $request)
     {
         $user = $request->user();
@@ -22,9 +27,11 @@ class TimelineController extends Controller
     {
         $viewer = $request->user();
         abort_unless($viewer, 403);
+        abort_if($viewer->hasRole('client', 'next_of_kin'), 403);
 
         if ($viewer->id !== $user->id) {
             abort_unless($viewer->canDo('timeline.viewAny') || $viewer->canDo('staff.viewAny'), 403);
+            abort_unless($this->sharesOrganization($viewer, $user), 403);
         }
 
         $range = $this->parseRange($request);
@@ -47,7 +54,7 @@ class TimelineController extends Controller
                 'from' => $range['from']->toISOString(),
                 'to' => $range['to']->toISOString(),
             ],
-            'events' => $events->map(fn($e) => $this->toEventDto($e))->values(),
+            'events' => $events->map(fn ($e) => $this->toEventDto($e))->values(),
         ]);
     }
 
@@ -58,6 +65,7 @@ class TimelineController extends Controller
 
         // Existing client policy is used elsewhere; keep it consistent.
         $this->authorize('view', $client);
+        abort_unless($this->sectionAccess->canViewTimeline($viewer, $client), 403);
 
         $range = $this->parseRange($request);
 
@@ -81,7 +89,7 @@ class TimelineController extends Controller
         $client->load(['site:id,name', 'serviceContext:id,name,type']);
 
         return inertia('timeline/index', [
-            'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name . ' ' . $client->last_name)],
+            'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)],
             'client' => [
                 'id' => $client->id,
                 'first_name' => $client->first_name,
@@ -99,7 +107,7 @@ class TimelineController extends Controller
                 'from' => $range['from']->toISOString(),
                 'to' => $range['to']->toISOString(),
             ],
-            'events' => $events->map(fn($e) => $this->toEventDto($e))->values(),
+            'events' => $events->map(fn ($e) => $this->toEventDto($e))->values(),
             'filters' => [
                 'type' => $request->type ?? 'all',
                 'from' => $request->query('from'),
@@ -147,7 +155,7 @@ class TimelineController extends Controller
                     'body' => $c->body,
                     'user_id' => $c->user_id,
                     'user_name' => $c->user?->name,
-                    'is_staff' => !in_array($c->user?->role, ['client', 'next_of_kin'], true),
+                    'is_staff' => ! in_array($c->user?->role, ['client', 'next_of_kin'], true),
                     'likes_count' => $c->likes->count(),
                     'liked_by_user_ids' => $c->likes->pluck('user_id')->all(),
                     'created_at' => $c->created_at?->toISOString(),
@@ -156,7 +164,7 @@ class TimelineController extends Controller
                         'body' => $r->body,
                         'user_id' => $r->user_id,
                         'user_name' => $r->user?->name,
-                        'is_staff' => !in_array($r->user?->role, ['client', 'next_of_kin'], true),
+                        'is_staff' => ! in_array($r->user?->role, ['client', 'next_of_kin'], true),
                         'likes_count' => $r->likes->count(),
                         'liked_by_user_ids' => $r->likes->pluck('user_id')->all(),
                         'created_at' => $r->created_at?->toISOString(),
@@ -175,5 +183,12 @@ class TimelineController extends Controller
                     ->all()
                 : [],
         ];
+    }
+
+    private function sharesOrganization(User $viewer, User $target): bool
+    {
+        return $viewer->organization_id === null
+            || $target->organization_id === null
+            || (int) $viewer->organization_id === (int) $target->organization_id;
     }
 }

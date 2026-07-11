@@ -9,28 +9,60 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
-use App\Services\Timeline\TimelineEmitter;
-use App\Support\WorkerClock;
+use App\Services\Clients\ClientProfileSectionAccess;
 use App\Support\ShiftTaskSupport;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ClientCalendarController extends Controller
 {
+    public function __construct(
+        private readonly ClientProfileSectionAccess $sectionAccess,
+    ) {}
+
     public function events(Request $request, Client $client)
     {
         $this->authorize('view', $client);
 
-        $start = $this->parseCalendarBoundary($request->query('start'), now()->startOfMonth());
-        $end = $this->parseCalendarBoundary($request->query('end'), now()->endOfMonth());
+        $user = $request->user();
+        abort_unless($user && ! $user->hasRole('client', 'next_of_kin'), 403);
+
+        $access = $this->sectionAccess->for($user, $client);
+        abort_unless($access['calendar'], 403);
+
+        $request->merge([
+            'start' => $this->normalizeCalendarBoundaryInput($request->query('start')),
+            'end' => $this->normalizeCalendarBoundaryInput($request->query('end')),
+        ]);
+        $boundaries = $request->validate([
+            'start' => ['nullable', 'date'],
+            'end' => ['nullable', 'date'],
+        ]);
+
+        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, now()->startOfMonth());
+        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, now()->endOfMonth());
+        if ($end->lt($start)) {
+            throw ValidationException::withMessages([
+                'end' => 'The calendar end must be on or after the start.',
+            ]);
+        }
+        if ($start->diffInDays($end) > 93) {
+            throw ValidationException::withMessages([
+                'end' => 'The calendar range cannot exceed 93 days.',
+            ]);
+        }
 
         $events = collect();
 
         // 1. Shifts
-        $shifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$start, $end])
-            ->with(['staff:id,name', 'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order'])
-            ->get();
+        $shifts = $access['shifts']
+            ? Shift::where('client_id', $client->id)
+                ->whereBetween('starts_at', [$start, $end])
+                ->with(['staff:id,name', 'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order'])
+                ->get()
+            : collect();
 
         foreach ($shifts as $s) {
             $isRespite = (bool) $s->respite_booking_id;
@@ -57,11 +89,13 @@ class ClientCalendarController extends Controller
         }
 
         // 2. Approved family visit requests
-        $visits = FamilyVisitRequest::where('client_id', $client->id)
-            ->where('status', 'approved')
-            ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
-            ->with('user:id,name')
-            ->get();
+        $visits = $access['portal_access']
+            ? FamilyVisitRequest::where('client_id', $client->id)
+                ->where('status', 'approved')
+                ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+                ->with('user:id,name')
+                ->get()
+            : collect();
 
         foreach ($visits as $v) {
             $startTime = $v->requested_date->copy();
@@ -134,11 +168,13 @@ class ClientCalendarController extends Controller
         }
 
         // 4. Family notes with due dates
-        $familyNotes = FamilyNote::forClient($client->id)
-            ->withDueDate()
-            ->open()
-            ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
-            ->get();
+        $familyNotes = $access['family_notes']
+            ? FamilyNote::forClient($client->id)
+                ->withDueDate()
+                ->open()
+                ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+                ->get()
+            : collect();
 
         foreach ($familyNotes as $fn) {
             $noteStart = $fn->due_date->copy();
@@ -165,10 +201,12 @@ class ClientCalendarController extends Controller
         }
 
         // 5. Medication administrations (scheduled doses)
-        $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
-            ->whereBetween('scheduled_for', [$start, $end])
-            ->with('medication:id,name,dosage,route,form')
-            ->get();
+        $medAdmins = $access['medical']
+            ? ClientMedicationAdministration::where('client_id', $client->id)
+                ->whereBetween('scheduled_for', [$start, $end])
+                ->with('medication:id,name,dosage,route,form')
+                ->get()
+            : collect();
 
         foreach ($medAdmins as $ma) {
             $medName = $ma->medication?->name ?? 'Medication';
@@ -207,13 +245,19 @@ class ClientCalendarController extends Controller
         }
 
         // 6. Scheduled medication doses — only show ± 3 days from today to avoid clutter
-        $medStart = max($start, now()->subDays(3)->startOfDay());
-        $medEnd = min($end, now()->addDays(3)->endOfDay());
-        $activeMeds = ClientMedication::where('client_id', $client->id)
-            ->where('active', true)
-            ->whereNull('ceased_at')
-            ->where('is_prn', false)
-            ->get();
+        $medStart = $start->greaterThan(now()->subDays(3)->startOfDay())
+            ? $start->copy()
+            : now()->subDays(3)->startOfDay();
+        $medEnd = $end->lessThan(now()->addDays(3)->endOfDay())
+            ? $end->copy()
+            : now()->addDays(3)->endOfDay();
+        $activeMeds = $access['medical']
+            ? ClientMedication::where('client_id', $client->id)
+                ->where('active', true)
+                ->whereNull('ceased_at')
+                ->where('is_prn', false)
+                ->get()
+            : collect();
 
         foreach ($activeMeds as $med) {
             $times = $this->parseFrequencyTimes($med->frequency);
@@ -261,6 +305,7 @@ class ClientCalendarController extends Controller
     public function storeAppointment(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        abort_unless($request->user()?->canDo('calendar.create'), 403);
 
         $data = $request->validate([
             'title' => 'required|string|max:255',
@@ -282,33 +327,13 @@ class ClientCalendarController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        app(TimelineEmitter::class)->record([
-            'source_type' => ClientAppointment::class,
-            'source_id' => $appointment->id,
-            'occurred_at' => now(),
-            'type' => 'appointment_scheduled',
-            'actor_user_id' => $request->user()->id,
-            'client_id' => $client->id,
-            'site_id' => $client->site_id,
-            'subject' => 'Appointment scheduled: '.$data['title'],
-            'body' => $data['description'],
-            'meta' => array_filter([
-                'appointment_type' => $data['appointment_type'],
-                'starts_at' => $appointment->starts_at?->toIso8601String(),
-                'location' => $data['location'] ?? null,
-                'provider_name' => $data['provider_name'] ?? null,
-            ]),
-            'visibility' => ($data['share_with_family'] ?? true) ? 'portal' : 'internal',
-            'is_pinned' => false,
-            'created_by' => $request->user()->id,
-        ]);
-
         return response()->json(['success' => true, 'appointment' => $appointment]);
     }
 
     public function updateAppointment(Request $request, Client $client, ClientAppointment $appointment)
     {
         $this->authorize('view', $client);
+        abort_unless($request->user()?->canDo('calendar.manage'), 403);
         abort_unless($appointment->client_id === $client->id, 404);
 
         $data = $request->validate([
@@ -329,6 +354,17 @@ class ClientCalendarController extends Controller
             }
         }
 
+        $effectiveStart = $data['starts_at'] ?? $appointment->starts_at;
+        $effectiveEnd = array_key_exists('ends_at', $data)
+            ? $data['ends_at']
+            : $appointment->ends_at;
+
+        if ($effectiveEnd !== null && ! $effectiveEnd->gt($effectiveStart)) {
+            throw ValidationException::withMessages([
+                'ends_at' => 'The appointment end must be after the start.',
+            ]);
+        }
+
         $appointment->update($data);
 
         return response()->json(['success' => true, 'appointment' => $appointment->fresh()]);
@@ -337,6 +373,7 @@ class ClientCalendarController extends Controller
     public function destroyAppointment(Request $request, Client $client, ClientAppointment $appointment)
     {
         $this->authorize('view', $client);
+        abort_unless($request->user()?->canDo('calendar.manage'), 403);
         abort_unless($appointment->client_id === $client->id, 404);
 
         $appointment->delete();
@@ -354,9 +391,20 @@ class ClientCalendarController extends Controller
             return $fallback->copy();
         }
 
-        $normalized = preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', trim($value)) ?? trim($value);
+        $normalized = $this->normalizeCalendarBoundaryInput($value);
 
         return Carbon::parse($normalized);
+    }
+
+    private function normalizeCalendarBoundaryInput(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+
+        return preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', $trimmed) ?? $trimmed;
     }
 
     /**

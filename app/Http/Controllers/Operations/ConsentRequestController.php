@@ -27,6 +27,7 @@ class ConsentRequestController extends Controller
 
     public function index(Request $request, Client $client)
     {
+        Gate::authorize('view', $client);
         Gate::authorize('viewAny', ConsentRequest::class);
 
         $requests = ConsentRequest::forClient($client->id)
@@ -49,6 +50,7 @@ class ConsentRequestController extends Controller
 
     public function create(Request $request, Client $client)
     {
+        Gate::authorize('view', $client);
         Gate::authorize('create', ConsentRequest::class);
 
         $consentTypes = ConsentType::query()
@@ -84,6 +86,7 @@ class ConsentRequestController extends Controller
 
     public function store(Request $request, Client $client)
     {
+        Gate::authorize('view', $client);
         Gate::authorize('create', ConsentRequest::class);
 
         $data = $request->validate([
@@ -125,8 +128,9 @@ class ConsentRequestController extends Controller
 
     public function show(Request $request, Client $client, ConsentRequest $consentRequest)
     {
-        Gate::authorize('view', $consentRequest);
+        Gate::authorize('view', $client);
         abort_unless($consentRequest->client_id === $client->id, 404);
+        Gate::authorize('view', $consentRequest);
 
         $consentRequest->load([
             'consentType',
@@ -144,8 +148,9 @@ class ConsentRequestController extends Controller
 
     public function cancel(Request $request, Client $client, ConsentRequest $consentRequest)
     {
-        Gate::authorize('cancel', $consentRequest);
+        Gate::authorize('view', $client);
         abort_unless($consentRequest->client_id === $client->id, 404);
+        Gate::authorize('cancel', $consentRequest);
 
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:5', 'max:500'],

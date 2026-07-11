@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class NextOfKin extends Model
@@ -16,6 +17,10 @@ class NextOfKin extends Model
         'user_id',
         'client_id',
         'relationship',
+        'legal_authority_type',
+        'legal_authority_verified_at',
+        'legal_authority_verified_by_user_id',
+        'legal_authority_expires_at',
         'is_primary_contact',
         'is_emergency_contact',
         'phone',
@@ -31,6 +36,8 @@ class NextOfKin extends Model
     protected $casts = [
         'is_primary_contact' => 'boolean',
         'is_emergency_contact' => 'boolean',
+        'legal_authority_verified_at' => 'datetime',
+        'legal_authority_expires_at' => 'datetime',
         'can_view_medical' => 'boolean',
         'can_view_medications' => 'boolean',
         'can_view_incidents' => 'boolean',
@@ -51,6 +58,20 @@ class NextOfKin extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function legalAuthorityVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'legal_authority_verified_by_user_id');
+    }
+
+    public function hasVerifiedLegalAuthority(string $authorityType): bool
+    {
+        return in_array($authorityType, ConsentRequest::AUTHORISED_SUBSTITUTE_RELATIONS, true)
+            && $this->legal_authority_type === $authorityType
+            && $this->legal_authority_verified_at !== null
+            && $this->legal_authority_verified_by_user_id !== null
+            && ($this->legal_authority_expires_at === null || $this->legal_authority_expires_at->isFuture());
     }
 
     /**

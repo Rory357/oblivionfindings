@@ -1,12 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FamilyChatPopup } from '@/components/clients/profile/family-chat';
 import { ActionsReviewsTab } from '@/pages/operations/clients/tabs/actions-reviews';
+import { CareSupportPlanTab } from '@/pages/operations/clients/tabs/care-support-plan';
+import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import {
     DailyNotesTab,
     type ClientDailyNote,
 } from '@/pages/operations/clients/tabs/daily-notes';
+import { GoalsPathTab } from '@/pages/operations/clients/tabs/goals-path';
+import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
 
 vi.mock('@inertiajs/react', () => ({
     Link: ({
@@ -24,6 +29,14 @@ vi.mock('@inertiajs/react', () => ({
     router: {
         post: vi.fn(),
     },
+    useForm: <T,>(initial: T) => ({
+        data: initial,
+        errors: {},
+        processing: false,
+        post: vi.fn(),
+        reset: vi.fn(),
+        setData: vi.fn(),
+    }),
 }));
 
 const notes: ClientDailyNote[] = [
@@ -73,6 +86,7 @@ describe('client profile phase-one tabs', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        vi.unstubAllGlobals();
     });
 
     it('opens daily notes filtered to the review queue from query params and still surfaces drafts', () => {
@@ -92,6 +106,37 @@ describe('client profile phase-one tabs', () => {
         expect(screen.queryByText('Community walk')).not.toBeInTheDocument();
         expect(screen.getByText('My Drafts')).toBeVisible();
         expect(screen.getByText('Draft health note')).toBeVisible();
+    });
+
+    it('uses record capabilities instead of broad note permissions for review actions', () => {
+        render(
+            <DailyNotesTab
+                clientId={1}
+                notes={[
+                    {
+                        ...notes[0],
+                        can: {
+                            update: false,
+                            delete: false,
+                            flag: false,
+                            review: false,
+                        },
+                    },
+                ]}
+                summary={{ total: 1, flagged_open: 1, drafts: 0 }}
+                canReview
+                canUpdate
+                onCreateDaily={vi.fn()}
+                onCreateQuick={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.queryByRole('button', { name: 'Mark Reviewed' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Review' }),
+        ).not.toBeInTheDocument();
     });
 
     it('groups actions by due bucket before severity', () => {
@@ -140,5 +185,173 @@ describe('client profile phase-one tabs', () => {
         expect(screen.getByText('Due this week')).toBeVisible();
         expect(screen.getByText('Upcoming')).toBeVisible();
         expect(screen.getByText('Call GP')).toBeVisible();
+    });
+
+    it('keeps goal management and PATH editing independently gated', () => {
+        const props = {
+            clientId: 1,
+            clientName: 'Tane Rangi',
+            goals: [],
+            canManageGoals: false,
+            canEditPath: true,
+            onAddGoal: vi.fn(),
+            onManageGoal: vi.fn(),
+            onEditPlan: vi.fn(),
+        };
+        const { rerender } = render(<GoalsPathTab {...props} />);
+
+        expect(
+            screen.queryByRole('button', { name: 'Add goal' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Edit planning' }),
+        ).toBeVisible();
+
+        rerender(
+            <GoalsPathTab {...props} canManageGoals canEditPath={false} />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Add goal' })).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Edit planning' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('discloses bounded daily communication timeline care-plan and action collections', () => {
+        const { rerender } = render(
+            <DailyNotesTab
+                clientId={1}
+                notes={notes}
+                summary={{ total: 73, loaded: 3, has_more: true }}
+            />,
+        );
+        expect(
+            screen.getByText('Showing the latest 3 of 73 daily notes.'),
+        ).toBeVisible();
+
+        rerender(
+            <CommunicationNotesTab
+                notes={[notes[0]]}
+                familyNotes={[]}
+                familyNotesOpenCount={0}
+                coverage={{ total: 61, loaded: 1, has_more: true }}
+            />,
+        );
+        expect(screen.getByText('61')).toBeVisible();
+        expect(
+            screen.getByText('Showing the latest 1 of 61 communication notes.'),
+        ).toBeVisible();
+
+        rerender(
+            <ClientTimelineTab
+                clientId={1}
+                events={[]}
+                handover={[]}
+                summary={{
+                    total: 101,
+                    loaded: 80,
+                    has_more: true,
+                    pinned_handover_total: 8,
+                    pinned_handover_loaded: 5,
+                    pinned_handover_has_more: true,
+                }}
+                canCreateNote={false}
+                canPinHandover={false}
+            />,
+        );
+        expect(
+            screen.getByText('Showing the latest 80 of 101 timeline events.'),
+        ).toBeVisible();
+        expect(
+            screen.getByText('Showing 5 of 8 pinned handover items.'),
+        ).toBeVisible();
+
+        rerender(
+            <CareSupportPlanTab
+                client={{ id: 1, first_name: 'Tane' }}
+                summary={{
+                    active_plan: {
+                        id: 2,
+                        title: 'Current plan',
+                        status: 'active',
+                        goals: [],
+                        sign_offs: [],
+                    },
+                    versions: [
+                        {
+                            id: 1,
+                            title: 'Plan version',
+                            status: 'archived',
+                            version: 1,
+                        },
+                    ],
+                    versions_total: 32,
+                    versions_loaded: 30,
+                    versions_has_more: true,
+                }}
+                canEdit={false}
+                canCreate={false}
+                onCreatePlan={vi.fn()}
+                onEditPlan={vi.fn()}
+                onGoToGoals={vi.fn()}
+            />,
+        );
+        expect(
+            screen.getByText('Showing the latest 30 of 32 plan versions.'),
+        ).toBeVisible();
+
+        rerender(
+            <ActionsReviewsTab
+                summary={{
+                    open: 20,
+                    loaded: 20,
+                    has_more: true,
+                    critical: 2,
+                    warning: 5,
+                }}
+                items={[]}
+            />,
+        );
+        expect(screen.getByText('20+')).toBeVisible();
+        expect(screen.getByText('Open actions shown')).toBeVisible();
+        expect(screen.getByText(/Additional open actions exist/)).toBeVisible();
+    });
+
+    it('keeps family chat read-only while disclosing its recent-message window', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    conversation: {
+                        id: 5,
+                        title: 'Whānau chat',
+                        participants: [],
+                    },
+                    messages: [],
+                    meta: { total: 125, loaded: 100, has_more: true },
+                    portal_users: [],
+                }),
+            }),
+        );
+
+        render(
+            <FamilyChatPopup
+                open
+                onClose={vi.fn()}
+                clientId={1}
+                clientName="Tane"
+                canSend={false}
+            />,
+        );
+
+        expect(
+            await screen.findByText('Showing the latest 100 of 125 messages.'),
+        ).toBeVisible();
+        expect(
+            screen.getByText('This conversation is read-only for your role.'),
+        ).toBeVisible();
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        expect(screen.queryByPlaceholderText('Type a message')).toBeNull();
     });
 });

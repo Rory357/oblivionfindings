@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\FamilyPortalSetting;
 use App\Models\FamilyVisitRequest;
 use App\Models\RespiteBooking;
 use App\Models\Shift;
+use App\Services\Portal\PortalClientSectionAccess;
 use Illuminate\Http\Request;
 
 class PortalScheduleController extends Controller
@@ -18,9 +18,9 @@ class PortalScheduleController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        $portalSettings = FamilyPortalSetting::where('client_id', $client->id)->first();
-        $showShifts = $portalSettings?->show_shift_schedule ?? true;
-        $showRespite = $portalSettings?->show_respite ?? true;
+        $sectionAccess = app(PortalClientSectionAccess::class)->for($user, $client);
+        $showShifts = $sectionAccess['show_shift_schedule'];
+        $showRespite = $sectionAccess['show_respite'];
         $rangeStart = now()->startOfDay();
         $rangeEnd = now()->addDays(30);
 

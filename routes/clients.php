@@ -57,6 +57,16 @@ Route::middleware(['auth'])->group(function () {
         ->whereNumber('client')
         ->name('clients.show');
 
+    // Compatibility RAG endpoint. Exact any/assigned/self authorization lives
+    // in ClientRagController rather than inheriting broad client-update access.
+    Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
+        ->middleware([
+            'permission:clients.viewAny|clients.viewAssigned|clients.viewPortal',
+            'throttle:ai-queries',
+        ])
+        ->whereNumber('client')
+        ->name('clients.rag.ask');
+
     // Meal preferences (food allergies, dietary tags, dislikes) — kitchen-side data,
     // gated by sites.meals.view so kitchen / care staff can edit even without full
     // client update rights.
@@ -87,6 +97,11 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Client updates
+    Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])
+        ->middleware('permission:clients.onboarding.manage|clients.update')
+        ->whereNumber('client')
+        ->name('clients.onboarding.toggle');
+
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
@@ -140,17 +155,6 @@ Route::middleware(['auth'])->group(function () {
             ->name('clients.portal_users.store');
         Route::delete('/clients/{client}/portal-users/{user}', [ClientPortalUserController::class, 'destroy'])
             ->name('clients.portal_users.destroy');
-
-        // RAG/AI queries
-        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
-            ->middleware('throttle:ai-queries')
-            ->name('clients.rag.ask');
-
-        // Onboarding checklist
-        Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])
-            ->whereNumber('client')
-            ->name('clients.onboarding.toggle')
-            ->middleware('permission:clients.onboarding.manage|clients.update');
 
         // Support plan
         Route::put('/clients/{client}/support-plan', [ClientSupportPlanController::class, 'update'])

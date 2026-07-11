@@ -37,8 +37,9 @@ class SendConsentRequestReminders extends Command
                     }
                 }
 
-                $service->sendReminder($request);
-                $sent++;
+                if ($service->sendReminder($request)) {
+                    $sent++;
+                }
             });
 
         $this->info(sprintf('Sent %d reminders', $sent));

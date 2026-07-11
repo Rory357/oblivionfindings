@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
+use App\Models\NextOfKin;
 use App\Models\User;
 use App\Notifications\Operations\ConsentRequestCreatedNotification;
 use App\Notifications\Operations\ConsentRequestReminderNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * State-machine for ConsentRequest. All transitions go through here so the
@@ -30,6 +33,8 @@ class ConsentRequestService
         $expiresAt = now()->addDays((int) ($expiresInDays ?? 14));
 
         return DB::transaction(function () use ($data, $requester, $expiresAt) {
+            $data = $this->validatedCreationData($data, $requester);
+
             $request = ConsentRequest::create(array_merge($data, [
                 'requested_by_user_id' => $requester->id,
                 'status' => ConsentRequest::STATUS_PENDING,
@@ -53,14 +58,22 @@ class ConsentRequestService
      */
     public function markViewed(ConsentRequest $request): void
     {
-        if ($request->viewed_at !== null) {
-            return;
-        }
+        DB::transaction(function () use ($request): void {
+            $lockedRequest = $this->lockedRequest($request);
 
-        $request->update([
-            'viewed_at' => now(),
-            'audit_trail' => $this->appendAudit($request, 'viewed', $request->recipient_user_id),
-        ]);
+            if ($lockedRequest->viewed_at !== null) {
+                return;
+            }
+
+            $lockedRequest->update([
+                'viewed_at' => now(),
+                'audit_trail' => $this->appendAudit(
+                    $lockedRequest,
+                    'viewed',
+                    $lockedRequest->recipient_user_id,
+                ),
+            ]);
+        });
     }
 
     /**
@@ -76,25 +89,39 @@ class ConsentRequestService
         Request $httpRequest,
         ?string $responseNotes = null,
     ): ClientConsent {
-        $this->assertActionable($request);
-        $this->assertRecipient($request, $recipient);
-
         return DB::transaction(function () use ($request, $recipient, $httpRequest, $responseNotes) {
-            $consent = $this->materialiseClientConsent($request, $recipient, $responseNotes);
+            $lockedRequest = $this->lockedRequest($request);
+            $this->assertRecipientContext($lockedRequest, $recipient);
 
-            $request->update([
+            if ($lockedRequest->status === ConsentRequest::STATUS_APPROVED) {
+                if (
+                    $lockedRequest->response_notes === $responseNotes
+                    && $lockedRequest->resulting_consent_id !== null
+                ) {
+                    return ClientConsent::query()->findOrFail($lockedRequest->resulting_consent_id);
+                }
+
+                throw new ConflictHttpException('This consent request has already been approved with a different response.');
+            }
+
+            $this->assertActionableForDecision($lockedRequest);
+            $this->assertBoundAuthorityStillValid($lockedRequest);
+
+            $consent = $this->materialiseClientConsent($lockedRequest, $recipient, $responseNotes);
+
+            $lockedRequest->update([
                 'status' => ConsentRequest::STATUS_APPROVED,
                 'responded_at' => now(),
                 'response_notes' => $responseNotes,
                 'response_ip_address' => $httpRequest->ip(),
                 'response_user_agent' => substr((string) $httpRequest->userAgent(), 0, 500),
                 'resulting_consent_id' => $consent->id,
-                'audit_trail' => $this->appendAudit($request, 'approved', $recipient->id, [
+                'audit_trail' => $this->appendAudit($lockedRequest, 'approved', $recipient->id, [
                     'resulting_consent_id' => $consent->id,
                 ]),
             ]);
 
-            $request->requestedBy?->notify(new ConsentRequestRespondedNotification($request->fresh(), 'approved'));
+            $lockedRequest->requestedBy?->notify(new ConsentRequestRespondedNotification($lockedRequest->fresh(), 'approved'));
 
             return $consent;
         });
@@ -106,20 +133,30 @@ class ConsentRequestService
         Request $httpRequest,
         ?string $responseNotes = null,
     ): void {
-        $this->assertActionable($request);
-        $this->assertRecipient($request, $recipient);
-
         DB::transaction(function () use ($request, $recipient, $httpRequest, $responseNotes) {
-            $request->update([
+            $lockedRequest = $this->lockedRequest($request);
+            $this->assertRecipientContext($lockedRequest, $recipient);
+
+            if ($lockedRequest->status === ConsentRequest::STATUS_DECLINED) {
+                if ($lockedRequest->response_notes === $responseNotes) {
+                    return;
+                }
+
+                throw new ConflictHttpException('This consent request has already been declined with a different response.');
+            }
+
+            $this->assertActionableForDecision($lockedRequest);
+
+            $lockedRequest->update([
                 'status' => ConsentRequest::STATUS_DECLINED,
                 'responded_at' => now(),
                 'response_notes' => $responseNotes,
                 'response_ip_address' => $httpRequest->ip(),
                 'response_user_agent' => substr((string) $httpRequest->userAgent(), 0, 500),
-                'audit_trail' => $this->appendAudit($request, 'declined', $recipient->id),
+                'audit_trail' => $this->appendAudit($lockedRequest, 'declined', $recipient->id),
             ]);
 
-            $request->requestedBy?->notify(new ConsentRequestRespondedNotification($request->fresh(), 'declined'));
+            $lockedRequest->requestedBy?->notify(new ConsentRequestRespondedNotification($lockedRequest->fresh(), 'declined'));
         });
     }
 
@@ -129,18 +166,34 @@ class ConsentRequestService
      */
     public function cancel(ConsentRequest $request, User $staff, string $reason): void
     {
-        if (! $request->isPending()) {
-            throw new RuntimeException('Only pending requests can be cancelled.');
-        }
+        DB::transaction(function () use ($request, $staff, $reason) {
+            $lockedRequest = $this->lockedRequest($request);
+            $this->assertStaffContext($lockedRequest, $staff);
 
-        $request->update([
-            'status' => ConsentRequest::STATUS_CANCELLED,
-            'cancelled_by_user_id' => $staff->id,
-            'cancellation_reason' => $reason,
-            'audit_trail' => $this->appendAudit($request, 'cancelled', $staff->id, [
-                'reason' => $reason,
-            ]),
-        ]);
+            if ($lockedRequest->status === ConsentRequest::STATUS_CANCELLED) {
+                if (
+                    $lockedRequest->cancelled_by_user_id === $staff->id
+                    && $lockedRequest->cancellation_reason === $reason
+                ) {
+                    return;
+                }
+
+                throw new ConflictHttpException('This consent request has already been cancelled with different details.');
+            }
+
+            if (! $lockedRequest->isPending()) {
+                throw new ConflictHttpException('Only pending consent requests can be cancelled.');
+            }
+
+            $lockedRequest->update([
+                'status' => ConsentRequest::STATUS_CANCELLED,
+                'cancelled_by_user_id' => $staff->id,
+                'cancellation_reason' => $reason,
+                'audit_trail' => $this->appendAudit($lockedRequest, 'cancelled', $staff->id, [
+                    'reason' => $reason,
+                ]),
+            ]);
+        });
     }
 
     /**
@@ -155,11 +208,30 @@ class ConsentRequestService
             ->overdueForExpiry()
             ->lazy()
             ->each(function (ConsentRequest $request) use (&$expired) {
-                $request->update([
-                    'status' => ConsentRequest::STATUS_EXPIRED,
-                    'audit_trail' => $this->appendAudit($request, 'expired', null),
-                ]);
-                $expired++;
+                $didExpire = DB::transaction(function () use ($request): bool {
+                    $lockedRequest = ConsentRequest::query()
+                        ->lockForUpdate()
+                        ->find($request->getKey());
+
+                    if (
+                        ! $lockedRequest
+                        || ! $lockedRequest->isPending()
+                        || $lockedRequest->expires_at?->isFuture()
+                    ) {
+                        return false;
+                    }
+
+                    $lockedRequest->update([
+                        'status' => ConsentRequest::STATUS_EXPIRED,
+                        'audit_trail' => $this->appendAudit($lockedRequest, 'expired', null),
+                    ]);
+
+                    return true;
+                });
+
+                if ($didExpire) {
+                    $expired++;
+                }
             });
 
         return $expired;
@@ -171,13 +243,33 @@ class ConsentRequestService
      * called from the scheduled reminder command — idempotency (one
      * reminder per request) is enforced by the caller.
      */
-    public function sendReminder(ConsentRequest $request): void
+    public function sendReminder(ConsentRequest $request): bool
     {
-        $request->recipient?->notify(new ConsentRequestReminderNotification($request));
+        return DB::transaction(function () use ($request): bool {
+            $lockedRequest = ConsentRequest::query()
+                ->with(['client', 'consentType', 'recipient'])
+                ->lockForUpdate()
+                ->find($request->getKey());
 
-        $request->update([
-            'audit_trail' => $this->appendAudit($request, 'reminder_sent', null),
-        ]);
+            if (! $lockedRequest || ! $lockedRequest->isActionable()) {
+                return false;
+            }
+
+            $alreadySent = collect($lockedRequest->audit_trail ?? [])
+                ->contains(fn (array $entry): bool => ($entry['event'] ?? null) === 'reminder_sent');
+
+            if ($alreadySent) {
+                return false;
+            }
+
+            $lockedRequest->recipient?->notify(new ConsentRequestReminderNotification($lockedRequest));
+
+            $lockedRequest->update([
+                'audit_trail' => $this->appendAudit($lockedRequest, 'reminder_sent', null),
+            ]);
+
+            return true;
+        });
     }
 
     // ── internals ─────────────────────────────────────────────────
@@ -224,6 +316,7 @@ class ConsentRequestService
             'conditions' => [
                 'source' => 'family_portal',
                 'consent_request_id' => $request->id,
+                'authority_next_of_kin_id' => $isSubstituted ? $request->authority_next_of_kin_id : null,
                 'data_scope' => $request->data_scope,
                 'retention_period_days' => $request->retention_period_days,
                 'purpose' => $request->purpose,
@@ -234,10 +327,10 @@ class ConsentRequestService
         ]);
     }
 
-    private function assertActionable(ConsentRequest $request): void
+    private function assertActionableForDecision(ConsentRequest $request): void
     {
         if (! $request->isActionable()) {
-            throw new RuntimeException(sprintf(
+            throw new ConflictHttpException(sprintf(
                 'Consent request #%d is not actionable (status=%s).',
                 $request->id,
                 $request->status,
@@ -245,11 +338,149 @@ class ConsentRequestService
         }
     }
 
-    private function assertRecipient(ConsentRequest $request, User $user): void
+    private function assertRecipientContext(ConsentRequest $request, User $user): void
     {
         if ($request->recipient_user_id !== $user->id) {
-            throw new RuntimeException('Only the designated recipient may respond to this request.');
+            throw new ConflictHttpException('Only the designated recipient may respond to this request.');
         }
+
+        $lockedUser = User::query()
+            ->lockForUpdate()
+            ->find($user->id);
+        $client = $request->client;
+        if (
+            ! $lockedUser
+            || ! $client
+            || ! $this->sameOrganisation($lockedUser->organization_id, $client->organization_id)
+            || ! $client->portalUsers()
+                ->whereKey($lockedUser->id)
+                ->lockForUpdate()
+                ->first()
+        ) {
+            throw new ConflictHttpException('The designated recipient is no longer linked to this client.');
+        }
+    }
+
+    private function assertStaffContext(ConsentRequest $request, User $staff): void
+    {
+        $client = $request->client;
+        if (! $client || ! $this->sameOrganisation($staff->organization_id, $client->organization_id)) {
+            throw new ConflictHttpException('This consent request does not belong to the staff member\'s organisation.');
+        }
+    }
+
+    private function assertBoundAuthorityStillValid(ConsentRequest $request): void
+    {
+        if (! in_array($request->recipient_relationship, ConsentRequest::AUTHORISED_SUBSTITUTE_RELATIONS, true)) {
+            return;
+        }
+
+        if ($request->authority_next_of_kin_id === null) {
+            throw new ConflictHttpException('Verified substitute decision-making authority is no longer available.');
+        }
+
+        $authority = NextOfKin::query()
+            ->lockForUpdate()
+            ->find($request->authority_next_of_kin_id);
+
+        if (
+            ! $authority
+            || $authority->client_id !== $request->client_id
+            || $authority->user_id !== $request->recipient_user_id
+            || ! $authority->hasVerifiedLegalAuthority($request->recipient_relationship)
+        ) {
+            throw new ConflictHttpException('Verified substitute decision-making authority is no longer valid.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function validatedCreationData(array $data, User $requester): array
+    {
+        $client = Client::query()->find($data['client_id'] ?? null);
+        $recipient = User::query()->find($data['recipient_user_id'] ?? null);
+
+        if (! $client || ! $this->sameOrganisation($requester->organization_id, $client->organization_id)) {
+            throw ValidationException::withMessages([
+                'client_id' => 'The client must belong to your organisation.',
+            ]);
+        }
+
+        $portalRecipient = $recipient && $this->sameOrganisation($recipient->organization_id, $client->organization_id)
+            ? $client->portalUsers()
+                ->whereKey($recipient->id)
+                ->lockForUpdate()
+                ->first()
+            : null;
+
+        if (! $recipient || ! $portalRecipient) {
+            throw ValidationException::withMessages([
+                'recipient_user_id' => 'The recipient must be a family-portal user linked to this client.',
+            ]);
+        }
+
+        $relationship = $data['recipient_relationship'] ?? null;
+        $supportedRelationships = [
+            ConsentRequest::RELATION_SELF,
+            ConsentRequest::RELATION_NEXT_OF_KIN,
+            ...ConsentRequest::AUTHORISED_SUBSTITUTE_RELATIONS,
+        ];
+
+        if (! in_array($relationship, $supportedRelationships, true)) {
+            throw ValidationException::withMessages([
+                'recipient_relationship' => 'Select a supported relationship for this consent request.',
+            ]);
+        }
+
+        if (
+            $relationship === ConsentRequest::RELATION_SELF
+            && ! in_array(
+                $portalRecipient->pivot?->relation,
+                [ConsentRequest::RELATION_SELF, 'self'],
+                true,
+            )
+        ) {
+            throw ValidationException::withMessages([
+                'recipient_relationship' => 'Self-consent requests must be sent to a portal account linked as the client.',
+            ]);
+        }
+
+        $data['authority_next_of_kin_id'] = null;
+
+        if (in_array($relationship, ConsentRequest::AUTHORISED_SUBSTITUTE_RELATIONS, true)) {
+            $authority = NextOfKin::query()
+                ->where('client_id', $client->id)
+                ->where('user_id', $recipient->id)
+                ->where('legal_authority_type', $relationship)
+                ->lockForUpdate()
+                ->get()
+                ->first(fn (NextOfKin $nextOfKin) => $nextOfKin->hasVerifiedLegalAuthority($relationship));
+
+            if (! $authority) {
+                throw ValidationException::withMessages([
+                    'recipient_relationship' => 'Verified, current legal authority is required for substituted consent.',
+                ]);
+            }
+
+            $data['authority_next_of_kin_id'] = $authority->id;
+        }
+
+        return $data;
+    }
+
+    private function lockedRequest(ConsentRequest $request): ConsentRequest
+    {
+        return ConsentRequest::query()
+            ->with(['client', 'consentType', 'requestedBy'])
+            ->lockForUpdate()
+            ->findOrFail($request->getKey());
+    }
+
+    private function sameOrganisation(mixed $first, mixed $second): bool
+    {
+        return $first === null || $second === null || (int) $first === (int) $second;
     }
 
     /**

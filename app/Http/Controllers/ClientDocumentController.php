@@ -5,18 +5,29 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientDocumentFolder;
-use App\Models\TimelineEvent;
-use App\Services\Rag\OpenAiVectorStoreClient;
 use App\Services\AuditLogger;
+use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\NotificationService;
+use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Rag\OpenAiVectorStoreClient;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ClientDocumentController extends Controller
 {
+    public function __construct(
+        private readonly ClientProfileSectionAccess $profileSectionAccess,
+    ) {}
+
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        $user = $request->user();
+        abort_unless(
+            $user && $this->profileSectionAccess->for($user, $client)['documents'],
+            403,
+        );
 
         AuditLogger::log('documents.list', $client);
 
@@ -112,8 +123,8 @@ class ClientDocumentController extends Controller
 
         // RAG: attach uploaded docs directly to this client's vector store.
         if ($openai->isEnabled()) {
-            if (!$client->openai_vector_store_id) {
-                $vsId = $openai->createVectorStore('client_' . $client->id);
+            if (! $client->openai_vector_store_id) {
+                $vsId = $openai->createVectorStore('client_'.$client->id);
                 if ($vsId) {
                     $client->forceFill(['openai_vector_store_id' => $vsId])->save();
                 }
@@ -129,7 +140,7 @@ class ClientDocumentController extends Controller
             }
         }
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => ClientDocument::class,
             'source_id' => $doc->id,
             'occurred_at' => now(),
@@ -137,7 +148,7 @@ class ClientDocumentController extends Controller
             'actor_user_id' => $request->user()?->id,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'subject' => 'Document uploaded: ' . ($doc->title ?: $doc->original_name),
+            'subject' => 'Document uploaded: '.($doc->title ?: $doc->original_name),
             'body' => $data['notes'] ?? null,
             'meta' => array_filter([
                 'title' => $doc->title,
@@ -175,7 +186,7 @@ class ClientDocumentController extends Controller
         ]);
 
         // Only update portal_visible if it was explicitly sent (so older clients don't accidentally flip)
-        if (!array_key_exists('portal_visible', $data)) {
+        if (! array_key_exists('portal_visible', $data)) {
             $data['portal_visible'] = $document->portal_visible;
         }
 
@@ -219,6 +230,21 @@ class ClientDocumentController extends Controller
         $routeName = $request->route()?->getName();
         if ($routeName && str_starts_with($routeName, 'portal.')) {
             abort_unless($document->portal_visible, 403);
+            $user = $request->user();
+            abort_unless($user, 403);
+            $canViewSharedDocuments = app(PortalClientSectionAccess::class)
+                ->for($user, $client)['has_family_information_consent'];
+            abort_unless(
+                $canViewSharedDocuments
+                    || (int) $document->uploaded_by_user_id === (int) $user->id,
+                403,
+            );
+        } else {
+            $user = $request->user();
+            abort_unless(
+                $user && $this->profileSectionAccess->for($user, $client)['documents'],
+                403,
+            );
         }
 
         AuditLogger::log('documents.download', $document, [

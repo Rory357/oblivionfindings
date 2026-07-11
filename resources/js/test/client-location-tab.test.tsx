@@ -10,7 +10,14 @@ const inertiaMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@inertiajs/react', () => ({
-    Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    Link: ({
+        href,
+        children,
+        ...props
+    }: {
+        href: string;
+        children: React.ReactNode;
+    }) => (
         <a href={href} {...props}>
             {children}
         </a>
@@ -37,6 +44,7 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
             clientHouse="Harbour Respite"
             clientPhoto={null}
             location={{
+                canManage: true,
                 tracker: {
                     id: 12,
                     name: 'Amelia pendant',
@@ -54,8 +62,10 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
                     last_safety_event: null,
                     last_safety_event_at: null,
                     panic_active: false,
-                    locate_now_url: '/operations/clients/9012/location/locate-now',
-                    acknowledge_panic_url: '/operations/clients/9012/location/acknowledge-panic',
+                    locate_now_url:
+                        '/operations/clients/9012/location/locate-now',
+                    acknowledge_panic_url:
+                        '/operations/clients/9012/location/acknowledge-panic',
                     last_command_status: 'acked',
                 },
                 currentLocation: {
@@ -66,7 +76,7 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
                     accuracy: 8,
                 },
                 trackingConsent: {
-                    status: 'active',
+                    status: 'given',
                     given_at: '2026-05-01T00:00:00Z',
                     expires_at: null,
                 },
@@ -80,6 +90,9 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
     expect(screen.getByText('No panic events recorded')).toBeVisible();
     expect(screen.getAllByText(/Charging/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Acknowledged')).toBeVisible();
+    expect(
+        screen.queryByText('Location Tracking Consent Not Active'),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
 
@@ -98,6 +111,7 @@ it('shows the active panic banner and acknowledges it', () => {
             clientHouse="House 1"
             clientPhoto={null}
             location={{
+                canManage: true,
                 tracker: {
                     id: 1,
                     name: 'Pendant',
@@ -112,8 +126,10 @@ it('shows the active panic banner and acknowledges it', () => {
                     panic_active: true,
                     last_safety_event: 'sos',
                     last_safety_event_at: '2026-05-18T04:00:00Z',
-                    locate_now_url: '/operations/clients/42/location/locate-now',
-                    acknowledge_panic_url: '/operations/clients/42/location/acknowledge-panic',
+                    locate_now_url:
+                        '/operations/clients/42/location/locate-now',
+                    acknowledge_panic_url:
+                        '/operations/clients/42/location/acknowledge-panic',
                 },
                 currentLocation: {
                     lat: 0,
@@ -122,7 +138,11 @@ it('shows the active panic banner and acknowledges it', () => {
                     heading: null,
                     accuracy: null,
                 },
-                trackingConsent: { status: 'active', given_at: null, expires_at: null },
+                trackingConsent: {
+                    status: 'active',
+                    given_at: null,
+                    expires_at: null,
+                },
                 geofences: [],
                 geofenceStatus: 'unknown',
             }}
@@ -136,4 +156,107 @@ it('shows the active panic banner and acknowledges it', () => {
         {},
         expect.objectContaining({ preserveScroll: true }),
     );
+});
+
+it('does not expose tracker commands when the server omits management URLs', () => {
+    render(
+        <ClientLocationTab
+            clientId={43}
+            clientName="Read Only Person"
+            clientHouse="House 2"
+            clientPhoto={null}
+            location={{
+                canManage: false,
+                tracker: {
+                    id: 2,
+                    name: 'Read-only pendant',
+                    serial: 'SN-2',
+                    mac: null,
+                    provider: 'queclink',
+                    status: 'online',
+                    last_seen_at: '2026-05-18T04:00:00Z',
+                    battery: 64,
+                    panic_active: true,
+                    last_safety_event: 'sos',
+                    last_safety_event_at: '2026-05-18T04:00:00Z',
+                },
+                currentLocation: {
+                    lat: 0,
+                    lng: 0,
+                    speed: null,
+                    heading: null,
+                    accuracy: null,
+                },
+                trackingConsent: {
+                    status: 'active',
+                    given_at: null,
+                    expires_at: null,
+                },
+                geofences: [],
+                geofenceStatus: 'unknown',
+            }}
+        />,
+    );
+
+    expect(screen.getByRole('button', { name: /Locate Now/i })).toBeDisabled();
+    expect(
+        screen.queryByRole('button', { name: /Acknowledge/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
+    expect(inertiaMocks.post).not.toHaveBeenCalled();
+});
+
+it('does not offer tracker assignment to a read-only location viewer', () => {
+    render(
+        <ClientLocationTab
+            clientId={44}
+            clientName="Untracked Person"
+            clientHouse="House 3"
+            clientPhoto={null}
+            location={{
+                canManage: false,
+                tracker: null,
+                currentLocation: null,
+                trackingConsent: null,
+                geofences: [],
+                geofenceStatus: 'unknown',
+            }}
+        />,
+    );
+
+    expect(screen.getByText('No Personal Tracker Assigned')).toBeVisible();
+    expect(
+        screen.queryByRole('link', { name: /Assign Tracker/i }),
+    ).not.toBeInTheDocument();
+});
+
+it('shows only the inactive-consent state when tracking data is restricted', () => {
+    render(
+        <ClientLocationTab
+            clientId={45}
+            clientName="Consent Restricted Person"
+            clientHouse="House 4"
+            clientPhoto={null}
+            location={{
+                trackingRestricted: true,
+                canManage: false,
+                tracker: null,
+                currentLocation: null,
+                trackingConsent: null,
+                geofences: [],
+                geofenceStatus: 'unknown',
+            }}
+        />,
+    );
+
+    expect(
+        screen.getByText('Location Tracking Consent Not Active'),
+    ).toBeVisible();
+    expect(
+        screen.queryByText('No Personal Tracker Assigned'),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('link', { name: /Assign Tracker/i }),
+    ).not.toBeInTheDocument();
 });

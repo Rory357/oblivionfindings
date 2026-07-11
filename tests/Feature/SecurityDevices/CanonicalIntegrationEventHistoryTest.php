@@ -5,6 +5,8 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\LocationHardware;
 use App\Models\Role;
@@ -21,8 +23,11 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $portalUser;
+
     private Site $site;
+
     private Client $client;
 
     protected function setUp(): void
@@ -45,6 +50,22 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
 
         $this->portalUser->portalClients()->attach($this->client->id, [
             'relation' => 'family',
+        ]);
+
+        $trackingConsentType = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)',
+        ]);
+        ClientConsent::query()->create([
+            'client_id' => $this->client->id,
+            'consent_type_id' => $trackingConsentType->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_by_user_id' => $this->portalUser->id,
+            'given_by_relationship' => 'next_of_kin',
+            'given_method' => 'portal',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
         ]);
     }
 
