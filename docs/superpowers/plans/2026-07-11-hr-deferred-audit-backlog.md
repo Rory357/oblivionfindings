@@ -545,21 +545,21 @@ git commit -m "fix(hr): harden calendar layers and team audiences"
 - Modify: `resources/js/pages/hr/time/index.tsx`
 - Move: `resources/js/components/hr/recruitment/text-prompt-dialog.tsx` → `resources/js/components/hr/text-prompt-dialog.tsx`
 
-- [ ] **Step 1: Write RED UI contracts**
+- [x] **Step 1: Write RED UI contracts**
 
 Test server-derived hero counts/links, payroll desktop/mobile action parity, training token usage, feedback deep links, stable `TextPromptDialog` API, and time refresh preserving filters while replacing entries.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npm test -- resources/js/test/hr-deferred-ui-contracts.test.tsx`
 
 Expected: FAIL because the specialised heroes and refresh contract do not exist.
 
-- [ ] **Step 3: Implement shared HR patterns**
+- [x] **Step 3: Implement shared HR patterns**
 
 Reuse existing `CalendarHero`/`PeopleHero` anatomy, existing responsive table/mobile-card primitives, row context menus, URL query filters, and standard tokens. Do not add a new component system.
 
-- [ ] **Step 4: Move the prompt dialog**
+- [x] **Step 4: Move the prompt dialog**
 
 Move the file and update all imports found by:
 
@@ -569,7 +569,7 @@ rg -n "recruitment/text-prompt-dialog|TextPromptDialog" resources/js
 
 The final search must show only neutral imports.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 npm test
