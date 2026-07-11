@@ -17,6 +17,7 @@ import {
     relTime,
     ymd,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 type RailCounts = {
     draft: number;
@@ -88,7 +89,7 @@ export function HandoverRail({
                 </p>
                 <div className="mt-3 space-y-1">
                     {awaiting.map((h) => (
-                        <button
+                        <GuardrailButton unstyled
                             key={h.id}
                             type="button"
                             onClick={() => onOpen(h)}
@@ -115,7 +116,7 @@ export function HandoverRail({
                                 </span>
                             </span>
                             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </button>
+                        </GuardrailButton>
                     ))}
                 </div>
             </div>

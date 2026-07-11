@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\It\TicketSlaNotification;
+use App\Support\It\BusinessHours;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 
@@ -204,4 +207,49 @@ test('a growing waiting pause relaxes a breached ticket without re-paging anyone
     expect($ticket->refresh()->sla_state)->toBe('ok');
     expect($ticket->events()->where('type', 'sla_breached')->count())->toBe(1);
     Notification::assertSentToTimes($this->hr, TicketSlaNotification::class, 1);
+});
+
+test('a business-hours SLA neither risks nor breaches over a weekend, then fires on the next working day', function () {
+    Notification::fake();
+    ItSlaPolicy::query()->create([
+        'tenant_id' => 1,
+        'priority' => 'normal',
+        'first_response_minutes' => 6000, // parked ~11 working days out; the resolution clock binds
+        'resolution_minutes' => 120,       // two working hours
+        'business_hours' => BusinessHours::nzDefault()['business_hours'], // Mon–Fri 08:00–17:00
+        'holiday_dates' => [],
+    ]);
+
+    // Raise it Friday 16:00 NZ (travel as the UTC instant — production now() is UTC).
+    $friday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek()->addDays(4)->setTime(16, 0);
+    $this->travelTo($friday->utc());
+    $this->actingAs($this->worker)->post('/it/tickets', [
+        'title' => 'Weekend clock',
+        'category' => 'hardware',
+        'priority' => 'normal',
+    ])->assertRedirect();
+    $ticket = ItTicket::query()->firstWhere('title', 'Weekend clock');
+
+    // 120 working min from Fri 16:00 bakes to Monday 09:00 (Fri 16–17 + Mon 08–09).
+    $mondayNine = $friday->addDays(3)->setTime(9, 0);
+    expect($ticket->resolution_due_at->equalTo($mondayNine))->toBeTrue();
+
+    // Saturday midday: 60 working min of the 120 window still remain (all of
+    // Monday 08:00–09:00) — above the 25% band, so it stays OK. Wall-clock
+    // maths would have wrongly screamed at-risk across the idle weekend.
+    $this->travelTo($friday->addDay()->setTime(12, 0)->utc());
+    $this->artisan('it:check-sla')->assertSuccessful();
+    expect($ticket->fresh()->sla_state)->toBe('ok');
+
+    // Monday 08:50: only 10 working min left → at risk, during work hours.
+    $this->travelTo($mondayNine->subMinutes(10)->utc());
+    $this->artisan('it:check-sla')->assertSuccessful();
+    expect($ticket->fresh()->sla_state)->toBe('at_risk');
+
+    // Monday 09:30: past the baked deadline → breached.
+    $this->travelTo($mondayNine->addMinutes(30)->utc());
+    $this->artisan('it:check-sla')->assertSuccessful();
+    expect($ticket->fresh()->sla_state)->toBe('breached');
+
+    $this->travelBack();
 });

@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { catBgVar, catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { categoryIcon } from './icons';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ---- Floating dropdown (replaces native <select>) ----------------------- */
 export interface DropdownOption {
@@ -123,7 +125,7 @@ export function Dropdown({
 
     return (
         <div ref={ref} className={cn('relative', className)}>
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 aria-haspopup="listbox"
@@ -138,7 +140,7 @@ export function Dropdown({
                     {selected ? selected.label : placeholder}
                 </span>
                 <ChevronsUpDown className={cn('h-3.5 w-3.5', subColor)} />
-            </button>
+            </GuardrailButton>
             {open && pos ? (
                 <div
                     ref={menuRef}
@@ -168,7 +170,7 @@ export function Dropdown({
                                 const active = String(o.value) === String(value);
                                 const OptIcon = o.Icon;
                                 return (
-                                    <button
+                                    <GuardrailButton unstyled
                                         key={o.value}
                                         type="button"
                                         role="option"
@@ -199,7 +201,7 @@ export function Dropdown({
                                             ) : null}
                                         </span>
                                         {active ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
-                                    </button>
+                                    </GuardrailButton>
                                 );
                             })
                         )}
@@ -225,12 +227,12 @@ export function ViewToggle({
         { key: 'list', Icon: Rows3, label: 'List' },
     ];
     return (
-        <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5">
+        <GuardrailCard unstyled className="inline-flex items-center rounded-lg border border-border bg-card p-0.5">
             {opts.map((o) => {
                 const active = o.key === value;
                 const Icon = o.Icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
@@ -244,10 +246,10 @@ export function ViewToggle({
                     >
                         <Icon className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">{o.label}</span>
-                    </button>
+                    </GuardrailButton>
                 );
             })}
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -412,13 +414,13 @@ export function SearchInput({
                 className="h-9 w-full rounded-md border border-input bg-card pl-8 pr-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
             />
             {value ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => onChange('')}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                     <X className="h-3.5 w-3.5" />
-                </button>
+                </GuardrailButton>
             ) : null}
         </div>
     );

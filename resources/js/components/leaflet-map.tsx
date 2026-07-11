@@ -322,6 +322,7 @@ export default function LeafletMap({
     const initRef = useRef(false);
     const onMapClickRef = useRef(onMapClick);
     const clusterZoomHandlerRef = useRef<((e: any) => void) | null>(null);
+    const syncClusterZoomListenerRef = useRef<() => void>(() => undefined);
 
     // Latest-props mirror. Render helpers below read from this rather than
     // their defining closure so the imperative renders fired from the async
@@ -516,7 +517,7 @@ export default function LeafletMap({
     }
 
     // Idempotently attach the zoomend listener used to re-cluster on zoom.
-    function syncClusterZoomListener() {
+    syncClusterZoomListenerRef.current = () => {
         const { markers, clustering } = propsRef.current;
         const map = mapRef.current;
         if (!map) return;
@@ -530,7 +531,7 @@ export default function LeafletMap({
             map.on('zoomend', handler);
             clusterZoomHandlerRef.current = handler;
         }
-    }
+    };
 
     // Initialize map
     useEffect(() => {
@@ -617,7 +618,7 @@ export default function LeafletMap({
                 fitBoundsToMarkers();
                 renderPolyline();
                 renderGeofences();
-                syncClusterZoomListener();
+                syncClusterZoomListenerRef.current();
             }
         })();
 
@@ -687,7 +688,7 @@ export default function LeafletMap({
         if (!initRef.current) return;
         renderMarkers();
         fitBoundsToMarkers();
-        syncClusterZoomListener();
+        syncClusterZoomListenerRef.current();
     }, [markers, onMarkerClick, clustering, zoom]);
 
     // Re-render polyline when polyline-related props change

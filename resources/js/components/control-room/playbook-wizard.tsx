@@ -352,7 +352,7 @@ export function PlaybookWizard({
                                 {EVIDENCE_OPTIONS.map((opt) => {
                                     const on = form.data.required_evidence.includes(opt);
                                     return (
-                                        <button
+                                        <Button unstyled
                                             key={opt}
                                             type="button"
                                             onClick={() =>
@@ -364,7 +364,7 @@ export function PlaybookWizard({
                                             className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
                                         >
                                             {titleCase(opt)}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>

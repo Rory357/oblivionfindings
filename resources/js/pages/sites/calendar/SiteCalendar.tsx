@@ -138,6 +138,7 @@ import {
     type Density,
     type SourceDef,
 } from './_parts';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type SiteLite = { id: number; name: string; type: string };
 export type Person = { id: number; name: string };
@@ -978,7 +979,7 @@ export default function SiteCalendar({
     );
 
     const toolbar = (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2">
+        <GuardrailCard unstyled className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2">
             <div className="flex items-center gap-1">
                 <Button
                     variant="outline"
@@ -1033,13 +1034,13 @@ export default function SiteCalendar({
                     </select>
                 )}
 
-                <div
+                <GuardrailCard unstyled
                     role="tablist"
                     aria-label="Calendar view"
                     className="flex items-center rounded-md border bg-background p-0.5"
                 >
                     {VIEWS.map((v) => (
-                        <button
+                        <Button unstyled
                             key={v.key}
                             role="tab"
                             aria-selected={view === v.key}
@@ -1054,9 +1055,9 @@ export default function SiteCalendar({
                                 className="h-3.5 w-3.5"
                             />
                             <span className="hidden sm:inline">{v.label}</span>
-                        </button>
+                        </Button>
                     ))}
-                </div>
+                </GuardrailCard>
 
                 <select
                     value={colorBy}
@@ -1099,7 +1100,7 @@ export default function SiteCalendar({
                     <span className="hidden sm:inline">Subscribe</span>
                 </Button>
             </div>
-        </div>
+        </GuardrailCard>
     );
 
     const legend = (
@@ -1107,7 +1108,7 @@ export default function SiteCalendar({
             {sources.map((s) => {
                 const on = enabledSources.has(s.key);
                 return (
-                    <button
+                    <Button unstyled
                         key={s.key}
                         onClick={() => toggleSource(s.key)}
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity ${on ? '' : 'opacity-40'}`}
@@ -1124,7 +1125,7 @@ export default function SiteCalendar({
                             style={{ background: `var(--src-${s.key})` }}
                         />
                         {s.short}
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -1363,13 +1364,13 @@ export default function SiteCalendar({
                         <div className="grid grid-cols-3 gap-1">
                             {(['source', 'status', 'owner'] as ColorBy[]).map(
                                 (c) => (
-                                    <button
+                                    <Button unstyled
                                         key={c}
                                         onClick={() => setColorBy(c)}
                                         className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${colorBy === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                                     >
                                         {c}
-                                    </button>
+                                    </Button>
                                 ),
                             )}
                         </div>
@@ -1381,13 +1382,13 @@ export default function SiteCalendar({
                         <div className="grid grid-cols-2 gap-1">
                             {(['comfortable', 'compact'] as Density[]).map(
                                 (d) => (
-                                    <button
+                                    <Button unstyled
                                         key={d}
                                         onClick={() => setDensity(d)}
                                         className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${density === d ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                                     >
                                         {d}
-                                    </button>
+                                    </Button>
                                 ),
                             )}
                         </div>
@@ -1397,7 +1398,7 @@ export default function SiteCalendar({
                             <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                 Sources
                             </p>
-                            <button
+                            <Button unstyled
                                 onClick={() =>
                                     setEnabledSources(
                                         allSourcesOn
@@ -1410,13 +1411,13 @@ export default function SiteCalendar({
                                 className="text-[11px] font-medium text-primary hover:underline"
                             >
                                 {allSourcesOn ? 'Clear all' : 'Select all'}
-                            </button>
+                            </Button>
                         </div>
                         <div className="max-h-44 space-y-0.5 overflow-y-auto">
                             {sources.map((s) => {
                                 const on = enabledSources.has(s.key);
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={s.key}
                                         onClick={() => toggleSource(s.key)}
                                         className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-accent/50"
@@ -1442,7 +1443,7 @@ export default function SiteCalendar({
                                         <span className="flex-1 truncate">
                                             {s.label}
                                         </span>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -1827,7 +1828,7 @@ function HouseSelector({
                     </div>
                 </div>
                 <div className="max-h-[320px] overflow-y-auto p-1.5">
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={() => go('/calendar')}
                         className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${currentId === 'all' ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
@@ -1848,11 +1849,11 @@ function HouseSelector({
                         {currentId === 'all' && (
                             <Check className="h-4 w-4 text-primary" />
                         )}
-                    </button>
+                    </Button>
                     {list.map((s) => {
                         const active = s.id === currentId;
                         return (
-                            <button
+                            <Button unstyled
                                 key={s.id}
                                 type="button"
                                 onClick={() => go(`/sites/${s.id}/calendar`)}
@@ -1874,7 +1875,7 @@ function HouseSelector({
                                 {active && (
                                     <Check className="h-4 w-4 text-primary" />
                                 )}
-                            </button>
+                            </Button>
                         );
                     })}
                     {list.length === 0 && (
@@ -2531,7 +2532,7 @@ function CreateEventDialog({
                                             const active =
                                                 form.data.event_type === t.key;
                                             return (
-                                                <button
+                                                <Button unstyled
                                                     type="button"
                                                     key={t.key}
                                                     onClick={() =>
@@ -2574,7 +2575,7 @@ function CreateEventDialog({
                                                             </span>
                                                         )}
                                                     </span>
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -2959,14 +2960,14 @@ function CreateEventDialog({
                                         <Label className="mb-1.5 block">
                                             Attendees
                                         </Label>
-                                        <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input bg-background/40 p-2">
+                                        <GuardrailCard unstyled className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input bg-background/40 p-2">
                                             {people.map((p) => {
                                                 const on =
                                                     form.data.attendee_user_ids.includes(
                                                         p.id,
                                                     );
                                                 return (
-                                                    <button
+                                                    <Button unstyled
                                                         key={p.id}
                                                         type="button"
                                                         onClick={() =>
@@ -2991,10 +2992,10 @@ function CreateEventDialog({
                                                         className={`rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
                                                     >
                                                         {p.name}
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
-                                        </div>
+                                        </GuardrailCard>
                                     </div>
                                 )}
 
@@ -3009,7 +3010,7 @@ function CreateEventDialog({
                                                     r.minutes,
                                                 );
                                             return (
-                                                <button
+                                                <Button unstyled
                                                     key={r.minutes}
                                                     type="button"
                                                     onClick={() =>
@@ -3035,7 +3036,7 @@ function CreateEventDialog({
                                                     className={`rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
                                                 >
                                                     {r.label}
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -3372,7 +3373,7 @@ function QuickAddMenu({
             <ul className="max-h-[260px] space-y-px overflow-y-auto">
                 {eventTypes.map((t) => (
                     <li key={t.key}>
-                        <button
+                        <Button unstyled
                             role="menuitem"
                             data-menuitem
                             tabIndex={-1}
@@ -3400,12 +3401,12 @@ function QuickAddMenu({
                                     Approval
                                 </span>
                             )}
-                        </button>
+                        </Button>
                     </li>
                 ))}
             </ul>
             <div className="my-1 h-px bg-border/60" />
-            <button
+            <Button unstyled
                 role="menuitem"
                 data-menuitem
                 tabIndex={-1}
@@ -3419,7 +3420,7 @@ function QuickAddMenu({
                     <Pencil className="h-3.5 w-3.5" />
                 </span>
                 Open full form…
-            </button>
+            </Button>
         </div>,
         document.body,
     );
@@ -3583,7 +3584,7 @@ function ApprovalsPanel({
                                   ev.eventType)
                                 : null;
                             return (
-                                <div
+                                <GuardrailCard unstyled
                                     key={`${ev.id}-${ev.start}`}
                                     className="flex items-center gap-3 rounded-lg border bg-card/40 p-2.5"
                                 >
@@ -3594,7 +3595,7 @@ function ApprovalsPanel({
                                             background: `var(--src-${ev.source})`,
                                         }}
                                     />
-                                    <button
+                                    <Button unstyled
                                         onClick={() => onOpenEvent(ev)}
                                         className="min-w-0 flex-1 text-left"
                                     >
@@ -3614,7 +3615,7 @@ function ApprovalsPanel({
                                                 ` · ${fmtTime(ev._start)}`}
                                             {typeLabel && ` · ${typeLabel}`}
                                         </span>
-                                    </button>
+                                    </Button>
                                     {ev.owner && (
                                         <Avatar
                                             person={ev.owner}
@@ -3640,7 +3641,7 @@ function ApprovalsPanel({
                                             Approve
                                         </Button>
                                     </div>
-                                </div>
+                                </GuardrailCard>
                             );
                         })}
                     </div>

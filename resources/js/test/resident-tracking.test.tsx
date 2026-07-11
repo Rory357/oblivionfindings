@@ -214,9 +214,8 @@ function historyResident(overrides: Partial<Resident> = {}): Resident {
 it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
 
-    expect(screen.getByText('Tracked')).toBeInTheDocument();
-    expect(screen.getByText('Online')).toBeInTheDocument();
-    expect(screen.getByText('Low Battery')).toBeInTheDocument();
+    expect(screen.getByText('Residents tracked')).toBeInTheDocument();
+    expect(screen.getByText('3 online')).toBeInTheDocument();
     expect(screen.getByText('Battery not reported')).toBeVisible();
     expect(screen.getByText('Low battery')).toBeVisible();
     expect(screen.getByText('Charging')).toBeVisible();

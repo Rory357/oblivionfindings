@@ -328,9 +328,9 @@ export default function SiteEmergencyPlanIndex({
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-lg border bg-slate-100 p-4 shadow-inner">
+                        <div className="rounded-lg border bg-muted p-4 shadow-inner">
                                 <div
-                                    className="relative mx-auto max-h-[640px] max-w-full overflow-hidden rounded-md bg-white shadow-sm ring-1 ring-slate-200"
+                                className="relative mx-auto max-h-[640px] max-w-full overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
                                     style={{ aspectRatio: previewAspect }}
                                     data-test="emergency-plan-preview-page"
                                 >

@@ -35,6 +35,7 @@ class FinFixedAsset extends Model
         'gl_asset_account_id',
         'gl_depreciation_account_id',
         'gl_expense_account_id',
+        'acquisition_journal_id',
         'status',
         'disposed_date',
         'disposal_proceeds',

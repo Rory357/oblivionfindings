@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoneyFromCents as money, toNum, type InventoryItem, type RecipeFull, type RecipeIngredient } from './_helpers';
 import RecipeEditDialog from './_recipe-edit-dialog';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     siteId: number;
@@ -94,22 +95,22 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                     <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recipes…" className="pl-8" />
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+                    <GuardrailCard unstyled className="inline-flex rounded-lg border border-border bg-card p-0.5">
                         {scopes.map((s) => (
-                            <button key={s.value} type="button" onClick={() => setScope(s.value)} className={cn('rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors', scope === s.value ? 'bg-sites text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                            <Button unstyled key={s.value} type="button" onClick={() => setScope(s.value)} className={cn('rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors', scope === s.value ? 'bg-sites text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                                 {s.label}
-                            </button>
+                            </Button>
                         ))}
-                    </div>
+                    </GuardrailCard>
                     {canManageTags && (
-                        <button type="button" onClick={onManageTags} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent">
+                        <Button unstyled type="button" onClick={onManageTags} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent">
                             <Tags className="h-4 w-4" /> Manage tags
-                        </button>
+                        </Button>
                     )}
                     {canManage && (
-                        <button type="button" onClick={() => setEditor({ open: true, recipe: null })} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+                        <Button unstyled type="button" onClick={() => setEditor({ open: true, recipe: null })} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
                             <Plus className="h-4 w-4" /> Add recipe
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -121,7 +122,7 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
             {categories.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
                     {['all', ...categories].map((c) => (
-                        <button
+                        <Button unstyled
                             key={c}
                             type="button"
                             onClick={() => setCat(c)}
@@ -131,19 +132,19 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                             )}
                         >
                             {c === 'all' ? 'All recipes' : c}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             )}
 
             {filtered.length === 0 ? (
                 filtersActive ? (
-                    <div className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+                    <GuardrailCard unstyled className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
                         <div className="text-sm font-medium text-foreground">No recipes match your filters</div>
                         <Button variant="ghost" size="sm" onClick={clearFilters}>Clear filters</Button>
-                    </div>
+                    </GuardrailCard>
                 ) : (
-                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+                    <GuardrailCard unstyled className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
                         <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sites-bg text-sites-deep"><ChefHat className="h-7 w-7" /></span>
                         <div>
                             <div className="text-[15px] font-semibold text-foreground">No recipes yet</div>
@@ -153,7 +154,7 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                         {canManage && (
                             <Button size="sm" onClick={() => setEditor({ open: true, recipe: null })}><Plus className="mr-1.5 h-4 w-4" /> Add recipe</Button>
                         )}
-                    </div>
+                    </GuardrailCard>
                 )
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -161,7 +162,7 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                         const { toBuy } = recipeStockSummary(r, inventory, 1);
                         const totalTime = (r.prep_minutes ?? 0) + (r.cook_minutes ?? 0);
                         return (
-                            <button key={r.id} type="button" onClick={() => setView(r)} className="group flex flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-sites/50 hover:shadow-md">
+                            <Button unstyled key={r.id} type="button" onClick={() => setView(r)} className="group flex flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-sites/50 hover:shadow-md">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sites-bg text-sites-deep"><ChefHat className="h-5 w-5" /></span>
                                     <div className="flex items-center gap-1.5">
@@ -187,7 +188,7 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                                         {toBuy === 0 ? <><Check className="h-3 w-3" /> All in stock</> : <><ShoppingCart className="h-3 w-3" /> {toBuy} to buy</>}
                                     </span>
                                 </div>
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>
@@ -427,9 +428,9 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
                 </div>
                 <DialogFooter className="sm:justify-between">
                     {canManage ? (
-                        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+                        <Button unstyled type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
                             <Pencil className="h-3.5 w-3.5" /> Edit recipe
-                        </button>
+                        </Button>
                     ) : (
                         <span />
                     )}

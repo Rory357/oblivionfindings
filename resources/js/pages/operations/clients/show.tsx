@@ -1003,6 +1003,7 @@ export default function ClientShow({
             familyNotesOpenCount,
             pageProps.client_incidents,
             pageProps.client_risks,
+            pageProps.first_aid_records,
             pendingConsentRequestsCount,
             transport?.stats?.outings_30d,
             transport?.stats?.transports_30d,

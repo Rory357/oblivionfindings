@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 
 import type { StatusTab, ViewMode } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TabCounts = {
     total: number;
@@ -91,19 +93,19 @@ export function Toolbar({
 
             <div className="ml-auto flex flex-wrap items-center gap-3">
                 {hasFilters ? (
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={onClearFilters}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                     >
                         <X className="h-3.5 w-3.5" />
                         Clear filters
-                    </button>
+                    </GuardrailButton>
                 ) : null}
                 <span className="text-[12.5px] text-muted-foreground tabular-nums">
                     {shown} of {total} shown
                 </span>
-                <div
+                <GuardrailCard unstyled
                     className="flex items-center gap-1 rounded-xl border border-border bg-card p-1"
                     role="tablist"
                     aria-label="View mode"
@@ -111,7 +113,7 @@ export function Toolbar({
                     {VIEWS.map((v) => {
                         const Icon = v.icon;
                         return (
-                            <button
+                            <GuardrailButton unstyled
                                 key={v.id}
                                 type="button"
                                 role="tab"
@@ -126,10 +128,10 @@ export function Toolbar({
                             >
                                 <Icon className="h-3.5 w-3.5" />
                                 {v.label}
-                            </button>
+                            </GuardrailButton>
                         );
                     })}
-                </div>
+                </GuardrailCard>
             </div>
         </div>
     );

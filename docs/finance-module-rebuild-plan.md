@@ -825,25 +825,100 @@ vendor, receipt) — the mould for C2.
     inline under sync queue in this env** (job `handle()` works when called directly; likely its unusual `queue()`
     method) — so observer-dispatched GL jobs may not post without a running queue worker. App-wide (house-ledger/fuel/
     maintenance), not C7-specific. Spawned as its own task.
-  - **[ ] C7a Sites damage/repair → FinBill(AP) + optional insurance FinInvoice(AR) — MISSING.** Seam =
-    `SiteDamageController::update()` when status→'repaired' + `actual_cost`. AP side clean via `AccountsPayableService::
-    createBill`; insurance AR side harder (⚠️ no `createInvoice` service — see C7-blocker).
-  - **[ ] C7d Asset/Fleet purchase → FinFixedAsset capitalisation — WIRED in finance, no ops trigger.**
-    `FixedAssetService::createAsset()` + `postAcquisitionJournal()` work; missing = an `App\Models\Asset::created`
-    observer (fixed-asset categories) dispatching to it. `FinFixedAsset.linked_asset_id` FK already exists.
-  - **[ ] C7e Operational spend → FinBill + FinVendor — ⚠️ DOUBLE-POST RISK.** `FleetFuelLogObserver` +
-    `AssetMaintenanceLogObserver` ALREADY post GL via `FinancialEventService` (DR 6200/6300 / CR AP 2000). Naively adding
-    `createBill` would double-count (approveBill re-posts DR expense/CR AP). Needs a rethink (bill REPLACES the direct GL
-    post, or stays GL-only). `SiteVendor` has NO `fin_vendor_id` column → migration needed. LOW priority / careful.
-  - **[ ] C7c Respite booking-confirmed → FinInvoice vs funder + funding drawdown — MISSING + HARDEST.** Seam =
-    `RespiteBookingController::confirm()` (already fires `RespiteEvent('respite.booking.confirmed')`). ⚠️ blocked on the
-    missing AR `createInvoice` service + funding-drawdown logic (TBD). Defer.
-  - **⚠️ C7-blocker: `AccountsReceivableService` has NO `createInvoice()`** — only `allocatePayment()`. AR-side captures
-    (C7a insurance, C7c respite) need a canonical invoice-creation path first (add `createInvoice` or use `FinInvoice::
-    create` + manual journal). Build the AP/asset/ledger flows first; AR flows after the service gap is closed.
-- **[ ] C8 — Final parity pass.** Whole module vs Rostering side-by-side in browser; FinanceDemoSeeder v2
-  (marker-based guard + funding/client-money/payroll rows); route:list clean; ledger 100% green; axe clean;
-  plan-doc DoD re-ticked with screenshots; memory updated.
+  - **[x] C7a Sites damage/repair → FinBill(AP) — SHIPPED.** `SiteDamageController::update()` now, when a damage is
+    'repaired' with `actual_cost > 0`, posts a DRAFT AP bill via new `AccountsPayableService::captureOperationalBill()`
+    (resolves-or-creates the org's "Property Repairs" contractor vendor + resolves GL 6420 Property Maintenance by code,
+    throws if missing; idempotent on `vendor_reference` = "DAMAGE-{id}"; non-fatal try/catch). Draft = GL-safe: the
+    balanced journal (DR 6420 / CR 2000) posts on approval — synchronous, so unaffected by the observer-dispatch quirk.
+    gst_rate 0 (actual_cost has no GST breakdown; approveBill lumps line GST into the expense anyway). Config
+    `finance.capture.{damage_repair_account,damage_repair_vendor}`. Test `DamageRepairBillCaptureTest` 4/4 (draft bill /
+    idempotent / approval posts balanced DR 6420-CR 2000 / no-cost skips). Browser-verified the capture+approval on the
+    REAL demo chart (DR 6420 / CR 2000 balanced). Insurance-AR half DEFERRED (blocked on missing `createInvoice`).
+    ⚠️ Pre-existing (flagged, not mine): SiteDamageTest `support_worker_blocked` expects 403 but the sites route-group
+    `permission:sites.viewAny` middleware REDIRECTS (302) — worker still blocked, stale expectation; also blocks
+    non-Inertia HTTP browser-verify of sites routes (verified posting via the service path instead).
+  - **[~] C7d Asset/Fleet purchase → FinFixedAsset capitalisation — DEFERRED (re-derived: nuanced, not clean).**
+    Deeper re-derivation corrected the plan: (1) the purchase cost is NOT on `Asset` — it's on a 1:1 `AssetValue`
+    (`asset->value->purchase_cost`), set separately, so `Asset::created` has no cost; (2) a MANUAL capitalisation flow
+    already exists (`FixedAssetController` creates a FinFixedAsset with `linked_asset_id`); (3) `createAsset` only posts
+    the acquisition journal if `gl_asset_account_id` is passed, and `updateAsset` never posts — so there is NO clean
+    "draft now, capitalise later" path (a GL-account-less FinFixedAsset can never post its acquisition). Auto-capture
+    would therefore either leave a register entry that never hits the GL, or auto-post (advised against) with an ambiguous
+    CR account (the ops asset doesn't record cash-vs-credit) + a capitalisation-threshold + capital-category policy — all
+    business decisions the manual finance flow already owns. Low value over the existing manual flow; DEFER.
+  - **[~] C7e Operational spend → FinBill + FinVendor — DEFERRED (⚠️ DOUBLE-POST).** `FleetFuelLogObserver` +
+    `AssetMaintenanceLogObserver` ALREADY post the GL (DR 6200/6300 / CR AP 2000) — the spend IS captured, just as a
+    journal not a bill. Adding a bill would double-count. The only clean addition (a `SiteVendor.fin_vendor_id` attribution
+    migration) has no consumer yet → infra-without-user. DEFER.
+  - **[x] C7c Respite booking-confirmed → FinInvoice vs funder — SHIPPED.** Unblocked by building the AR service gap
+    first (below). `RespiteBookingController::confirm()`, after status→'confirmed', posts a DRAFT receivable invoice to
+    the funder for `nights × serviceAgreement.daily_rate` (zero-rated — funded disability support), via new
+    `AccountsReceivableService::captureOperationalInvoice()` (idempotent on the RespiteBooking source, resolves GL 4000
+    Funding Revenue best-effort, non-fatal). Skips when no agreement rate / no funder / no dates. Draft = GL-safe: the AR
+    issue journal (DR 1100 / CR 4000) posts on send via `PostFinInvoiceJournalJob`. Config
+    `finance.capture.respite_revenue_account`. Tests: `OperationalInvoiceCaptureTest` 3/3. Browser-verified on the REAL
+    demo chart: draft funder invoice (revenue 4000 resolved) → send posts a balanced DR 1100 / CR 4000 journal.
+    ⚠️ **Funding-DRAWDOWN (debit the funding stream/allocation) is DEFERRED** — the invoice bills the funder; drawing
+    down the funding balance is a separate concern (no clean booking↔funding-stream link yet).
+  - **[x] AR service gap CLOSED — `AccountsReceivableService::createInvoice()` built** (the canonical AR counterpart to
+    `createBill`): DRAFT invoice, bcmath totals, NZ 15% GST default or per-line `gst_rate`/`tax_rate_id`, auto
+    `FinInvoice::nextNumber`, `source_type`/`source_id` capture; NO journal on create (posts on send). Test
+    `CreateInvoiceServiceTest` 3/3. Plus `captureOperationalInvoice()` (idempotent capture wrapper). Unblocks C7c +
+    any future C7a-insurance AR.
+- **[x] C8 — Completion assessment: C-series STEADY STATE reached 2026-07-09.** Every remaining item is
+  deferred/blocked/cross-module — the clean, high-value finance work is shipped, gated, and merged. Evidence:
+  `route:list` clean (269 finance routes, no dead); **finance feature suite 247 green (1289 assertions)**; demo org
+  chart complete (C7-FOUNDATION); observer→GL dispatch fixed (`c502ab31`).
+  **SHIPPED (C-series, all merged to main):** C0 P&L-500 fix · C1 Overview hub · C2 modal sweep (+2 real GL bugs:
+  recurring-charge NOT-NULL, disposal 8100→8400) · C3 one-visual-language (formatMoney/tokens/StatusBadge/command-layer/
+  right-click/EmptyState, axe-clean) · C4 client-money canonical (ClientFund) · C5 GL bridge verified sound · C6 budgets
+  (keep-both cleanup + C6-3 spend-approval gate `057b44b1`) · **C7a** Sites damage→draft AP bill `e5dfb3b8` · **C7b**
+  Catering shopping→HouseLedger groceries `86ba6a59` · **C7-FOUNDATION** demo-chart completion `9fe3039c` (org 1 had only
+  8/83 accounts → every observer GL post silently failed on demo; now seeds the full chart idempotently) · root-caused
+  the `queue()`-method dispatch bug (fixed `c502ab31`) that silently dropped every observer GL journal under sync.
+  **UPDATE 2026-07-10 — "implement all" round (user-directed): every deferred residual re-derived and CLOSED.**
+  - **C7a-insurance SHIPPED**: approved insurance claim on a damage → draft AR invoice to the insurer (4230 Insurance
+    Recoveries — new chart account; zero-rated to mirror the gst-0 repair bill so recovery offsets expense 1:1).
+  - **C7e SHIPPED (double-post-free design)**: fuel = paid-at-pump card spend → GL credit moved from phantom AP 2000 to
+    **1180 Card Clearing** (config `fuel_expense.credit`; allocations untouched). Maintenance = genuine vendor spend →
+    DRAFT AP bill (vendor from the log, ref MAINT-{id}) REPLACING the direct GL post; bills gained capture context
+    (`fin_bills.site_id/asset_id/allocation_event_type`) and **approveBill now creates the FinCostAllocation rows** its
+    expense lines imply — the pre-condition that made bill-conversion regression-free (SiteCostService groups by
+    event_type; continuity preserved). The old plan's "SiteVendor.fin_vendor_id FK" is superseded: vendor attribution
+    happens through the real FinVendor on the captured bill.
+  - **C7d SHIPPED (GL-safe capture + the missing capitalise action)**: AssetValueObserver registers high-value capital-
+    category valuations on the fixed-asset register WITHOUT GL accounts (no auto journal — policy stays with finance);
+    new `fin_fixed_assets.acquisition_journal_id` + idempotent postAcquisitionJournal + `FixedAssetService::
+    capitaliseAsset` + POST /finance/fixed-assets/{id}/capitalise + a "Post acquisition" ConfirmDialog button on Show.
+  - **C7c-attribution SHIPPED (the honest funding drawdown)**: `fin_invoice_lines.funding_stream_id` (+ send-journal
+    revenue lines carry it into the GL, where the funding-stream summary reads); `resolveFundingStream(orgId, funderKey)`
+    matches respite funding_source → stream (code/funder_type, case-insensitive); the respite capture uses the stream's
+    default revenue account + proper funder name. FinFundingStream has no balance column by design — GL attribution IS
+    the drawdown the data model supports.
+  - **C5 payroll seam SHIPPED**: ESCT (bands 10.5–39% from annualised gross) computed in NzPayrollCalculatorService,
+    stored on `hr_payslips.esct`, split in the payroll journal (CR 2120 net-of-ESCT to the fund + CR **2150 ESCT
+    Payable** — 2140 was already Child Support; DR 5010 stays gross), and summed into the IRD payday filing (was
+    hardcoded '0.00'). GL-failure surfacing: `hr_payroll_runs.gl_error` written by PostPayrollJournalJob on failure
+    (cleared on success), "GL failed" badge + Retry GL button + POST /hr/payroll/runs/{run}/retry-gl.
+  - **C4 client-money modal = SATISFIED-BY-OPERATIONS (no build)**: the ops client-funds Show page already records
+    transactions through ClientFundController::addTransaction and ClientFundTransactionObserver bridges them to the GL —
+    a finance-side duplicate write path would be worse, not better.
+  - **C4-A funding hub = SATISFIED-BY-COMPOSITION (no build)**: /operations/funding hub (stats/claims/agreements) +
+    /finance/funding-streams CRUD + the funding-stream-summary report already compose the hub; a new /finance/funding
+    page would duplicate them. The risky Settings-cascade refactor stays deliberately not done.
+  **UPDATE 2026-07-09 (post-C8): C7c Respite→funder invoice SHIPPED** (built the AR `createInvoice` service to unblock it)
+  — 4 of the 5 capture-at-source flows now done; only C7d/C7e remain deferred.
+  **DEFERRED — honest residuals (all RE-DERIVED from code, not skipped):**
+  - **C7d/C7e** (remaining captures): see the C7 scorecard — asset→FinFixedAsset is a capitalisation-policy /
+    existing-manual-flow concern (no clean draft-capitalise path); op-spend→bill would double-post (observers already
+    post the GL). The clean next chunk if resumed: add `AccountsReceivableService::createInvoice` (mirror `createBill`),
+    then C7c respite + C7a-insurance AR.
+  - **C5 payroll** GL-failure-surfacing + ESCT: HR-seam (owned by the concurrent HR loop).
+  - **C4-A funding hub** + **C4 Client-Money Transaction modal**: low-value / cross-module, deliberately deferred.
+  - **Pre-existing (flagged as separate tasks, not finance regressions):** sites route-group middleware 302-vs-403
+    (`task_34f7354f`); the now-fixed observer-dispatch bug.
+  **OUT OF HEADLESS SCOPE (→ USER):** side-by-side visual parity vs Rostering on oblivionfindings.com (needs a human
+  browser pass); the AR-side captures above.
 
 ### Deploy runbook deltas (C-series)
 - C4 introduces funding-hub permissions → extend `FinancePermissionsSeeder` + `db:seed --force` on deploy.

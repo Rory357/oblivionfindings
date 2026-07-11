@@ -35,6 +35,7 @@ interface PayrollRun {
     locked_at: string | null;
     exported_at: string | null;
     gl_posted_at: string | null;
+    gl_error: string | null;
     net_paid_at: string | null;
     export_profile: {
         id: number;
@@ -430,6 +431,34 @@ export default function PayrollIndex({
                                                             Paid
                                                         </span>
                                                     )}
+                                                    {run.gl_error &&
+                                                        !run.gl_posted_at && (
+                                                            <>
+                                                                <span
+                                                                    className="inline-flex items-center rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical"
+                                                                    title={run.gl_error}
+                                                                >
+                                                                    GL failed
+                                                                </span>
+                                                                {can.manage && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            router.post(
+                                                                                `/hr/payroll/runs/${run.id}/retry-gl`,
+                                                                                {},
+                                                                                {
+                                                                                    preserveScroll: true,
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Retry GL
+                                                                    </Button>
+                                                                )}
+                                                            </>
+                                                        )}
                                                     {can.export_data &&
                                                         run.net_paid_at && (
                                                             <Button

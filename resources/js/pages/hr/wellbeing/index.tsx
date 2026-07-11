@@ -9,6 +9,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 /* ===================================================================== */
 /* Types                                                                  */
@@ -576,8 +577,8 @@ export default function WellbeingIndex(props: PageProps) {
                         <span>HR</span><span style={{ opacity: 0.5 }}>/</span><span style={{ color: 'var(--fg)', fontWeight: 600 }}>Wellbeing &amp; engagement</span>
                     </div>
                     <div style={{ display: 'inline-flex', gap: 2, background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
-                        <button className="wbseg" onClick={() => setEmployee(false)} style={seg(!employee)}>Manager</button>
-                        <button className="wbseg" onClick={() => setEmployee(true)} style={seg(employee)}>My HR (employee)</button>
+                        <GuardrailButton unstyled className="wbseg" onClick={() => setEmployee(false)} style={seg(!employee)}>Manager</GuardrailButton>
+                        <GuardrailButton unstyled className="wbseg" onClick={() => setEmployee(true)} style={seg(employee)}>My HR (employee)</GuardrailButton>
                     </div>
                 </div>
 
@@ -626,7 +627,7 @@ export default function WellbeingIndex(props: PageProps) {
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 120, display: 'flex', alignItems: 'center', gap: 11, background: 'var(--fg)', color: 'var(--bg)', borderRadius: 11, padding: '12px 16px', boxShadow: '0 16px 40px -12px rgba(0,0,0,.5)', animation: 'wbPop .25s', fontSize: 13, fontWeight: 500 }}>
                     <span style={{ display: 'grid', placeItems: 'center', width: 20, height: 20, borderRadius: '50%', background: 'var(--ok)', color: '#fff' }}><Svg name="tick" size={13} sw={3} /></span>
                     {toast.msg}
-                    {toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--amber)', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginLeft: 4 }}>Undo</button>}
+                    {toast.undo && <GuardrailButton unstyled onClick={() => { toast.undo?.(); setToast(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--amber)', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginLeft: 4 }}>Undo</GuardrailButton>}
                 </div>
             )}
 
@@ -635,7 +636,7 @@ export default function WellbeingIndex(props: PageProps) {
                 <div onClick={() => setCtx(null)} style={{ position: 'fixed', inset: 0, zIndex: 130 }}>
                     <div style={{ ...THEME, position: 'absolute', top: ctx.y, left: ctx.x, minWidth: 210, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 11, boxShadow: '0 18px 50px -14px rgba(20,10,50,.4)', padding: 5, animation: 'wbPop .12s' }}>
                         {ctx.items.map((it, i) => (
-                            <button key={i} className="wbmi" onClick={() => { setCtx(null); it.onClick(); }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', border: 'none', background: 'transparent', borderRadius: 7, padding: '8px 10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left', color: it.color ?? 'var(--fg)' }}>{it.label}</button>
+                            <GuardrailButton unstyled key={i} className="wbmi" onClick={() => { setCtx(null); it.onClick(); }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', border: 'none', background: 'transparent', borderRadius: 7, padding: '8px 10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left', color: it.color ?? 'var(--fg)' }}>{it.label}</GuardrailButton>
                         ))}
                     </div>
                 </div>
@@ -681,11 +682,11 @@ function TabBtn({ active, onClick, icon, label, badge, badgeTone }: { active: bo
     const badgeBg = badgeTone === 'warn' ? 'var(--warn-bg)' : badgeTone === 'crit' ? 'var(--crit-bg)' : 'var(--muted)';
     const badgeFg = badgeTone === 'warn' ? 'var(--warn)' : badgeTone === 'crit' ? 'var(--crit)' : 'var(--fg)';
     return (
-        <button className="wbtab" role="tab" onClick={onClick} style={base}>
+        <GuardrailButton unstyled className="wbtab" role="tab" onClick={onClick} style={base}>
             <Svg name={icon} size={14} />
             {label}
             {badge !== undefined && <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 999, background: badgeBg, color: badgeFg, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>{badge}</span>}
-        </button>
+        </GuardrailButton>
     );
 }
 
@@ -708,10 +709,10 @@ function ManagerHero({ summary, ringDash, needs, canManage, onStat, onNewSurvey,
     onStat: (t: TabKey) => void; onNewSurvey: () => void; onCheckin: () => void; onNewPlan: () => void;
 }) {
     const statBtn = (label: string, value: ReactElement | string, onClick: () => void, valueColor?: string) => (
-        <button className="wbstat" onClick={onClick} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', borderRadius: 10, padding: '8px 12px', textAlign: 'left' }}>
+        <GuardrailButton unstyled className="wbstat" onClick={onClick} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', borderRadius: 10, padding: '8px 12px', textAlign: 'left' }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)' }}>{label}</span>
             <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: valueColor ?? 'inherit' }}>{value}</span>
-        </button>
+        </GuardrailButton>
     );
     return (
         <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 24, background: 'var(--hero)', color: 'var(--primary-fg)', boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)' }}>
@@ -741,9 +742,9 @@ function ManagerHero({ summary, ringDash, needs, canManage, onStat, onNewSurvey,
 
                     {canManage && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
-                            <button className="wbprimary" onClick={onNewSurvey} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, borderRadius: 9, border: 'none', background: 'var(--primary-fg)', color: 'var(--primary)', padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.1)' }}><Svg name="plus" size={15} sw={2.2} />New survey</button>
-                            <button className="wbqa" onClick={onCheckin} style={qaBtn}><Svg name="chat" size={15} />Log check-in</button>
-                            <button className="wbqa" onClick={onNewPlan} style={qaBtn}><Svg name="check" size={15} />New action plan</button>
+                            <GuardrailButton unstyled className="wbprimary" onClick={onNewSurvey} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, borderRadius: 9, border: 'none', background: 'var(--primary-fg)', color: 'var(--primary)', padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.1)' }}><Svg name="plus" size={15} sw={2.2} />New survey</GuardrailButton>
+                            <GuardrailButton unstyled className="wbqa" onClick={onCheckin} style={qaBtn}><Svg name="chat" size={15} />Log check-in</GuardrailButton>
+                            <GuardrailButton unstyled className="wbqa" onClick={onNewPlan} style={qaBtn}><Svg name="check" size={15} />New action plan</GuardrailButton>
                         </div>
                     )}
 
@@ -751,9 +752,9 @@ function ManagerHero({ summary, ringDash, needs, canManage, onStat, onNewSurvey,
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 18 }}>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>Needs you</span>
                             {needs.map((n) => (
-                                <button key={n.key} className="wbqa" onClick={() => onStat(n.tab)} style={{ ...qaBtn, padding: '6px 12px 6px 10px', fontSize: 12 }}>
+                                <GuardrailButton unstyled key={n.key} className="wbqa" onClick={() => onStat(n.tab)} style={{ ...qaBtn, padding: '6px 12px 6px 10px', fontSize: 12 }}>
                                     <span style={{ width: 6, height: 6, flex: 'none', borderRadius: '50%', background: 'var(--amber)', boxShadow: '0 0 0 3px color-mix(in oklch, var(--amber) 32%, transparent)' }} />{n.label}
-                                </button>
+                                </GuardrailButton>
                             ))}
                         </div>
                     )}
@@ -812,7 +813,7 @@ function Overview({ atRisk, sla, liveSurvey, workload, onTriage, onAllSignals, o
                         <span style={{ display: 'grid', placeItems: 'center', width: 30, height: 30, borderRadius: 8, background: 'var(--crit-bg)', color: 'var(--crit)' }}><Svg name="alert" size={16} /></span>
                         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>People who need a check-in</h3>
                     </div>
-                    <button className="wbghost" onClick={onAllSignals} style={{ border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', borderRadius: 7, padding: '5px 9px' }}>View all signals →</button>
+                    <GuardrailButton unstyled className="wbghost" onClick={onAllSignals} style={{ border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', borderRadius: 7, padding: '5px 9px' }}>View all signals →</GuardrailButton>
                 </div>
                 {atRisk.length === 0 ? (
                     <Empty text="No one needs a check-in right now. Ka pai!" />
@@ -831,7 +832,7 @@ function Overview({ atRisk, sla, liveSurvey, workload, onTriage, onAllSignals, o
                                         <span style={pillStyle(pl.bg, pl.fg)}>{p.flag_level === 'red' ? 'Red' : 'Amber'}</span>
                                     </div>
                                     <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 10, lineHeight: 1.4 }}>{p.triggered_rules[0] ?? 'Flagged'}</div>
-                                    <button className="wbprimary" onClick={() => onTriage(p)} style={{ width: '100%', height: 32, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Triage</button>
+                                    <GuardrailButton unstyled className="wbprimary" onClick={() => onTriage(p)} style={{ width: '100%', height: 32, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Triage</GuardrailButton>
                                 </div>
                             );
                         })}
@@ -867,7 +868,7 @@ function Overview({ atRisk, sla, liveSurvey, workload, onTriage, onAllSignals, o
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 12, color: 'var(--muted-fg)' }}>{liveSurvey.response_count} of {liveSurvey.recipient_count} responded</div>
                                 <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 3 }}>{liveSurvey.is_anonymous ? 'Anonymous' : 'Named'} · {liveSurvey.question_count} questions</div>
-                                <button className="wbghost" onClick={() => onNudge(liveSurvey)} style={{ marginTop: 9, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 8, padding: '6px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Nudge non-responders</button>
+                                <GuardrailButton unstyled className="wbghost" onClick={() => onNudge(liveSurvey)} style={{ marginTop: 9, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 8, padding: '6px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Nudge non-responders</GuardrailButton>
                             </div>
                         </div>
                     </>
@@ -895,10 +896,10 @@ function Overview({ atRisk, sla, liveSurvey, workload, onTriage, onAllSignals, o
 
 function SlaCell({ value, label, color, onClick }: { value: number; label: string; color: string; onClick: () => void }) {
     return (
-        <button className="wbcard" onClick={onClick} style={{ textAlign: 'left', border: '1px solid var(--border)', borderRadius: 11, padding: 12, cursor: 'pointer', background: 'var(--card)', transition: '.18s' }}>
+        <GuardrailButton unstyled className="wbcard" onClick={onClick} style={{ textAlign: 'left', border: '1px solid var(--border)', borderRadius: 11, padding: 12, cursor: 'pointer', background: 'var(--card)', transition: '.18s' }}>
             <div style={{ fontSize: 24, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
             <div style={{ fontSize: 11, color: 'var(--muted-fg)', fontWeight: 600, marginTop: 2 }}>{label}</div>
-        </button>
+        </GuardrailButton>
     );
 }
 
@@ -912,14 +913,14 @@ function FilterChips<T extends string>({ options, value, onChange }: { options: 
     return (
         <div style={{ display: 'inline-flex', gap: 2, background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
             {options.map((o) => (
-                <button key={o.v} onClick={() => onChange(o.v)} style={{ borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: 'none', background: value === o.v ? 'var(--card)' : 'transparent', color: value === o.v ? 'var(--fg)' : 'var(--muted-fg)', boxShadow: value === o.v ? '0 1px 2px rgba(0,0,0,.06)' : 'none' }}>{o.l}</button>
+                <GuardrailButton unstyled key={o.v} onClick={() => onChange(o.v)} style={{ borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: 'none', background: value === o.v ? 'var(--card)' : 'transparent', color: value === o.v ? 'var(--fg)' : 'var(--muted-fg)', boxShadow: value === o.v ? '0 1px 2px rgba(0,0,0,.06)' : 'none' }}>{o.l}</GuardrailButton>
             ))}
         </div>
     );
 }
 
 function PrimaryBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-    return <button className="wbprimary" onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, borderRadius: 9, border: 'none', background: 'var(--primary)', color: '#fff', padding: '0 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}><Svg name="plus" size={15} sw={2.2} />{children}</button>;
+    return <GuardrailButton unstyled className="wbprimary" onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, borderRadius: 9, border: 'none', background: 'var(--primary)', color: '#fff', padding: '0 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}><Svg name="plus" size={15} sw={2.2} />{children}</GuardrailButton>;
 }
 
 /* ---- Surveys tab ---- */
@@ -952,8 +953,8 @@ function SurveysTab({ surveys, filter, setFilter, canManage, onNew, onPrimary, o
                                 <div style={{ height: 7, borderRadius: 999, background: 'var(--muted)', overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 999, background: 'var(--primary)', width: `${s.response_pct}%` }} /></div>
                             </div>
                             <div className="wbdots" style={{ display: 'flex', gap: 4, opacity: 0, transition: '.12s' }}>
-                                <button onClick={() => onPrimary(s)} className="wbghost" style={ghostSm}>{s.status === 'draft' ? 'Edit' : 'Results'}</button>
-                                <button onClick={(e) => onCtx(e, s)} className="wbghost" style={{ ...ghostSm, width: 30, padding: 0, display: 'grid', placeItems: 'center' }}><Svg name="dots" size={16} fill="currentColor" /></button>
+                                <GuardrailButton unstyled onClick={() => onPrimary(s)} className="wbghost" style={ghostSm}>{s.status === 'draft' ? 'Edit' : 'Results'}</GuardrailButton>
+                                <GuardrailButton unstyled onClick={(e) => onCtx(e, s)} className="wbghost" style={{ ...ghostSm, width: 30, padding: 0, display: 'grid', placeItems: 'center' }}><Svg name="dots" size={16} fill="currentColor" /></GuardrailButton>
                             </div>
                         </div>
                     );
@@ -1000,7 +1001,7 @@ function PlansTab({ plans, filter, setFilter, canManage, onNew, onUpdate, onCtx 
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{p.link_label}</span>
-                                    {p.can_update && <button className="wbghost" onClick={() => onUpdate(p)} style={ghostSm}>Update</button>}
+                                    {p.can_update && <GuardrailButton unstyled className="wbghost" onClick={() => onUpdate(p)} style={ghostSm}>Update</GuardrailButton>}
                                 </div>
                             </div>
                         );
@@ -1062,11 +1063,11 @@ function SignalsTab({ flagged, canManage, onCheckin, onPlan, onEap, onTriage, on
                                 </div>
                                 {canManage && (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                                        <button className="wbprimary" onClick={() => onCheckin(p)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 33, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Log check-in</button>
-                                        <button className="wbghost" onClick={() => onPlan(p)} style={ghostMd}>Create action plan</button>
-                                        <button className="wbghost" onClick={() => onEap(p)} style={ghostMd}>Refer to EAP</button>
-                                        <button className="wbghost" onClick={() => onTriage(p)} style={ghostMd}>Acknowledge / snooze</button>
-                                        <button className="wbghost" onClick={(e) => onCtx(e, p)} style={{ ...ghostMd, marginLeft: 'auto', width: 33, padding: 0, display: 'grid', placeItems: 'center' }}><Svg name="dots" size={16} fill="currentColor" /></button>
+                                        <GuardrailButton unstyled className="wbprimary" onClick={() => onCheckin(p)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 33, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Log check-in</GuardrailButton>
+                                        <GuardrailButton unstyled className="wbghost" onClick={() => onPlan(p)} style={ghostMd}>Create action plan</GuardrailButton>
+                                        <GuardrailButton unstyled className="wbghost" onClick={() => onEap(p)} style={ghostMd}>Refer to EAP</GuardrailButton>
+                                        <GuardrailButton unstyled className="wbghost" onClick={() => onTriage(p)} style={ghostMd}>Acknowledge / snooze</GuardrailButton>
+                                        <GuardrailButton unstyled className="wbghost" onClick={(e) => onCtx(e, p)} style={{ ...ghostMd, marginLeft: 'auto', width: 33, padding: 0, display: 'grid', placeItems: 'center' }}><Svg name="dots" size={16} fill="currentColor" /></GuardrailButton>
                                     </div>
                                 )}
                             </div>
@@ -1096,9 +1097,9 @@ function EmployeeView({ my, onRespond, onAck, onKudos }: { my: My; onRespond: (s
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
                         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', alignSelf: 'center' }}>Needs you</span>
                         {needs.map((n) => (
-                            <button key={n.key} className="wbqa" onClick={n.onClick} style={{ ...qaBtn, padding: '6px 12px 6px 10px', fontSize: 12 }}>
+                            <GuardrailButton unstyled key={n.key} className="wbqa" onClick={n.onClick} style={{ ...qaBtn, padding: '6px 12px 6px 10px', fontSize: 12 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', boxShadow: '0 0 0 3px color-mix(in oklch, var(--amber) 32%, transparent)' }} />{n.label}
-                            </button>
+                            </GuardrailButton>
                         ))}
                     </div>
                 )}
@@ -1115,7 +1116,7 @@ function EmployeeView({ my, onRespond, onAck, onKudos }: { my: My; onRespond: (s
                                         <div style={{ fontSize: 11.5, color: 'var(--muted-fg)', marginTop: 2 }}>{s.is_anonymous ? 'Anonymous' : 'Named'}{s.open && s.closes_in_days != null && s.closes_in_days >= 0 ? ` · closes in ${s.closes_in_days} ${s.closes_in_days === 1 ? 'day' : 'days'}` : ''}</div>
                                     </div>
                                     {s.open ? (
-                                        <button className="wbprimary" onClick={() => onRespond(s)} style={{ height: 32, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Respond</button>
+                                        <GuardrailButton unstyled className="wbprimary" onClick={() => onRespond(s)} style={{ height: 32, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Respond</GuardrailButton>
                                     ) : (
                                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ok)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Svg name="tick" size={14} sw={2.5} />Submitted</span>
                                     )}
@@ -1136,12 +1137,12 @@ function EmployeeView({ my, onRespond, onAck, onKudos }: { my: My; onRespond: (s
                                         <span style={{ marginLeft: 'auto', fontSize: 11, color: c.acknowledged ? 'var(--ok)' : 'var(--muted-fg)', fontWeight: c.acknowledged ? 600 : 400 }}>{c.acknowledged ? 'Acknowledged' : c.created_human}</span>
                                     </div>
                                     {c.notes && <div style={{ fontSize: 12, color: 'var(--muted-fg)', lineHeight: 1.45, marginBottom: c.acknowledged ? 0 : 10 }}>{c.notes}</div>}
-                                    {!c.acknowledged && <button className="wbprimary" onClick={() => onAck(c)} style={{ height: 30, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Acknowledge</button>}
+                                    {!c.acknowledged && <GuardrailButton unstyled className="wbprimary" onClick={() => onAck(c)} style={{ height: 30, border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', padding: '0 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Acknowledge</GuardrailButton>}
                                 </div>
                             ))}
                         </div>
                     )}
-                    <button className="wbghost" onClick={onKudos} style={{ marginTop: 13, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Svg name="star" size={14} />Send kudos</button>
+                    <GuardrailButton unstyled className="wbghost" onClick={onKudos} style={{ marginTop: 13, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Svg name="star" size={14} />Send kudos</GuardrailButton>
                 </div>
             </div>
         </div>
@@ -1210,15 +1211,15 @@ function Modal(props: {
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', padding: '14px 20px', flex: 'none' }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-fg)' }}>{headerLabel}</div>
-                            <button className="wbghost" onClick={onClose} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', color: 'var(--muted-fg)' }}><Svg name="x" size={18} /></button>
+                            <GuardrailButton unstyled className="wbghost" onClick={onClose} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', color: 'var(--muted-fg)' }}><Svg name="x" size={18} /></GuardrailButton>
                         </header>
                         <div style={{ height: 3, background: 'var(--muted)', flex: 'none' }}><div style={{ height: '100%', background: 'var(--primary)', width: progress, transition: 'width .3s' }} /></div>
                         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '22px 24px' }}>
                             <ModalBody kind={kind} step={step} subject={subject} form={form} setF={setF} templates={templates} sites={sites} owners={owners} activeStaffCount={activeStaffCount} />
                         </div>
                         <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border)', background: 'var(--muted)', padding: '13px 20px', flex: 'none' }}>
-                            {step > 0 && <button className="wbghost" onClick={onBack} style={{ height: 36, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 9, padding: '0 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Back</button>}
-                            <button className="wbprimary" disabled={busy} onClick={onNext} style={{ height: 36, border: 'none', borderRadius: 9, background: 'var(--primary)', color: '#fff', padding: '0 18px', fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Saving…' : nextLabel}</button>
+                            {step > 0 && <GuardrailButton unstyled className="wbghost" onClick={onBack} style={{ height: 36, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 9, padding: '0 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Back</GuardrailButton>}
+                            <GuardrailButton unstyled className="wbprimary" disabled={busy} onClick={onNext} style={{ height: 36, border: 'none', borderRadius: 9, background: 'var(--primary)', color: '#fff', padding: '0 18px', fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Saving…' : nextLabel}</GuardrailButton>
                         </footer>
                     </div>
                 </div>
@@ -1262,7 +1263,7 @@ function Seg<T extends string>({ options, value, onChange }: { options: { v: T; 
     return (
         <div style={{ display: 'inline-flex', gap: 3, background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
             {options.map((o) => (
-                <button key={o.v} onClick={() => onChange(o.v)} style={{ border: 'none', cursor: 'pointer', borderRadius: 7, padding: '7px 14px', fontSize: 13, fontWeight: 600, background: value === o.v ? 'var(--card)' : 'transparent', color: value === o.v ? 'var(--fg)' : 'var(--muted-fg)', boxShadow: value === o.v ? '0 1px 2px rgba(0,0,0,.08)' : 'none' }}>{o.l}</button>
+                <GuardrailButton unstyled key={o.v} onClick={() => onChange(o.v)} style={{ border: 'none', cursor: 'pointer', borderRadius: 7, padding: '7px 14px', fontSize: 13, fontWeight: 600, background: value === o.v ? 'var(--card)' : 'transparent', color: value === o.v ? 'var(--fg)' : 'var(--muted-fg)', boxShadow: value === o.v ? '0 1px 2px rgba(0,0,0,.08)' : 'none' }}>{o.l}</GuardrailButton>
             ))}
         </div>
     );
@@ -1307,10 +1308,10 @@ function ModalBody({ kind, step, subject, form, setF, templates, sites, owners }
                     <Seg value={(f.surveyType as string) ?? 'pulse'} onChange={(v) => setF({ surveyType: v })} options={[{ v: 'pulse', l: 'Pulse' }, { v: 'enps', l: 'eNPS' }, { v: 'engagement', l: 'Engagement' }]} />
                 </Field>
                 <Field label="Anonymity" hint={f.anon ? 'No one — including you — can see who said what. Best for honest answers.' : 'You will see who answered.'}>
-                    <button onClick={() => setF({ anon: !f.anon })} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                    <GuardrailButton unstyled onClick={() => setF({ anon: !f.anon })} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                         <span style={{ width: 38, height: 22, borderRadius: 999, flex: 'none', background: f.anon ? 'var(--primary)' : 'var(--muted)', position: 'relative', transition: '.2s' }}><span style={{ position: 'absolute', top: 2, left: f.anon ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: '.2s' }} /></span>
                         <span style={{ fontSize: 13, fontWeight: 600 }}>{f.anon ? 'Anonymous responses' : 'Named responses'}</span>
-                    </button>
+                    </GuardrailButton>
                 </Field>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <Field label="Opens"><input className="wbfield" type="date" value={String(f.startsAt ?? '')} onChange={(e) => setF({ startsAt: e.target.value })} /></Field>
@@ -1323,7 +1324,7 @@ function ModalBody({ kind, step, subject, form, setF, templates, sites, owners }
                 <Head2 t="Questions" s="Add, reorder and set required. Start from a template if you like." />
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                     {templates.map((t) => (
-                        <button key={t.key} onClick={() => setF({ surveyType: t.survey_type, questions: t.questions.map((q) => ({ question_type: q.question_type, question_text: q.question_text, is_required: q.is_required, options: q.options })) })} style={{ border: '1px dashed var(--border)', background: 'var(--card)', borderRadius: 9, padding: '8px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: 'var(--primary)' }}>+ {t.name} template</button>
+                        <GuardrailButton unstyled key={t.key} onClick={() => setF({ surveyType: t.survey_type, questions: t.questions.map((q) => ({ question_type: q.question_type, question_text: q.question_text, is_required: q.is_required, options: q.options })) })} style={{ border: '1px dashed var(--border)', background: 'var(--card)', borderRadius: 9, padding: '8px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: 'var(--primary)' }}>+ {t.name} template</GuardrailButton>
                     ))}
                 </div>
                 {questions.map((q, i) => (
@@ -1333,10 +1334,10 @@ function ModalBody({ kind, step, subject, form, setF, templates, sites, owners }
                         <select className="wbfield" style={{ width: 110, height: 32 }} value={q.question_type} onChange={(e) => updateQuestion(setF, questions, i, { question_type: e.target.value as SurveyQuestion['question_type'] })}>
                             <option value="scale">Scale 1–5</option><option value="enps">eNPS 0–10</option><option value="text">Text</option><option value="boolean">Yes/No</option><option value="choice">Choice</option>
                         </select>
-                        <button onClick={() => setF({ questions: questions.filter((_, j) => j !== i) })} style={{ border: 'none', background: 'transparent', color: 'var(--muted-fg)', cursor: 'pointer' }}><Svg name="x" size={16} /></button>
+                        <GuardrailButton unstyled onClick={() => setF({ questions: questions.filter((_, j) => j !== i) })} style={{ border: 'none', background: 'transparent', color: 'var(--muted-fg)', cursor: 'pointer' }}><Svg name="x" size={16} /></GuardrailButton>
                     </div>
                 ))}
-                <button onClick={() => setF({ questions: [...questions, { question_type: 'scale', question_text: '', is_required: true, options: [] }] })} style={{ width: '100%', border: '1px dashed var(--border)', background: 'transparent', borderRadius: 11, padding: 12, fontSize: 13, fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', marginTop: 4 }}>+ Add question</button>
+                <GuardrailButton unstyled onClick={() => setF({ questions: [...questions, { question_type: 'scale', question_text: '', is_required: true, options: [] }] })} style={{ width: '100%', border: '1px dashed var(--border)', background: 'transparent', borderRadius: 11, padding: 12, fontSize: 13, fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', marginTop: 4 }}>+ Add question</GuardrailButton>
             </>
         );
         if (step === 2) return (
@@ -1425,9 +1426,9 @@ function ModalBody({ kind, step, subject, form, setF, templates, sites, owners }
     /* ---- TRIAGE ---- */
     if (kind === 'triage') {
         const opt = (v: string, l: string, d: string) => (
-            <button onClick={() => setF({ triage: v })} style={{ display: 'block', width: '100%', textAlign: 'left', border: `1px solid ${f.triage === v ? 'var(--primary)' : 'var(--border)'}`, background: f.triage === v ? 'color-mix(in oklch,var(--primary) 8%,var(--card))' : 'var(--card)', borderRadius: 11, padding: '13px 15px', marginBottom: 10, cursor: 'pointer' }}>
+            <GuardrailButton unstyled onClick={() => setF({ triage: v })} style={{ display: 'block', width: '100%', textAlign: 'left', border: `1px solid ${f.triage === v ? 'var(--primary)' : 'var(--border)'}`, background: f.triage === v ? 'color-mix(in oklch,var(--primary) 8%,var(--card))' : 'var(--card)', borderRadius: 11, padding: '13px 15px', marginBottom: 10, cursor: 'pointer' }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700 }}>{l}</div><div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>{d}</div>
-            </button>
+            </GuardrailButton>
         );
         return (
             <>
@@ -1460,7 +1461,7 @@ function ModalBody({ kind, step, subject, form, setF, templates, sites, owners }
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <Field label="Follow-up date"><input className="wbfield" type="date" value={String(f.followUp ?? '')} onChange={(e) => setF({ followUp: e.target.value })} /></Field>
                     <Field label="Visibility">
-                        <button onClick={() => setF({ isPrivate: !(f.isPrivate ?? true) })} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 9, padding: '9px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{(f.isPrivate ?? true) ? '🔒 Private to managers' : '👀 Shared with staff'}</button>
+                        <GuardrailButton unstyled onClick={() => setF({ isPrivate: !(f.isPrivate ?? true) })} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', border: '1px solid var(--border)', background: 'var(--card)', borderRadius: 9, padding: '9px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{(f.isPrivate ?? true) ? '🔒 Private to managers' : '👀 Shared with staff'}</GuardrailButton>
                     </Field>
                 </div>
             </>
@@ -1535,7 +1536,7 @@ function RespondInput({ q, value, onChange }: { q: SurveyQuestion; value: never;
                 {Array.from({ length: 11 }, (_, i) => {
                     const col = i <= 6 ? 'var(--crit)' : i <= 8 ? 'var(--warn)' : 'var(--ok)';
                     const on = Number(value) === i;
-                    return <button key={i} onClick={() => onChange(i)} style={{ width: 42, height: 42, borderRadius: 10, border: `1px solid ${on ? col : 'var(--border)'}`, background: on ? col : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{i}</button>;
+                    return <GuardrailButton unstyled key={i} onClick={() => onChange(i)} style={{ width: 42, height: 42, borderRadius: 10, border: `1px solid ${on ? col : 'var(--border)'}`, background: on ? col : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{i}</GuardrailButton>;
                 })}
             </div>
         );
@@ -1545,7 +1546,7 @@ function RespondInput({ q, value, onChange }: { q: SurveyQuestion; value: never;
             <div style={{ display: 'flex', gap: 8 }}>
                 {[1, 2, 3, 4, 5].map((n) => {
                     const on = Number(value) === n;
-                    return <button key={n} onClick={() => onChange(n)} style={{ flex: 1, height: 46, borderRadius: 10, border: `1px solid ${on ? 'var(--primary)' : 'var(--border)'}`, background: on ? 'var(--primary)' : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>{n}</button>;
+                    return <GuardrailButton unstyled key={n} onClick={() => onChange(n)} style={{ flex: 1, height: 46, borderRadius: 10, border: `1px solid ${on ? 'var(--primary)' : 'var(--border)'}`, background: on ? 'var(--primary)' : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>{n}</GuardrailButton>;
                 })}
             </div>
         );
@@ -1555,7 +1556,7 @@ function RespondInput({ q, value, onChange }: { q: SurveyQuestion; value: never;
             <div style={{ display: 'flex', gap: 8 }}>
                 {[{ v: 'yes', l: 'Yes' }, { v: 'no', l: 'No' }].map((o) => {
                     const on = value === o.v;
-                    return <button key={o.v} onClick={() => onChange(o.v)} style={{ flex: 1, height: 42, borderRadius: 10, border: `1px solid ${on ? 'var(--primary)' : 'var(--border)'}`, background: on ? 'var(--primary)' : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{o.l}</button>;
+                    return <GuardrailButton unstyled key={o.v} onClick={() => onChange(o.v)} style={{ flex: 1, height: 42, borderRadius: 10, border: `1px solid ${on ? 'var(--primary)' : 'var(--border)'}`, background: on ? 'var(--primary)' : 'var(--card)', color: on ? '#fff' : 'var(--fg)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{o.l}</GuardrailButton>;
                 })}
             </div>
         );

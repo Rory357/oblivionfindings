@@ -17,6 +17,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type SiteOption = {
     id: number;
@@ -101,7 +102,7 @@ export function SiteFilter({
                         </button>
                     </PopoverTrigger>
                     {!allSelected ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             aria-label="Clear site filter"
                             className={cn(
@@ -113,7 +114,7 @@ export function SiteFilter({
                             onClick={clearAll}
                         >
                             <X className="h-3 w-3" />
-                        </button>
+                        </GuardrailButton>
                     ) : null}
                 </div>
             </PopoverAnchor>
@@ -209,13 +210,13 @@ export function SiteFilter({
                             <span className="text-muted-foreground tabular-nums">
                                 {selectedCount} of {sites.length} selected
                             </span>
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={clearAll}
                                 className="font-semibold text-primary hover:underline"
                             >
                                 Clear
-                            </button>
+                            </GuardrailButton>
                         </div>
                     ) : null}
                 </Command>

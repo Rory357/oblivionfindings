@@ -217,7 +217,7 @@ function TagPicker({
             {catalogue.map((t) => {
                 const isSelected = selectedIds.has(t.id);
                 return (
-                    <button
+                    <Button unstyled
                         key={t.id}
                         type="button"
                         onClick={() => onToggle(t.id)}
@@ -225,7 +225,7 @@ function TagPicker({
                         style={tagBadgeStyle(t)}
                     >
                         {t.label}
-                    </button>
+                    </Button>
                 );
             })}
             {catalogue.length === 0 && <span className="text-xs text-muted-foreground">No catalogue tags yet.</span>}

@@ -5,7 +5,7 @@
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
 import { CsatRater, CsatStars } from '@/components/it/csat';
-import { ResolveTicketDialog } from '@/components/it/it-wizards';
+import { MergeTicketDialog, ResolveTicketDialog, type MergeTarget } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import {
     TicketThread,
@@ -34,9 +34,12 @@ import {
     Copy,
     Eye,
     EyeOff,
+    GitMerge,
     Link2,
+    Mail,
     RotateCcw,
     Server,
+    ShieldCheck,
     Ticket as TicketIcon,
     UserPlus,
     XCircle,
@@ -70,6 +73,17 @@ interface TicketPayload {
     updated_at: string | null;
     resolved_at: string | null;
     closed_at: string | null;
+    merged_into: { id: number; reference: string | null; title: string } | null;
+    requires_approval: boolean;
+    approval: {
+        id: number;
+        status: string;
+        requested_by_name: string | null;
+        approver_name: string | null;
+        reason: string | null;
+        requested_at: string | null;
+        decided_at: string | null;
+    } | null;
 }
 
 interface Props {
@@ -79,6 +93,7 @@ interface Props {
     assignees: { id: number; name: string }[];
     assetOptions: { id: number; name: string; tag: string | null }[];
     kbSuggestions: ThreadKbHint[];
+    mergeTargets: MergeTarget[];
     can: {
         manage: boolean;
         view: boolean;
@@ -86,6 +101,9 @@ interface Props {
         reopen: boolean;
         watching: boolean;
         rate: boolean;
+        merge: boolean;
+        requestApproval: boolean;
+        decideApproval: boolean;
     };
 }
 
@@ -127,6 +145,7 @@ export default function ItTicketShow({
     assignees,
     assetOptions,
     kbSuggestions,
+    mergeTargets,
     can,
 }: Props) {
     const page = usePage<{ auth?: { user?: { id?: number } } }>();
@@ -139,6 +158,7 @@ export default function ItTicketShow({
 
     const [subcategory, setSubcategory] = useState(ticket.subcategory ?? '');
     const [resolving, setResolving] = useState(false);
+    const [merging, setMerging] = useState(false);
 
     /** PATCH a triage field and toast the outcome. */
     const patch = (data: Record<string, string | number | null>, doneMsg = 'Ticket updated.') =>
@@ -157,6 +177,14 @@ export default function ItTicketShow({
             onSuccess: () => toast.success(doneMsg),
         });
 
+    const decideApproval = (decision: 'approve' | 'reject') => {
+        if (!ticket.approval) return;
+        router.post(`/it/approvals/${ticket.approval.id}/decide`, { decision }, {
+            preserveScroll: true,
+            onSuccess: () => toast.success(decision === 'approve' ? 'Approval granted.' : 'Approval rejected.'),
+        });
+    };
+
     const copyReference = () => {
         if (!ticket.reference) return;
         void navigator.clipboard.writeText(ticket.reference).then(() => {
@@ -165,6 +193,29 @@ export default function ItTicketShow({
     };
 
     const isWorking = WORKING_STATUSES.includes(ticket.status);
+
+    const approvalBadge = ((): { label: string; variant: StatusVariant } => {
+        switch (ticket.approval?.status) {
+            case 'approved':
+                return { label: 'Approved', variant: 'success' };
+            case 'rejected':
+                return { label: 'Rejected', variant: 'critical' };
+            case 'pending':
+                return { label: 'Awaiting approval', variant: 'warning' };
+            default:
+                return { label: 'Approval needed', variant: 'warning' };
+        }
+    })();
+
+    const approvalMeta = ((): string => {
+        const a = ticket.approval;
+        if (!a) return 'A manager must approve this before it can be resolved.';
+        if (a.status === 'pending') {
+            return `Requested by ${a.requested_by_name ?? 'an agent'}${a.requested_at ? ` · ${absolute(a.requested_at)}` : ''}.`;
+        }
+        const verb = a.status === 'approved' ? 'Approved' : 'Rejected';
+        return `${verb} by ${a.approver_name ?? 'a manager'}${a.decided_at ? ` · ${absolute(a.decided_at)}` : ''}${a.reason ? ` — ${a.reason}` : ''}.`;
+    })();
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -175,8 +226,65 @@ export default function ItTicketShow({
                     onClose={() => setResolving(false)}
                 />
             ) : null}
+            {merging ? (
+                <MergeTicketDialog
+                    ticket={{ id: ticket.id, reference: ticket.reference, title: ticket.title }}
+                    targets={mergeTargets}
+                    onClose={() => setMerging(false)}
+                />
+            ) : null}
 
             <div className="flex flex-col gap-5 p-4 sm:p-6">
+                {ticket.merged_into ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-[13px]">
+                        <GitMerge className="h-4 w-4 flex-none text-muted-foreground" />
+                        <span className="font-medium">This ticket was merged into</span>
+                        <Link
+                            href={`/it/tickets/${ticket.merged_into.id}`}
+                            className="font-mono font-semibold text-primary hover:underline"
+                        >
+                            {ticket.merged_into.reference ?? `#${ticket.merged_into.id}`}
+                        </Link>
+                        <span className="min-w-0 truncate text-muted-foreground">
+                            — {ticket.merged_into.title}
+                        </span>
+                    </div>
+                ) : null}
+                {ticket.requires_approval ? (
+                    <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 flex-none text-muted-foreground" />
+                                <span className="text-[13px] font-semibold">Manager approval</span>
+                                <StatusBadge variant={approvalBadge.variant} size="sm">
+                                    {approvalBadge.label}
+                                </StatusBadge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {can.requestApproval ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => act(`/it/tickets/${ticket.id}/approvals`, 'Approval requested.')}
+                                    >
+                                        Request approval
+                                    </Button>
+                                ) : null}
+                                {can.decideApproval ? (
+                                    <>
+                                        <Button size="sm" onClick={() => decideApproval('approve')}>
+                                            <Check className="h-3.5 w-3.5" /> Approve
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => decideApproval('reject')}>
+                                            <XCircle className="h-3.5 w-3.5" /> Reject
+                                        </Button>
+                                    </>
+                                ) : null}
+                            </div>
+                        </div>
+                        <p className="mt-1.5 text-[12px] text-muted-foreground">{approvalMeta}</p>
+                    </div>
+                ) : null}
                 {/* Compact header band */}
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-9 py-7 text-primary-foreground">
                     <Link
@@ -213,6 +321,11 @@ export default function ItTicketShow({
                                 {/* Live SLA countdown — ticks once a minute, tone from the
                                     server verdict, hidden once met/settled. */}
                                 <SlaChip ticket={ticket} />
+                                {ticket.source === 'email' ? (
+                                    <span className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/85">
+                                        <Mail className="h-3 w-3" /> via email
+                                    </span>
+                                ) : null}
                             </div>
                             <h1 className="mt-1 truncate text-[22px] leading-tight font-bold tracking-tight">
                                 {ticket.title}
@@ -231,6 +344,15 @@ export default function ItTicketShow({
                                     onClick={() => setResolving(true)}
                                 >
                                     <CheckCircle2 className="h-3.5 w-3.5" /> Resolve…
+                                </Button>
+                            ) : null}
+                            {can.merge ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-white/15 text-primary-foreground hover:bg-white/25"
+                                    onClick={() => setMerging(true)}
+                                >
+                                    <GitMerge className="h-3.5 w-3.5" /> Merge…
                                 </Button>
                             ) : null}
                             {can.manage && ticket.status === 'resolved' ? (

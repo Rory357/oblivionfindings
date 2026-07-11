@@ -591,9 +591,9 @@ function PhotosSection({ d }: { d: FleetIncidentDetail }) {
                                         <Download className="h-3 w-3" />
                                     </a>
                                     {canUpload ? (
-                                        <button type="button" onClick={() => router.delete(`/fleet-assets/incidents/${d.id}/attachments/${a.id}`, { preserveScroll: true })} className="rounded px-1 py-0.5 text-status-critical hover:bg-muted" aria-label="Remove">
+                                        <Button unstyled type="button" onClick={() => router.delete(`/fleet-assets/incidents/${d.id}/attachments/${a.id}`, { preserveScroll: true })} className="rounded px-1 py-0.5 text-status-critical hover:bg-muted" aria-label="Remove">
                                             <Trash2 className="h-3 w-3" />
-                                        </button>
+                                        </Button>
                                     ) : null}
                                 </span>
                             </div>

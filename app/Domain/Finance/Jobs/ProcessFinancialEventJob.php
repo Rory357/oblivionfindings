@@ -102,11 +102,21 @@ class ProcessFinancialEventJob implements ShouldQueue
         $this->markPermanentlyFailed($e);
     }
 
-    /**
-     * Determine the queue this job should run on.
+    /*
+     * NOTE: do NOT add a `queue()` METHOD to route this job to a named queue.
+     *
+     * Laravel's Bus\Dispatcher::dispatchToQueue() treats a `queue()` method as a
+     * custom "enqueue yourself" hook: when the method exists it calls
+     * $command->queue($queueInstance, $command) and expects THAT method to push the
+     * job onto the queue. A method that merely returns a queue name (as this class
+     * previously did — `queue(): string { return 'finance'; }`) silently swallows the
+     * dispatch — the job is never pushed, so under the `sync` connection handle()
+     * never runs and no GL journal posts. This broke every observer-dispatched GL
+     * capture (house-ledger, fuel, maintenance).
+     *
+     * To route to a specific queue, set the `$queue` PROPERTY (public string $queue =
+     * 'finance';) or call ->onQueue('finance') at dispatch — and make sure a worker
+     * actually consumes that queue. Today the app runs `sync` with no dedicated queue
+     * worker, so this job executes inline on the default queue.
      */
-    public function queue(): string
-    {
-        return 'finance';
-    }
 }

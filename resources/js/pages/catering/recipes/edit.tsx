@@ -147,7 +147,7 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
                                 {tags.map((t) => {
                                     const selected = form.data.tag_ids.includes(t.id);
                                     return (
-                                        <button
+                                        <Button unstyled
                                             key={t.id}
                                             type="button"
                                             onClick={() => toggleTag(t.id)}
@@ -155,7 +155,7 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
                                             style={tagBadgeStyle(t)}
                                         >
                                             {t.label}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>

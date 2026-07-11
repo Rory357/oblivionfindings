@@ -29,6 +29,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type PlanPickerOption = { id: number; client_id: number | null; title: string; status: string; reference: string; restrictive_practice_type: string | null };
 
@@ -567,12 +568,12 @@ function StaffMultiSelect({ options, value, onChange }: { options: { value: stri
     const toggle = (id: number) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
     if (options.length === 0) return <p className="text-sm text-muted-foreground">No staff available.</p>;
     return (
-        <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-border bg-card/50 p-2">
+        <GuardrailCard unstyled className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-border bg-card/50 p-2">
             {options.map((o) => {
                 const id = Number(o.value);
                 const active = value.includes(id);
                 return (
-                    <button
+                    <Button unstyled
                         key={o.value}
                         type="button"
                         aria-pressed={active}
@@ -584,9 +585,9 @@ function StaffMultiSelect({ options, value, onChange }: { options: { value: stri
                     >
                         {active ? <CheckCircle2 className="h-3 w-3" /> : null}
                         {o.label}
-                    </button>
+                    </Button>
                 );
             })}
-        </div>
+        </GuardrailCard>
     );
 }

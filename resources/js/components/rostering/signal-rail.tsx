@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 import { avatarHueStyle } from './avatar-hue';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type SignalTone = 'critical' | 'warning' | 'info' | 'success';
 
@@ -123,13 +124,13 @@ export function SignalRail({
                                     {s.href ? (
                                         <Link href={s.href}>{inner}</Link>
                                     ) : s.onClick ? (
-                                        <button
+                                        <GuardrailButton unstyled
                                             type="button"
                                             onClick={s.onClick}
                                             className="block w-full"
                                         >
                                             {inner}
-                                        </button>
+                                        </GuardrailButton>
                                     ) : (
                                         <div>{inner}</div>
                                     )}

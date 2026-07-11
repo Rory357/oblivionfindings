@@ -10,6 +10,7 @@ import { ArrowLeft, Leaf, Loader2, Package, Pencil, Plus, Search, ShieldAlert, T
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoneyFromCents as money } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TagKind = 'dietary' | 'allergen';
 type TagSeverity = 'info' | 'warn' | 'critical';
@@ -270,9 +271,9 @@ function ProductFormView({ product, categories, tags, onCancel, onSaved }: { pro
         <form onSubmit={submit}>
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                    <button type="button" onClick={onCancel} className="rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Back to products">
+                    <Button unstyled type="button" onClick={onCancel} className="rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Back to products">
                         <ArrowLeft className="h-4 w-4" />
-                    </button>
+                    </Button>
                     {isNew ? 'Add product' : 'Edit product'}
                 </DialogTitle>
                 <DialogDescription>Link this to recipe ingredients and site inventory to track stock and cost.</DialogDescription>
@@ -336,7 +337,7 @@ function ProductFormView({ product, categories, tags, onCancel, onSaved }: { pro
                         {tags.map((t) => {
                             const sel = data.tag_ids.includes(t.id);
                             return (
-                                <button
+                                <Button unstyled
                                     key={t.id}
                                     type="button"
                                     onClick={() => toggleTag(t.id)}
@@ -351,7 +352,7 @@ function ProductFormView({ product, categories, tags, onCancel, onSaved }: { pro
                                     aria-pressed={sel}
                                 >
                                     {t.label}
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -508,7 +509,7 @@ function DietaryTagsManagerBody({ onClose, onChanged }: { onClose: () => void; o
                                     ) : (
                                         <div className="flex flex-wrap gap-1.5">
                                             {list.map((t) => (
-                                                <button
+                                                <Button unstyled
                                                     key={t.id}
                                                     type="button"
                                                     onClick={() => setEditing(t)}
@@ -518,7 +519,7 @@ function DietaryTagsManagerBody({ onClose, onChanged }: { onClose: () => void; o
                                                     {t.label}
                                                     <span className={cn('rounded-full px-1.5 text-[9.5px] font-semibold uppercase', t.severity === 'critical' ? 'text-status-critical' : t.severity === 'warn' ? 'text-status-warning' : 'text-muted-foreground')}>{t.severity}</span>
                                                     <Pencil className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     )}
@@ -604,9 +605,9 @@ function TagFormView({ tag, onCancel, onSaved }: { tag: ManagedTag | null; onCan
         <form onSubmit={submit}>
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                    <button type="button" onClick={onCancel} className="rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Back to tags">
+                    <Button unstyled type="button" onClick={onCancel} className="rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Back to tags">
                         <ArrowLeft className="h-4 w-4" />
-                    </button>
+                    </Button>
                     {isNew ? 'Add tag' : 'Edit tag'}
                 </DialogTitle>
                 <DialogDescription>Allergen tags drive the hard conflict checks; dietary tags describe a resident's preferences.</DialogDescription>
@@ -627,7 +628,7 @@ function TagFormView({ tag, onCancel, onSaved }: { tag: ManagedTag | null; onCan
                             const Icon = k.icon;
                             const active = data.kind === k.value;
                             return (
-                                <button
+                                <Button unstyled
                                     key={k.value}
                                     type="button"
                                     onClick={() => patch({ kind: k.value })}
@@ -644,7 +645,7 @@ function TagFormView({ tag, onCancel, onSaved }: { tag: ManagedTag | null; onCan
                                         <span className="block text-sm font-medium">{k.label}</span>
                                         <span className="block text-xs text-muted-foreground">{k.description}</span>
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -653,18 +654,18 @@ function TagFormView({ tag, onCancel, onSaved }: { tag: ManagedTag | null; onCan
                 <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
                     <div>
                         <Label>Severity</Label>
-                        <div className="mt-1.5 inline-flex w-full rounded-lg border border-border bg-card p-0.5">
+                        <GuardrailCard unstyled className="mt-1.5 inline-flex w-full rounded-lg border border-border bg-card p-0.5">
                             {SEVERITIES.map((s) => (
-                                <button
+                                <Button unstyled
                                     key={s.value}
                                     type="button"
                                     onClick={() => patch({ severity: s.value })}
                                     className={cn('flex-1 rounded-md px-2 py-1.5 text-[12.5px] font-medium transition-colors', data.severity === s.value ? 'bg-sites text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
                                 >
                                     {s.label}
-                                </button>
+                                </Button>
                             ))}
-                        </div>
+                        </GuardrailCard>
                     </div>
                     <div>
                         <Label>Colour</Label>

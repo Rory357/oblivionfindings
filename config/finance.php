@@ -21,6 +21,11 @@ return [
         // ── Fleet ──────────────────────────────────────────────
         'fuel_expense' => [
             'debit' => '6200',   // Fuel & Oil Expense
+            // Fuel is paid at the pump (fuel card) — credit Card Clearing, NOT
+            // Accounts Payable: an AP credit with no bill can never be settled by
+            // a payment run, so 2000 accrued unreconcilable balances. 1180 clears
+            // on bank reconciliation when the card statement arrives.
+            'credit' => '1180',  // Card Clearing
             'journal_type' => 'standard',
         ],
 
@@ -153,6 +158,7 @@ return [
         '1130' => 'NASC',
         '1180' => 'Card Clearing',
         '2000' => 'Accounts Payable',
+        '2150' => 'ESCT',
         '2310' => 'Expense Claims Payable',
         '2400' => 'Accrued Leave',
         '2510' => 'Provision for Claims',
@@ -409,6 +415,31 @@ return [
     'spend_approval' => [
         'enforce' => env('FINANCE_SPEND_APPROVAL_ENFORCE', false),
         'threshold' => env('FINANCE_SPEND_APPROVAL_THRESHOLD', 10000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Capture-at-source (operational events → canonical finance documents)
+    |--------------------------------------------------------------------------
+    |
+    | Vendor names + GL expense codes used when an operational event in another
+    | module is captured as a draft accounts-payable bill. Codes must exist in
+    | the chart of accounts (AccountsPayableService resolves them and throws if
+    | missing — never invents a code).
+    |
+    */
+
+    'capture' => [
+        'damage_repair_account' => env('FINANCE_CAPTURE_DAMAGE_ACCOUNT', '6420'), // Property Maintenance Expense
+        'damage_repair_vendor' => env('FINANCE_CAPTURE_DAMAGE_VENDOR', 'Property Repairs'),
+        'respite_revenue_account' => env('FINANCE_CAPTURE_RESPITE_ACCOUNT', '4000'), // Funding Revenue
+        'insurance_revenue_account' => env('FINANCE_CAPTURE_INSURANCE_ACCOUNT', '4230'), // Insurance Recoveries
+        'maintenance_vendor' => env('FINANCE_CAPTURE_MAINTENANCE_VENDOR', 'Maintenance Contractor'),
+        // Operational assets valued at/above this land on the fixed-asset register
+        // (WITHOUT GL accounts — finance capitalises explicitly, so no auto journal).
+        'asset_capitalisation_threshold' => env('FINANCE_CAPTURE_ASSET_THRESHOLD', 1000),
+        'asset_capital_categories' => ['vehicle', 'equipment', 'building', 'furniture', 'it_equipment', 'land'],
+        'asset_useful_life_months' => env('FINANCE_CAPTURE_ASSET_LIFE_MONTHS', 60),
     ],
 
 ];

@@ -431,20 +431,20 @@ export default function IncidentsIndex({
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent align="end" className="w-64 p-1.5">
-                                    <button type="button" onClick={() => openReport('incident')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
+                                    <Button unstyled type="button" onClick={() => openReport('incident')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
                                         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />
                                         <span>
                                             <span className="block text-sm font-medium">An incident</span>
                                             <span className="block text-xs text-muted-foreground">Something happened to a client or worker.</span>
                                         </span>
-                                    </button>
-                                    <button type="button" onClick={() => openReport('near_miss')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
+                                    </Button>
+                                    <Button unstyled type="button" onClick={() => openReport('near_miss')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
                                         <Eye className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
                                         <span>
                                             <span className="block text-sm font-medium">A near miss</span>
                                             <span className="block text-xs text-muted-foreground">No harm done — takes under a minute.</span>
                                         </span>
-                                    </button>
+                                    </Button>
                                 </PopoverContent>
                             </Popover>
                         ) : null}

@@ -5,6 +5,7 @@ import type { PaneCtx } from '../context';
 import { Dropdown, Empty, ViewToggle, type ChecklistView } from '../primitives';
 import { RunListRow, WorklistCard } from '../run-cards';
 import type { ChecklistRun } from '../types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'All statuses' },
@@ -45,7 +46,7 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
 
     return (
         <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5 shadow-sm">
+            <GuardrailCard unstyled className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5 shadow-sm">
                 <div>
                     <h3 className="text-base font-semibold">All runs</h3>
                     <p className="text-sm text-muted-foreground">
@@ -62,11 +63,11 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
                     />
                     <ViewToggle value={view} onChange={setView} />
                 </div>
-            </div>
+            </GuardrailCard>
             {filtered.length === 0 ? (
-                <div className="rounded-xl border border-border bg-card p-2 shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
                     <Empty title="No runs match your filters." />
-                </div>
+                </GuardrailCard>
             ) : view === 'board' ? (
                 <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     {filtered.map((r) => (
@@ -74,11 +75,11 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
                     ))}
                 </div>
             ) : (
-                <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard unstyled className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     {filtered.map((r) => (
                         <RunListRow key={`${r.id}-${r.status}`} run={r} />
                     ))}
-                </div>
+                </GuardrailCard>
             )}
         </div>
     );

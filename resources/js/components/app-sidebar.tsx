@@ -1735,12 +1735,37 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     const ar: NavItem[] = [];
     if (can?.finance?.ar?.view) {
+        ar.push({
+            title: 'Billing',
+            href: '/finance/billing',
+            icon: DollarSign,
+        });
         // Sales & Receivables hub — invoices, quotes, recurring charges, billing,
         // aged AR, statements, price books and allocations are now tabs here.
         ar.push({
             title: 'Receivables',
             href: '/finance/receivables',
             icon: DollarSign,
+        });
+        ar.push({
+            title: 'Invoices',
+            href: '/finance/invoices',
+            icon: FileText,
+        });
+        ar.push({
+            title: 'Price Books',
+            href: '/finance/price-books',
+            icon: BookOpen,
+        });
+        ar.push({
+            title: 'Quotes',
+            href: '/finance/quotes',
+            icon: FileText,
+        });
+        ar.push({
+            title: 'Recurring Charges',
+            href: '/finance/recurring-charges',
+            icon: Receipt,
         });
     }
 

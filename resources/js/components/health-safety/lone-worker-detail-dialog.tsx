@@ -52,6 +52,7 @@ import {
     SESSION_TONE,
     type SessionDetail,
 } from './lone-worker-types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const ALERT_TYPE_ICON: Record<string, typeof AlertTriangle> = {
     emergency: AlertTriangle,
@@ -131,25 +132,25 @@ function SessionDetailDialog({
                     <ActBtn icon={XCircle} onClick={() => setAction({ kind: 'end', session: d })}>
                         End session
                     </ActBtn>
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => setAction({ kind: 'emergency', session: d })}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-status-critical px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-status-critical/90"
                     >
                         <AlertTriangle className="h-4 w-4" /> Trigger emergency
-                    </button>
+                    </GuardrailButton>
                 </>
             ) : (
                 <span className="text-xs text-muted-foreground">No lifecycle actions — session {SESSION_LABEL[d.status]?.toLowerCase() ?? d.status}.</span>
             )}
             {canRemove ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => setAction({ kind: 'delete', session: d })}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-status-critical/40 px-3 py-2 text-sm font-medium text-status-critical transition-colors hover:bg-status-critical/10"
                 >
                     <Trash2 className="h-4 w-4" /> Remove session
-                </button>
+                </GuardrailButton>
             ) : null}
         </div>
     );
@@ -253,26 +254,26 @@ function SessionOverview({ d }: { d: SessionDetail }) {
                                     Last seen {formatRelative(d.tracker.last_seen_at)}
                                 </div>
                             </div>
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => router.post(d.tracker!.locate_url, {}, { preserveScroll: true })}
                                 className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
                             >
                                 <Navigation className="h-3 w-3" /> Locate now
-                            </button>
+                            </GuardrailButton>
                         </div>
                         {d.tracker.panic_active ? (
                             <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-status-critical-bg px-3 py-2">
                                 <span className="flex items-center gap-1.5 text-xs font-semibold text-status-critical">
                                     <AlertTriangle className="h-3.5 w-3.5" /> Panic / man-down active
                                 </span>
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => router.post(d.tracker!.acknowledge_panic_url, {}, { preserveScroll: true })}
                                     className="rounded-lg bg-status-critical px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-status-critical/90"
                                 >
                                     Acknowledge
-                                </button>
+                                </GuardrailButton>
                             </div>
                         ) : null}
                     </div>
@@ -360,7 +361,7 @@ function SessionAlerts({ d, onOpenAlert }: { d: SessionDetail; onOpenAlert: (id:
                         const Icon = ALERT_TYPE_ICON[a.type] ?? Bell;
                         const status = ALERT_STATUS_META[a.status] ?? { tone: 'neutral' as const, label: a.status };
                         return (
-                            <button
+                            <GuardrailButton unstyled
                                 key={a.id}
                                 type="button"
                                 onClick={() => onOpenAlert(a.id)}
@@ -376,7 +377,7 @@ function SessionAlerts({ d, onOpenAlert }: { d: SessionDetail; onOpenAlert: (id:
                                     </span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            </button>
+                            </GuardrailButton>
                         );
                     })}
                 </div>
@@ -427,9 +428,9 @@ function AlertDetailDialog({
                             {d.session?.user?.name ?? 'Lone worker'} · {d.session?.site?.name ?? 'No site'}
                         </p>
                     </div>
-                    <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
+                    <GuardrailButton unstyled type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
                         <XCircle className="h-4 w-4" />
-                    </button>
+                    </GuardrailButton>
                 </div>
 
                 <div className="px-5 py-4">
@@ -483,34 +484,34 @@ function AlertDetailDialog({
                             {isLegacy && can.manage ? (
                                 <div className="flex gap-2">
                                     {d.status === 'active' ? (
-                                        <button
+                                        <GuardrailButton unstyled
                                             type="button"
                                             onClick={() => setAction({ kind: 'acknowledge', alert: d })}
                                             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
                                         >
                                             <Bell className="h-4 w-4" /> Acknowledge
-                                        </button>
+                                        </GuardrailButton>
                                     ) : null}
                                     {d.status !== 'resolved' ? (
-                                        <button
+                                        <GuardrailButton unstyled
                                             type="button"
                                             onClick={() => setAction({ kind: 'resolve', alert: d })}
                                             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-status-critical px-3 py-2 text-sm font-semibold text-white hover:bg-status-critical/90"
                                         >
                                             <Check className="h-4 w-4" /> Resolve
-                                        </button>
+                                        </GuardrailButton>
                                     ) : null}
                                 </div>
                             ) : null}
 
                             {sessionId ? (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onOpenSession(sessionId)}
                                     className="inline-flex items-center gap-1 self-start text-sm font-medium text-primary hover:underline"
                                 >
                                     <Activity className="h-4 w-4" /> View linked session <ChevronRight className="h-3 w-3" />
-                                </button>
+                                </GuardrailButton>
                             ) : null}
                         </div>
                     )}
@@ -533,14 +534,14 @@ function SectionLabel({ icon: Icon, children }: { icon: typeof MapPin; children:
 
 function ActBtn({ icon: Icon, onClick, children }: { icon: typeof Clock; onClick: () => void; children: ReactNode }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={onClick}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
         >
             <Icon className="h-4 w-4" />
             {children}
-        </button>
+        </GuardrailButton>
     );
 }
 

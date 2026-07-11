@@ -51,6 +51,8 @@ import {
     type WizardState,
 } from './components/compliance-wizards';
 import type { PersonOption } from '@/components/hr/people-picker';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface StaffRow {
     user_id: number;
@@ -190,7 +192,7 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                 </div>
 
                 {/* Filter bar */}
-                <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                <GuardrailCard unstyled className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
                     <div className="relative min-w-[220px] flex-1">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -226,7 +228,7 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
+                </GuardrailCard>
 
                 {/* Bulk bar */}
                 {selectedIds.length > 0 && (
@@ -242,14 +244,14 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                             )}
                             <BulkBtn onClick={() => exportStaff()}>Export</BulkBtn>
                         </div>
-                        <button onClick={clearSelection} className="ml-auto text-sm font-semibold text-muted-foreground hover:text-foreground">
+                        <GuardrailButton unstyled onClick={clearSelection} className="ml-auto text-sm font-semibold text-muted-foreground hover:text-foreground">
                             Clear
-                        </button>
+                        </GuardrailButton>
                     </div>
                 )}
 
                 {/* Table */}
-                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
                     <table className="w-full text-[13px]">
                         <thead>
                             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -323,13 +325,13 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                                                 )}
                                             </td>
                                             <td className="px-3 py-2.5 text-right">
-                                                <button
+                                                <GuardrailButton unstyled
                                                     onClick={(e) => openCtx(e, rowMenu(r))}
                                                     aria-label="Row actions"
                                                     className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent"
                                                 >
                                                     <MoreVertical className="h-4 w-4" />
-                                                </button>
+                                                </GuardrailButton>
                                             </td>
                                         </tr>
                                     );
@@ -343,7 +345,7 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                         </span>
                         {staffStatuses.last_page > 1 && <LaravelPagination links={staffStatuses.links} />}
                     </div>
-                </div>
+                </GuardrailCard>
             </div>
 
             <ComplianceContextMenu ctx={ctx} onClose={closeCtx} />
@@ -370,7 +372,7 @@ function Th({ children }: { children: React.ReactNode }) {
 
 function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={onChange}
             aria-checked={checked}
@@ -378,17 +380,17 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => voi
             className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
         >
             {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
-        </button>
+        </GuardrailButton>
     );
 }
 
 function BulkBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
     return (
-        <button
+        <GuardrailButton unstyled
             onClick={onClick}
             className="rounded-lg border border-primary/25 bg-card px-2.5 py-1.5 text-[12.5px] font-semibold text-primary transition-colors hover:bg-primary/5"
         >
             {children}
-        </button>
+        </GuardrailButton>
     );
 }

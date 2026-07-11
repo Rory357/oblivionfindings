@@ -6,10 +6,12 @@
 import { router, useForm } from '@inertiajs/react';
 import {
     BookOpen,
+    CalendarClock,
     CheckCircle2,
     ClipboardCheck,
     FileText,
     Flag,
+    GitMerge,
     KeyRound,
     Laptop,
     Mail,
@@ -112,6 +114,15 @@ export interface SlaPolicyRow {
 
 export type SlaPolicyGrid = Record<string, SlaPolicyRow>;
 
+/** The tenant's business-hours calendar, flattened to the editor's single-window view. */
+export interface SlaCalendar {
+    enabled: boolean;
+    open_time: string;
+    close_time: string;
+    working_days: string[];
+    holiday_dates: string[];
+}
+
 /** A tenant employee profile, for the manual provisioning-request picker. */
 export interface EmployeeOption {
     id: number;
@@ -180,6 +191,7 @@ export function ItWizard({
     employeeOptions = [],
     assetOptions = [],
     slaPolicies,
+    slaCalendar,
     kbSuggestions = [],
     onOpenArticle,
     onDraftKb,
@@ -190,6 +202,7 @@ export function ItWizard({
     employeeOptions?: EmployeeOption[];
     assetOptions?: AssetOption[];
     slaPolicies?: SlaPolicyGrid | null;
+    slaCalendar?: SlaCalendar | null;
     kbSuggestions?: KbSuggestion[];
     onOpenArticle?: (id: number) => void;
     onDraftKb?: (draft: KbDraft) => void;
@@ -226,7 +239,9 @@ export function ItWizard({
                 />
             );
         case 'sla':
-            return slaPolicies ? <SlaPolicyDialog policies={slaPolicies} onClose={onClose} /> : null;
+            return slaPolicies ? (
+                <SlaPolicyDialog policies={slaPolicies} calendar={slaCalendar} onClose={onClose} />
+            ) : null;
         case 'resolve':
             return <ResolveTicketDialog ticket={modal.ticket} onDraftKb={onDraftKb} onClose={onClose} />;
         case 'fulfil':
@@ -1230,6 +1245,7 @@ export function ResolveTicketDialog({
 
 const SLA_STEPS: readonly WizardStep[] = [
     { key: 'targets', label: 'SLA targets', blurb: 'Minutes per priority', icon: Timer },
+    { key: 'hours', label: 'Business hours', blurb: 'When the clock runs', icon: CalendarClock },
 ];
 
 /** §G defaults — what "Reset to defaults" restores. */
@@ -1246,6 +1262,16 @@ const SLA_PRIORITY_HINTS: Record<string, string> = {
     normal: 'Annoying, but they can work',
     low: 'Whenever there’s a moment',
 };
+
+const SLA_WORKING_DAYS: readonly { key: string; short: string }[] = [
+    { key: 'mon', short: 'Mon' },
+    { key: 'tue', short: 'Tue' },
+    { key: 'wed', short: 'Wed' },
+    { key: 'thu', short: 'Thu' },
+    { key: 'fri', short: 'Fri' },
+    { key: 'sat', short: 'Sat' },
+    { key: 'sun', short: 'Sun' },
+];
 
 /** "90 min" / "4 h" / "3 d" — so minutes never need mental arithmetic. */
 function minutesHuman(raw: string): string {
@@ -1264,13 +1290,23 @@ type SlaFormData = Record<string, { first_response_minutes: string; resolution_m
 
 export function SlaPolicyDialog({
     policies,
+    calendar,
     onClose,
 }: {
     policies: SlaPolicyGrid;
+    calendar?: SlaCalendar | null;
     onClose: () => void;
 }) {
     const wizard = useWizard(SLA_STEPS.length);
     const [done, setDone] = useState(false);
+    const [cal, setCal] = useState({
+        enabled: calendar?.enabled ?? false,
+        open_time: calendar?.open_time ?? '08:00',
+        close_time: calendar?.close_time ?? '17:00',
+        working_days: calendar?.working_days ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
+        holiday_dates: calendar?.holiday_dates ?? [],
+    });
+    const [holidayDraft, setHolidayDraft] = useState('');
 
     const form = useForm<SlaFormData>(
         Object.fromEntries(
@@ -1296,7 +1332,31 @@ export function SlaPolicyDialog({
     const set = (priority: string, field: 'first_response_minutes' | 'resolution_minutes', value: string) =>
         form.setData(priority, { ...form.data[priority], [field]: value });
 
+    const toggleDay = (key: string) =>
+        setCal((c) => ({
+            ...c,
+            working_days: c.working_days.includes(key)
+                ? c.working_days.filter((d) => d !== key)
+                : [...c.working_days, key],
+        }));
+    const addHoliday = () => {
+        if (holidayDraft && !cal.holiday_dates.includes(holidayDraft)) {
+            setCal((c) => ({ ...c, holiday_dates: [...c.holiday_dates, holidayDraft].sort() }));
+        }
+        setHolidayDraft('');
+    };
+    const removeHoliday = (d: string) =>
+        setCal((c) => ({ ...c, holiday_dates: c.holiday_dates.filter((x) => x !== d) }));
+
     const submit = () => {
+        form.transform((data) => ({
+            ...data,
+            business_hours_enabled: cal.enabled,
+            open_time: cal.open_time,
+            close_time: cal.close_time,
+            working_days: cal.working_days,
+            holiday_dates: cal.holiday_dates,
+        }));
         form.put('/it/sla-policies', {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -1334,25 +1394,36 @@ export function SlaPolicyDialog({
                 ) : undefined
             }
             footerStart={
-                <Button
-                    variant="ghost"
-                    onClick={() => form.setData(structuredClone(SLA_DEFAULTS))}
-                    disabled={form.processing}
-                >
-                    <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
-                </Button>
+                wizard.isFirst ? (
+                    <Button
+                        variant="ghost"
+                        onClick={() => form.setData(structuredClone(SLA_DEFAULTS))}
+                        disabled={form.processing}
+                    >
+                        <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
+                    </Button>
+                ) : (
+                    <Button variant="outline" onClick={wizard.back}>
+                        Back
+                    </Button>
+                )
             }
             footerEnd={
                 <>
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={form.processing}>
-                        {form.processing ? 'Saving…' : 'Save targets'}
-                    </Button>
+                    {wizard.isLast ? (
+                        <Button onClick={submit} disabled={form.processing}>
+                            {form.processing ? 'Saving…' : 'Save targets'}
+                        </Button>
+                    ) : (
+                        <Button onClick={wizard.next}>Next</Button>
+                    )}
                 </>
             }
         >
+            {wizard.index === 0 && (
             <WizardStepPane>
                 <StepHead
                     icon={Timer}
@@ -1422,9 +1493,271 @@ export function SlaPolicyDialog({
                         </div>
                     ))}
                     <InfoCard icon={Timer}>
-                        Clocks run 24/7 for now — business-hours calendars are a recorded
-                        follow-up decision. Changing targets never rewrites tickets already
-                        on the queue.
+                        {cal.enabled
+                            ? 'Clocks run on the business-hours calendar set in the next step.'
+                            : 'Clocks run 24/7 — set a business-hours calendar in the next step to pause them overnight and at weekends.'}{' '}
+                        Changing targets never rewrites tickets already on the queue.
+                    </InfoCard>
+                </div>
+            </WizardStepPane>
+            )}
+
+            {wizard.index === 1 && (
+            <WizardStepPane>
+                <StepHead
+                    icon={CalendarClock}
+                    title="Business hours"
+                    blurb="When enabled, SLA clocks only tick during these hours — a Friday-evening ticket is due the next working morning, not over the weekend."
+                />
+                <div className="grid gap-3.5">
+                    <label className="flex items-center gap-2 text-[13px] font-medium">
+                        <Checkbox
+                            checked={cal.enabled}
+                            onCheckedChange={(v) => setCal((c) => ({ ...c, enabled: v === true }))}
+                        />
+                        Run SLA clocks on a business-hours calendar
+                    </label>
+
+                    {cal.enabled ? (
+                        <>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <Field label="Opens" error={errors.open_time}>
+                                    <Input
+                                        type="time"
+                                        value={cal.open_time}
+                                        onChange={(e) => setCal((c) => ({ ...c, open_time: e.target.value }))}
+                                        aria-label="Business hours open time"
+                                    />
+                                </Field>
+                                <Field label="Closes" error={errors.close_time}>
+                                    <Input
+                                        type="time"
+                                        value={cal.close_time}
+                                        onChange={(e) => setCal((c) => ({ ...c, close_time: e.target.value }))}
+                                        aria-label="Business hours close time"
+                                    />
+                                </Field>
+                            </div>
+
+                            <Field label="Working days" error={errors.working_days}>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {SLA_WORKING_DAYS.map((d) => {
+                                        const on = cal.working_days.includes(d.key);
+                                        return (
+                                            // eslint-disable-next-line no-restricted-syntax -- selector chip: custom selected fill + aria-pressed, not a <Button>
+                                            <button
+                                                key={d.key}
+                                                type="button"
+                                                aria-pressed={on}
+                                                onClick={() => toggleDay(d.key)}
+                                                className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                                    on
+                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
+                                                }`}
+                                            >
+                                                {d.short}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </Field>
+
+                            <Field label="Public holidays (optional)">
+                                <div className="grid gap-2">
+                                    {cal.holiday_dates.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {cal.holiday_dates.map((d) => (
+                                                <span
+                                                    key={d}
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[12px]"
+                                                >
+                                                    {d}
+                                                    {/* eslint-disable-next-line no-restricted-syntax -- tiny inline remove-chip control */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeHoliday(d)}
+                                                        aria-label={`Remove holiday ${d}`}
+                                                        className="text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="date"
+                                            value={holidayDraft}
+                                            onChange={(e) => setHolidayDraft(e.target.value)}
+                                            aria-label="Add a public holiday"
+                                        />
+                                        <Button variant="outline" onClick={addHoliday} disabled={!holidayDraft}>
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Field>
+
+                            <InfoCard icon={CalendarClock}>
+                                These hours apply to every priority. Weekends and listed holidays don’t count
+                                against any SLA clock.
+                            </InfoCard>
+                        </>
+                    ) : (
+                        <InfoCard icon={Timer}>
+                            Clocks run 24/7 — every minute counts, including nights and weekends. Enable a
+                            calendar above to pause them outside working hours.
+                        </InfoCard>
+                    )}
+                </div>
+            </WizardStepPane>
+            )}
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  Merge ticket (agent — fold a duplicate into a survivor, §P-S2)     */
+/* ================================================================== */
+
+export interface MergeTarget {
+    id: number;
+    reference: string | null;
+    title: string;
+    priority: string;
+    status: string;
+}
+
+const MERGE_STEPS: readonly WizardStep[] = [
+    { key: 'target', label: 'Merge target', blurb: 'Pick the survivor', icon: GitMerge },
+];
+
+const MERGE_PRIORITY_VARIANT: Record<string, 'critical' | 'info' | 'neutral'> = {
+    urgent: 'critical',
+    high: 'critical',
+    normal: 'info',
+    low: 'neutral',
+};
+
+export function MergeTicketDialog({
+    ticket,
+    targets,
+    onClose,
+}: {
+    ticket: { id: number; reference: string | null; title: string };
+    targets: MergeTarget[];
+    onClose: () => void;
+}) {
+    const [q, setQ] = useState('');
+    const [selected, setSelected] = useState<number | null>(null);
+    const [processing, setProcessing] = useState(false);
+
+    const filtered = useMemo(() => {
+        const term = q.trim().toLowerCase();
+        if (!term) return targets;
+        return targets.filter(
+            (t) =>
+                (t.reference ?? '').toLowerCase().includes(term) || t.title.toLowerCase().includes(term),
+        );
+    }, [q, targets]);
+
+    const chosen = targets.find((t) => t.id === selected) ?? null;
+
+    const submit = () => {
+        if (!selected) return;
+        setProcessing(true);
+        router.post(
+            `/it/tickets/${ticket.id}/merge`,
+            { target_ticket_id: selected },
+            {
+                onSuccess: () => toast.success('Ticket merged.'),
+                onError: () => toast.error('Could not merge — the target may no longer be open.'),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Merge ticket"
+            description={`Fold ${ticket.reference ?? `#${ticket.id}`} into another open ticket.`}
+            railIcon={GitMerge}
+            railTitle="Merge"
+            railSub="IT helpdesk"
+            steps={MERGE_STEPS}
+            stepIndex={0}
+            onStepClick={() => {}}
+            pct={100}
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={!selected || processing}>
+                        {processing
+                            ? 'Merging…'
+                            : chosen
+                              ? `Merge into ${chosen.reference ?? `#${chosen.id}`}`
+                              : 'Merge'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={GitMerge}
+                    title="Choose the surviving ticket"
+                    blurb="This ticket's conversation and watchers move onto the one you pick; this ticket then closes as a duplicate."
+                />
+                <div className="grid gap-3">
+                    <Input
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search by reference or title…"
+                        aria-label="Search merge targets"
+                    />
+                    <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-border p-4 text-center text-[13px] text-muted-foreground">
+                                {targets.length === 0
+                                    ? 'No other open tickets to merge into.'
+                                    : 'No tickets match your search.'}
+                            </div>
+                        ) : (
+                            filtered.map((t) => {
+                                const on = t.id === selected;
+                                return (
+                                    // eslint-disable-next-line no-restricted-syntax -- selectable list row, not a <Button>
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => setSelected(t.id)}
+                                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                            on ? 'border-primary ring-1 ring-primary' : 'border-border hover:bg-muted'
+                                        }`}
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="truncate text-[13px] font-semibold">{t.title}</div>
+                                            <div className="font-mono text-[11.5px] text-muted-foreground">
+                                                {t.reference ?? `#${t.id}`}
+                                            </div>
+                                        </div>
+                                        <StatusBadge variant={MERGE_PRIORITY_VARIANT[t.priority] ?? 'neutral'} size="sm">
+                                            {t.priority}
+                                        </StatusBadge>
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                    <InfoCard icon={GitMerge}>
+                        Merging can’t be undone. The duplicate stays in the record — closed and linked to
+                        the survivor — so nothing is lost.
                     </InfoCard>
                 </div>
             </WizardStepPane>

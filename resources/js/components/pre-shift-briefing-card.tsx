@@ -17,6 +17,7 @@ import { formatRelative, formatTime } from '@/lib/datetime';
 
 import type { HandoverReadPayload } from './handover-read-card';
 import type { RosterShift } from './roster/types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // Match the 5-minute grace window used by Shift::isLate so the card and the
 // status pill agree on when a worker is "late".
@@ -117,7 +118,7 @@ export default function PreShiftBriefingCard({
                     </div>
 
                     {notes ? (
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="mb-1 flex items-center gap-2 font-medium">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 {t('what_to_know')}
@@ -125,11 +126,11 @@ export default function PreShiftBriefingCard({
                             <p className="line-clamp-3 whitespace-pre-wrap text-muted-foreground">
                                 {notes}
                             </p>
-                        </div>
+                        </GuardrailCard>
                     ) : null}
 
                     <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="flex items-center gap-2 font-medium">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                 {t('tasks')}
@@ -139,8 +140,8 @@ export default function PreShiftBriefingCard({
                                     count: briefing.tasks.length,
                                 })}
                             </p>
-                        </div>
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        </GuardrailCard>
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="flex items-center gap-2 font-medium">
                                 <Pill className="h-4 w-4 text-muted-foreground" />
                                 {t('meds_during_shift')}
@@ -156,11 +157,11 @@ export default function PreShiftBriefingCard({
                                     {t('none_scheduled')}
                                 </p>
                             )}
-                        </div>
+                        </GuardrailCard>
                     </div>
 
                     {briefing.incoming_handover ? (
-                        <div className="rounded-lg border bg-background/80 p-3 text-sm">
+                        <GuardrailCard unstyled className="rounded-lg border bg-background/80 p-3 text-sm">
                             <div className="font-medium">
                                 {t('incoming_handover')}
                             </div>
@@ -168,7 +169,7 @@ export default function PreShiftBriefingCard({
                                 {briefing.incoming_handover.handover_notes ||
                                     t('read_handover_hint')}
                             </p>
-                        </div>
+                        </GuardrailCard>
                     ) : null}
                 </div>
 

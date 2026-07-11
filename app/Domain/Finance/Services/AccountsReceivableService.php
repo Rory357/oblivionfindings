@@ -3,8 +3,10 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinPaymentAllocation;
+use App\Domain\Finance\Models\FinTaxRate;
 use App\Models\Client;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -16,6 +18,163 @@ class AccountsReceivableService
     public function __construct(
         private JournalPostingService $journalPostingService,
     ) {}
+
+    /**
+     * Create a DRAFT accounts-receivable invoice with lines — the canonical AR
+     * counterpart to AccountsPayableService::createBill. Draft is GL-safe: the
+     * AR issue journal (DR 1100 / CR revenue) posts later when the invoice is
+     * sent, never on create. Line tax resolves by `tax_rate_id`, else a direct
+     * `gst_rate` percentage, else NZ 15% GST. `source_type`/`source_id` capture
+     * the originating record so callers can be idempotent (one invoice per source).
+     *
+     * @param  array{client_id?:int,client_name?:string,funding_body?:string,invoice_date?:string,due_date?:string,source_type?:string,source_id?:int,source?:string,notes?:string,currency_code?:string,invoice_number?:string,lines:array<array{description:string,quantity?:float|int,unit_price:float|string,tax_rate_id?:int,gst_rate?:float|int,account_id?:int,service_date?:string,category?:string}>}  $data
+     */
+    public function createInvoice(?int $orgId, array $data): FinInvoice
+    {
+        return DB::transaction(function () use ($orgId, $data) {
+            $invoiceNumber = ! empty($data['invoice_number'])
+                ? $data['invoice_number']
+                : FinInvoice::nextNumber($orgId);
+
+            $subtotal = '0';
+            $taxTotal = '0';
+            $lines = [];
+
+            foreach ($data['lines'] as $index => $line) {
+                $qty = (string) ($line['quantity'] ?? 1);
+                $price = (string) $line['unit_price'];
+                $lineSubtotal = bcmul($qty, $price, 2);
+
+                $taxRateId = $line['tax_rate_id'] ?? null;
+                if ($taxRateId && ($rate = FinTaxRate::find($taxRateId))) {
+                    $taxAmount = bcmul($lineSubtotal, bcdiv((string) $rate->rate, '100', 6), 2);
+                } elseif (array_key_exists('gst_rate', $line)) {
+                    $taxAmount = bcmul($lineSubtotal, bcdiv((string) $line['gst_rate'], '100', 6), 2);
+                } else {
+                    $taxAmount = bcmul($lineSubtotal, '0.15', 2); // NZ 15% GST default
+                }
+                $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
+
+                $lines[] = [
+                    'description' => $line['description'],
+                    'quantity' => $qty,
+                    'unit_price' => $price,
+                    'tax_rate_id' => $taxRateId,
+                    'tax_amount' => $taxAmount,
+                    'line_total' => $lineTotal,
+                    'service_date' => $line['service_date'] ?? null,
+                    'category' => $line['category'] ?? null,
+                    'sort_order' => $index,
+                    'account_id' => $line['account_id'] ?? null,
+                    'funding_stream_id' => $line['funding_stream_id'] ?? null,
+                ];
+                $subtotal = bcadd($subtotal, $lineSubtotal, 2);
+                $taxTotal = bcadd($taxTotal, $taxAmount, 2);
+            }
+
+            $invoice = FinInvoice::create([
+                'organization_id' => $orgId,
+                'client_id' => $data['client_id'] ?? null,
+                'invoice_number' => $invoiceNumber,
+                'invoice_date' => $data['invoice_date'] ?? now()->toDateString(),
+                'due_date' => $data['due_date'] ?? now()->addDays(30)->toDateString(),
+                // client_name is NOT NULL — fall back to the funder, then a generic
+                // label, so a funder-only capture invoice still has a bill-to name.
+                'client_name' => $data['client_name'] ?? $data['funding_body'] ?? 'Customer',
+                'client_email' => $data['client_email'] ?? null,
+                'client_address' => $data['client_address'] ?? null,
+                'funding_body' => $data['funding_body'] ?? null,
+                'source' => $data['source'] ?? null,
+                'source_type' => $data['source_type'] ?? null,
+                'source_id' => $data['source_id'] ?? null,
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxTotal,
+                'total_amount' => bcadd($subtotal, $taxTotal, 2),
+                'currency_code' => $data['currency_code'] ?? 'NZD',
+                'status' => 'draft',
+                'notes' => $data['notes'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            foreach ($lines as $line) {
+                $invoice->lines()->create($line);
+            }
+
+            return $invoice->load('lines');
+        });
+    }
+
+    /**
+     * Capture-at-source: record an operational event (a confirmed respite booking,
+     * …) as a DRAFT receivable invoice. Idempotent on `source_type`/`source_id` so
+     * a source event that fires more than once never creates a duplicate. Amount =
+     * quantity × unit_price; a zero/absent amount is a no-op. The revenue account is
+     * resolved best-effort by code (draft, so a finance user can set it before
+     * sending). Draft is GL-safe — the AR issue journal posts only when sent.
+     *
+     * @param  array{source_type:string,source_id:int,quantity?:float|int,unit_price:float|string,description:string,funding_body?:string,client_id?:int,client_name?:string,revenue_account_code?:string,gst_rate?:float|int,notes?:string}  $data
+     */
+    public function captureOperationalInvoice(?int $orgId, array $data): ?FinInvoice
+    {
+        $amount = (float) ($data['quantity'] ?? 1) * (float) $data['unit_price'];
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $existing = FinInvoice::where('organization_id', $orgId)
+            ->where('source_type', $data['source_type'])
+            ->where('source_id', $data['source_id'])
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $accountId = $data['revenue_account_id']
+            ?? (! empty($data['revenue_account_code'])
+                ? FinAccount::where('organization_id', $orgId)
+                    ->where('code', $data['revenue_account_code'])
+                    ->where('is_active', true)
+                    ->value('id')
+                : null);
+
+        return $this->createInvoice($orgId, [
+            'client_id' => $data['client_id'] ?? null,
+            'client_name' => $data['client_name'] ?? null,
+            'funding_body' => $data['funding_body'] ?? null,
+            'source' => 'operations',
+            'source_type' => $data['source_type'],
+            'source_id' => $data['source_id'],
+            'notes' => $data['notes'] ?? null,
+            'lines' => [[
+                'description' => $data['description'],
+                'quantity' => $data['quantity'] ?? 1,
+                'unit_price' => $data['unit_price'],
+                'gst_rate' => $data['gst_rate'] ?? 0,
+                'account_id' => $accountId,
+                'funding_stream_id' => $data['funding_stream_id'] ?? null,
+            ]],
+        ]);
+    }
+
+    /**
+     * Resolve a funding stream from an operational funder key (e.g. a respite
+     * booking's `funding_source` such as "whaikaha" or "acc") by matching the
+     * stream code or funder_type, case-insensitively. Returns null when nothing
+     * matches — attribution is best-effort, never blocking.
+     */
+    public function resolveFundingStream(?int $orgId, ?string $funderKey): ?FinFundingStream
+    {
+        $key = strtolower(trim((string) $funderKey));
+        if ($key === '') {
+            return null;
+        }
+
+        return FinFundingStream::forOrganization($orgId)
+            ->active()
+            ->where(fn ($q) => $q->whereRaw('LOWER(code) = ?', [$key])
+                ->orWhereRaw('LOWER(funder_type) = ?', [$key]))
+            ->first();
+    }
 
     /**
      * Get aged receivables grouped by client with aging buckets.

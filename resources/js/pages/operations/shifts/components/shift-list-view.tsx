@@ -15,6 +15,8 @@ import {
     shiftStartTime,
     type ShiftRow,
 } from './shift-row-types';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     shifts: ShiftRow[];
@@ -56,7 +58,7 @@ export function ShiftListView({
 
     if (shifts.length === 0) {
         return (
-            <div className="rounded-xl border border-border bg-card p-10 text-center">
+            <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-10 text-center">
                 <CalendarClock className="mx-auto h-10 w-10 text-muted-foreground" />
                 <h3 className="mt-3 text-lg font-semibold text-foreground">
                     No shifts match these filters
@@ -64,7 +66,7 @@ export function ShiftListView({
                 <p className="mt-1 text-sm text-muted-foreground">
                     Try clearing a filter, or create a new shift.
                 </p>
-            </div>
+            </GuardrailCard>
         );
     }
 
@@ -155,13 +157,13 @@ function DayBlock({
                     ) : null}
                 </div>
                 {onCreateOnDay ? (
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => onCreateOnDay(date)}
                         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
                     >
                         <Plus className="h-3.5 w-3.5" /> Add to day
-                    </button>
+                    </GuardrailButton>
                 ) : null}
             </header>
             <ul>
@@ -274,7 +276,7 @@ function ShiftRowItem({
                     </div>
                 ) : (
                     <div className="min-w-0">
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -292,14 +294,14 @@ function ShiftRowItem({
                             ].join(' ')}
                         >
                             {coverRequested ? 'Cover requested' : 'Find cover'}
-                        </button>
+                        </GuardrailButton>
                         <ShiftStatusBadge status={effectiveStatus(shift)} />
                     </div>
                 )}
             </div>
 
             <div className="flex shrink-0 items-center gap-0.5">
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -309,9 +311,9 @@ function ShiftRowItem({
                     aria-label="View"
                 >
                     <Eye className="h-4 w-4" />
-                </button>
+                </GuardrailButton>
                 {locked ? null : (
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -321,9 +323,9 @@ function ShiftRowItem({
                         aria-label="Edit"
                     >
                         <Pencil className="h-4 w-4" />
-                    </button>
+                    </GuardrailButton>
                 )}
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -333,7 +335,7 @@ function ShiftRowItem({
                     aria-label="More"
                 >
                     <MoreVertical className="h-4 w-4" />
-                </button>
+                </GuardrailButton>
             </div>
         </li>
     );

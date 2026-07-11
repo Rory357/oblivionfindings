@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { LayoutGrid, List as ListIcon, Search } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
 import { TONE_DOT, type Tone } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function PaneHead({
     icon: Icon,
@@ -70,7 +71,7 @@ export function FilterChip({
     children: ReactNode;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={onClick}
             className={cn(
@@ -82,7 +83,7 @@ export function FilterChip({
         >
             {tone && active ? <span className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[tone])} /> : null}
             {children}
-        </button>
+        </GuardrailButton>
     );
 }
 
@@ -94,7 +95,7 @@ export function ViewToggle({ view, setView }: { view: 'list' | 'board'; setView:
     return (
         <div className="inline-flex rounded-[9px] border border-border bg-muted p-0.5">
             {opts.map(([k, label, Icon]) => (
-                <button
+                <GuardrailButton unstyled
                     key={k}
                     type="button"
                     onClick={() => setView(k)}
@@ -105,7 +106,7 @@ export function ViewToggle({ view, setView }: { view: 'list' | 'board'; setView:
                 >
                     <Icon className="h-3.5 w-3.5" />
                     {label}
-                </button>
+                </GuardrailButton>
             ))}
         </div>
     );

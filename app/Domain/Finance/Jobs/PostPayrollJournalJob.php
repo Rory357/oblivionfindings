@@ -56,12 +56,19 @@ class PostPayrollJournalJob implements ShouldQueue
         try {
             $journal = $service->postPayrollJournal($payrollRun);
 
+            // Clear any earlier failure now that the post succeeded.
+            $payrollRun->update(['gl_error' => null]);
+
             Log::info('Payroll journal posted successfully.', [
                 'payroll_run_id' => $payrollRun->id,
                 'journal_id' => $journal->id,
                 'journal_number' => $journal->journal_number,
             ]);
         } catch (\Throwable $e) {
+            // Surface the failure on the run itself ($tries = 1, so a throw
+            // otherwise only reaches failed_jobs — invisible to payroll users).
+            $payrollRun->update(['gl_error' => $e->getMessage()]);
+
             Log::error('Failed to post payroll journal.', [
                 'payroll_run_id' => $payrollRun->id,
                 'error' => $e->getMessage(),

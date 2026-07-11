@@ -2,18 +2,25 @@
 
 namespace App\Observers;
 
-use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
-use App\Domain\Finance\Models\FinFinancialEvent;
+use App\Domain\Finance\Services\AccountsPayableService;
 use App\Models\AssetMaintenanceLog;
 use Illuminate\Support\Facades\Log;
 
 class AssetMaintenanceLogObserver
 {
     /**
-     * Dispatch GL posting job when a maintenance log is created.
+     * Capture-at-source: a maintenance log with a cost becomes a DRAFT
+     * accounts-payable bill against the log's vendor.
      *
      * Trigger: AssetMaintenanceLog::created (cost > 0)
-     * GL Entry: DR 6300 Equipment Maintenance / CR 2000 AP
+     *
+     * This REPLACES the old direct GL post (DR 6300 / CR 2000 with no bill):
+     * maintenance is genuine on-account vendor spend, and an AP credit with no
+     * bill can never be settled by a payment run. The draft bill is GL-safe —
+     * approving it posts the balanced journal AND creates the FinCostAllocation
+     * rows (site/asset, event_type asset_maintenance_expense) that site cost
+     * reporting reads, so the move from direct posting loses no attribution.
+     * Idempotent on the "MAINT-{id}" reference; non-fatal.
      */
     public function created(AssetMaintenanceLog $log): void
     {
@@ -34,25 +41,23 @@ class AssetMaintenanceLogObserver
 
             $accountConfig = config('finance.event_accounts.asset_maintenance_expense');
 
-            ProcessFinancialEventJob::dispatch([
-                'organization_id' => $orgId,
-                'source_type' => AssetMaintenanceLog::class,
-                'source_id' => $log->id,
-                'event_type' => 'asset_maintenance_expense',
-                'description' => "Asset maintenance: {$log->type} — {$asset->name}"
-                    . ($log->vendor ? " (vendor: {$log->vendor})" : ''),
-                'amount' => (string) $log->cost,
-                'event_date' => ($log->performed_at ?? $log->created_at)->toDateString(),
-                'debit_account_code' => $accountConfig['debit'],
-                'payment_type' => FinFinancialEvent::PAYMENT_AP,
-                'journal_type' => $accountConfig['journal_type'],
+            app(AccountsPayableService::class)->captureOperationalBill($orgId, [
+                'reference' => "MAINT-{$log->id}",
+                'vendor_name' => $log->vendor ?: config('finance.capture.maintenance_vendor', 'Maintenance Contractor'),
+                'vendor_type' => 'contractor',
+                'description' => "Asset maintenance: {$log->type} — {$asset->name}",
+                'amount' => (float) $log->cost,
+                'account_code' => $accountConfig['debit'],
+                // cost is a single recorded figure with no GST breakdown
+                'gst_rate' => 0,
+                'bill_date' => ($log->performed_at ?? $log->created_at)->toDateString(),
                 'site_id' => $asset->site_id,
                 'asset_id' => $asset->id,
-                'staff_id' => $log->performed_by_user_id,
-                'source_updated_at' => $log->updated_at?->toISOString(),
+                'allocation_event_type' => 'asset_maintenance_expense',
+                'notes' => "Auto-captured from maintenance log #{$log->id}.",
             ]);
         } catch (\Throwable $e) {
-            Log::error("AssetMaintenanceLogObserver: Failed to dispatch GL job for log #{$log->id}: {$e->getMessage()}");
+            Log::error("AssetMaintenanceLogObserver: Failed to capture bill for log #{$log->id}: {$e->getMessage()}");
         }
     }
 }

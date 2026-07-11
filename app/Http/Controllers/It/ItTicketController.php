@@ -3,22 +3,29 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
+use App\Http\Requests\It\DecideApprovalRequest;
+use App\Http\Requests\It\MergeTicketRequest;
+use App\Http\Requests\It\RequestApprovalRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
+use App\Models\ItTicketApproval;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Inertia\Inertia;
 
@@ -114,6 +121,12 @@ class ItTicketController extends Controller
             ->values()
             ->all();
 
+        // §P-S3 approval state for the rail — the latest request + who can act.
+        $latestApproval = $ticket->requires_approval
+            ? $ticket->approvals()->with('requester:id,name', 'approver:id,name')->first()
+            : null;
+        $pendingApproval = $latestApproval?->status === 'pending' ? $latestApproval : null;
+
         return [
             'ticket' => [
                 'id' => $ticket->id,
@@ -165,6 +178,25 @@ class ItTicketController extends Controller
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
                 'resolved_at' => $ticket->resolved_at?->toIso8601String(),
                 'closed_at' => $ticket->closed_at?->toIso8601String(),
+                // §P-S2: the survivor this ticket was folded into, for the banner.
+                'merged_into' => $ticket->mergedInto
+                    ? [
+                        'id' => $ticket->mergedInto->id,
+                        'reference' => $ticket->mergedInto->reference,
+                        'title' => $ticket->mergedInto->title,
+                    ]
+                    : null,
+                // §P-S3 approval — flag + the latest request, for the rail.
+                'requires_approval' => (bool) $ticket->requires_approval,
+                'approval' => $latestApproval ? [
+                    'id' => $latestApproval->id,
+                    'status' => $latestApproval->status,
+                    'requested_by_name' => $latestApproval->requester?->name,
+                    'approver_name' => $latestApproval->approver?->name,
+                    'reason' => $latestApproval->reason,
+                    'requested_at' => $latestApproval->created_at?->toIso8601String(),
+                    'decided_at' => $latestApproval->decided_at?->toIso8601String(),
+                ] : null,
             ],
             'comments' => $comments,
             'events' => $events,
@@ -176,6 +208,26 @@ class ItTicketController extends Controller
             // as they type a reply. Agents (it.view) only — requesters already
             // met the KB at raise time and their payload stays lean.
             'kbSuggestions' => $isAgent ? $this->kbSuggestions($tenantId) : [],
+            // §P-S2 merge picker: recent live tickets an agent can fold this one
+            // into. Agents only; excludes self and already-merged tickets.
+            'mergeTargets' => $canManage
+                ? ItTicket::query()
+                    ->forTenant($tenantId)
+                    ->whereIn('status', ItTicket::OPEN_STATUSES)
+                    ->whereNull('merged_into_ticket_id')
+                    ->where('id', '!=', $ticket->id)
+                    ->latest('id')
+                    ->limit(50)
+                    ->get(['id', 'reference', 'title', 'priority', 'status'])
+                    ->map(fn (ItTicket $t) => [
+                        'id' => $t->id,
+                        'reference' => $t->reference,
+                        'title' => $t->title,
+                        'priority' => $t->priority,
+                        'status' => $t->status,
+                    ])
+                    ->all()
+                : [],
             'can' => [
                 'manage' => $canManage,
                 'view' => $isAgent,
@@ -184,6 +236,11 @@ class ItTicketController extends Controller
                 'watching' => $ticket->watchers->contains('id', $user->id),
                 // The requester may rate their own resolved ticket (§K).
                 'rate' => $isRequester && $ticket->status === 'resolved',
+                // Fold a duplicate into another live ticket (§P-S2). Agents only.
+                'merge' => $canManage && ! $ticket->isMerged() && $ticket->status !== 'closed',
+                // Approval affordances (§P-S3).
+                'requestApproval' => (bool) $user->can('requestApproval', $ticket),
+                'decideApproval' => $pendingApproval !== null && (bool) $user->can('decide', $pendingApproval),
             ],
         ];
     }
@@ -311,6 +368,10 @@ class ItTicketController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
+        if ($ticket->isMerged()) {
+            return redirect()->back()->with('error', 'This ticket was merged into another — reopen the survivor instead.');
+        }
+
         if (! in_array($ticket->status, ['resolved', 'closed'], true)) {
             return redirect()->back()->with('error', 'Only resolved or closed tickets can be reopened.');
         }
@@ -331,6 +392,118 @@ class ItTicketController extends Controller
         }
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
+    }
+
+    /**
+     * Fold a duplicate SOURCE ticket into a TARGET survivor: the conversation
+     * and watchers move across, the source closes as merged, and both
+     * timelines get a `merged` marker. Audit events stay put — merging never
+     * rewrites a ticket's own history. Guarded by ItTicketPolicy@merge.
+     */
+    public function merge(MergeTicketRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        $target = $request->targetTicket();
+        abort_unless($target instanceof ItTicket, 404);
+
+        DB::transaction(function () use ($ticket, $target, $user) {
+            // The conversation continues on the survivor.
+            $ticket->comments()->update(['ticket_id' => $target->id]);
+
+            // Watchers follow, de-duplicated against the survivor's list.
+            $watcherIds = $ticket->watchers()->pluck('users.id')->all();
+            if ($watcherIds !== []) {
+                $target->watchers()->syncWithoutDetaching($watcherIds);
+                $ticket->watchers()->detach();
+            }
+
+            // Close the source as merged — kept, never deleted.
+            $ticket->forceFill([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'merged_into_ticket_id' => $target->id,
+                'merged_at' => now(),
+            ])->save();
+
+            // A marker on each timeline; each ticket's own audit stays intact.
+            ItTicketEvent::record($ticket, 'merged', $user->id, [
+                'direction' => 'into',
+                'target_id' => $target->id,
+                'target_reference' => $target->reference,
+            ]);
+            ItTicketEvent::record($target, 'merged', $user->id, [
+                'direction' => 'from',
+                'source_id' => $ticket->id,
+                'source_reference' => $ticket->reference,
+            ]);
+        });
+
+        return redirect()
+            ->route('it.tickets.show', $target)
+            ->with('success', "Merged {$ticket->reference} into {$target->reference}.");
+    }
+
+    /**
+     * Raise a sign-off request on a ticket whose category needs approval
+     * (§P-S3). Notifies the other agents (never the requester) and logs it.
+     * Authorised by ItTicketPolicy@requestApproval (RequestApprovalRequest).
+     */
+    public function requestApproval(RequestApprovalRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+
+        $approval = $ticket->approvals()->create([
+            'tenant_id' => $ticket->tenant_id,
+            'requested_by' => $user->id,
+            'status' => 'pending',
+            'reason' => $request->validated('reason'),
+        ]);
+
+        ItTicketEvent::record($ticket, 'approval_requested', $user->id, ['approval_id' => $approval->id]);
+
+        // Every agent who could sign off, except the one who asked.
+        $approvers = ItStaffDirectory::agents($tenantId)->reject(fn (User $u) => $u->id === $user->id);
+        if ($approvers->isNotEmpty()) {
+            NotificationFacade::send($approvers, new TicketApprovalNotification($ticket, 'requested'));
+        }
+
+        return redirect()->back()->with('success', "Approval requested for {$ticket->reference}.");
+    }
+
+    /**
+     * Record a manager's verdict on a pending request (§P-S3) and tell the
+     * agent who asked. Authorised by ItTicketApprovalPolicy@decide
+     * (DecideApprovalRequest) — a different agent, pending only.
+     */
+    public function decideApproval(DecideApprovalRequest $request, ItTicketApproval $approval)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $approval->tenant_id);
+
+        $status = $request->validated('decision') === 'approve' ? 'approved' : 'rejected';
+
+        $approval->forceFill([
+            'status' => $status,
+            'approver_id' => $user->id,
+            'reason' => $request->validated('reason') ?? $approval->reason,
+            'decided_at' => now(),
+        ])->save();
+
+        $ticket = $approval->ticket;
+        ItTicketEvent::record($ticket, 'approval_'.$status, $user->id, ['approval_id' => $approval->id]);
+
+        $requester = User::find($approval->requested_by);
+        if ($requester) {
+            $requester->notify(new TicketApprovalNotification($ticket, $status));
+        }
+
+        return redirect()->back()->with('success', "Approval {$status} for {$ticket->reference}.");
     }
 
     /**

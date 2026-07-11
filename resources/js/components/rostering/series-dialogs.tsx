@@ -20,6 +20,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirror App\Services\Operations\ShiftSeriesPresenter@detail */
@@ -124,12 +125,12 @@ function formatTimeRange(startsAt?: string | null, endsAt?: string | null) {
 
 function StatTile({ label, value }: { label: string; value: number }) {
     return (
-        <div className="rounded-xl border border-border bg-card p-3 text-center">
+        <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-3 text-center">
             <div className="text-xl font-bold tabular-nums">{value}</div>
             <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {label}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -288,14 +289,14 @@ function DetailBody({
                             Cancel future
                         </Button>
                     ) : null}
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={() => onOpenChange(false)}
                         aria-label="Close"
                         className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                     >
                         <X className="h-5 w-5" />
-                    </button>
+                    </Button>
                 </div>
             </header>
 
@@ -509,22 +510,22 @@ function OccurrenceRow({
                     Open shift
                 </a>
                 {canManage && onCancel ? (
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={onCancel}
                         className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"
                     >
                         Cancel occurrence
-                    </button>
+                    </Button>
                 ) : null}
                 {canManage && onReopen ? (
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={onReopen}
                         className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"
                     >
                         Reopen occurrence
-                    </button>
+                    </Button>
                 ) : null}
             </div>
         </div>

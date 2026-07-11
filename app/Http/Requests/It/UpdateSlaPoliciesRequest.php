@@ -3,6 +3,7 @@
 namespace App\Http\Requests\It;
 
 use App\Models\ItTicket;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -37,7 +38,29 @@ class UpdateSlaPoliciesRequest extends FormRequest
             ];
         }
 
+        // Optional tenant-wide business-hours calendar (v1: a single daily
+        // window across the chosen working days). Off → the 24/7 clock,
+        // unchanged. The controller applies it to every priority row.
+        $rules['business_hours_enabled'] = ['boolean'];
+        $rules['open_time'] = ['required_if:business_hours_enabled,true', 'nullable', 'date_format:H:i'];
+        $rules['close_time'] = ['required_if:business_hours_enabled,true', 'nullable', 'date_format:H:i'];
+        $rules['working_days'] = ['required_if:business_hours_enabled,true', 'nullable', 'array', 'min:1'];
+        $rules['working_days.*'] = ['in:mon,tue,wed,thu,fri,sat,sun'];
+        $rules['holiday_dates'] = ['nullable', 'array', 'max:60'];
+        $rules['holiday_dates.*'] = ['date_format:Y-m-d'];
+
         return $rules;
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->boolean('business_hours_enabled')
+                && $this->filled('open_time') && $this->filled('close_time')
+                && $this->input('close_time') <= $this->input('open_time')) {
+                $validator->errors()->add('close_time', 'The close time must be after the open time.');
+            }
+        });
     }
 
     /**

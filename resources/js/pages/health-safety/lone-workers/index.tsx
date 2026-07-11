@@ -85,6 +85,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { type MouseEvent as ReactMouseEvent, useState } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 type Props = {
     tab: 'sessions' | 'alerts';
@@ -334,13 +335,13 @@ export default function LoneWorkerIndex({ tab, sessions, alerts, detail, tabCoun
                                     <PopoverContent align="end" className="w-60 p-1.5">
                                         <ReportLink href="/health-safety/analytics" icon={BarChart3} title="Safety analytics" sub="Trends, LTIFR / TRIFR" />
                                         <ReportLink href="/health-safety/reports/board-summary" icon={FileText} title="Board summary" sub="Governance report" />
-                                        <button type="button" onClick={exportCsv} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted">
+                                        <GuardrailButton unstyled type="button" onClick={exportCsv} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted">
                                             <FileText className="h-4 w-4 text-muted-foreground" />
                                             <span>
                                                 <span className="block text-sm font-medium text-foreground">Export current view</span>
                                                 <span className="block text-xs text-muted-foreground">CSV · this tab</span>
                                             </span>
-                                        </button>
+                                        </GuardrailButton>
                                     </PopoverContent>
                                 </Popover>
 
@@ -437,9 +438,9 @@ function StatusPill({ status }: { status: string }) {
 
 function Kebab({ onClick }: { onClick: (e: ReactMouseEvent) => void }) {
     return (
-        <button type="button" onClick={onClick} className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Row actions">
+        <GuardrailButton unstyled type="button" onClick={onClick} className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Row actions">
             <span className="text-lg leading-none">⋮</span>
-        </button>
+        </GuardrailButton>
     );
 }
 

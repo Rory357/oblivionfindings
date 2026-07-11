@@ -364,7 +364,7 @@ export function StepBasics({
                         const Icon = type.icon;
                         const isSelected = data.type === type.value;
                         return (
-                            <button
+                            <Button unstyled
                                 key={type.value}
                                 type="button"
                                 onClick={() => setData('type', type.value)}
@@ -389,7 +389,7 @@ export function StepBasics({
                                         {type.description}
                                     </div>
                                 </div>
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>

@@ -99,7 +99,7 @@ function ResolutionTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <button
+                    <Button unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -121,7 +121,7 @@ function ResolutionTypePicker({
                                 {t.description}
                             </span>
                         </span>
-                    </button>
+                    </Button>
                 );
             })}
         </div>

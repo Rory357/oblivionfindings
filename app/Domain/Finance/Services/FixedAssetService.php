@@ -402,17 +402,48 @@ class FixedAssetService
     }
 
     /**
-     * Post the acquisition journal for a new asset.
+     * Explicitly capitalise an asset that was registered without GL accounts
+     * (e.g. auto-captured from an operational purchase): posts the acquisition
+     * journal (DR fixed-asset account / CR bank) once the GL asset account has
+     * been assigned. Idempotent — throws if the acquisition already posted, so
+     * the action is surfaced, never silently repeated.
+     */
+    public function capitaliseAsset(FinFixedAsset $asset): FinFixedAsset
+    {
+        if ($asset->acquisition_journal_id) {
+            throw new InvalidArgumentException('The acquisition journal for this asset has already been posted.');
+        }
+
+        if (! $asset->gl_asset_account_id) {
+            throw new InvalidArgumentException('Assign a GL asset account before posting the acquisition.');
+        }
+
+        if (! $this->getDefaultAccountId($asset->organization_id, '1000')) {
+            throw new InvalidArgumentException("Bank account '1000' not found for this organisation — cannot post the acquisition.");
+        }
+
+        $this->postAcquisitionJournal($asset->organization_id, $asset);
+
+        return $asset->refresh();
+    }
+
+    /**
+     * Post the acquisition journal for a new asset. Idempotent: skips when the
+     * asset already records an acquisition journal, and stores the journal id.
      */
     protected function postAcquisitionJournal(?int $orgId, FinFixedAsset $asset): void
     {
+        if ($asset->acquisition_journal_id) {
+            return;
+        }
+
         $bankAccountId = $this->getDefaultAccountId($orgId, '1000');
 
         if (! $bankAccountId || ! $asset->gl_asset_account_id) {
             return;
         }
 
-        $this->journalPostingService->createAndPost($orgId, [
+        $journal = $this->journalPostingService->createAndPost($orgId, [
             'journal_date' => $asset->purchase_date->toDateString(),
             'type' => 'standard',
             'reference' => "ACQ-{$asset->asset_tag}",
@@ -434,6 +465,8 @@ class FixedAssetService
                 ],
             ],
         ]);
+
+        $asset->update(['acquisition_journal_id' => $journal->id]);
     }
 
     /**

@@ -29,11 +29,15 @@ class ItSlaPolicy extends Model
         'priority',
         'first_response_minutes',
         'resolution_minutes',
+        'business_hours',
+        'holiday_dates',
     ];
 
     protected $casts = [
         'first_response_minutes' => 'integer',
         'resolution_minutes' => 'integer',
+        'business_hours' => 'array',
+        'holiday_dates' => 'array',
     ];
 
     /**
@@ -54,5 +58,30 @@ class ItSlaPolicy extends Model
         }
 
         return self::DEFAULTS[$priority] ?? self::DEFAULTS['normal'];
+    }
+
+    /**
+     * The business-hours calendar for a tenant + priority, in the shape
+     * App\Support\It\BusinessHours consumes — or null when the tenant hasn't
+     * set one. Null means the 24/7 clock, so the v1 behaviour is preserved.
+     * Read alongside minutesFor() when stamping (wired in S2).
+     *
+     * @return array{business_hours: array<string, mixed>, holiday_dates: array<int, string>}|null
+     */
+    public static function calendarFor(int $tenantId, string $priority): ?array
+    {
+        $row = static::query()
+            ->where('tenant_id', $tenantId)
+            ->where('priority', $priority)
+            ->first();
+
+        if (! $row || empty($row->business_hours)) {
+            return null;
+        }
+
+        return [
+            'business_hours' => $row->business_hours,
+            'holiday_dates' => $row->holiday_dates ?? [],
+        ];
     }
 }

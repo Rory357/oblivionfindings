@@ -422,7 +422,7 @@ function Segmented<T extends string>({
             {options.map((o) => {
                 const active = value === o.value;
                 return (
-                    <button
+                    <Button unstyled
                         key={o.value}
                         type="button"
                         onClick={() => onChange(o.value)}
@@ -438,7 +438,7 @@ function Segmented<T extends string>({
                         )}
                     >
                         {o.label}
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -493,7 +493,7 @@ function ClientStep({
         <>
             <div className="mb-4 inline-flex rounded-[9px] border border-border bg-muted p-0.5">
                 {(['new', 'existing'] as const).map((m) => (
-                    <button
+                    <Button unstyled
                         key={m}
                         type="button"
                         onClick={() => setData('mode', m)}
@@ -505,7 +505,7 @@ function ClientStep({
                         )}
                     >
                         {m === 'new' ? 'New person' : 'Existing client'}
-                    </button>
+                    </Button>
                 ))}
             </div>
 

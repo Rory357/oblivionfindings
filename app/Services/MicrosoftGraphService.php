@@ -167,6 +167,67 @@ class MicrosoftGraphService
         return $this->client()->post('/me/sendMail', $message)->successful();
     }
 
+    /**
+     * Unread inbox messages for a mailbox (requires Mail.Read on the connected
+     * account, delegated to the support mailbox), oldest first, normalised to
+     * the shape InboundEmailIngestor::ingest() consumes plus `remote_id` for
+     * the follow-up markRead().
+     *
+     * @return array<int, array{remote_id:string,from:string,subject:?string,text:string,message_id:?string,in_reply_to:?string}>
+     */
+    public function listUnreadMessages(string $mailboxUpn, int $limit = 25): array
+    {
+        $response = $this->client()->get('/users/'.rawurlencode($mailboxUpn).'/mailFolders/inbox/messages', [
+            '$filter' => 'isRead eq false',
+            '$select' => 'id,subject,from,body,bodyPreview,internetMessageId,receivedDateTime',
+            '$top' => $limit,
+            '$orderby' => 'receivedDateTime asc',
+        ]);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        return collect($response->json('value', []))
+            ->map(fn (array $m) => [
+                'remote_id' => (string) ($m['id'] ?? ''),
+                'from' => (string) ($m['from']['emailAddress']['address'] ?? ''),
+                'subject' => $m['subject'] ?? null,
+                'text' => $this->plainTextBody($m),
+                'message_id' => $m['internetMessageId'] ?? null,
+                // Graph doesn't $select an in-reply-to header; threading keys
+                // off the IT-… reference in the subject (InboundEmailIngestor).
+                'in_reply_to' => null,
+            ])
+            ->filter(fn (array $m) => $m['remote_id'] !== '' && $m['from'] !== '')
+            ->values()
+            ->all();
+    }
+
+    /** Flag a mailbox message read so the next poll doesn't re-ingest it. */
+    public function markRead(string $mailboxUpn, string $messageId): bool
+    {
+        return $this->client()
+            ->patch('/users/'.rawurlencode($mailboxUpn).'/messages/'.rawurlencode($messageId), ['isRead' => true])
+            ->successful();
+    }
+
+    /** Best-effort plain text from a Graph message body (text, html, or preview). */
+    private function plainTextBody(array $message): string
+    {
+        $type = strtolower((string) ($message['body']['contentType'] ?? ''));
+        $content = (string) ($message['body']['content'] ?? '');
+
+        if ($content !== '' && $type !== 'html') {
+            return trim($content);
+        }
+        if ($content !== '') {
+            return trim(html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5));
+        }
+
+        return trim((string) ($message['bodyPreview'] ?? ''));
+    }
+
     // User info
 
     public function getProfile(): ?array

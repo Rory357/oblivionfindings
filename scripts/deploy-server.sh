@@ -84,14 +84,24 @@ run_app php artisan storage:link 2>/dev/null || true
 echo "▶ php artisan optimize:clear"
 run_app php artisan optimize:clear
 
-# Demo data for the redesigned /emar/rounds page. Opt-in (set SEED_DEMO_DATA=true
-# in .env on demo/test servers) so we never inject fake residents into a real
-# deployment. Idempotent + date-relative, so every deploy refreshes TODAY's rounds.
+# Demo data for the redesigned /emar/rounds page and the Finance hubs. Opt-in (set
+# SEED_DEMO_DATA=true in .env on demo/test servers) so we never inject fake residents
+# or finance rows into a real deployment. Both seeders are idempotent + date-relative,
+# so every deploy refreshes TODAY's rounds and repairs the org-1 chart of accounts.
 # Non-fatal: a seeding hiccup must never fail the deploy.
 if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
     echo "▶ php artisan db:seed MedicationRoundsDemoSeeder (SEED_DEMO_DATA=true)"
     run_app php artisan db:seed --class='Database\Seeders\MedicationRoundsDemoSeeder' --force \
         || echo "  ⚠ demo round seed failed (non-fatal) — run manually if needed."
+
+    # FinanceDemoSeeder re-seeds the org-1 chart of accounts + an open fiscal period
+    # (idempotent; FinanceSeeder::run(1) runs before its demo-data guard, so redeploys
+    # repair an emptied/partial chart). Without a chart, every observer-dispatched GL
+    # post (fuel, asset maintenance, house-ledger groceries) fails to resolve its
+    # accounts and silently writes no journal.
+    echo "▶ php artisan db:seed FinanceDemoSeeder (SEED_DEMO_DATA=true)"
+    run_app php artisan db:seed --class='Database\Seeders\FinanceDemoSeeder' --force \
+        || echo "  ⚠ finance demo seed failed (non-fatal) — run manually if needed."
 fi
 
 if [ "$SKIP_NOMINATIM" -eq 1 ]; then

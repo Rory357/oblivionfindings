@@ -21,6 +21,8 @@ import {
 import { ComplianceHubHeader, type HeroPayload } from './components/compliance-hub-header';
 import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from './components/compliance-wizards';
 import type { PersonOption } from '@/components/hr/people-picker';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface RenewalEvent {
     id: string;
@@ -134,7 +136,7 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
                 <ComplianceHubHeader hero={hero} active="calendar" can={{ manage: can.manage, vetting: can.vetting_manage, driver: can.driver_manage }} onWizard={(type) => setWz({ type })} />
 
                 {/* Horizon + type filters */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-2.5">
+                <GuardrailCard unstyled className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-2.5">
                     <span className="mr-1 text-xs font-semibold text-muted-foreground">Horizon</span>
                     {HORIZONS.map((h) => (
                         <Pill key={h.key} active={horizon === h.key} onClick={() => setHorizon(h.key)}>
@@ -147,13 +149,13 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
                             {t.label}
                         </Pill>
                     ))}
-                </div>
+                </GuardrailCard>
 
                 {groups.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
+                    <GuardrailCard unstyled className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
                         <Clock className="mx-auto mb-2 h-8 w-8 opacity-40" />
                         Nothing due in this window. 🎉
-                    </div>
+                    </GuardrailCard>
                 ) : (
                     groups.map(([month, items]) => (
                         <div key={month}>
@@ -161,7 +163,7 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
                                 <h3 className="text-sm font-bold">{month}</h3>
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{items.length} due</span>
                             </div>
-                            <div className="overflow-hidden rounded-xl border border-border bg-card">
+                            <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
                                 {items.map((e) => {
                                     const tb = RENEWAL_TYPE_BADGE[e.type] ?? RENEWAL_TYPE_BADGE.compliance;
                                     return (
@@ -186,7 +188,7 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
                                         </div>
                                     );
                                 })}
-                            </div>
+                            </GuardrailCard>
                         </div>
                     ))
                 )}
@@ -214,17 +216,17 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
                             </div>
                             <div className="mt-5 flex gap-2">
                                 {can.manage && (
-                                    <button onClick={() => { recordRenewal(sheet); setSheet(null); }} className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
+                                    <GuardrailButton unstyled onClick={() => { recordRenewal(sheet); setSheet(null); }} className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
                                         Record renewal
-                                    </button>
+                                    </GuardrailButton>
                                 )}
-                                <button onClick={() => remind(sheet)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">
+                                <GuardrailButton unstyled onClick={() => remind(sheet)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">
                                     Remind
-                                </button>
+                                </GuardrailButton>
                                 {can.manage && (
-                                    <button onClick={() => { waive(sheet); setSheet(null); }} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">
+                                    <GuardrailButton unstyled onClick={() => { waive(sheet); setSheet(null); }} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">
                                         Waive
-                                    </button>
+                                    </GuardrailButton>
                                 )}
                             </div>
                         </>
@@ -240,7 +242,7 @@ export default function ComplianceRenewals({ hero, events, wizard, can }: Props)
 
 function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={onClick}
             className={`h-8 rounded-lg border px-3 text-[12.5px] font-semibold transition-colors ${
@@ -248,7 +250,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
             }`}
         >
             {children}
-        </button>
+        </GuardrailButton>
     );
 }
 

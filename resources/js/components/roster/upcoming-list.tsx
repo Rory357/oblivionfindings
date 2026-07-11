@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate, formatTime } from '@/lib/datetime';
 
 import type { RosterShift } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function groupByDay(shifts: RosterShift[]): Array<[string, RosterShift[]]> {
     const grouped = shifts.reduce<Record<string, RosterShift[]>>(
@@ -40,7 +41,7 @@ export default function UpcomingList({
                     <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                         {formatDate(day)}
                     </h3>
-                    <div className="divide-y rounded-lg border bg-card">
+                    <GuardrailCard unstyled className="divide-y rounded-lg border bg-card">
                         {dayShifts.map((shift) => (
                             <Button
                                 key={shift.id}
@@ -72,7 +73,7 @@ export default function UpcomingList({
                                 </span>
                             </Button>
                         ))}
-                    </div>
+                    </GuardrailCard>
                 </section>
             ))}
         </div>

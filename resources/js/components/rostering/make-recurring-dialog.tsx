@@ -118,7 +118,7 @@ export function MakeRecurringDialog({
                             {WEEKDAYS.map((d) => {
                                 const on = weekdays.includes(d.id);
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={d.id}
                                         type="button"
                                         onClick={() => toggleWeekday(d.id)}
@@ -130,7 +130,7 @@ export function MakeRecurringDialog({
                                         )}
                                     >
                                         {d.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>

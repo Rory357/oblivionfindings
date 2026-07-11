@@ -225,7 +225,7 @@ export function SeriesPane({
     const [search, setSearch] = useState('');
     const [activeOnly, setActiveOnly] = useState(false);
 
-    const list = series ?? [];
+    const list = useMemo(() => series ?? [], [series]);
 
     const stats: MicroStat[] = useMemo(() => {
         const open = list.reduce((sum, s) => sum + s.open_occurrences_count, 0);
@@ -294,7 +294,7 @@ export function SeriesPane({
                             { key: false, label: 'All' },
                             { key: true, label: 'Active' },
                         ].map((opt) => (
-                            <button
+                            <Button unstyled
                                 key={String(opt.key)}
                                 type="button"
                                 aria-pressed={activeOnly === opt.key}
@@ -307,7 +307,7 @@ export function SeriesPane({
                                 )}
                             >
                                 {opt.label}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>

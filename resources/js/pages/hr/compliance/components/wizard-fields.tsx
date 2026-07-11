@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 /** Multi-select chips with distinct value/label (e.g. role name vs. role label). */
 export function LabeledChipMulti({
@@ -23,7 +24,7 @@ export function LabeledChipMulti({
             {options.map((o) => {
                 const active = values.includes(o.value);
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={o.value}
                         type="button"
                         aria-pressed={active}
@@ -37,7 +38,7 @@ export function LabeledChipMulti({
                     >
                         {active ? <Check className="h-3 w-3" /> : null}
                         {o.label}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -104,7 +105,7 @@ export function Toggle({
     label: ReactNode;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             onClick={() => onChange(!checked)}
             aria-pressed={checked}
@@ -124,7 +125,7 @@ export function Toggle({
                 />
             </span>
             <span className="text-[13px] font-medium">{label}</span>
-        </button>
+        </GuardrailButton>
     );
 }
 

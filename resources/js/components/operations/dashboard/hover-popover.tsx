@@ -23,6 +23,7 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 import type { HoverPopoverContent } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const ICON_MAP: Record<string, LucideIcon> = {
     'alert-triangle': AlertTriangle,
@@ -105,7 +106,7 @@ export function HoverPopover({
     const headerTone = TONE[content.tone] ?? TONE.info;
 
     return createPortal(
-        <div
+        <GuardrailCard unstyled
             ref={popRef}
             role="dialog"
             onMouseEnter={onMouseEnter}
@@ -178,7 +179,7 @@ export function HoverPopover({
                     <ArrowRight className="h-3 w-3" />
                 </Link>
             </div>
-        </div>,
+        </GuardrailCard>,
         document.body,
     );
 }
@@ -229,8 +230,8 @@ export function useHoverPopover() {
 export function PulseDot({ className }: { className?: string }): ReactNode {
     return (
         <span aria-hidden="true" className={cn('relative inline-flex h-2 w-2', className)}>
-            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
         </span>
     );
 }

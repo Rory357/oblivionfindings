@@ -326,6 +326,24 @@ Route::middleware('auth')->group(function () {
             ->name('settings.calendar-sync.disconnect');
     });
 
+    // IT support mailbox (email-to-ticket): connect the Exchange/Gmail account
+    // the hourly PollItMailboxJob reads. Same admin gate as calendar-sync;
+    // the OAuth flow mirrors it (E6).
+    Route::middleware('permission:integrations.manage_tenant_secrets')->group(function () {
+        Route::get('settings/it-mailbox', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'index'])
+            ->name('settings.it-mailbox');
+        Route::put('settings/it-mailbox/mailbox/{provider}', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'updateMailbox'])
+            ->name('settings.it-mailbox.mailbox');
+        Route::post('settings/it-mailbox/poll-now', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'pollNow'])
+            ->name('settings.it-mailbox.poll-now');
+        Route::get('settings/it-mailbox/connect/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'redirect'])
+            ->name('settings.it-mailbox.connect');
+        Route::get('settings/it-mailbox/callback/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'callback'])
+            ->name('settings.it-mailbox.callback');
+        Route::delete('settings/it-mailbox/connect/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'disconnect'])
+            ->name('settings.it-mailbox.disconnect');
+    });
+
     // Hardware integrations now live in Security & Devices. Microsoft and Google stay in Auth/SSO.
     Route::redirect('settings/integrations', '/security-devices/integrations', 301)
         ->middleware('permission:integrations.view')

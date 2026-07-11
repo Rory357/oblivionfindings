@@ -168,7 +168,7 @@ export default function CeoReportsIndex({ auth, reports, meetings }: Props) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {FILTER_CHIPS.map((chip) => (
-                <button
+                <Button unstyled
                   key={chip.key}
                   type="button"
                   onClick={() => setFilter(chip.key)}
@@ -191,7 +191,7 @@ export default function CeoReportsIndex({ auth, reports, meetings }: Props) {
                       {chip.count}
                     </span>
                   )}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

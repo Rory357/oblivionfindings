@@ -41,6 +41,8 @@ import {
     humanizeRole,
     initials,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function DetailList({
     icon: Icon,
@@ -67,7 +69,7 @@ function DetailList({
               ? 'bg-status-warning'
               : 'bg-primary';
     return (
-        <div className="rounded-xl border border-border bg-card">
+        <GuardrailCard unstyled className="rounded-xl border border-border bg-card">
             <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
                 <span
                     className={cn(
@@ -95,7 +97,7 @@ function DetailList({
                     </div>
                 ))}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -588,32 +590,32 @@ export function HandoverDetailDialog({
                         ) : null}
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={() => onOpenChange(false)}
                             className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                         >
                             Close
-                        </button>
+                        </GuardrailButton>
                         {h.status === 'draft' && h.can_submit ? (
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => onSubmit(h)}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                             >
                                 <Send className="h-3.5 w-3.5" />
                                 Submit
-                            </button>
+                            </GuardrailButton>
                         ) : null}
                         {h.status === 'submitted' && h.can_acknowledge ? (
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => onAcknowledge(h)}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                             >
                                 <Check className="h-4 w-4" />
                                 Acknowledge
-                            </button>
+                            </GuardrailButton>
                         ) : null}
                         {h.edit_lock ? (
                             <button
@@ -626,14 +628,14 @@ export function HandoverDetailDialog({
                                 Being edited
                             </button>
                         ) : h.can_edit ? (
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => onEdit(h)}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                             >
                                 <FileText className="h-3.5 w-3.5" />
                                 Edit handover
-                            </button>
+                            </GuardrailButton>
                         ) : (
                             <button
                                 type="button"

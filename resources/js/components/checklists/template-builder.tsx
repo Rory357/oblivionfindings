@@ -41,6 +41,7 @@ import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { categoryIcon } from './icons';
 import type { ResponseType, TemplateDetail } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface ItemDraft {
     id?: number;
@@ -326,7 +327,7 @@ function TemplateBuilderBody({
                             const Icon = categoryIcon(c.icon);
                             const active = form.data.category === c.key;
                             return (
-                                <button
+                                <Button unstyled
                                     key={c.key}
                                     type="button"
                                     onClick={() => form.setData('category', active ? '' : c.key)}
@@ -346,7 +347,7 @@ function TemplateBuilderBody({
                                         <span className="block truncate text-sm font-medium">{c.label}</span>
                                         <span className="block text-xs text-muted-foreground">{c.blurb}</span>
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -533,7 +534,7 @@ function ItemRow({
 }) {
     const locked = item.has_responses === true;
     return (
-        <div className="rounded-lg border border-border bg-card p-3">
+        <GuardrailCard unstyled className="rounded-lg border border-border bg-card p-3">
             <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-0.5 pt-1">
                     <GripVertical className="h-4 w-4 text-muted-foreground/40" />
@@ -658,6 +659,6 @@ function ItemRow({
                     )}
                 </div>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }

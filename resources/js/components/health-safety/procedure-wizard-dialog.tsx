@@ -53,6 +53,8 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { ProcedureFormData } from './procedure-detail-dialog';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Options + form shape                                               */
@@ -263,40 +265,40 @@ export function ProcedureWizardDialog({
     /* ---- footer ---- */
     const footerEnd = isReview ? (
         <div className="flex items-center gap-2">
-            <button type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Cancel
-            </button>
+            </GuardrailButton>
             {!isEdit ? (
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => submit(true)}
                     disabled={form.processing}
                     className="rounded-lg border border-primary/40 px-3.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
                 >
                     Save &amp; add another
-                </button>
+                </GuardrailButton>
             ) : null}
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={() => submit(false)}
                 disabled={form.processing}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
             >
                 <FilePlus2 className="h-4 w-4" /> {isEdit ? 'Save changes' : 'Create procedure'}
-            </button>
+            </GuardrailButton>
         </div>
     ) : (
         <div className="flex items-center gap-2">
-            <button type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Cancel
-            </button>
-            <button
+            </GuardrailButton>
+            <GuardrailButton unstyled
                 type="button"
                 onClick={next}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
                 Continue <ChevronRight className="h-4 w-4" />
-            </button>
+            </GuardrailButton>
         </div>
     );
 
@@ -316,9 +318,9 @@ export function ProcedureWizardDialog({
             pctLabel="Procedure completeness"
             footerStart={
                 stepIndex > 0 && !done ? (
-                    <button type="button" onClick={back} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                    <GuardrailButton unstyled type="button" onClick={back} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                         <ChevronLeft className="h-4 w-4" /> Back
-                    </button>
+                    </GuardrailButton>
                 ) : null
             }
             footerEnd={done ? null : footerEnd}
@@ -334,22 +336,22 @@ export function ProcedureWizardDialog({
                         actions={
                             <>
                                 {!isEdit ? (
-                                    <button type="button" onClick={() => { setDone(false); reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                                    <GuardrailButton unstyled type="button" onClick={() => { setDone(false); reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
                                         Add another
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
                                 {createdId ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={() => { const id = createdId; close(); onOpenProcedure(id); }}
                                         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                                     >
                                         Open procedure
-                                    </button>
+                                    </GuardrailButton>
                                 ) : (
-                                    <button type="button" onClick={close} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                                    <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
                                         Done
-                                    </button>
+                                    </GuardrailButton>
                                 )}
                             </>
                         }
@@ -541,9 +543,9 @@ function FreeChips({ values, onChange, suggestions, placeholder }: { values: str
                     {values.map((v) => (
                         <span key={v} className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-[13px] font-medium text-primary">
                             {v}
-                            <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="text-primary/70 hover:text-primary">
+                            <GuardrailButton unstyled type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="text-primary/70 hover:text-primary">
                                 <X className="h-3 w-3" />
-                            </button>
+                            </GuardrailButton>
                         </span>
                     ))}
                 </div>
@@ -561,9 +563,9 @@ function FreeChips({ values, onChange, suggestions, placeholder }: { values: str
                     placeholder={placeholder}
                     className="h-9"
                 />
-                <button type="button" onClick={() => add(text)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted">
+                <GuardrailButton unstyled type="button" onClick={() => add(text)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted">
                     <Plus className="h-4 w-4" /> Add
-                </button>
+                </GuardrailButton>
             </div>
             {extraSuggestions.length ? <ChipMulti values={[]} onChange={(v) => v.length && add(v[v.length - 1])} options={extraSuggestions} /> : null}
         </div>
@@ -591,7 +593,7 @@ function EntityChecklist<T extends string | number>({
             {options.map((o) => {
                 const active = selected.includes(o.value);
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={String(o.value)}
                         type="button"
                         aria-pressed={active}
@@ -604,7 +606,7 @@ function EntityChecklist<T extends string | number>({
                         {active ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3 text-muted-foreground" />}
                         {o.label}
                         {o.sub ? <span className="text-[10px] font-bold text-muted-foreground">{o.sub}</span> : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -620,7 +622,7 @@ function StepsEditor({ steps, onChange }: { steps: WizForm['steps']; onChange: (
     return (
         <div className="flex flex-col gap-3">
             {steps.map((s, i) => (
-                <div key={i} className="rounded-xl border border-border bg-card/60 p-3">
+                <GuardrailCard unstyled key={i} className="rounded-xl border border-border bg-card/60 p-3">
                     <div className="flex items-start gap-2.5">
                         <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
                         <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -628,16 +630,16 @@ function StepsEditor({ steps, onChange }: { steps: WizForm['steps']; onChange: (
                             <Input value={s.safety_notes} onChange={(e) => update(i, { safety_notes: e.target.value })} placeholder="Safety note (optional)" className="h-9" />
                         </div>
                         {steps.length > 1 ? (
-                            <button type="button" onClick={() => remove(i)} aria-label={`Remove step ${i + 1}`} className="mt-1 shrink-0 text-muted-foreground hover:text-status-critical">
+                            <GuardrailButton unstyled type="button" onClick={() => remove(i)} aria-label={`Remove step ${i + 1}`} className="mt-1 shrink-0 text-muted-foreground hover:text-status-critical">
                                 <Trash2 className="h-4 w-4" />
-                            </button>
+                            </GuardrailButton>
                         ) : null}
                     </div>
-                </div>
+                </GuardrailCard>
             ))}
-            <button type="button" onClick={add} className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
+            <GuardrailButton unstyled type="button" onClick={add} className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
                 <Plus className="h-4 w-4" /> Add step
-            </button>
+            </GuardrailButton>
         </div>
     );
 }

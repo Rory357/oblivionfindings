@@ -16,6 +16,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type EntityFilterOption = {
     id: number;
@@ -96,7 +97,7 @@ export function EntityFilter({
                         </button>
                     </PopoverTrigger>
                     {selected ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             aria-label={`Clear ${label} filter`}
                             className={cn(
@@ -108,7 +109,7 @@ export function EntityFilter({
                             onClick={() => onChange(null)}
                         >
                             <X className="h-3 w-3" />
-                        </button>
+                        </GuardrailButton>
                     ) : null}
                 </div>
             </PopoverAnchor>

@@ -266,7 +266,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                                         {tags.map((t) => {
                                             const selected = form.data.tag_ids?.includes(t.id);
                                             return (
-                                                <button
+                                                <Button unstyled
                                                     key={t.id}
                                                     type="button"
                                                     aria-pressed={selected}
@@ -275,7 +275,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                                                     style={tagBadgeStyle(t)}
                                                 >
                                                     {t.label}
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>

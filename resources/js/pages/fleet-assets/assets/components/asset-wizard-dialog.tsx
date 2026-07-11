@@ -343,7 +343,7 @@ export function AssetWizardDialog({
     const set = <K extends keyof WizardState>(k: K, v: WizardState[K]) =>
         setData((prev) => ({ ...prev, [k]: v }));
 
-    const clientList = clients ?? [];
+    const clientList = useMemo(() => clients ?? [], [clients]);
     const selectedSiteId = data.site_id ? Number(data.site_id) : null;
     const filteredClients = useMemo(() => {
         if (!selectedSiteId) return clientList;

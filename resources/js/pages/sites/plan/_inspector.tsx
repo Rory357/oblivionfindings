@@ -158,7 +158,7 @@ export default function PlanInspector({
                     Use the <strong>Set scale</strong> tool on the canvas for a
                     click-and-measure calibration. Walls show their length live.
                 </p>
-                <div className="mt-3 flex items-center justify-between rounded-md border bg-slate-50 px-2 py-2">
+            <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-2 py-2">
                     <div>
                         <Label className="text-xs">Snap to grid</Label>
                         <p className="text-[11px] text-muted-foreground">
@@ -194,7 +194,7 @@ export default function PlanInspector({
                                     key={group.id}
                                     className="flex items-center justify-between"
                                 >
-                                    <span className="text-xs text-slate-700">
+                                        <span className="text-xs text-muted-foreground">
                                         {group.label}
                                     </span>
                                     <Switch
@@ -254,9 +254,9 @@ export default function PlanInspector({
                                 return (
                                     <div
                                         key={room.id}
-                                        className={`rounded-md border p-2 ${selected ? 'border-blue-400 bg-blue-50' : ''}`}
+                                                className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             className="block w-full text-left"
                                             onClick={() =>
@@ -285,7 +285,7 @@ export default function PlanInspector({
                                                     Free-form label
                                                 </span>
                                             )}
-                                        </button>
+                                        </Button>
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             <RoomLinkPopover
                                                 roomId={room.id}
@@ -366,10 +366,10 @@ export default function PlanInspector({
                                 return (
                                     <div
                                         key={id}
-                                        className={`rounded-md border p-2 ${selected ? 'border-blue-400 bg-blue-50' : ''}`}
+                                                className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
-                                            <button
+                                            <Button unstyled
                                                 type="button"
                                                 className="block flex-1 text-left"
                                                 onClick={() =>
@@ -417,7 +417,7 @@ export default function PlanInspector({
                                                         </Badge>
                                                     )}
                                                 </div>
-                                            </button>
+                                            </Button>
                                             <Button
                                                 type="button"
                                                 size="icon"
@@ -490,7 +490,7 @@ function SelectionDetails({
 }) {
     if (selection.length === 0) {
         return (
-            <div className="rounded-md border border-dashed bg-slate-50 p-3 text-xs text-muted-foreground">
+            <div className="rounded-md border border-dashed bg-muted/50 p-3 text-xs text-muted-foreground">
                 Select an item on the canvas to edit it. Drag on empty canvas to
                 select multiple items.
             </div>
@@ -499,11 +499,11 @@ function SelectionDetails({
 
     if (selection.length > 1) {
         return (
-            <div className="rounded-md border bg-blue-50 p-3 text-xs">
-                <div className="mb-2 font-medium text-blue-900">
+            <div className="rounded-md border bg-status-info-bg p-3 text-xs">
+                <div className="mb-2 font-medium text-status-info">
                     {selection.length} items selected
                 </div>
-                <p className="mb-2 text-blue-900/80">
+                <p className="mb-2 text-status-info/80">
                     Drag any selected item on the canvas to move the whole
                     group.
                 </p>
@@ -539,7 +539,7 @@ function SelectionDetails({
                 <h3 className="mb-2 text-sm font-medium">
                     Room — {room.label ?? 'Unnamed'}
                 </h3>
-                <dl className="space-y-1 text-xs text-slate-700">
+                    <dl className="space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
                         <dt>Width</dt>
                         <dd>{formatMeters(room.width * canvasWidth, mpu)}</dd>
@@ -594,7 +594,7 @@ function SelectionDetails({
         return (
             <div className="rounded-md border p-3">
                 <h3 className="mb-2 text-sm font-medium">Wall</h3>
-                <dl className="space-y-1 text-xs text-slate-700">
+                    <dl className="space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
                         <dt>Length</dt>
                         <dd>{formatMeters(length, mpu)}</dd>
@@ -645,7 +645,7 @@ function SelectionDetails({
                     {kindMeta?.label ?? pin.kind.replaceAll('_', ' ')}
                 </h3>
                 {validationError && (
-                    <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+            <div className="rounded-md border border-status-critical/30 bg-status-critical-bg px-2 py-1 text-xs text-status-critical">
                         {validationError}
                     </div>
                 )}
@@ -820,7 +820,7 @@ function SelectionDetails({
                     </Badge>
                 </div>
                 {!normalised.wall_id && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
                         Drag this door close to a wall to create a clean
                         opening.
                     </div>
@@ -1003,7 +1003,7 @@ function SelectionDetails({
                     </Badge>
                 </div>
                 {!item.wall_id && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
                         Drag this window close to a wall to align it with the
                         plan.
                     </div>
@@ -1234,7 +1234,7 @@ function PinKindPicker({
                 <div className="max-h-[360px] space-y-2 overflow-y-auto">
                     {groups.map((group) => (
                         <div key={group.id}>
-                            <div className="mb-1 px-1 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    <div className="mb-1 px-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                                 {group.label}
                             </div>
                             <div className="grid grid-cols-3 gap-1">
@@ -1244,16 +1244,16 @@ function PinKindPicker({
                                     const Icon = resolveIcon(kind.icon);
                                     const active = pin.kind === kindKey;
                                     return (
-                                        <button
+                                        <Button unstyled
                                             key={kindKey}
                                             type="button"
                                             onClick={() => changeKind(kindKey)}
                                             data-test={`site-plan-pin-kind-option-${kindKey}`}
                                             title={kind.label}
                                             className={cn(
-                                                'flex flex-col items-center gap-1 rounded border bg-white p-1.5 text-[10px] text-slate-700 transition hover:bg-slate-50',
+                                                'flex flex-col items-center gap-1 rounded border bg-background p-1.5 text-[10px] text-muted-foreground transition hover:bg-muted/50',
                                                 active &&
-                                                    'border-blue-500 bg-blue-50 text-blue-900',
+                                                    'border-primary bg-primary/10 text-primary',
                                             )}
                                         >
                                             <Icon
@@ -1263,7 +1263,7 @@ function PinKindPicker({
                                             <span className="line-clamp-2 text-center leading-tight">
                                                 {kind.label}
                                             </span>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>

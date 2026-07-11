@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 import { DRIVER_BADGE } from '@/pages/hr/compliance/components/compliance-bits';
 import { CompactHeroBand, HeroGhostButton, HeroInitials, HeroSolidButton } from '@/pages/hr/compliance/components/compliance-hero';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface Driver {
     id: number;
@@ -130,7 +131,7 @@ export default function DriverShow({ driver, history, can }: Props) {
                 )}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="rounded-xl border border-border bg-card p-4">
+                    <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-4">
                         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold">
                             <Pencil className="h-4 w-4 text-primary" /> Licence
                         </h3>
@@ -140,9 +141,9 @@ export default function DriverShow({ driver, history, can }: Props) {
                                 <span className="text-right font-semibold">{f.value}</span>
                             </div>
                         ))}
-                    </div>
+                    </GuardrailCard>
 
-                    <div className="rounded-xl border border-border bg-card p-4">
+                    <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-4">
                         <h3 className="mb-3 text-sm font-bold">History</h3>
                         {history.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No history recorded.</p>
@@ -161,7 +162,7 @@ export default function DriverShow({ driver, history, can }: Props) {
                                 </div>
                             ))
                         )}
-                    </div>
+                    </GuardrailCard>
                 </div>
             </div>
 

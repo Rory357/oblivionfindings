@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { formatRelative } from '@/lib/datetime';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export default function BreakControl({
     sessionId,
@@ -58,7 +59,7 @@ export default function BreakControl({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <GuardrailCard unstyled className="flex flex-col gap-3 rounded-lg border bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-sm">
                 <Coffee className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Breaks</span>
@@ -76,6 +77,6 @@ export default function BreakControl({
                 <PauseCircle className="mr-2 h-4 w-4" />
                 {submitting ? 'Starting...' : 'Start break'}
             </Button>
-        </div>
+        </GuardrailCard>
     );
 }

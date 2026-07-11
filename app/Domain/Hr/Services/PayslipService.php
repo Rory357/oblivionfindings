@@ -80,6 +80,7 @@ class PayslipService
             'acc_levy' => $result['acc_levy'],
             'kiwisaver_employee' => $result['kiwisaver_employee'],
             'kiwisaver_employer' => $result['kiwisaver_employer'],
+            'esct' => $result['esct'] ?? 0,
             'student_loan' => $result['student_loan'],
             'holiday_pay' => $result['holiday_pay'],
             'total_deductions' => $result['total_deductions'],

@@ -433,7 +433,7 @@ export function JobCard({
 
             {job.claimed_by && (
                 <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-2.5 py-2">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-400 to-pink-500 text-[10.5px] font-bold text-white">
+                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-[10.5px] font-bold text-primary-foreground">
                         {initialsOf(job.claimed_by.name)}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">

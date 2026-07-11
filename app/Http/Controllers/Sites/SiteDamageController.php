@@ -2,14 +2,22 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteDamage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class SiteDamageController extends Controller
 {
+    public function __construct(
+        private AccountsPayableService $accountsPayable,
+        private AccountsReceivableService $accountsReceivable,
+    ) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('viewAny', SiteDamage::class);
@@ -86,7 +94,82 @@ class SiteDamageController extends Controller
 
         $damage->update($data);
 
+        // Capture-at-source: a repaired damage with an actual cost becomes a draft
+        // accounts-payable bill for the repair, and an approved insurance claim
+        // becomes a draft receivable invoice to the insurer. Both idempotent and
+        // non-fatal — never block the operational update. (fresh() can be null if
+        // the row was deleted concurrently — skip quietly rather than fatal.)
+        if ($fresh = $damage->fresh()) {
+            $this->captureRepairBill($site, $fresh);
+            $this->captureInsuranceInvoice($site, $fresh);
+        }
+
         return redirect()->back()->with('success', 'Damage report updated.');
+    }
+
+    /**
+     * Post an approved insurance claim as a DRAFT receivable invoice (billed to
+     * the insurer, GL 4230 Insurance Recoveries). Amount = actual cost, falling
+     * back to the estimate while the repair is unpriced. Zero-rated: the claim
+     * amount is recovered as-is, mirroring the gst-0 repair bill so the recovery
+     * offsets the expense 1:1. Idempotent on the SiteDamage source.
+     */
+    private function captureInsuranceInvoice(Site $site, SiteDamage $damage): void
+    {
+        $amount = (float) ($damage->actual_cost ?: $damage->estimated_cost);
+
+        if ($damage->insurance_status !== 'approved' || $amount <= 0) {
+            return;
+        }
+
+        try {
+            $claimRef = $damage->insurance_claim_ref;
+            $this->accountsReceivable->captureOperationalInvoice($damage->tenant_id, [
+                'source_type' => SiteDamage::class,
+                'source_id' => $damage->id,
+                'client_name' => $claimRef ? "Insurance — claim {$claimRef}" : 'Insurance claim',
+                'funding_body' => 'Insurance',
+                'description' => "Insurance recovery — {$damage->title} @ {$site->name}",
+                'quantity' => 1,
+                'unit_price' => $amount,
+                'gst_rate' => 0,
+                'revenue_account_code' => config('finance.capture.insurance_revenue_account', '4230'),
+                'notes' => "Auto-captured from damage report #{$damage->id}"
+                    .($claimRef ? " (claim {$claimRef})" : '').'.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Insurance invoice capture failed for damage #{$damage->id}: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Post the repair cost of a repaired damage to accounts payable as a draft
+     * bill (against the org's Property Repairs vendor, GL 6420). The finance
+     * service is idempotent on the "DAMAGE-{id}" reference, so this can run on
+     * every update without duplicating.
+     */
+    private function captureRepairBill(Site $site, SiteDamage $damage): void
+    {
+        if ($damage->status !== 'repaired' || (float) $damage->actual_cost <= 0) {
+            return;
+        }
+
+        try {
+            $this->accountsPayable->captureOperationalBill($damage->tenant_id, [
+                'reference' => "DAMAGE-{$damage->id}",
+                'vendor_name' => config('finance.capture.damage_repair_vendor', 'Property Repairs'),
+                'vendor_type' => 'contractor',
+                'description' => "Repair — {$damage->title} @ {$site->name}",
+                'amount' => (float) $damage->actual_cost,
+                'account_code' => config('finance.capture.damage_repair_account', '6420'),
+                // actual_cost is a single figure with no GST breakdown; record it as the
+                // expense/payable as-is (bill approval lumps any line GST into the expense).
+                'gst_rate' => 0,
+                'notes' => "Auto-captured from damage report #{$damage->id}.",
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Damage repair bill capture failed for damage #{$damage->id}: {$e->getMessage()}");
+        }
     }
 
     public function destroy(Request $request, Site $site, SiteDamage $damage)

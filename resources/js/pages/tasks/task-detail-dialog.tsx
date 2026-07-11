@@ -38,6 +38,7 @@ import {
     type TaskDetail,
     type TaskItem,
 } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -203,9 +204,9 @@ function SplitTaskForm({
                             Assignee <span className="font-normal">(optional)</span>
                         </label>
                         {assignee ? (
-                            <div className="flex h-9 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm">
+                            <GuardrailCard unstyled className="flex h-9 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm">
                                 <span className="truncate">{assignee.name}</span>
-                                <button
+                                <Button unstyled
                                     type="button"
                                     aria-label="Clear assignee"
                                     onClick={() => {
@@ -215,8 +216,8 @@ function SplitTaskForm({
                                     className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     <UserX className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                                </Button>
+                            </GuardrailCard>
                         ) : (
                             <input
                                 id="split-assignee"

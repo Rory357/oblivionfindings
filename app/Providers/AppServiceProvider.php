@@ -223,6 +223,8 @@ class AppServiceProvider extends ServiceProvider
         FleetFuelLog::observe(FleetFuelLogObserver::class);
         FleetWorkOrder::observe(FleetWorkOrderObserver::class);
         AssetMaintenanceLog::observe(AssetMaintenanceLogObserver::class);
+        // Capitalisation capture: high-value asset valuations → fixed-asset register
+        \App\Models\AssetValue::observe(\App\Observers\AssetValueObserver::class);
         // HrExpenseClaim GL posting is handled solely by
         // ExpenseService::approveClaim() → PostExpenseJournalJob (per-category DR /
         // CR 2000 Accounts Payable). The former HrExpenseClaimObserver posted a

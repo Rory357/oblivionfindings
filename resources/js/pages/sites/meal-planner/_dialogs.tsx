@@ -15,6 +15,7 @@ import { ConfirmAction } from '../_confirm-action';
 import { announce } from './_announcer';
 import { addDays, allergenResidentsFor, dietaryMismatchesFor, firstName, fluidsResidentsFor, joinNames, MEAL_SLOTS, SLOT_LABEL, formatQty, textureResidentsFor, toIsoDate, type InventoryItem, type MealSlot, type PlanEntry, type RecipeFull, type Resident, type SourceType, type WeekTemplate } from './_helpers';
 import { TemplateBuilderDialog } from './_templates-panel';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type ProductOpt = { id: number; name: string; default_unit: string };
 
@@ -170,7 +171,13 @@ export function PlanEntryDialog({
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [open, siteId, form.data.source_type, form.data.recipe_id, JSON.stringify(form.data.client_ids)]);
+    }, [
+        open,
+        siteId,
+        form.data.source_type,
+        form.data.recipe_id,
+        form.data.client_ids,
+    ]);
 
     // Explicit, non-debounced re-check (the "Retry check" button + submit-time re-verify).
     function retryCheck() {
@@ -276,13 +283,13 @@ export function PlanEntryDialog({
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     {!isNew && entry?.allergen_override_at && existingOverrideReason && (
-                        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50/60 p-2 text-xs text-red-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg/60 p-2 text-xs text-status-critical">
                             <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
                             <div>
                                 <div className="font-medium">Allergen override on file</div>
                                 <div className="mt-0.5">&ldquo;{existingOverrideReason}&rdquo;</div>
                                 {entry.allergen_override_by && (
-                                    <div className="mt-0.5 text-red-800/80">by {entry.allergen_override_by.name} · {new Date(entry.allergen_override_at).toLocaleString('en-NZ')}</div>
+                                        <div className="mt-0.5 text-status-critical/80">by {entry.allergen_override_by.name} · {new Date(entry.allergen_override_at).toLocaleString('en-NZ')}</div>
                                 )}
                             </div>
                         </div>
@@ -315,7 +322,7 @@ export function PlanEntryDialog({
                                 const ModeIcon = m.icon;
                                 const isActive = form.data.source_type === m.key;
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={m.key}
                                         type="button"
                                         onClick={() => {
@@ -334,7 +341,7 @@ export function PlanEntryDialog({
                                         <ModeIcon className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                                         <div className="text-xs font-medium">{m.label}</div>
                                         <div className="text-[10px] text-muted-foreground">{m.desc}</div>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -362,7 +369,7 @@ export function PlanEntryDialog({
                                 <Input value={form.data.ad_hoc_name} onChange={(e) => form.setData('ad_hoc_name', e.target.value)} placeholder="e.g. Cheese toasties" />
                             </div>
                             {allergenReminder ? (
-                                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                                <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                                     <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
                                     <span>{allergenReminder} Ad-hoc meals aren't auto-checked — confirm ingredients before serving.</span>
                                 </div>
@@ -417,7 +424,7 @@ export function PlanEntryDialog({
                                     />
                                 </div>
                             </div>
-                            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                                 {allergenReminder ? <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" /> : <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />}
                                 <span><strong>Takeaway meal</strong> — {allergenReminder ? `${allergenReminder} Confirm dietary suitability with the vendor before serving.` : 'allergen check unavailable. Confirm dietary suitability with the vendor before serving.'}</span>
                             </div>
@@ -437,8 +444,8 @@ export function PlanEntryDialog({
                             <div className="mb-1 flex items-center justify-between">
                                 <Label className="mb-0">Residents <span className="font-normal text-muted-foreground">(allergens checked against these)</span></Label>
                                 <div className="flex gap-2 text-[11px] font-medium text-primary">
-                                    <button type="button" onClick={() => form.setData('client_ids', residents.map((r) => r.id))} className="hover:underline">All</button>
-                                    <button type="button" onClick={() => form.setData('client_ids', [])} className="hover:underline">None</button>
+                                    <Button unstyled type="button" onClick={() => form.setData('client_ids', residents.map((r) => r.id))} className="hover:underline">All</Button>
+                                    <Button unstyled type="button" onClick={() => form.setData('client_ids', [])} className="hover:underline">None</Button>
                                 </div>
                             </div>
                             <div className="mt-1 grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
@@ -463,7 +470,7 @@ export function PlanEntryDialog({
                     )}
 
                     {careClauses.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Soup className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
                             <div>
                                 <div className="font-semibold">{textureResidents.length > 0 ? 'Texture-modified diet' : 'Thickened fluids'}</div>
@@ -473,7 +480,7 @@ export function PlanEntryDialog({
                     )}
 
                     {dietaryMismatchList.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Leaf className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
                             <div>
                                 <div className="font-semibold">Dietary requirement</div>
@@ -539,20 +546,20 @@ export function PlanEntryDialog({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical">
+                                <GuardrailCard unstyled className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical">
                                     <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                     <span>Your role cannot override an allergen conflict. Ask a <strong>Service Manager</strong> or <strong>Registered Nurse</strong> to plan this meal, or choose a safe alternative.</span>
-                                </div>
+                                </GuardrailCard>
                             )}
                         </div>
                     )}
 
                     {hasSoft && !hasHard && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-                            <div className="mb-2 flex items-center gap-2 font-medium text-amber-900">
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
+                                <div className="mb-2 flex items-center gap-2 font-medium text-status-warning">
                                 <AlertTriangle className="h-4 w-4" /> Heads up — soft warnings
                             </div>
-                            <ul className="space-y-1 text-amber-900">
+                                <ul className="space-y-1 text-status-warning">
                                 {report.soft_warnings.map((panel) => (
                                     <li key={panel.client_id}>
                                         <strong>{panel.client_name}</strong>:{' '}
@@ -560,7 +567,7 @@ export function PlanEntryDialog({
                                     </li>
                                 ))}
                             </ul>
-                            <label className="mt-2 flex items-center gap-2 text-xs text-amber-900">
+                                <label className="mt-2 flex items-center gap-2 text-xs text-status-warning">
                                 <input
                                     type="checkbox"
                                     checked={acknowledgedSoft}
@@ -572,7 +579,7 @@ export function PlanEntryDialog({
                     )}
 
                     {hasHard && hasSoft && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                             <strong>Also noted:</strong>{' '}
                             {report.soft_warnings.flatMap((p) => p.matches.map((m) => `${p.client_name} — ${m.label}`)).join('; ')}
                         </div>
@@ -909,14 +916,14 @@ export function AdjustInventoryDialog({
                         <Label className="mb-2 block">What happened?</Label>
                         <div className="grid grid-cols-3 gap-2">
                             {(['add', 'remove', 'set'] as AdjustMode[]).map((m) => (
-                                <button
+                                <Button unstyled
                                     key={m}
                                     type="button"
                                     onClick={() => setMode(m)}
                                     className={`rounded-md border p-3 text-left transition ${mode === m ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-accent'}`}
                                 >
                                     <div className="text-sm font-medium">{MODE_PRESETS[m].label}</div>
-                                </button>
+                                </Button>
                             ))}
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">{preset.helper}</p>
@@ -1143,7 +1150,7 @@ export function ShoppingListGenerateDialog({
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     {noMeals && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
                             <span>No planned meals this week to build a list from — plan meals first. You can still top up stock to par.</span>
                         </div>
@@ -1278,13 +1285,13 @@ export function SettingsDialog({
                         <p className="mb-2 text-[12px] text-muted-foreground">Reusable meal rotations you can apply to any week.</p>
 
                         {canManage && (
-                            <button type="button" onClick={() => setBuilderOpen(true)} className="mb-2 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 text-left transition-colors hover:bg-primary/10">
+                            <Button unstyled type="button" onClick={() => setBuilderOpen(true)} className="mb-2 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 text-left transition-colors hover:bg-primary/10">
                                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><LayoutTemplate className="h-5 w-5" /></span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-[13.5px] font-semibold text-foreground">Build a template from scratch</span>
                                     <span className="block text-[11.5px] text-muted-foreground">Compose a full week on a day × meal grid</span>
                                 </span>
-                            </button>
+                            </Button>
                         )}
 
                         {canManage && (
@@ -1306,7 +1313,7 @@ export function SettingsDialog({
 
                         <div className="space-y-1.5">
                             {templates.map((t) => (
-                                <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+                                <GuardrailCard unstyled key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
                                     <LayoutTemplate className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     <div className="min-w-0 flex-1">
                                         <div className="truncate text-[13px] font-medium text-foreground">{t.name}</div>
@@ -1317,7 +1324,7 @@ export function SettingsDialog({
                                             <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-status-critical" /></Button>
                                         </ConfirmAction>
                                     )}
-                                </div>
+                                </GuardrailCard>
                             ))}
                             {templates.length === 0 && <div className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[12px] text-muted-foreground">No templates yet.</div>}
                         </div>

@@ -23,6 +23,7 @@ import {
     handoverDate,
     moodEmoji,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export function ListView({
     handovers,
@@ -179,33 +180,33 @@ export function ListView({
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {h.status === 'draft' && h.can_submit ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={() => onSubmit(h)}
                                         className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
                                     >
                                         Submit
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
                                 {h.status === 'submitted' &&
                                 h.can_acknowledge ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={() => onAcknowledge(h)}
                                         className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                                     >
                                         <Check className="h-3.5 w-3.5" />
                                         Ack
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onOpen(h)}
                                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                 >
                                     Open
                                     <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
+                                </GuardrailButton>
                             </div>
                         </div>
                     );

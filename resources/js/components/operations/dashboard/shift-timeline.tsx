@@ -5,6 +5,8 @@ import { useState, type ComponentType } from 'react';
 import { cn } from '@/lib/utils';
 
 import type { TimelineBar, TimelineData, TimelineRow } from './types';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const TYPE_ICON: Record<string, ComponentType<{ className?: string }>> = {
     overnight: Moon,
@@ -144,7 +146,7 @@ export function ShiftTimeline({ timeline }: Props) {
 
     return (
         <section>
-            <div className="rounded-xl border bg-card" style={{ borderColor: 'var(--border)' }}>
+            <GuardrailCard unstyled className="rounded-xl border bg-card" style={{ borderColor: 'var(--border)' }}>
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
                     style={{ borderColor: 'var(--border)' }}
@@ -166,7 +168,7 @@ export function ShiftTimeline({ timeline }: Props) {
                                 { v: 'staff' as ViewKey, label: 'By staff' },
                                 { v: 'type' as ViewKey, label: 'By shift type' },
                             ].map((opt, i) => (
-                                <button
+                                <GuardrailButton unstyled
                                     key={opt.v}
                                     type="button"
                                     role="tab"
@@ -182,7 +184,7 @@ export function ShiftTimeline({ timeline }: Props) {
                                     style={{ borderColor: 'var(--border)' }}
                                 >
                                     {opt.label}
-                                </button>
+                                </GuardrailButton>
                             ))}
                         </div>
                         <Link
@@ -265,7 +267,7 @@ export function ShiftTimeline({ timeline }: Props) {
                         </span>
                     </div>
                 </div>
-            </div>
+            </GuardrailCard>
         </section>
     );
 }

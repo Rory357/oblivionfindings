@@ -18,6 +18,7 @@ import { useChecklistConfig, type GoTab, type PaneCtx } from '../context';
 import { Donut, LegendDot, MiniRing, SegmentDonut, Sparkline } from '../charts';
 import { CategoryIcon, Empty, StatusBadge } from '../primitives';
 import type { HeroStats } from '../hero';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function miniKpi(value: number, label: string, tone: string) {
     return (
@@ -66,7 +67,7 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
         <div className="space-y-4">
             {/* analytics strip */}
             <div className="grid gap-4 lg:grid-cols-3">
-                <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-sm">
+                <GuardrailCard unstyled className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-sm">
                     <div className="mb-3 flex w-full items-center justify-between">
                         <h3 className="text-sm font-semibold">Compliance health</h3>
                         <StatusBadge tone={onTrack >= 90 ? 'success' : 'warning'} Icon={onTrack >= 90 ? TrendingUp : TrendingDown}>
@@ -84,28 +85,28 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                         {miniKpi(categoriesHealthy, 'categories ≥95%', 'success')}
                         {miniKpi(overdue.length, 'overdue items', overdue.length ? 'critical' : 'success')}
                     </div>
-                </div>
+                </GuardrailCard>
 
-                <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-5 shadow-sm">
                     <h3 className="mb-3 text-sm font-semibold">Run workload</h3>
                     <div className="flex items-center gap-5">
                         <SegmentDonut segments={workSegs} size={132} stroke={15} centerValue={workTotal} centerLabel="runs" />
                         <div className="flex-1 space-y-1.5">
                             {workSegs.map((s) => (
-                                <button
+                                <Button unstyled
                                     key={s.key}
                                     type="button"
                                     onClick={() => goTab(s.key === 'overdue' || s.key === 'inprog' ? 'due' : 'runs')}
                                     className="w-full"
                                 >
                                     <LegendDot color={s.color} label={s.label} value={s.value} />
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </div>
-                </div>
+                </GuardrailCard>
 
-                <div className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
+                <GuardrailCard unstyled className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
                     <div className="mb-1 flex items-start justify-between">
                         <div>
                             <h3 className="text-sm font-semibold">Completion trend</h3>
@@ -137,12 +138,12 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                             <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                     </div>
-                </div>
+                </GuardrailCard>
             </div>
 
             {/* category rings + needs attention */}
             <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
                     <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
                         <div>
                             <h3 className="text-base font-semibold">On-track by category</h3>
@@ -157,7 +158,7 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                     </div>
                     <div className="grid grid-cols-1 gap-x-4 gap-y-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
                         {ctx.reports.complianceByCategory.map((c) => (
-                            <button
+                            <Button unstyled
                                 key={c.key}
                                 type="button"
                                 onClick={() => {
@@ -175,12 +176,12 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                                         <div className="text-[11px] text-status-success">on track</div>
                                     )}
                                 </div>
-                            </button>
+                            </Button>
                         ))}
                     </div>
-                </div>
+                </GuardrailCard>
 
-                <div className="rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm">
                     <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
                         <h3 className="text-base font-semibold">Needs attention</h3>
                         {siteAttention.length ? (
@@ -197,7 +198,7 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                         ) : (
                             <div className="space-y-1">
                                 {siteAttention.slice(0, 6).map((x) => (
-                                    <button
+                                    <Button unstyled
                                         key={x.site.id}
                                         type="button"
                                         onClick={() => goTab('due')}
@@ -237,25 +238,25 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                                                 </span>
                                             ) : null}
                                         </div>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         )}
                     </div>
-                </div>
+                </GuardrailCard>
             </div>
 
             {/* site performance (org) + recent activity */}
             <div className="grid gap-4 lg:grid-cols-3">
                 {scope.mode === 'org' ? (
-                    <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
+                    <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
                         <div className="border-b border-border px-5 py-3.5">
                             <h3 className="text-base font-semibold">Site performance</h3>
                             <p className="text-sm text-muted-foreground">On-track rate and live load per site</p>
                         </div>
                         <div className="grid gap-2.5 p-4 sm:grid-cols-2 xl:grid-cols-3">
                             {ctx.sites.map((s) => (
-                                <button
+                                <Button unstyled
                                     key={s.id}
                                     type="button"
                                     onClick={() => goTab('assignments')}
@@ -275,10 +276,10 @@ export function OverviewPane({ ctx, stats, goTab }: { ctx: PaneCtx; stats: HeroS
                                             )}
                                         </div>
                                     </div>
-                                </button>
+                                </Button>
                             ))}
                         </div>
-                    </div>
+                    </GuardrailCard>
                 ) : null}
 
                 <div className={cn('rounded-xl border border-border bg-card shadow-sm', scope.mode === 'org' ? '' : 'lg:col-span-3')}>

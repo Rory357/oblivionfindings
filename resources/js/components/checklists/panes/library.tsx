@@ -22,6 +22,7 @@ import { freqLabel, typeLabel, useChecklistConfig, type PaneCtx } from '../conte
 import { categoryIcon } from '../icons';
 import { CategoryIcon, Dropdown, Empty, StatusBadge, ViewToggle, type ChecklistView } from '../primitives';
 import type { ChecklistTemplate } from '../types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function FlagChips({ t }: { t: ChecklistTemplate }) {
     return (
@@ -202,7 +203,7 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
         Icon: LucideIcon,
         dot?: string,
     ): ReactNode => (
-        <button
+        <Button unstyled
             key={key}
             type="button"
             onClick={onClick}
@@ -217,7 +218,7 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             <Icon className="h-3.5 w-3.5 shrink-0" style={!active && dot ? { color: dot } : undefined} />
             {label}
             <span className={cn('rounded px-1 text-[10px] tabular-nums', active ? 'bg-white/20' : 'bg-muted')}>{count}</span>
-        </button>
+        </Button>
     );
 
     const knownKeys = new Set(cfg.categories.map((c) => c.key));
@@ -233,11 +234,11 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                 ))}
             </div>
         ) : (
-            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <GuardrailCard unstyled className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 {rows.map((t) => (
                     <TemplateRow key={t.id} t={t} templates={ctx.templates} />
                 ))}
-            </div>
+            </GuardrailCard>
         );
 
     return (
@@ -278,9 +279,9 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             </div>
 
             {nothing ? (
-                <div className="rounded-xl border border-border bg-card p-2 shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
                     <Empty Icon={Sparkles} title="No templates match your filters." />
-                </div>
+                </GuardrailCard>
             ) : (
                 <>
                     {sections.map((c) => (

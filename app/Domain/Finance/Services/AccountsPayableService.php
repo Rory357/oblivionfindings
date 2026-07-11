@@ -33,6 +33,9 @@ class AccountsPayableService
                 'vendor_id' => $data['vendor_id'],
                 'purchase_order_id' => $data['purchase_order_id'] ?? null,
                 'spend_approval_id' => $data['spend_approval_id'] ?? null,
+                'site_id' => $data['site_id'] ?? null,
+                'asset_id' => $data['asset_id'] ?? null,
+                'allocation_event_type' => $data['allocation_event_type'] ?? null,
                 'bill_number' => $billNumber,
                 'vendor_reference' => $data['vendor_reference'] ?? null,
                 'status' => 'draft',
@@ -84,6 +87,83 @@ class AccountsPayableService
 
             return $bill->load('lines', 'vendor');
         });
+    }
+
+    /**
+     * Capture-at-source: record an operational expense (a repair, a delivery, …)
+     * as a DRAFT accounts-payable bill. Kept draft so it stays GL-safe — the GL
+     * journal posts only when a finance user approves it (approveBill), never
+     * automatically. Idempotent on `reference` (stored as vendor_reference), so a
+     * source event that fires more than once never creates a duplicate bill. The
+     * vendor is resolved-or-created by name; the expense account is resolved by
+     * code and throws if the chart is missing it (never invents one).
+     *
+     * When `site_id`/`asset_id`/`allocation_event_type` are given, approving the
+     * bill also creates the FinCostAllocation rows that feed site cost reporting.
+     *
+     * @param  array{reference:string,vendor_name:string,description:string,amount:float|string,account_code:string,vendor_type?:string,gst_rate?:float|int,bill_date?:string,due_date?:string,notes?:string,cost_centre_id?:int,site_id?:int,asset_id?:int,allocation_event_type?:string}  $data
+     */
+    public function captureOperationalBill(?int $orgId, array $data): ?FinBill
+    {
+        $amount = (float) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $reference = $data['reference'];
+
+        $existing = FinBill::where('organization_id', $orgId)
+            ->where('vendor_reference', $reference)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $vendor = FinVendor::firstOrCreate(
+            ['organization_id' => $orgId, 'name' => $data['vendor_name']],
+            ['vendor_type' => $data['vendor_type'] ?? 'contractor', 'is_active' => true],
+        );
+
+        $account = $this->resolveExpenseAccount($orgId, $data['account_code']);
+
+        return $this->createBill($orgId, [
+            'vendor_id' => $vendor->id,
+            'vendor_reference' => $reference,
+            'bill_date' => $data['bill_date'] ?? now()->toDateString(),
+            'due_date' => $data['due_date'] ?? now()->addDays(30)->toDateString(),
+            'notes' => $data['notes'] ?? null,
+            'site_id' => $data['site_id'] ?? null,
+            'asset_id' => $data['asset_id'] ?? null,
+            'allocation_event_type' => $data['allocation_event_type'] ?? null,
+            'lines' => [[
+                'description' => $data['description'],
+                'quantity' => 1,
+                'unit_price' => $amount,
+                'gst_rate' => $data['gst_rate'] ?? 15,
+                'account_id' => $account->id,
+                'cost_centre_id' => $data['cost_centre_id'] ?? null,
+            ]],
+        ]);
+    }
+
+    /**
+     * Resolve an active expense GL account by code for an org, throwing if the
+     * chart is missing it — capture-at-source must never invent a chart code.
+     */
+    private function resolveExpenseAccount(?int $orgId, string $code): FinAccount
+    {
+        $account = FinAccount::where('organization_id', $orgId)
+            ->where('code', $code)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $account) {
+            throw new InvalidArgumentException(
+                "GL expense account '{$code}' not found (or inactive) for organisation #{$orgId}."
+            );
+        }
+
+        return $account;
     }
 
     /**
@@ -205,8 +285,47 @@ class AccountsPayableService
                 'journal_id' => $journal->id,
             ]);
 
+            $this->allocateCapturedBill($bill, $journal);
+
             return $bill->refresh();
         });
+    }
+
+    /**
+     * Cost-allocate an approved capture-at-source bill. FinCostAllocation is the
+     * cross-module layer site budgets/forecasts read (SiteCostService groups by
+     * event_type), and it is otherwise only written by FinancialEventService — so
+     * a bill that carries operational context (site/asset) must allocate its
+     * expense lines here or the spend silently vanishes from site reporting.
+     */
+    private function allocateCapturedBill(FinBill $bill, $journal): void
+    {
+        if (! $bill->site_id && ! $bill->asset_id) {
+            return;
+        }
+
+        $journal->loadMissing('lines');
+        $expenseLineIds = $bill->lines->pluck('account_id')->all();
+
+        foreach ($journal->lines as $journalLine) {
+            if (bccomp((string) $journalLine->debit, '0', 2) <= 0) {
+                continue; // allocate expense (debit) lines only, never the AP credit
+            }
+            if (! in_array($journalLine->account_id, $expenseLineIds, true)) {
+                continue;
+            }
+
+            \App\Domain\Finance\Models\FinCostAllocation::create([
+                'journal_id' => $journal->id,
+                'journal_line_id' => $journalLine->id,
+                'financial_event_id' => null,
+                'site_id' => $bill->site_id,
+                'asset_id' => $bill->asset_id,
+                'amount' => $journalLine->debit,
+                'event_type' => $bill->allocation_event_type ?: 'bill_expense',
+                'event_date' => $bill->bill_date->toDateString(),
+            ]);
+        }
     }
 
     /**

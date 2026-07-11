@@ -139,13 +139,13 @@ export default function CalendarSyncSettings() {
                     </header>
 
                     {flash?.success && (
-                        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                            <div className="flex items-center gap-2 rounded-lg border border-status-success/30 bg-status-success-bg px-4 py-2.5 text-sm text-status-success">
                             <Check className="h-4 w-4 shrink-0" />
                             {flash.success}
                         </div>
                     )}
                     {(flash?.error || errorList.length > 0) && (
-                        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-2.5 text-sm text-status-critical">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <div>{flash?.error}{errorList.map((e, i) => <div key={i}>{e}</div>)}</div>
                         </div>
@@ -235,7 +235,7 @@ function ProviderConnectCard({ provider }: { provider: ProviderCard }) {
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{provider.label}</CardTitle>
                     {provider.connected ? (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-200">
+                                <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg">
                             Connected
                         </Badge>
                     ) : (
@@ -399,7 +399,7 @@ function MappingRow({
                         className="h-9 min-w-[12rem]"
                     />
                 )}
-                {m?.lastError && <span className="mt-1 block text-xs text-red-600">{m.lastError}</span>}
+                                    {m?.lastError && <span className="mt-1 block text-xs text-status-critical">{m.lastError}</span>}
             </TableCell>
             <TableCell>
                 <select

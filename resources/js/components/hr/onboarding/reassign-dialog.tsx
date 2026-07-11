@@ -73,7 +73,7 @@ export function ReassignDialog({
                         const active = selected === o.id;
                         const av = avatarStyle(o.name ?? '');
                         return (
-                            <button
+                            <Button unstyled
                                 key={o.id}
                                 type="button"
                                 onClick={() => setSelected(o.id)}
@@ -88,7 +88,7 @@ export function ReassignDialog({
                                     {initials(o.name)}
                                 </span>
                                 <span className="text-sm font-semibold">{o.name}</span>
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>

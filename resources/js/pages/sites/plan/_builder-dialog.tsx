@@ -46,6 +46,7 @@ import {
     type Taxonomy,
 } from './_types';
 import { usePlanEditor } from './_use-plan-editor';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TypePlanSummary = {
     tab_label: string;
@@ -205,7 +206,10 @@ export default function SiteTypePlanBuilderDialog({
                 : typePlan.status === 'draft'
                   ? 'Draft'
                   : 'New plan';
-    const emergencyKinds = typePlan.emergency_pin_kinds ?? [];
+    const emergencyKinds = useMemo(
+        () => typePlan.emergency_pin_kinds ?? [],
+        [typePlan.emergency_pin_kinds],
+    );
 
     // When the dialog opens we re-seed the editor from the current source.
     useLayoutEffect(() => {
@@ -417,7 +421,7 @@ export default function SiteTypePlanBuilderDialog({
                                     </span>
                                     {mode === 'emergency' && (
                                         <span
-                                            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                                            className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2 py-0.5 text-xs font-medium text-status-critical"
                                             data-test="site-plan-emergency-mode-badge"
                                         >
                                             Emergency mode
@@ -442,7 +446,7 @@ export default function SiteTypePlanBuilderDialog({
                         </div>
                     </DialogHeader>
                     <div className="grid min-h-0 gap-3 p-3 lg:grid-cols-[270px_minmax(0,1fr)_350px]">
-                        <div className="min-h-0 overflow-y-auto rounded-lg border bg-background p-2 shadow-sm">
+                        <GuardrailCard unstyled className="min-h-0 overflow-y-auto rounded-lg border bg-background p-2 shadow-sm">
                             <ToolPalette
                                 taxonomy={taxonomy}
                                 activeKind={state.activeKind}
@@ -463,8 +467,8 @@ export default function SiteTypePlanBuilderDialog({
                                     })
                                 }
                             />
-                        </div>
-                        <div className="min-h-0 rounded-lg border bg-slate-100 p-2 shadow-sm">
+                        </GuardrailCard>
+                        <div className="min-h-0 rounded-lg border bg-muted p-2 shadow-sm">
                             <PlanCanvas
                                 layout={state.layout}
                                 pins={state.pins}
@@ -617,7 +621,7 @@ export default function SiteTypePlanBuilderDialog({
                     </DialogHeader>
                     {calibrationDialog && (
                         <div className="space-y-3">
-                            <div className="rounded-md border bg-slate-50 p-3 text-xs">
+                            <div className="rounded-md border bg-muted/50 p-3 text-xs">
                                 <div className="flex justify-between">
                                     <span>Measured distance</span>
                                     <strong>

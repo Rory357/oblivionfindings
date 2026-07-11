@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Respite;
 
+use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -16,6 +17,7 @@ use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -26,6 +28,8 @@ class RespiteBookingController extends Controller
     private const FUNDING_STATUSES = ['not_required', 'pending_approval', 'approved', 'declined', 'expired'];
 
     private const BOOKING_STATUSES = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show', 'on_hold_pending_funding'];
+
+    public function __construct(private AccountsReceivableService $accountsReceivable) {}
 
     public function index(): Response
     {
@@ -274,6 +278,10 @@ class RespiteBookingController extends Controller
 
         app(RespiteCalendarProjector::class)->projectBooking($booking, auth()->id());
 
+        // Capture-at-source: a confirmed booking with a funder + an agreed daily
+        // rate becomes a draft receivable invoice to the funder. Idempotent + non-fatal.
+        $this->captureRespiteInvoice($booking);
+
         event(new RespiteEvent('respite.booking.confirmed', [
             'id' => $booking->id,
             'client_id' => $booking->client_id,
@@ -281,6 +289,54 @@ class RespiteBookingController extends Controller
         ]));
 
         return back()->with('success', 'Booking confirmed.');
+    }
+
+    /**
+     * Post a confirmed respite booking's care cost to accounts receivable as a
+     * DRAFT invoice billed to the funder (nights × the service agreement's daily
+     * rate, zero-rated — funded disability support). The finance service is
+     * idempotent on the RespiteBooking source, so this can run on every confirm
+     * without duplicating. GL-safe (draft) and never blocks the confirmation.
+     */
+    private function captureRespiteInvoice(RespiteBooking $booking): void
+    {
+        $booking->loadMissing('serviceAgreement', 'client');
+        $rate = (float) ($booking->serviceAgreement->daily_rate ?? 0);
+
+        if ($rate <= 0 || ! $booking->funding_source || ! $booking->start_at || ! $booking->end_at) {
+            return;
+        }
+
+        $nights = max(1, $booking->start_at->diffInDays($booking->end_at));
+
+        try {
+            $orgId = auth()->user()?->organization_id;
+
+            // Best-effort funder attribution: when the booking's funding source
+            // matches a configured funding stream, the invoice line carries the
+            // stream (and the stream's default revenue account, if set) so the
+            // funder income lands on the funding-stream summary — the GL-level
+            // drawdown attribution.
+            $stream = $this->accountsReceivable->resolveFundingStream($orgId, $booking->funding_source);
+
+            $this->accountsReceivable->captureOperationalInvoice($orgId, [
+                'source_type' => RespiteBooking::class,
+                'source_id' => $booking->id,
+                'funding_body' => $stream?->name ?? (string) $booking->funding_source,
+                'client_id' => $booking->client_id,
+                'client_name' => $booking->client?->full_name,
+                'description' => "Respite care — {$nights} night(s)",
+                'quantity' => $nights,
+                'unit_price' => $rate,
+                'gst_rate' => 0,
+                'revenue_account_id' => $stream?->default_revenue_account_id,
+                'revenue_account_code' => config('finance.capture.respite_revenue_account', '4000'),
+                'funding_stream_id' => $stream?->id,
+                'notes' => "Auto-captured from respite booking #{$booking->id}.",
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Respite funder invoice capture failed for booking #{$booking->id}: {$e->getMessage()}");
+        }
     }
 
     /**
