@@ -32,6 +32,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
+use App\Models\WorkplaceInjury;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -676,6 +677,8 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $profile->load([
             'user:id,name,email',
@@ -686,6 +689,46 @@ class EmployeeProfileController extends Controller
         ]);
 
         $userId = $profile->user_id;
+        $canViewInjuries = $user->canDo('hazards.view');
+
+        // H&S owns workplace injuries and RTW plans. HR federates a minimal,
+        // read-only employee summary only for viewers with the existing H&S
+        // read permission; there is deliberately no HR mutation path.
+        $workplaceInjuries = $canViewInjuries
+            ? WorkplaceInjury::query()
+                ->forWorker($userId)
+                ->with([
+                    'site:id,name',
+                    'returnToWorkPlans' => fn ($query) => $query->orderByDesc('created_at'),
+                ])
+                ->orderByDesc('injury_date')
+                ->get()
+                ->map(function (WorkplaceInjury $injury) {
+                    $latestPlan = $injury->returnToWorkPlans->first();
+
+                    return [
+                        'id' => $injury->id,
+                        'reference' => $injury->reference_number ?: 'Injury #'.$injury->id,
+                        'injury_date' => $injury->injury_date?->toDateString(),
+                        'injury_type' => $injury->injury_type,
+                        'body_part_affected' => $injury->body_part_affected,
+                        'severity' => $injury->severity,
+                        'status' => $injury->status,
+                        'lost_time_days' => (int) $injury->lost_time_days,
+                        'expected_return_date' => $injury->expected_return_date?->toDateString(),
+                        'actual_return_date' => $injury->actual_return_date?->toDateString(),
+                        'site' => $injury->site?->name,
+                        'return_to_work' => $latestPlan ? [
+                            'status' => $latestPlan->status,
+                            'plan_start_date' => $latestPlan->plan_start_date?->toDateString(),
+                            'plan_end_date' => $latestPlan->plan_end_date?->toDateString(),
+                            'next_review_date' => $latestPlan->next_review_date?->toDateString(),
+                        ] : null,
+                        'url' => route('health-safety.injuries.show', $injury),
+                    ];
+                })
+                ->values()
+            : collect();
 
         // Tenure
         $tenure = null;
@@ -978,6 +1021,7 @@ class EmployeeProfileController extends Controller
             'assetAssignments' => $assetAssignments,
             'policyAttestations' => $policyAttestations,
             'safeWorkProcedures' => $this->employeeProcedures($user, $profile),
+            ...($canViewInjuries ? ['workplaceInjuries' => $workplaceInjuries] : []),
             // Re-hire wizard site options — only needed when the viewer can
             // manage AND the profile is a former employee.
             'rehireSites' => $user->canDo('hr.employees.manage') && ! $profile->is_active
@@ -986,6 +1030,7 @@ class EmployeeProfileController extends Controller
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
                 'viewSensitive' => $user->canDo('hr.employees.viewRestricted'),
+                'viewInjuries' => $canViewInjuries,
             ],
         ]);
     }

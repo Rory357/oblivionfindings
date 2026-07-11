@@ -33,6 +33,7 @@ import {
     Flame,
     FolderOpen,
     Heart,
+    HeartPulse,
     Laptop,
     Mail,
     MapPin,
@@ -289,6 +290,27 @@ interface PolicyAttestation {
     attested_at: string | null;
 }
 
+interface WorkplaceInjurySummary {
+    id: number;
+    reference: string;
+    injury_date: string | null;
+    injury_type: string;
+    body_part_affected: string | null;
+    severity: string;
+    status: string;
+    lost_time_days: number;
+    expected_return_date: string | null;
+    actual_return_date: string | null;
+    site: string | null;
+    return_to_work: {
+        status: string;
+        plan_start_date: string | null;
+        plan_end_date: string | null;
+        next_review_date: string | null;
+    } | null;
+    url: string;
+}
+
 interface Props {
     profile: Profile;
     tenure: { years: number; months: number } | null;
@@ -314,8 +336,13 @@ interface Props {
     assetAssignments: AssetAssignment[];
     policyAttestations: PolicyAttestation[];
     safeWorkProcedures?: ApplicableProcedure[];
+    workplaceInjuries?: WorkplaceInjurySummary[];
     rehireSites?: Array<{ id: number; name: string }>;
-    can: { manage: boolean; viewSensitive: boolean };
+    can: {
+        manage: boolean;
+        viewSensitive: boolean;
+        viewInjuries: boolean;
+    };
 }
 
 /* ------------------------------------------------------------------ */
@@ -582,6 +609,7 @@ export default function EmployeeShow({
     assetAssignments = [],
     policyAttestations = [],
     safeWorkProcedures = [],
+    workplaceInjuries = [],
     rehireSites = [],
     can,
 }: Props) {
@@ -806,6 +834,13 @@ export default function EmployeeShow({
                             Compliance
                             <TabCount count={complianceSummary.total} />
                         </TabsTrigger>
+                        {can.viewInjuries ? (
+                            <TabsTrigger value="injuries">
+                                <HeartPulse className="mr-1.5 h-3.5 w-3.5" />
+                                Workplace injuries
+                                <TabCount count={workplaceInjuries.length} />
+                            </TabsTrigger>
+                        ) : null}
                         <TabsTrigger value="leave">
                             <Calendar className="mr-1.5 h-3.5 w-3.5" />
                             Leave
@@ -1152,6 +1187,109 @@ export default function EmployeeShow({
                             </div>
                         </div>
                     </TabsContent>
+
+                    {/* ======== WORKPLACE INJURIES (H&S READ-ONLY) ======== */}
+                    {can.viewInjuries ? (
+                        <TabsContent value="injuries">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <HeartPulse className="h-4 w-4 text-status-warning" />
+                                                Workplace injuries
+                                            </CardTitle>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Read-only records owned by
+                                                Health &amp; Safety.
+                                            </p>
+                                        </div>
+                                        <Badge variant="outline">Read only</Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    {workplaceInjuries.length === 0 ? (
+                                        <EmptyState
+                                            icon={HeartPulse}
+                                            label="No workplace injuries recorded"
+                                        />
+                                    ) : (
+                                        <div className="divide-y">
+                                            {workplaceInjuries.map((injury) => (
+                                                <Link
+                                                    key={injury.id}
+                                                    href={injury.url}
+                                                    className="flex flex-col gap-3 p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="font-medium">
+                                                                {injury.reference}
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                            >
+                                                                {formatLabel(
+                                                                    injury.severity,
+                                                                )}
+                                                            </Badge>
+                                                            <Badge
+                                                                variant="outline"
+                                                            >
+                                                                {formatLabel(
+                                                                    injury.status,
+                                                                )}
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="mt-1 text-sm">
+                                                            {formatLabel(
+                                                                injury.injury_type,
+                                                            )}
+                                                            {injury.body_part_affected
+                                                                ? ` · ${injury.body_part_affected}`
+                                                                : ''}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {formatDate(
+                                                                injury.injury_date,
+                                                            )}
+                                                            {injury.site
+                                                                ? ` · ${injury.site}`
+                                                                : ''}
+                                                            {injury.lost_time_days >
+                                                            0
+                                                                ? ` · ${injury.lost_time_days} lost-time day${injury.lost_time_days === 1 ? '' : 's'}`
+                                                                : ''}
+                                                        </p>
+                                                        {injury.return_to_work ? (
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                Return-to-work
+                                                                plan:{' '}
+                                                                {formatLabel(
+                                                                    injury
+                                                                        .return_to_work
+                                                                        .status,
+                                                                )}
+                                                                {injury
+                                                                    .return_to_work
+                                                                    .next_review_date
+                                                                    ? ` · review ${formatDate(injury.return_to_work.next_review_date)}`
+                                                                    : ''}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="flex shrink-0 items-center gap-2 text-sm text-primary">
+                                                        Open in H&amp;S
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </div>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    ) : null}
 
                     {/* ======== DOCUMENTS ======== */}
                     <TabsContent value="documents">
