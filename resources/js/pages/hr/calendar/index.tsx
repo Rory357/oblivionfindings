@@ -473,7 +473,8 @@ export default function CalendarIndex({
             site_id: (props.siteId as number) ?? null,
             rrule: (props.rrule as string) ?? null,
             recurrence_until: (props.recurrenceUntil as string) ?? null,
-            audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'people') ?? 'org',
+            audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'team' | 'people') ?? 'org',
+            audience_team: (props.audienceRef as string) ?? null,
             audience_user_ids: (props.attendeeUserIds as number[]) ?? [],
             reminders: (props.reminders as { offset_minutes: number; channel: string }[]) ?? [],
             attachments: (props.attachments as CalendarEventInitial['attachments']) ?? [],
@@ -910,6 +911,7 @@ export default function CalendarIndex({
                         onSaved={refetch}
                         sites={sites}
                         departments={departments}
+                        teams={teams}
                         categories={categories}
                         staff={staff}
                         initial={editingEvent}

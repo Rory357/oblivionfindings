@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class CalendarController extends Controller
@@ -270,7 +271,16 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_type' => ['nullable', 'in:org,site,department,team,people'],
+            'audience_team' => [
+                'exclude_unless:audience_type,team',
+                'required_if:audience_type,team',
+                'string',
+                'max:255',
+                Rule::exists('hr_employee_profiles', 'team')->where(fn ($query) => $query
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_active', true)),
+            ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
@@ -279,9 +289,10 @@ class CalendarController extends Controller
         ]);
 
         $audienceType = $data['audience_type'] ?? null;
+        $audienceTeam = $data['audience_team'] ?? null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $reminders = $data['reminders'] ?? [];
-        unset($data['audience_type'], $data['audience_user_ids'], $data['reminders']);
+        unset($data['audience_type'], $data['audience_team'], $data['audience_user_ids'], $data['reminders']);
 
         $data['category_id'] = $this->resolveCategoryId($tenantId, $data['event_type'] ?? null);
 
@@ -291,7 +302,7 @@ class CalendarController extends Controller
             ...$data,
         ]);
 
-        $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
+        $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds, $audienceTeam);
         $this->syncReminders($event, $reminders);
         $this->notifyNewInvitees($event, $newInvitees);
 
@@ -311,6 +322,7 @@ class CalendarController extends Controller
         abort_unless($this->canManage($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
         $this->assertEventIsActive($event);
+        $tenantId = (int) $event->tenant_id;
 
         $request->validate([
             'file' => ['required', 'file', 'max:10240', 'mimes:'.self::ATTACHMENT_MIMES],
@@ -380,7 +392,8 @@ class CalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $event->tenant_id);
         $this->assertEventIsActive($event);
 
         $data = $request->validate([
@@ -396,7 +409,16 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_type' => ['nullable', 'in:org,site,department,team,people'],
+            'audience_team' => [
+                'exclude_unless:audience_type,team',
+                'required_if:audience_type,team',
+                'string',
+                'max:255',
+                Rule::exists('hr_employee_profiles', 'team')->where(fn ($query) => $query
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_active', true)),
+            ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
@@ -410,12 +432,13 @@ class CalendarController extends Controller
         $scope = $data['scope'] ?? 'all';
         $occurrenceDate = $data['occurrence_date'] ?? null;
         $audienceType = $data['audience_type'] ?? null;
+        $audienceTeam = $data['audience_team'] ?? null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $audienceProvided = $request->has('audience_type');
         $reminders = $data['reminders'] ?? [];
         $remindersProvided = $request->has('reminders');
         unset(
-            $data['scope'], $data['occurrence_date'], $data['audience_type'],
+            $data['scope'], $data['occurrence_date'], $data['audience_type'], $data['audience_team'],
             $data['audience_user_ids'], $data['reminders'],
         );
 
@@ -444,7 +467,7 @@ class CalendarController extends Controller
         $event->update($data);
 
         if ($audienceProvided) {
-            $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
+            $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds, $audienceTeam);
             $this->notifyNewInvitees($event, $newInvitees);
         }
         if ($remindersProvided) {
@@ -491,8 +514,12 @@ class CalendarController extends Controller
      * @return array<int, int> User ids newly added to the invite list (so the
      *                         caller can notify them — re-syncs don't re-invite).
      */
-    private function syncAttendees(HrCalendarEvent $event, ?string $audienceType, array $userIds): array
-    {
+    private function syncAttendees(
+        HrCalendarEvent $event,
+        ?string $audienceType,
+        array $userIds,
+        ?string $audienceTeam = null,
+    ): array {
         if ($audienceType === null) {
             return [];
         }
@@ -502,6 +529,7 @@ class CalendarController extends Controller
             $ref = match ($audienceType) {
                 'site' => $event->site_id,
                 'department' => $event->department_id,
+                'team' => $audienceTeam,
                 default => null,
             };
             $event->attendees()->create([

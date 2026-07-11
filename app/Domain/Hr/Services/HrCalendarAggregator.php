@@ -13,6 +13,7 @@ use App\Services\ShiftCoverageService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Single entry point that fans the org/manager `/hr/calendar` page out across
@@ -98,6 +99,10 @@ class HrCalendarAggregator
 
     private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters, ?User $viewer = null): Collection
     {
+        if (! Schema::hasTable('hr_calendar_events')) {
+            return collect();
+        }
+
         $this->viewerId = $viewer?->id;
 
         // Top-level events only (exception/override children are folded into
@@ -121,7 +126,8 @@ class HrCalendarAggregator
             })
             ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments'])
             ->orderBy('starts_at')
-            ->get();
+            ->get()
+            ->filter(fn (HrCalendarEvent $event) => $this->teamAudienceIsVisible($event, $viewer));
 
         // Override children for the recurring bases in scope.
         $recurringIds = $base->whereNotNull('rrule')->pluck('id');
@@ -202,6 +208,7 @@ class HrCalendarAggregator
                 'recurrenceParentId' => $e->recurrence_parent_id,
                 'attendeeCount' => $audience['count'],
                 'audienceType' => $audience['type'],
+                'audienceRef' => $audience['ref'],
                 'attendeeSample' => $audience['sample'],
                 'attendeeUserIds' => $audience['userIds'],
                 'rsvp' => $audience['rsvp'],
@@ -229,12 +236,12 @@ class HrCalendarAggregator
      * Summarise an event's audience for the feed: invited-people count, a sample
      * of names, RSVP tallies, and the current viewer's own response.
      *
-     * @return array{count: int, type: string|null, sample: list<string>, userIds: list<int>, rsvp: array<string,int>, myRsvp: string|null}
+     * @return array{count: int, type: string|null, ref: string|null, sample: list<string>, userIds: list<int>, rsvp: array<string,int>, myRsvp: string|null}
      */
     private function attendeeSummary(HrCalendarEvent $e): array
     {
         if (! $e->relationLoaded('attendees')) {
-            return ['count' => 0, 'type' => null, 'sample' => [], 'userIds' => [], 'rsvp' => [], 'myRsvp' => null];
+            return ['count' => 0, 'type' => null, 'ref' => null, 'sample' => [], 'userIds' => [], 'rsvp' => [], 'myRsvp' => null];
         }
 
         $people = $e->attendees->where('audience_type', 'person');
@@ -248,6 +255,7 @@ class HrCalendarAggregator
         return [
             'count' => $people->count(),
             'type' => $group?->audience_type ?? ($people->isNotEmpty() ? 'people' : null),
+            'ref' => $group?->audience_ref,
             'sample' => $people->take(4)->map(fn ($p) => $p->user?->name)->filter()->values()->all(),
             'userIds' => $people->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->values()->all(),
             'rsvp' => $rsvp,
@@ -255,6 +263,30 @@ class HrCalendarAggregator
                 ? $people->firstWhere('user_id', $this->viewerId)?->rsvp_status
                 : null,
         ];
+    }
+
+    private function teamAudienceIsVisible(HrCalendarEvent $event, ?User $viewer): bool
+    {
+        $teamAudience = $event->attendees->firstWhere('audience_type', 'team');
+
+        if (! $teamAudience) {
+            return true;
+        }
+
+        if (! $viewer) {
+            return false;
+        }
+
+        if ((int) $event->created_by === (int) $viewer->id) {
+            return true;
+        }
+
+        return HrEmployeeProfile::query()
+            ->where('tenant_id', $event->tenant_id)
+            ->where('user_id', $viewer->id)
+            ->where('is_active', true)
+            ->where('team', $teamAudience->audience_ref)
+            ->exists();
     }
 
     /**
@@ -338,6 +370,10 @@ class HrCalendarAggregator
      */
     private function leaveAndHolidays(?int $tenantId, Carbon $start, Carbon $end, array $filters, ?User $viewer): array
     {
+        if (! Schema::hasTable('hr_leave_requests')) {
+            return [collect(), collect()];
+        }
+
         $canSeeSensitive = (bool) $viewer?->canDo('hr.leave.manage');
         $leaveFilters = ! empty($filters['site_id']) ? ['site_id' => $filters['site_id']] : [];
 
@@ -420,6 +456,10 @@ class HrCalendarAggregator
 
     private function shifts(Carbon $start, Carbon $end, array $filters, User $viewer): Collection
     {
+        if (! Schema::hasTable('shifts')) {
+            return collect();
+        }
+
         $siteId = ! empty($filters['site_id']) ? (int) $filters['site_id'] : null;
 
         $shifts = Shift::query()
@@ -495,58 +535,64 @@ class HrCalendarAggregator
 
         // Tenant-scoped like every other layer (audit fix round 2 — this layer
         // previously queried all three tables unscoped).
-        HrStaffComplianceStatus::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [$start, $end])
-            ->with(['user:id,name', 'requirement:id,name,code'])
-            ->get()
-            ->each(function ($s) use ($out, $urgency) {
-                $out->push($this->complianceRow(
-                    'compliance-'.$s->id,
-                    ($s->requirement?->name ?? 'Compliance').' · '.($s->user?->name ?? 'Unknown'),
-                    $s->expires_at,
-                    $urgency($s->expires_at),
-                    ['person' => $s->user?->name, 'requirement' => $s->requirement?->name],
-                ));
-            });
+        if (Schema::hasTable('hr_staff_compliance_statuses')) {
+            HrStaffComplianceStatus::query()
+                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->whereNotNull('expires_at')
+                ->whereBetween('expires_at', [$start, $end])
+                ->with(['user:id,name', 'requirement:id,name,code'])
+                ->get()
+                ->each(function ($s) use ($out, $urgency) {
+                    $out->push($this->complianceRow(
+                        'compliance-'.$s->id,
+                        ($s->requirement?->name ?? 'Compliance').' · '.($s->user?->name ?? 'Unknown'),
+                        $s->expires_at,
+                        $urgency($s->expires_at),
+                        ['person' => $s->user?->name, 'requirement' => $s->requirement?->name],
+                    ));
+                });
+        }
 
         // staff_background_checks has no tenant_id column — scope through the
         // owner's employee profile instead.
-        StaffBackgroundCheck::query()
-            ->when($tenantId !== null, fn ($q) => $q->whereHas(
-                'user.hrEmployeeProfile',
-                fn ($p) => $p->where('tenant_id', $tenantId),
-            ))
-            ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [$start, $end])
-            ->with('user:id,name')
-            ->get()
-            ->each(function ($c) use ($out, $urgency) {
-                $out->push($this->complianceRow(
-                    'vetting-'.$c->id,
-                    $this->humanise($c->check_type).' · '.($c->user?->name ?? 'Unknown'),
-                    $c->expires_at,
-                    $urgency($c->expires_at),
-                    ['person' => $c->user?->name, 'requirement' => $this->humanise($c->check_type)],
-                ));
-            });
+        if (Schema::hasTable('staff_background_checks')) {
+            StaffBackgroundCheck::query()
+                ->when($tenantId !== null, fn ($q) => $q->whereHas(
+                    'user.hrEmployeeProfile',
+                    fn ($p) => $p->where('tenant_id', $tenantId),
+                ))
+                ->whereNotNull('expires_at')
+                ->whereBetween('expires_at', [$start, $end])
+                ->with('user:id,name')
+                ->get()
+                ->each(function ($c) use ($out, $urgency) {
+                    $out->push($this->complianceRow(
+                        'vetting-'.$c->id,
+                        $this->humanise($c->check_type).' · '.($c->user?->name ?? 'Unknown'),
+                        $c->expires_at,
+                        $urgency($c->expires_at),
+                        ['person' => $c->user?->name, 'requirement' => $this->humanise($c->check_type)],
+                    ));
+                });
+        }
 
-        HrDriverEligibility::query()
-            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
-            ->whereNotNull('licence_expires_at')
-            ->whereBetween('licence_expires_at', [$start, $end])
-            ->with('user:id,name')
-            ->get()
-            ->each(function ($r) use ($out, $urgency) {
-                $out->push($this->complianceRow(
-                    'driver-'.$r->id,
-                    'Driver licence · '.($r->user?->name ?? 'Unknown'),
-                    $r->licence_expires_at,
-                    $urgency($r->licence_expires_at),
-                    ['person' => $r->user?->name, 'requirement' => 'Driver licence'],
-                ));
-            });
+        if (Schema::hasTable('hr_driver_eligibility')) {
+            HrDriverEligibility::query()
+                ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
+                ->whereNotNull('licence_expires_at')
+                ->whereBetween('licence_expires_at', [$start, $end])
+                ->with('user:id,name')
+                ->get()
+                ->each(function ($r) use ($out, $urgency) {
+                    $out->push($this->complianceRow(
+                        'driver-'.$r->id,
+                        'Driver licence · '.($r->user?->name ?? 'Unknown'),
+                        $r->licence_expires_at,
+                        $urgency($r->licence_expires_at),
+                        ['person' => $r->user?->name, 'requirement' => 'Driver licence'],
+                    ));
+                });
+        }
 
         return $out->values();
     }
@@ -572,6 +618,10 @@ class HrCalendarAggregator
     private function milestones(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
     {
         $out = collect();
+
+        if (! Schema::hasTable('hr_employee_profiles')) {
+            return $out;
+        }
 
         HrEmployeeProfile::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))

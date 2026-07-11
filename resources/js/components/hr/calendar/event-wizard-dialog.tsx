@@ -67,7 +67,8 @@ export interface CalendarEventInitial {
     site_id: number | null;
     rrule?: string | null;
     recurrence_until?: string | null;
-    audience_type?: 'org' | 'site' | 'department' | 'people' | null;
+    audience_type?: 'org' | 'site' | 'department' | 'team' | 'people' | null;
+    audience_team?: string | null;
     audience_user_ids?: number[];
     reminders?: { offset_minutes: number; channel: string }[];
     attachments?: EventAttachment[];
@@ -191,6 +192,7 @@ export function EventWizardDialog({
     onSaved,
     sites,
     departments,
+    teams,
     categories,
     staff,
     initial,
@@ -202,6 +204,7 @@ export function EventWizardDialog({
     onSaved: () => void;
     sites: IdName[];
     departments: IdName[];
+    teams: string[];
     categories: EventCategoryOption[];
     staff: PersonOption[];
     initial?: CalendarEventInitial | null;
@@ -227,7 +230,8 @@ export function EventWizardDialog({
         is_all_day: false,
         rrule: '' as string,
         recurrence_until: '' as string,
-        audience_type: 'org' as 'org' | 'site' | 'department' | 'people',
+        audience_type: 'org' as 'org' | 'site' | 'department' | 'team' | 'people',
+        audience_team: '',
         audience_user_ids: [] as number[],
         reminders: [] as { offset_minutes: number; channel: string }[],
         location: '',
@@ -249,6 +253,7 @@ export function EventWizardDialog({
                 rrule: initial.rrule ?? '',
                 recurrence_until: initial.recurrence_until ? initial.recurrence_until.substring(0, 10) : '',
                 audience_type: initial.audience_type ?? 'org',
+                audience_team: initial.audience_team ?? '',
                 audience_user_ids: initial.audience_user_ids ?? [],
                 reminders: initial.reminders ?? [],
                 location: initial.location ?? '',
@@ -315,7 +320,9 @@ export function EventWizardDialog({
     const canSubmit =
         form.data.title.trim() !== '' &&
         form.data.starts_at !== '' &&
-        form.data.ends_at !== '';
+        form.data.ends_at !== '' &&
+        (form.data.audience_type !== 'team' ||
+            form.data.audience_team !== '');
 
     // Completeness meter (matches the prototype) — required basics + nice-to-haves.
     const completeness = useMemo(() => {
@@ -364,6 +371,10 @@ export function EventWizardDialog({
                 return form.data.department_id
                     ? `Everyone in ${departmentName}.`
                     : 'Pick a department above to scope this.';
+            case 'team':
+                return form.data.audience_team
+                    ? `Everyone in ${form.data.audience_team}.`
+                    : 'Pick a team below to scope this.';
             case 'people': {
                 const n = form.data.audience_user_ids.length;
                 return `${n} ${n === 1 ? 'person' : 'people'} invited — they can RSVP.`;
@@ -375,6 +386,7 @@ export function EventWizardDialog({
         form.data.audience_type,
         form.data.site_id,
         form.data.department_id,
+        form.data.audience_team,
         form.data.audience_user_ids,
         siteName,
         departmentName,
@@ -394,6 +406,8 @@ export function EventWizardDialog({
             ...data,
             site_id: data.site_id === '' ? null : data.site_id,
             department_id: data.department_id === '' ? null : data.department_id,
+            audience_team:
+                data.audience_type === 'team' ? data.audience_team : null,
             rrule: data.rrule === '' ? null : data.rrule,
             recurrence_until: data.recurrence_until === '' ? null : data.recurrence_until,
             ...(isEdit && initial?.scope
@@ -757,6 +771,7 @@ export function EventWizardDialog({
                                         { value: 'org', label: 'Everyone' },
                                         { value: 'site', label: 'This site' },
                                         { value: 'department', label: 'This department' },
+                                        { value: 'team', label: 'A team' },
                                         { value: 'people', label: 'Specific people' },
                                     ]}
                                 />
@@ -803,6 +818,42 @@ export function EventWizardDialog({
                                             })}
                                         </div>
                                     ) : null}
+                                </div>
+                            ) : null}
+
+                            {form.data.audience_type === 'team' ? (
+                                <div className="mt-3">
+                                    <Field
+                                        label="Team"
+                                        required
+                                        error={form.errors.audience_team}
+                                    >
+                                        <SelectInput
+                                            value={
+                                                form.data.audience_team || 'none'
+                                            }
+                                            onChange={(value) =>
+                                                form.setData(
+                                                    'audience_team',
+                                                    value === 'none'
+                                                        ? ''
+                                                        : value,
+                                                )
+                                            }
+                                            placeholder="Select a team"
+                                            ariaLabel="Audience team"
+                                            options={[
+                                                {
+                                                    value: 'none',
+                                                    label: 'Select a team',
+                                                },
+                                                ...teams.map((team) => ({
+                                                    value: team,
+                                                    label: team,
+                                                })),
+                                            ]}
+                                        />
+                                    </Field>
                                 </div>
                             ) : null}
 

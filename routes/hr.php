@@ -1117,7 +1117,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Calendar
     |--------------------------------------------------------------------------
     */
-    Route::prefix('calendar')->name('calendar.')->group(function () {
+    Route::middleware('permission:hr.calendar.view')->prefix('calendar')->name('calendar.')->group(function () {
         Route::get('/', [CalendarController::class, 'index'])->name('index');
         Route::get('/feed', [CalendarController::class, 'feed'])->name('feed');
         Route::post('/events', [CalendarController::class, 'store'])->name('events.store');
