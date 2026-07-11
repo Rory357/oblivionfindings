@@ -478,7 +478,7 @@ publish and staging-verification boundary.
   ancestor of this branch, so no rebase is required before integration.
 - The worktree was clean after all implementation commits and release gates.
 
-### Task 11: Integrate, push, deploy, and verify staging
+### Task 11: Integrate, push, deploy, and verify staging — COMPLETE
 
 **Files:**
 - Merge: `codex/complete-warning-cleanup` into `main`
@@ -491,3 +491,30 @@ publish and staging-verification boundary.
 - [ ] **Step 5: Deploy with `scripts/deploy-server.sh --skip-nominatim --skip-queclink`**
 - [ ] **Step 6: Verify server HEAD, clean status, deployment exit 0, manifest presence, staging health, and server-side `npm audit --package-lock-only` = 0**
 - [ ] **Step 7: Record the final server evidence and push the ledger-only closeout commit**
+
+## Publish and staging ledger — 2026-07-11
+
+- `main` fast-forwarded from `1027c5ed` to `07bb4660` in the isolated
+  `codex-ticketing-main-integration` checkout; the original dirty/detached
+  checkout and `codex/move-billing-nav-finance` worktree were not modified.
+- Merged-SHA verification at `07bb4660`: `npm ci` audited 638 packages with 0
+  vulnerabilities; zero-warning ESLint, TypeScript, 44/44 Vitest files and
+  184/184 tests, client production build, SSR production build, and
+  `git diff --check` all exited 0.
+- `git push origin main` succeeded and `git ls-remote` independently resolved
+  `refs/heads/main` to `07bb4660457e92c12edf03502c45fb94d47c1c4e`.
+- Deployment ran with
+  `scripts/deploy-server.sh --skip-nominatim --skip-queclink` in a detached
+  background process. Durable evidence is stored on the server at
+  `/tmp/oblivion-warning-cleanup-07bb4660.log` and
+  `/tmp/oblivion-warning-cleanup-07bb4660.exit`; the exit file contains `0`
+  and the log ends with `Server provisioning complete`.
+- Server verification in `/var/www/oblivionfindings`: `HEAD` and `origin/main`
+  both `07bb4660`, branch `main`, 0 status lines, 0 pending migrations, and one
+  active queue worker.
+- `public/build/manifest.json` exists at 3,238,911 bytes with mtime
+  `2026-07-11 04:34:20.100565470 +0000`.
+- Server-side `npm audit --package-lock-only` reports 0 vulnerabilities and a
+  terminal HTTP probe to `https://oblivionfindings.com/login` returns 200.
+- Browser proof is explicitly deferred under the active crash-containment
+  boundary; no browser, Chrome, computer-use, or Playwright tool was invoked.
