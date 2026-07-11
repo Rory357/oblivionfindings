@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrApprovalInstance;
+use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrJobRequisition;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Services\ApprovalWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -140,8 +144,92 @@ class ApprovalController extends Controller
             'actions_count' => $instance->actions->count(),
         ]);
 
+        $nativeApprovals = collect();
+
+        if ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')) {
+            $nativeApprovals->push(...HrLeaveRequest::forTenant($tenantId)
+                ->pending()
+                ->with('user:id,name')
+                ->latest('submitted_at')
+                ->limit(20)
+                ->get()
+                ->map(fn (HrLeaveRequest $leave) => [
+                    'id' => $leave->id,
+                    'type' => 'leave',
+                    'title' => ucfirst(str_replace('_', ' ', $leave->leave_type)).' leave',
+                    'requester' => $leave->user?->name ?? 'Unknown employee',
+                    'summary' => "{$leave->hours_requested} hours requested",
+                    'status' => $leave->status,
+                    'submitted_at' => ($leave->submitted_at ?? $leave->created_at)?->toDateTimeString(),
+                    'url' => route('hr.leave.show', $leave, false),
+                ]));
+        }
+
+        if ($user->canDo('hr.expenses.approve')) {
+            $nativeApprovals->push(...HrExpenseClaim::forTenant($tenantId)
+                ->submitted()
+                ->with('user:id,name')
+                ->latest('submitted_at')
+                ->limit(20)
+                ->get()
+                ->map(fn (HrExpenseClaim $claim) => [
+                    'id' => $claim->id,
+                    'type' => 'expense',
+                    'title' => $claim->title,
+                    'requester' => $claim->user?->name ?? 'Unknown employee',
+                    'summary' => "{$claim->currency} {$claim->total_amount}",
+                    'status' => $claim->status,
+                    'submitted_at' => ($claim->submitted_at ?? $claim->created_at)?->toDateTimeString(),
+                    'url' => route('hr.compensation.expenses.show', $claim, false),
+                ]));
+        }
+
+        if ($user->canDo('hr.recruitment.manage')) {
+            $nativeApprovals->push(...HrOffer::query()
+                ->where('approval_status', 'pending_approval')
+                ->whereHas('application', fn ($query) => $query->where('tenant_id', $tenantId))
+                ->with('application.candidate:id,first_name,last_name')
+                ->latest('approval_requested_at')
+                ->limit(20)
+                ->get()
+                ->map(fn (HrOffer $offer) => [
+                    'id' => $offer->id,
+                    'type' => 'offer',
+                    'title' => $offer->position_title,
+                    'requester' => $offer->application?->candidate?->full_name ?? 'Unknown candidate',
+                    'summary' => 'Offer awaiting approval',
+                    'status' => $offer->approval_status,
+                    'submitted_at' => ($offer->approval_requested_at ?? $offer->created_at)?->toDateTimeString(),
+                    'url' => route('hr.recruitment.index', ['tab' => 'offers'], false),
+                ]));
+
+            $nativeApprovals->push(...HrJobRequisition::query()
+                ->where('tenant_id', $tenantId)
+                ->where('requires_approval', true)
+                ->where('status', 'pending_approval')
+                ->latest('updated_at')
+                ->limit(20)
+                ->get()
+                ->map(fn (HrJobRequisition $requisition) => [
+                    'id' => $requisition->id,
+                    'type' => 'requisition',
+                    'title' => $requisition->title,
+                    'requester' => 'Recruitment',
+                    'summary' => "{$requisition->openings} opening(s)",
+                    'status' => $requisition->status,
+                    'submitted_at' => $requisition->updated_at?->toDateTimeString(),
+                    'url' => route('hr.recruitment.index', ['tab' => 'requisitions'], false),
+                ]));
+        }
+
+        $nativeApprovals = $nativeApprovals
+            ->sortByDesc('submitted_at')
+            ->take(50)
+            ->values();
+
         return Inertia::render('hr/approvals/pending', [
             'instances' => $instances,
+            'nativeApprovals' => $nativeApprovals,
             'can' => [
                 'manage' => $user->canDo('hr.approvals.manage'),
             ],
