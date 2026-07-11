@@ -51,7 +51,7 @@ class HrCalendarAggregator
     ) {}
 
     /**
-     * @param  list<string>  $layers   active layer keys to compute (perf gate)
+     * @param  list<string>  $layers  active layer keys to compute (perf gate)
      * @param  array{site_id?: int|string|null, team?: string|null, department_id?: int|string|null}  $filters
      * @return list<array<string, mixed>>
      */
@@ -105,6 +105,7 @@ class HrCalendarAggregator
         // the range plus any recurring base whose window touches the range.
         $base = HrCalendarEvent::query()
             ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
+            ->active()
             ->whereNull('recurrence_parent_id')
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
             ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
@@ -128,6 +129,7 @@ class HrCalendarAggregator
             ? collect()
             : HrCalendarEvent::query()
                 ->whereIn('recurrence_parent_id', $recurringIds->all())
+                ->active()
                 ->where('is_exception', true)
                 ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments'])
                 ->get()
@@ -137,6 +139,7 @@ class HrCalendarAggregator
         foreach ($base as $e) {
             if (! $e->rrule) {
                 $out->push($this->eventRow($e, $e->starts_at, $e->ends_at));
+
                 continue;
             }
 

@@ -27,6 +27,7 @@ class DispatchCalendarReminders extends Command
         $sent = 0;
 
         $reminders = HrCalendarEventReminder::query()
+            ->whereHas('event', fn ($query) => $query->active())
             ->with(['event.attendees' => fn ($q) => $q->where('audience_type', 'person')])
             ->get();
 
@@ -58,6 +59,7 @@ class DispatchCalendarReminders extends Command
             }
             if ($userIds === []) {
                 $reminder->update(['last_sent_at' => $triggerAt]);
+
                 continue;
             }
 

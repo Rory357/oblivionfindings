@@ -64,6 +64,8 @@ import type { EventClickArg } from '@fullcalendar/core';
 import { Head, router } from '@inertiajs/react';
 import {
     CalendarDays,
+    Archive,
+    ArchiveRestore,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -76,7 +78,6 @@ import {
     Plus,
     Search,
     Star,
-    Trash2,
     User as UserIcon,
     Users,
 } from 'lucide-react';
@@ -110,11 +111,21 @@ interface Props {
     teams: string[];
     categories: EventCategoryOption[];
     staff: PersonOption[];
+    archivedEvents: ArchivedEvent[];
     stats: HeroStats;
     upNext: UpNextEntry[];
     ical: { url: string | null };
     can: { manage: boolean; manageRecurring: boolean; seeSensitive: boolean };
 }
+
+type ArchivedEvent = {
+    id: number;
+    title: string;
+    starts_at: string | null;
+    archived_at: string | null;
+    archived_by: string | null;
+    archive_reason: string | null;
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
@@ -191,6 +202,7 @@ export default function CalendarIndex({
     teams,
     categories,
     staff,
+    archivedEvents,
     stats,
     upNext,
     ical,
@@ -223,13 +235,14 @@ export default function CalendarIndex({
     const [editingEvent, setEditingEvent] = useState<CalendarEventInitial | null>(null);
     const [createDate, setCreateDate] = useState<string | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
+    const [archiveHistoryOpen, setArchiveHistoryOpen] = useState(false);
     const [scopePrompt, setScopePrompt] = useState<EventClickArg | null>(null);
     const [detail, setDetail] = useState<EventDetail | null>(null);
     const [ctxMenu, setCtxMenu] = useState<ShiftCtxState | null>(null);
     const [quickAdd, setQuickAdd] = useState<{ date: string; x: number; y: number } | null>(null);
     const [hover, setHover] = useState<{ e: CalendarLayerFeed; x: number; y: number } | null>(null);
     const [yearPickerOpen, setYearPickerOpen] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
+    const [archiveTarget, setArchiveTarget] = useState<{ id: number; title: string } | null>(null);
     const [dayDetail, setDayDetail] = useState<{ label: string; events: CalendarLayerFeed[] } | null>(null);
 
     const clickedInfoRef = useRef<EventClickArg | null>(null);
@@ -528,19 +541,19 @@ export default function CalendarIndex({
         );
     };
 
-    const deleteFromInfo = (info: EventClickArg) => {
+    const archiveFromInfo = (info: EventClickArg) => {
         const id = Number((info.event.extendedProps as Record<string, unknown>).eventId);
-        if (id) setDeleteTarget({ id, title: info.event.title });
+        if (id) setArchiveTarget({ id, title: info.event.title });
     };
 
-    const confirmDelete = () => {
-        if (!deleteTarget) return;
-        router.delete(`/hr/calendar/events/${deleteTarget.id}`, {
+    const confirmArchive = () => {
+        if (!archiveTarget) return;
+        router.delete(`/hr/calendar/events/${archiveTarget.id}`, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => refetch(),
         });
-        setDeleteTarget(null);
+        setArchiveTarget(null);
     };
 
     const buildEntryMenu = (e: CalendarLayerFeed, x: number, y: number) => {
@@ -553,7 +566,7 @@ export default function CalendarIndex({
                       { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit…', kbd: '↵', onClick: () => editFromInfo(info) },
                       { icon: <Copy className="h-3.5 w-3.5" />, label: 'Duplicate', onClick: () => duplicateFromInfo(info) },
                       { sep: true as const },
-                      { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Delete', tone: 'critical' as const, onClick: () => deleteFromInfo(info) },
+                      { icon: <Archive className="h-3.5 w-3.5" />, label: 'Archive', onClick: () => archiveFromInfo(info) },
                   ]
                 : [
                       { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open detail', onClick: () => handleEventClick(info) },
@@ -749,6 +762,21 @@ export default function CalendarIndex({
                         </button>
 
                         <div className="ml-auto flex flex-wrap items-center gap-[10px]">
+                            {can.manage ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setArchiveHistoryOpen(true)}
+                                    className="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground hover:bg-muted"
+                                >
+                                    <ArchiveRestore className="h-4 w-4" />
+                                    Archived events
+                                    {archivedEvents.length > 0 ? (
+                                        <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
+                                            {archivedEvents.length}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            ) : null}
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-[10px] top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
                                 <input
@@ -891,6 +919,53 @@ export default function CalendarIndex({
 
                 <ICalSubscribeDialog open={subscribeOpen} onClose={() => setSubscribeOpen(false)} url={ical.url} />
 
+                <Dialog open={archiveHistoryOpen} onOpenChange={setArchiveHistoryOpen}>
+                    <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Archived events</DialogTitle>
+                            <DialogDescription>
+                                Archived events stay out of active calendars while their attendees, reminders, and attachments are retained.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {archivedEvents.length > 0 ? (
+                            <ul className="max-h-[55vh] space-y-2 overflow-y-auto">
+                                {archivedEvents.map((event) => (
+                                    <li key={event.id} className="flex items-start justify-between gap-3 rounded-xl border border-border p-3">
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-sm font-semibold text-foreground">{event.title}</span>
+                                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                                                Archived {event.archived_at ? fmtLong(new Date(event.archived_at)) : 'previously'}
+                                                {event.archived_by ? ` by ${event.archived_by}` : ''}
+                                            </span>
+                                            {event.archive_reason ? (
+                                                <span className="mt-1 block text-xs text-muted-foreground">Reason: {event.archive_reason}</span>
+                                            ) : null}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => router.post(`/hr/calendar/events/${event.id}/restore`, {}, {
+                                                preserveScroll: true,
+                                                onSuccess: () => {
+                                                    toast.success('Event restored');
+                                                    setArchiveHistoryOpen(false);
+                                                    refetch();
+                                                },
+                                            })}
+                                            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-primary hover:bg-muted"
+                                        >
+                                            <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                                No archived events.
+                            </p>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
                 <Dialog open={!!scopePrompt} onOpenChange={(o) => !o && setScopePrompt(null)}>
                     <DialogContent className="max-w-md">
                         <DialogHeader>
@@ -931,7 +1006,7 @@ export default function CalendarIndex({
                         onClose={() => setDetail(null)}
                         onEdit={() => { setDetail(null); if (clickedInfoRef.current) editFromInfo(clickedInfoRef.current); }}
                         onDuplicate={() => { setDetail(null); if (clickedInfoRef.current) duplicateFromInfo(clickedInfoRef.current); }}
-                        onDelete={() => { setDetail(null); if (clickedInfoRef.current) deleteFromInfo(clickedInfoRef.current); }}
+                        onArchive={() => { setDetail(null); if (clickedInfoRef.current) archiveFromInfo(clickedInfoRef.current); }}
                         onDeepLink={(href) => { setDetail(null); router.visit(href); }}
                     />
                 ) : null}
@@ -1006,18 +1081,18 @@ export default function CalendarIndex({
                     </DialogContent>
                 </Dialog>
 
-                <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+                <AlertDialog open={!!archiveTarget} onOpenChange={(o) => !o && setArchiveTarget(null)}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Delete event?</AlertDialogTitle>
+                            <AlertDialogTitle>Archive event?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This permanently removes “{deleteTarget?.title}” from the calendar. This can't be undone.
+                                Archiving “{archiveTarget?.title}” removes it from active calendars but retains attendees, reminders, and attachments. It can be restored later.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Keep event</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmDelete} className="bg-status-critical text-white hover:bg-status-critical/90">
-                                Delete event
+                            <AlertDialogAction onClick={confirmArchive}>
+                                Archive event
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

@@ -6,6 +6,7 @@
 import { useForm } from '@inertiajs/react';
 import {
     AlarmClock,
+    Archive,
     ArrowRight,
     Bell,
     Building2,
@@ -16,7 +17,6 @@ import {
     Paperclip,
     PartyPopper,
     Repeat,
-    Trash2,
     Users,
     X,
     type LucideIcon,
@@ -447,14 +447,14 @@ export function EventWizardDialog({
         }
     };
 
-    const doDelete = () => {
+    const doArchive = () => {
         if (!initial) return;
         form.delete(`/hr/calendar/events/${initial.id}`, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
                 onSaved();
-                toast.success('Event deleted');
+                toast.success('Event archived');
                 close();
             },
         });
@@ -512,8 +512,8 @@ export function EventWizardDialog({
                                 onClick={() => setConfirmDelete(true)}
                                 className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-status-critical hover:bg-status-critical-bg"
                             >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
+                                <Archive className="h-4 w-4" />
+                                Archive
                             </button>
                         ) : null}
                     </div>
@@ -968,18 +968,17 @@ export function EventWizardDialog({
             <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete event?</AlertDialogTitle>
+                        <AlertDialogTitle>Archive event?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This permanently removes “{form.data.title}” from the calendar. This can't be undone.
+                            Archiving “{form.data.title}” removes it from active calendars but retains attendees, reminders, and attachments. It can be restored later.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Keep event</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={doDelete}
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            onClick={doArchive}
                         >
-                            Delete event
+                            Archive event
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

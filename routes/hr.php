@@ -798,6 +798,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.compensation.manage')->group(function () {
             Route::post('/bands', [CompensationController::class, 'storeBand'])->name('bands.store');
             Route::put('/bands/{band}', [CompensationController::class, 'updateBand'])->name('bands.update');
+            Route::post('/bands/{band}/deactivate', [CompensationController::class, 'deactivateBand'])->name('bands.deactivate');
+            Route::post('/bands/{band}/reactivate', [CompensationController::class, 'reactivateBand'])->name('bands.reactivate');
             Route::get('/reviews/create', [CompensationController::class, 'createReview'])->name('reviews.create');
             Route::post('/reviews', [CompensationController::class, 'storeReview'])->name('reviews.store');
             Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
@@ -1120,6 +1122,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/events', [CalendarController::class, 'store'])->name('events.store');
         Route::put('/events/{event}', [CalendarController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [CalendarController::class, 'destroy'])->name('events.destroy');
+        Route::post('/events/{event}/restore', [CalendarController::class, 'restore'])->name('events.restore');
         Route::post('/events/{event}/rsvp', [CalendarController::class, 'rsvp'])->name('events.rsvp');
         Route::post('/events/{event}/attachments', [CalendarController::class, 'storeAttachment'])->name('events.attachments.store');
         Route::delete('/attachments/{attachment}', [CalendarController::class, 'destroyAttachment'])->name('attachments.destroy');
