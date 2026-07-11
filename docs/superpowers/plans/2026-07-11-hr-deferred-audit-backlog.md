@@ -198,25 +198,25 @@ git commit -m "fix(hr): neutralize formulas in service csv exports"
 - Modify: `resources/js/pages/hr/compensation/bands.tsx`
 - Modify: `resources/js/pages/hr/calendar/index.tsx` and calendar dialogs
 
-- [ ] **Step 1: Write RED retention tests**
+- [x] **Step 1: Write RED retention tests**
 
 Assert calendar removal preserves the root, attendee, reminder, attachment row, and private file while excluding the event from active feed. Assert restore returns it. Assert salary-band deactivation preserves historical placement and excludes it from active selectors.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/DeferredRetentionLifecycleTest.php --compact`
 
 Expected: FAIL because calendar destroy deletes and salary bands have no lifecycle fields.
 
-- [ ] **Step 3: Add migrations and model contracts**
+- [x] **Step 3: Add migrations and model contracts**
 
 Calendar fields: `archived_at`, `archived_by`, `archive_reason`. Salary band fields: `is_active default true`, `deactivated_at`, `deactivated_by`. Add active/archived scopes and attribution relationships.
 
-- [ ] **Step 4: Replace destroy behavior and copy**
+- [x] **Step 4: Replace destroy behavior and copy**
 
 Calendar destroy sets archive fields inside a transaction and never deletes attachments/files. Add manager-only restore. Salary-band deactivate/reactivate uses existing compensation-manage permission. Replace Delete wording with Archive/Deactivate and add retained-history explanations.
 
-- [ ] **Step 5: Run GREEN, frontend gates, and commit**
+- [x] **Step 5: Run GREEN, frontend gates, and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/DeferredRetentionLifecycleTest.php tests/Feature/Hr/HrCalendarFeedTest.php tests/Feature/Hr/SalaryBandPlacementTest.php --compact
