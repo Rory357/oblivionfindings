@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Validator;
 
 class EmployeeImportExportService
 {
+    use SanitizesCsvOutput;
+
     /**
      * CSV headers used for export and import.
      */
@@ -45,10 +48,10 @@ class EmployeeImportExportService
             ->get();
 
         $output = fopen('php://temp', 'r+');
-        fputcsv($output, self::HEADERS);
+        $this->putCsv($output, self::HEADERS);
 
         foreach ($profiles as $profile) {
-            fputcsv($output, [
+            $this->putCsv($output, [
                 $profile->employee_number ?? '',
                 $profile->user?->name ?? '',
                 $profile->user?->email ?? '',
@@ -87,7 +90,7 @@ class EmployeeImportExportService
         // Validate headers
         $requiredHeaders = ['name', 'email'];
         foreach ($requiredHeaders as $required) {
-            if (!in_array($required, $headers)) {
+            if (! in_array($required, $headers)) {
                 return ['created' => 0, 'updated' => 0, 'errors' => ["Missing required header: {$required}"]];
             }
         }
@@ -122,7 +125,8 @@ class EmployeeImportExportService
             ]);
 
             if ($validator->fails()) {
-                $errors[] = "Row {$rowNumber}: " . implode(', ', $validator->errors()->all());
+                $errors[] = "Row {$rowNumber}: ".implode(', ', $validator->errors()->all());
+
                 continue;
             }
 
@@ -131,7 +135,7 @@ class EmployeeImportExportService
                     // Find or create user by email
                     $user = User::where('email', $data['email'])->first();
 
-                    if (!$user) {
+                    if (! $user) {
                         $user = User::create([
                             'name' => $data['name'],
                             'email' => $data['email'],
@@ -184,7 +188,7 @@ class EmployeeImportExportService
     public function generateTemplate(): string
     {
         $output = fopen('php://temp', 'r+');
-        fputcsv($output, self::HEADERS);
+        $this->putCsv($output, self::HEADERS);
         rewind($output);
         $csv = stream_get_contents($output);
         fclose($output);

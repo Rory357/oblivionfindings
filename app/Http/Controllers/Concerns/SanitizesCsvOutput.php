@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
 /**
  * Neutralises CSV formula injection (OWASP) for spreadsheet exports.
  *
@@ -45,7 +47,7 @@ trait SanitizesCsvOutput
      * @param  array<int, string>  $header
      * @param  iterable<int, array<int, mixed>>  $rows
      */
-    protected function streamSanitizedCsv(string $filename, array $header, iterable $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    protected function streamSanitizedCsv(string $filename, array $header, iterable $rows): StreamedResponse
     {
         return response()->streamDownload(function () use ($header, $rows) {
             $handle = fopen('php://output', 'w');
@@ -71,7 +73,15 @@ trait SanitizesCsvOutput
             return $value;
         }
 
-        $trimmed = ltrim($value);
+        // Ignore harmless visual spacing without stripping the tab/CR control
+        // prefixes that spreadsheet applications treat as executable input.
+        $trimmed = ltrim($value, " \v\f");
+
+        $firstMeaningful = $trimmed[0] ?? '';
+
+        if (in_array($firstMeaningful, ["\t", "\r"], true)) {
+            return "'".$value;
+        }
 
         // A purely numeric cell (negative numbers, "+64…" phone numbers) is not
         // a formula threat — leave it so the spreadsheet keeps it as a number and
@@ -81,9 +91,7 @@ trait SanitizesCsvOutput
             return $value;
         }
 
-        $firstMeaningful = $trimmed[0] ?? '';
-
-        if (in_array($firstMeaningful, ['=', '+', '-', '@', "\t", "\r"], true)) {
+        if (in_array($firstMeaningful, ['=', '+', '-', '@'], true)) {
             return "'".$value;
         }
 
