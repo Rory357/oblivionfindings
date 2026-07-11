@@ -466,23 +466,23 @@ git commit -m "feat(hr): complete deferred notification loops"
 - Modify: `resources/js/pages/operations/shifts/components/shift-detail-dialog.tsx`
 - Modify: `resources/js/components/roster/shift-detail-sheet.tsx`
 
-- [ ] **Step 1: Write RED seam tests**
+- [x] **Step 1: Write RED seam tests**
 
 Cover no-requirement compatibility, matching current class/endorsements, missing class, missing endorsement, expired licence, cross-organisation driver data, assignment block, and roster publish block.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/ShiftLicenceRequirementSeamTest.php --compact`
 
-- [ ] **Step 3: Add fields and shared validator**
+- [x] **Step 3: Add fields and shared validator**
 
 Add nullable `required_licence_class` and JSON `required_licence_endorsements`. Validate against the HR driver taxonomy. Register `RequiredDriverLicenceRule` in the existing eligibility pipeline; do not duplicate licence records.
 
-- [ ] **Step 4: Add shift UI**
+- [x] **Step 4: Add shift UI**
 
 Show optional class and endorsement selectors in create/edit, badges in read contexts, and plain-language eligibility blockers. Preserve payload omission for ordinary shifts.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/ShiftLicenceRequirementSeamTest.php tests/Feature/Hr/DriverEligibilityRosteringHardStopTest.php tests/Feature/Rostering/DriverLicenceEligibilityWarningTest.php --compact
