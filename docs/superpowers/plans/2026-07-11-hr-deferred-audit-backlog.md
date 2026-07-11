@@ -502,23 +502,23 @@ git commit -m "feat(rostering): enforce shift licence requirements"
 - Modify: `resources/js/components/hr/calendar/event-wizard-dialog.tsx`
 - Modify: `resources/js/pages/hr/calendar/index.tsx`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Assert feed survives each absent optional table, calendar routes carry view middleware, a team audience requires a valid tenant team, foreign team names fail, and active team members can see team events.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/HrCalendarResilienceTest.php --compact`
 
-- [ ] **Step 3: Add table guards and route defence**
+- [x] **Step 3: Add table guards and route defence**
 
 Each optional layer returns an empty collection when its table is absent. Add group-level `permission:hr.calendar.view` while retaining controller manage and tenant checks.
 
-- [ ] **Step 4: Support team audiences**
+- [x] **Step 4: Support team audiences**
 
 Accept `audience_type=team` plus required `audience_team`, validate against distinct active `HrEmployeeProfile.team` values for the tenant, and store the team string in `audience_ref`. Visibility resolves through the viewer’s active profile.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/HrCalendarResilienceTest.php tests/Feature/Hr/HrCalendarFeedTest.php tests/Feature/Hr/HrCalendarEventCrudTest.php --compact

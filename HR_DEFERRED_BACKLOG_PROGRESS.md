@@ -49,7 +49,7 @@ Status: ⬜ not started · 🔶 in progress/blocked · ✅ verified complete · 
 | U3 | Specialised feedback hero | ⬜ | — | — | — | Server-derived deep links. |
 | U4 | Neutral shared `TextPromptDialog` ownership | ⬜ | — | — | — | API unchanged. |
 | U5 | Time soft refresh updates entries and preserves filters | ⬜ | — | — | — | No selection reset. |
-| C1 | Calendar table guards, permission defence, team audiences | ⬜ | — | — | — | Team source is `HrEmployeeProfile.team`. |
+| C1 | Calendar table guards, permission defence, team audiences | ✅ | Pre-change source proof: no `Schema::hasTable` guard existed; the route group had no permission middleware; controller/wizard audience unions omitted `team`. | Focused: 10 passed / 36 assertions. Planned calendar regression: 24 passed / 90 assertions. Types and focused ESLint pass. | `89d16df2` | Seven optional source tables fail soft; all calendar routes carry the view gate; team values come only from active tenant profiles and visibility requires an active matching profile (creator retains access). |
 | L1 | Classify every historical open/deferred observation | ⬜ | — | — | — | Implemented, stale, or approved closed boundary. |
 
 ## Approved closed boundaries retained throughout
@@ -123,3 +123,11 @@ Backend RED was 8/8 failures: `RequiredDriverLicenceRule` did not exist and the 
 The requirements round-trip through one-off create/edit, eligibility preview, calendar create/edit, recurring-series sampling/generation, future-series changes, duplication, promotion, manager quick detail, and frontline roster detail. Assigned shift creation/assignment, calendar writes, roster-period validation, proposed-roster validation, and direct draft publishing cannot bypass a block. Ordinary new shifts omit both request keys; edit mode submits empty values so a manager can intentionally remove an old requirement.
 
 Final GREEN: current focused **9/9 (19 assertions)**; planned driver + publish + recurring sampler regression bundle **20/20 (44 assertions)**, plus the added direct-publish contract **1/1 (3 assertions)**; focused wizard Vitest **8/8**; `npm run types` exit 0; focused ESLint zero warnings; Pint, PHP syntax, and `git diff --check` clean. Implementation commit: `71fcfd32`.
+
+### Run 11 — C1 calendar resilience and team audiences
+
+The test contracts were written before production edits, but the isolated database's ~147-second bootstrap completed after implementation had already begun, so that process did not preserve a clean pre-change failure count. The authoritative RED evidence is therefore the inspected source state: `HrCalendarAggregator` had zero table guards, the entire HR calendar route group lacked permission middleware, and both controller validation and the wizard's audience union excluded the schema-supported `team` type. This limitation is recorded rather than relabelling the later harness-only mock failures as product RED evidence.
+
+Each optional calendar source now checks its root table before querying: events, leave/holidays, shifts/coverage, three independent compliance sources, and employee milestones. The route group carries `permission:hr.calendar.view` while controller manage, RSVP, tenant, archive, and attachment checks remain. Team selection is populated from distinct active `HrEmployeeProfile.team` values, validated against an active profile in the event tenant, stored in the existing attendee `audience_ref`, returned through feed/edit payloads, and visible only to the creator or an active same-tenant profile with the matching team.
+
+Final GREEN: focused **10/10 (36 assertions)**; focused plus `HrCalendarFeedTest` and `HrCalendarEventCrudTest` **24/24 (90 assertions)** in 180.23s; `npm run types` exit 0; focused ESLint zero warnings; Pint, PHP syntax, and `git diff --check` clean. Implementation commit: `89d16df2`.
