@@ -242,14 +242,9 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                            size="sm"
-                            className="bg-primary-foreground font-extrabold text-primary shadow-sm hover:bg-primary-foreground/90"
-                            onClick={() => setWizardOpen(true)}
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
+                        <FleetHeroAction icon={Plus} emphasis onClick={() => setWizardOpen(true)}>
                             New claim
-                        </Button>
+                        </FleetHeroAction>
                         <FleetHeroAction
                             href={`/fleet-assets/mileage/export?${new URLSearchParams(localFilters as Record<string, string>).toString()}`}
                             icon={Download}

@@ -23,14 +23,8 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $period = $request->input('period', '30d');
-        $startDate = match ($period) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            '90d' => now()->subDays(90),
-            '1y' => now()->subYear(),
-            default => now()->subDays(30),
-        };
+        $period = $this->normaliseReportPeriod($request->input('period', '30d'));
+        $startDate = $this->reportStartDate($period);
 
         $vehicleIds = Asset::vehicles()->pluck('id');
         $hasTripsTable = Schema::hasTable('fleet_trips');
@@ -401,8 +395,11 @@ class ReportController extends Controller
     public function export(Request $request)
     {
         $type = $request->input('type', 'trips');
-        $period = (int) $request->input('period', 30);
-        $since = now()->subDays($period);
+        $period = $this->normaliseReportPeriod(
+            $request->input('period', '30d'),
+            allowLegacyNumericDays: true,
+        );
+        $since = $this->reportStartDate($period);
 
         AuditLogger::log('fleet-assets.reports.export', null, [
             'period' => $period,
@@ -415,6 +412,44 @@ class ReportController extends Controller
             'maintenance' => $this->exportMaintenance($since),
             'compliance' => $this->exportCompliance(),
             default => back()->with('error', 'Unknown export type'),
+        };
+    }
+
+    private function normaliseReportPeriod(mixed $period, bool $allowLegacyNumericDays = false): string|int
+    {
+        if (is_string($period) && in_array($period, ['7d', '30d', '90d', '1y'], true)) {
+            return $period;
+        }
+
+        if ($allowLegacyNumericDays) {
+            $numericDays = null;
+
+            if (is_int($period)) {
+                $numericDays = $period;
+            } elseif (is_string($period) && preg_match('/^[1-9]\d{0,2}$/', $period) === 1) {
+                $numericDays = (int) $period;
+            }
+
+            if ($numericDays !== null && $numericDays >= 1 && $numericDays <= 365) {
+                return $numericDays;
+            }
+        }
+
+        return '30d';
+    }
+
+    private function reportStartDate(string|int $period)
+    {
+        if (is_int($period)) {
+            return now()->subDays($period);
+        }
+
+        return match ($period) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            '90d' => now()->subDays(90),
+            '1y' => now()->subYear(),
+            default => now()->subDays(30),
         };
     }
 
@@ -473,27 +508,38 @@ class ReportController extends Controller
 
     private function exportTrips($since)
     {
-        $vehicleIds = Asset::vehicles()->pluck('id');
-        $exportTripQuery = FleetTrip::query()
-            ->whereIn('asset_id', $vehicleIds)
-            ->where('started_at', '>=', $since);
-        if (Schema::hasColumn('fleet_trips', 'is_personal')) {
-            $exportTripQuery->where('is_personal', false);
-        }
-        $trips = $exportTripQuery
-            ->with(['asset:id,name,asset_tag', 'driverSession.user:id,name'])
-            ->orderByDesc('started_at')
-            ->get();
-
-        return response()->streamDownload(function () use ($trips) {
+        return response()->streamDownload(function () use ($since) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['Trip ID', 'Vehicle', 'Driver', 'Started At', 'Ended At', 'Distance (km)', 'Duration (min)', 'Status']);
-            foreach ($trips as $trip) {
+
+            $trips = FleetTrip::query()
+                ->leftJoin('assets as trip_assets', 'fleet_trips.asset_id', '=', 'trip_assets.id')
+                ->leftJoin('fleet_driver_sessions as trip_driver_sessions', 'fleet_trips.driver_session_id', '=', 'trip_driver_sessions.id')
+                ->leftJoin('users as trip_drivers', 'trip_driver_sessions.user_id', '=', 'trip_drivers.id')
+                ->whereIn('fleet_trips.asset_id', Asset::vehicles()->select('assets.id'))
+                ->where('fleet_trips.started_at', '>=', $since)
+                ->when(
+                    Schema::hasColumn('fleet_trips', 'is_personal'),
+                    fn ($query) => $query->where('fleet_trips.is_personal', false),
+                )
+                ->select([
+                    'fleet_trips.id',
+                    'trip_assets.name as vehicle_name',
+                    'trip_drivers.name as driver_name',
+                    'fleet_trips.started_at',
+                    'fleet_trips.ended_at',
+                    'fleet_trips.distance_km',
+                    'fleet_trips.duration_s',
+                    'fleet_trips.status',
+                ])
+                ->orderByDesc('fleet_trips.started_at');
+
+            foreach ($trips->cursor() as $trip) {
                 $durationMin = $trip->duration_s ? round($trip->duration_s / 60, 0) : '';
                 $this->putCsv($handle, [
                     $trip->id,
-                    $trip->asset?->name ?? '',
-                    $trip->driverSession?->user?->name ?? '',
+                    $trip->vehicle_name ?? '',
+                    $trip->driver_name ?? '',
                     $trip->started_at?->toDateTimeString() ?? '',
                     $trip->ended_at?->toDateTimeString() ?? '',
                     $trip->distance_km ?? '',
@@ -507,22 +553,33 @@ class ReportController extends Controller
 
     private function exportFuel($since)
     {
-        $vehicleIds = Asset::vehicles()->pluck('id');
-        $logs = FleetFuelLog::query()
-            ->whereIn('asset_id', $vehicleIds)
-            ->where('logged_at', '>=', $since)
-            ->with(['asset:id,name,asset_tag', 'user:id,name'])
-            ->orderByDesc('logged_at')
-            ->get();
-
-        return response()->streamDownload(function () use ($logs) {
+        return response()->streamDownload(function () use ($since) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['Log ID', 'Vehicle', 'User', 'Date', 'Fuel Type', 'Litres', 'Cost Per Litre', 'Total Cost', 'Odometer (km)']);
-            foreach ($logs as $log) {
+
+            $logs = FleetFuelLog::query()
+                ->leftJoin('assets as fuel_assets', 'fleet_fuel_logs.asset_id', '=', 'fuel_assets.id')
+                ->leftJoin('users as fuel_users', 'fleet_fuel_logs.user_id', '=', 'fuel_users.id')
+                ->whereIn('fleet_fuel_logs.asset_id', Asset::vehicles()->select('assets.id'))
+                ->where('fleet_fuel_logs.logged_at', '>=', $since)
+                ->select([
+                    'fleet_fuel_logs.id',
+                    'fuel_assets.name as vehicle_name',
+                    'fuel_users.name as user_name',
+                    'fleet_fuel_logs.logged_at',
+                    'fleet_fuel_logs.fuel_type',
+                    'fleet_fuel_logs.quantity_litres',
+                    'fleet_fuel_logs.cost_per_litre',
+                    'fleet_fuel_logs.total_cost',
+                    'fleet_fuel_logs.odometer_km',
+                ])
+                ->orderByDesc('fleet_fuel_logs.logged_at');
+
+            foreach ($logs->cursor() as $log) {
                 $this->putCsv($handle, [
                     $log->id,
-                    $log->asset?->name ?? '',
-                    $log->user?->name ?? '',
+                    $log->vehicle_name ?? '',
+                    $log->user_name ?? '',
                     $log->logged_at?->toDateTimeString() ?? '',
                     $log->fuel_type ?? '',
                     $log->quantity_litres ?? '',

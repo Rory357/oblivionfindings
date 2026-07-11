@@ -49,7 +49,14 @@ class DashboardHeroContractTest extends TestCase
     {
         $user = $this->makeFleetUser();
         $site = Site::factory()->create();
-        Asset::factory()->vehicle()->forSite($site)->count(2)->create();
+        Asset::factory()->vehicle()->forSite($site)->create([
+            'registration_expires_at' => now()->addDays(10),
+            'cof_expires_at' => now()->addDays(10),
+        ]);
+        Asset::factory()->vehicle()->forSite($site)->create([
+            'registration_expires_at' => now()->subDay(),
+            'cof_expires_at' => now()->subDay(),
+        ]);
 
         $this->actingAs($user)
             ->get('/fleet-assets')
@@ -57,8 +64,12 @@ class DashboardHeroContractTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
                 ->has('stats.wof_expired')
-                ->has('stats.cof_due')
-                ->has('stats.insurance_expiring')
+                ->where('stats.rego_due_30', 1)
+                ->where('stats.rego_expired', 1)
+                ->where('stats.cof_due', 1)
+                ->where('stats.cof_expired', 1)
+                ->where('stats.insurance_expiring', null)
+                ->where('stats.insurance_expired', null)
                 ->has('stats.transports_today')
                 ->has('stats.open_wandering_alerts')
                 ->has('stats.overdue_count_scoped')

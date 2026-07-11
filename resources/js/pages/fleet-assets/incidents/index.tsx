@@ -482,8 +482,8 @@ export default function FleetIncidentsIndex({
                     <div className="grid gap-3 lg:grid-cols-2">
                         <HeroCluster title="This period · last 30 days" icon={Activity}>
                             <HeroClusterTile href="/fleet-assets/incidents?tab=all" label="Reported" value={fmt(stats.reported)} caption="reported" tone="neutral" />
-                            <HeroClusterTile href="/fleet-assets/incidents?tab=under_investigation" label="Investigating" value={fmt(stats.investigating)} caption="under investigation" tone="warning" />
-                            <HeroClusterTile href="/fleet-assets/incidents?tab=all" label="Resolved" value={fmt(stats.resolved)} caption="back in service" tone="success" />
+                            <HeroClusterTile href="/fleet-assets/incidents?tab=under_investigation" label="Investigating" value={fmt(stats.investigating)} caption="under investigation" tone={stats.investigating > 0 ? 'warning' : 'success'} />
+                            <HeroClusterTile href="/fleet-assets/incidents?tab=all" label="Resolved" value={fmt(stats.resolved)} caption="back in service" tone={stats.resolved > 0 ? 'success' : 'neutral'} />
                             <HeroClusterTile href="/fleet-assets/incidents?tab=closed" label="Closed" value={fmt(stats.closed)} caption="finalised" tone="neutral" />
                         </HeroCluster>
                         <HeroCluster title="Needs attention" icon={Bell}>

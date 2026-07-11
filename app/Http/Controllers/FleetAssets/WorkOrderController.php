@@ -38,6 +38,14 @@ class WorkOrderController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        // Hero tile drill-down: open work past its due date (mirrors the
+        // hero's overdue count definition below).
+        if ($request->input('overdue') === '1') {
+            $query->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereNotNull('due_at')
+                ->where('due_at', '<', now());
+        }
+
         if ($request->filled('priority')) {
             $query->where('priority', $request->input('priority'));
         }
@@ -66,7 +74,7 @@ class WorkOrderController extends Controller
                 ->count(),
             'in_progress' => FleetWorkOrder::where('status', 'in_progress')->count(),
             'completed_30d' => FleetWorkOrder::where('status', 'completed')
-                ->where('updated_at', '>=', now()->subDays(30))
+                ->where('completed_at', '>=', now()->subDays(30))
                 ->count(),
         ];
 
@@ -107,7 +115,7 @@ class WorkOrderController extends Controller
                     'total' => $workOrders->total(),
                 ],
             ],
-            'filters' => $request->only(['status', 'priority', 'asset_id']),
+            'filters' => $request->only(['status', 'priority', 'asset_id', 'overdue']),
             'users' => $users,
             'stats' => $stats,
             'assets' => $assets,
@@ -183,9 +191,18 @@ class WorkOrderController extends Controller
             'due_at' => ['nullable', 'date'],
             'estimated_cost' => ['nullable', 'numeric', 'min:0'],
             'actual_cost' => ['nullable', 'numeric', 'min:0'],
-            'completed_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if (array_key_exists('status', $data)) {
+            if ($data['status'] === 'completed') {
+                if ($workOrder->status !== 'completed' || $workOrder->completed_at === null) {
+                    $data['completed_at'] = now();
+                }
+            } else {
+                $data['completed_at'] = null;
+            }
+        }
 
         $workOrder->update($data);
 
@@ -211,7 +228,7 @@ class WorkOrderController extends Controller
                 $updateData = ['status' => 'completed', 'completed_at' => now()];
                 break;
             case 'in_progress':
-                $updateData = ['status' => 'in_progress'];
+                $updateData = ['status' => 'in_progress', 'completed_at' => null];
                 break;
             case 'assign':
                 if (!empty($data['assigned_to_user_id'])) {

@@ -98,17 +98,36 @@ class DashboardController extends Controller
             ->where(fn ($q) => $q->vehicles())
             ->registrationExpiring(30)
             ->count();
+        $regoExpired = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('registration_expires_at')
+            ->where('registration_expires_at', '<', now())
+            ->count();
         $cofDue = Asset::query()
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<=', now()->addDays(30))
             ->where('cof_expires_at', '>=', now())
             ->count();
-        $insuranceExpiring = Schema::hasColumn('assets', 'insurance_expires_at')
+        $cofExpired = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('cof_expires_at')
+            ->where('cof_expires_at', '<', now())
+            ->count();
+        $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
+        $insuranceExpiring = $hasInsuranceExpiry
             ? Asset::query()
                 ->where(fn ($q) => $q->vehicles())
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<=', now()->addDays(30))
+                ->where('insurance_expires_at', '>=', now())
+                ->count()
+            : null;
+        $insuranceExpired = $hasInsuranceExpiry
+            ? Asset::query()
+                ->where(fn ($q) => $q->vehicles())
+                ->whereNotNull('insurance_expires_at')
+                ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
 
@@ -491,8 +510,11 @@ class DashboardController extends Controller
                 'wof_due_30' => $wofDue30,
                 'wof_expired' => $wofExpired,
                 'rego_due_30' => $regoDue30,
+                'rego_expired' => $regoExpired,
                 'cof_due' => $cofDue,
+                'cof_expired' => $cofExpired,
                 'insurance_expiring' => $insuranceExpiring,
+                'insurance_expired' => $insuranceExpired,
                 'transports_today' => $transportsToday,
                 'open_wandering_alerts' => $openWanderingAlerts,
                 'tracked_residents' => $trackedResidents,

@@ -99,9 +99,12 @@ type Props = {
         wof_due_30: number;
         wof_expired: number;
         rego_due_30: number;
+        rego_expired: number;
         cof_due: number;
+        cof_expired: number;
         /** `null` when the schema has no insurance column — hides the chip. */
         insurance_expiring: number | null;
+        insurance_expired: number | null;
         transports_today: number;
         open_wandering_alerts: number;
         tracked_residents?: number;
@@ -362,7 +365,8 @@ export default function FleetAssetsDashboard({
         upcoming_maintenance_count: 0,
         trips_today: 0,
         vehicles_in_maintenance: 0, wof_due_30: 0, wof_expired: 0,
-        rego_due_30: 0, cof_due: 0, insurance_expiring: null,
+        rego_due_30: 0, rego_expired: 0, cof_due: 0, cof_expired: 0,
+        insurance_expiring: null, insurance_expired: null,
         transports_today: 0, open_wandering_alerts: 0,
         tracked_residents: 0, active_outings: 0,
     };
@@ -650,8 +654,11 @@ export default function FleetAssetsDashboard({
                         wofDue={stats.wof_due_30 ?? 0}
                         wofExpired={stats.wof_expired ?? 0}
                         regoDue={stats.rego_due_30 ?? 0}
+                        regoExpired={stats.rego_expired ?? 0}
                         cofDue={stats.cof_due ?? 0}
+                        cofExpired={stats.cof_expired ?? 0}
                         insuranceExpiring={stats.insurance_expiring ?? null}
+                        insuranceExpired={stats.insurance_expired ?? null}
                         openAlerts={stats.active_alerts ?? 0}
                         criticalAlerts={stats.critical_alerts ?? 0}
                         hrefs={{
