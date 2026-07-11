@@ -421,28 +421,29 @@ git commit -m "feat(hr): brand employee invites and manage leave chains"
 - Create: `tests/Feature/Hr/DeferredNotificationContractsTest.php`
 - Modify: `app/Http/Controllers/Hr/SupervisionController.php`
 - Modify: `app/Http/Controllers/Hr/GoalController.php`
-- Modify: `app/Http/Controllers/Hr/AnnouncementController.php`
+- Modify: `app/Http/Controllers/Hr/FeedController.php` (the existing announcement-reply write seam)
+- Modify: `app/Http/Controllers/Hr/PerformanceHubController.php`
 - Modify: `routes/console.php`
-- Modify: `resources/js/components/hr/performance-wizards.tsx`
+- Modify: `resources/js/components/hr/performance/performance-wizards.tsx`
 - Delete: `resources/js/components/hr/performance/supervision-dialog.tsx`
 
-- [ ] **Step 1: Write RED notification tests**
+- [x] **Step 1: Write RED notification tests**
 
 Assert visible supervision notes notify the employee once; private notes do not; OKR completion notifies once on transition; announcement replies notify a same-org author but not self; worker expiry reminders are stamped and deduplicated.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/DeferredNotificationContractsTest.php --compact`
 
-- [ ] **Step 3: Wire transitions, not generic updates**
+- [x] **Step 3: Wire transitions, not generic updates**
 
 Call notification helpers only after the relevant transaction commits and only when the prior state was not complete/notified. Reuse existing `HrNotificationService::notifyGoalCompleted()`.
 
-- [ ] **Step 4: Expose session taxonomy and remove dead code**
+- [x] **Step 4: Expose session taxonomy and remove dead code**
 
 Populate the create wizard from the existing supervision session-type constant/model taxonomy. Run `rg` for the orphan component, remove it only when no import remains, and cover the submitted `session_type` in Vitest/Pest.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/DeferredNotificationContractsTest.php tests/Feature/Hr/SupervisionDialogTest.php tests/Feature/Hr/GoalsOkrHubTest.php tests/Feature/Hr/AnnouncementCommandCenterTest.php tests/Feature/Hr/ComplianceHubActionsTest.php --compact
