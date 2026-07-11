@@ -23,11 +23,12 @@ use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
 use App\Domain\Hr\Jobs\PublishDueAnnouncementsJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
-use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendAssetRemindersJob;
+use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendOfferExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendPipRemindersJob;
+use App\Domain\Hr\Jobs\SendWellbeingRemindersJob;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
@@ -46,6 +47,7 @@ use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\FleetAutoAlertJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
+use App\Jobs\PollItMailboxJob;
 use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
@@ -90,7 +92,7 @@ app(Schedule::class)
 // mail → tickets/replies via InboundEmailIngestor. Inert until an
 // ItMailboxConnection is connected (E4/E6).
 app(Schedule::class)
-    ->job(new \App\Jobs\PollItMailboxJob)
+    ->job(new PollItMailboxJob)
     ->hourly();
 
 // Overdue follow-up reminders: every day 09:00 NZ
@@ -356,6 +358,13 @@ app(Schedule::class)
     ->job(new SendExpiryRemindersJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
+
+// Persisted one-shot reminders for worker police-vetting and driver-licence expiry.
+app(Schedule::class)
+    ->command('hr:send-worker-compliance-expiry-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:05')
+    ->withoutOverlapping();
 
 // HR asset reminders (warranty expiring, returns overdue, repairs overdue,
 // leaver-held): daily at 07:30
@@ -736,7 +745,7 @@ app(Schedule::class)
 // Auto-close published engagement surveys past their end date + one-time
 // follow-up reminders for due wellbeing check-ins: daily at 08:00 NZ
 app(Schedule::class)
-    ->job(new \App\Domain\Hr\Jobs\SendWellbeingRemindersJob)
+    ->job(new SendWellbeingRemindersJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00')
     ->withoutOverlapping();

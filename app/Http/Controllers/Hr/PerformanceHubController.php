@@ -12,12 +12,12 @@ use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSkill;
-use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Domain\Hr\Models\HrSuccessionPlan;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -61,6 +61,7 @@ class PerformanceHubController extends Controller
             'competencies' => $competencies,
             'succession' => $succession,
             'staff' => $this->staffOptions($tenantId),
+            'sessionTypes' => HrSupervisionNote::sessionTypeOptions(),
             'successionEmployees' => HrEmployeeProfile::where('tenant_id', $tenantId)
                 ->where('is_active', true)
                 ->with('user:id,name')
@@ -114,7 +115,7 @@ class PerformanceHubController extends Controller
         $title = ucfirst($tab).' export';
 
         if ($request->query('format') === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('hr.performance.export-pdf', [
+            $pdf = Pdf::loadView('hr.performance.export-pdf', [
                 'title' => $title,
                 'headers' => $headers,
                 'rows' => array_map(fn ($r) => (array) $r, $rows),
@@ -139,7 +140,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Hero — clickable stats, compliance, needs-you                      */
+    /*  Hero — clickable stats, compliance, needs-you */
     /* ------------------------------------------------------------------ */
 
     private function hero(int $tenantId, array $reviews, array $supervision, array $goals, array $feedback, array $pips, array $succession): array
@@ -199,7 +200,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reviews                                                            */
+    /*  Reviews */
     /* ------------------------------------------------------------------ */
 
     private function reviews(int $tenantId, array $roleMap): array
@@ -230,7 +231,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Supervision                                                        */
+    /*  Supervision */
     /* ------------------------------------------------------------------ */
 
     private function supervision(int $tenantId, array $roleMap): array
@@ -293,7 +294,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Goals & OKRs                                                       */
+    /*  Goals & OKRs */
     /* ------------------------------------------------------------------ */
 
     private function goals(int $tenantId): array
@@ -330,7 +331,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Development                                                        */
+    /*  Development */
     /* ------------------------------------------------------------------ */
 
     private function development(int $tenantId, array $roleMap): array
@@ -363,7 +364,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  360 Feedback (grouped into subject × type cycles)                  */
+    /*  360 Feedback (grouped into subject × type cycles) */
     /* ------------------------------------------------------------------ */
 
     private function feedback(int $tenantId, array $roleMap): array
@@ -408,7 +409,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  PIPs                                                               */
+    /*  PIPs */
     /* ------------------------------------------------------------------ */
 
     private function pips(int $tenantId, array $roleMap): array
@@ -442,7 +443,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Competencies — matrix + coverage + skills                          */
+    /*  Competencies — matrix + coverage + skills */
     /* ------------------------------------------------------------------ */
 
     private function competencies(int $tenantId): array
@@ -522,7 +523,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Succession — 9-box + readiness + critical roles                    */
+    /*  Succession — 9-box + readiness + critical roles */
     /* ------------------------------------------------------------------ */
 
     private function succession(int $tenantId): array
@@ -587,7 +588,7 @@ class PerformanceHubController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /** Map of user_id => "Position · Department" for role sub-labels. */

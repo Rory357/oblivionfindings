@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
@@ -11,11 +9,15 @@ use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Notifications\SupervisionNoteAddedNotification;
 use App\Domain\Hr\Services\HrNotificationService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SupervisionController extends Controller
@@ -41,14 +43,14 @@ class SupervisionController extends Controller
             ->when($staffId, fn ($q) => $q->where('employee_user_id', $staffId))
             ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
                 $q2->where('topics_discussed', 'like', "%{$search}%")
-                   ->orWhereHas('employee', fn ($e) => $e->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('employee', fn ($e) => $e->where('name', 'like', "%{$search}%"));
             }))
             ->orderByDesc('session_date')
             ->paginate(20)
             ->withQueryString();
 
         // Transform to match frontend SupervisionNote type. Includes the full
-        // editable fields so the SupervisionDialog can edit a note inline.
+        // editable fields so the performance wizard can edit a note inline.
         $notes->getCollection()->transform(fn ($note) => [
             'id' => $note->id,
             'staff_user' => $note->employee ? ['id' => $note->employee->id, 'name' => $note->employee->name] : ['id' => 0, 'name' => 'Unknown'],
@@ -306,18 +308,11 @@ class SupervisionController extends Controller
     /** Supervision session-type options for the dialog. */
     private function sessionTypeOptions(): array
     {
-        return [
-            ['value' => 'one_to_one', 'label' => 'One-to-One'],
-            ['value' => 'supervision', 'label' => 'Supervision'],
-            ['value' => 'review', 'label' => 'Review'],
-            ['value' => 'check_in', 'label' => 'Check-in'],
-            ['value' => 'probation', 'label' => 'Probation Review'],
-            ['value' => 'other', 'label' => 'Other'],
-        ];
+        return HrSupervisionNote::sessionTypeOptions();
     }
 
     /**
-     * The page-based create form was replaced by the SupervisionDialog on the
+     * The page-based create form was replaced by the supervision wizard on the
      * performance hub. Preserve the route with a redirect.
      */
     public function create(Request $request)
@@ -360,7 +355,7 @@ class SupervisionController extends Controller
         $data = $request->validate([
             'employee_user_id' => ['required', 'integer', 'exists:users,id'],
             'session_date' => ['required', 'date'],
-            'session_type' => ['required', 'string', 'max:50'],
+            'session_type' => ['required', 'string', Rule::in(array_column(HrSupervisionNote::sessionTypeOptions(), 'value'))],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             // topics_discussed is NOT NULL at the DB level — require it.
             'topics_discussed' => ['required', 'string', 'max:5000'],
@@ -377,18 +372,22 @@ class SupervisionController extends Controller
             abort(404);
         }
 
-        HrSupervisionNote::create([
+        $note = HrSupervisionNote::create([
             'tenant_id' => $tenantId,
             'supervisor_user_id' => $user->id,
             'created_by' => $user->id,
             ...$data,
         ]);
 
+        if ($note->is_visible_to_employee) {
+            $note->employee?->notify(new SupervisionNoteAddedNotification($note));
+        }
+
         return redirect()->back()->with('success', 'Supervision note recorded.');
     }
 
     /**
-     * The page-based edit form was replaced by the SupervisionDialog (edit mode)
+     * The page-based edit form was replaced by the supervision wizard (edit mode)
      * on the performance hub. Preserve the route with a redirect.
      */
     public function edit(Request $request, HrSupervisionNote $note)
@@ -411,7 +410,7 @@ class SupervisionController extends Controller
 
         $data = $request->validate([
             'session_date' => ['sometimes', 'date'],
-            'session_type' => ['sometimes', 'string', 'max:50'],
+            'session_type' => ['sometimes', 'string', Rule::in(array_column(HrSupervisionNote::sessionTypeOptions(), 'value'))],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             // NOT NULL at the DB level: if present it must be non-empty.
             'topics_discussed' => ['sometimes', 'required', 'string', 'max:5000'],

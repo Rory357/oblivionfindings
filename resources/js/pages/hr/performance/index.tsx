@@ -98,6 +98,7 @@ type Props = {
     competencies: Competencies;
     succession: Succession;
     staff: Opt[];
+    sessionTypes: Opt[];
     successionEmployees: Opt[];
     competencyOptions: Opt[];
     can: { manage: boolean };
@@ -194,6 +195,7 @@ export default function PerformanceHub(props: Props) {
 
     const support: WizardSupport = {
         staff: props.staff,
+        sessionTypes: props.sessionTypes,
         reviewTypes: [
             { value: 'annual', label: 'Annual' },
             { value: 'mid_year', label: 'Mid-year' },
