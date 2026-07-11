@@ -2,10 +2,6 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Http\Requests\Hr\StoreEmployeeRequest;
-use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
@@ -15,29 +11,35 @@ use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEmployeeSkill;
-use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OrgChartService;
 use App\Domain\Hr\Services\PositionService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Hr\StoreEmployeeRequest;
+use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
+use App\Models\ProcedureAcknowledgement;
 use App\Models\Role;
+use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
@@ -45,7 +47,7 @@ class EmployeeProfileController extends Controller
     use ResolvesHrTenant;
 
     /* ------------------------------------------------------------------ */
-    /*  Index — paginated employee list                                    */
+    /*  Index — paginated employee list */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -91,47 +93,39 @@ class EmployeeProfileController extends Controller
             ->with([
                 'hrEmployeeProfile.primarySite:id,name',
             ])
-            ->when($search !== '', fn ($q) =>
-                $q->where(function ($inner) use ($search) {
-                    $inner->where('users.name', 'like', "%{$search}%")
-                        ->orWhere('users.email', 'like', "%{$search}%");
-                })
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('users.name', 'like', "%{$search}%")
+                    ->orWhere('users.email', 'like', "%{$search}%");
+            })
             )
-            ->when($status === 'active', fn ($q) =>
-                $q->where(function ($statusQuery) {
-                    $statusQuery
-                        ->whereDoesntHave('hrEmployeeProfile')
-                        ->orWhereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', true));
-                })
+            ->when($status === 'active', fn ($q) => $q->where(function ($statusQuery) {
+                $statusQuery
+                    ->whereDoesntHave('hrEmployeeProfile')
+                    ->orWhereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', true));
+            })
             )
-            ->when($status === 'inactive', fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', false))
+            ->when($status === 'inactive', fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', false))
             )
-            ->when($siteId, fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteId) {
-                    $profileQuery->where(function ($siteQuery) use ($siteId) {
-                        $siteQuery
-                            ->where('primary_site_id', (int) $siteId)
-                            ->orWhereJsonContains('secondary_site_ids', (int) $siteId);
-                    });
-                })
+            ->when($siteId, fn ($q) => $q->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteId) {
+                $profileQuery->where(function ($siteQuery) use ($siteId) {
+                    $siteQuery
+                        ->where('primary_site_id', (int) $siteId)
+                        ->orWhereJsonContains('secondary_site_ids', (int) $siteId);
+                });
+            })
             )
-            ->when($department, fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('department_id', (int) $department))
+            ->when($department, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('department_id', (int) $department))
             )
-            ->when($employmentType, fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('employment_type', $employmentType))
+            ->when($employmentType, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('employment_type', $employmentType))
             )
-            ->when($joined === '30', fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', fn ($p) => $p
-                    ->where('is_active', true)
-                    ->where('start_date', '>=', now()->subDays(30)))
+            ->when($joined === '30', fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->where('is_active', true)
+                ->where('start_date', '>=', now()->subDays(30)))
             )
-            ->when($probation, fn ($q) =>
-                $q->whereHas('hrEmployeeProfile', fn ($p) => $p
-                    ->where('is_active', true)
-                    ->whereNotNull('probation_end_date')
-                    ->where('probation_end_date', '>=', now()))
+            ->when($probation, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->where('is_active', true)
+                ->whereNotNull('probation_end_date')
+                ->where('probation_end_date', '>=', now()))
             )
             ->orderBy($sortColumn, $sortDir)
             ->orderBy('users.name')
@@ -199,7 +193,7 @@ class EmployeeProfileController extends Controller
 
         // Employment type breakdown
         $typeCounts = HrEmployeeProfile::where('is_active', true)
-            ->selectRaw("employment_type, count(*) as count")
+            ->selectRaw('employment_type, count(*) as count')
             ->groupBy('employment_type')
             ->pluck('count', 'employment_type')
             ->toArray();
@@ -423,7 +417,7 @@ class EmployeeProfileController extends Controller
 
         return [
             'compliance' => $compliance->map(fn ($s) => [
-                'id' => 'comp-' . $s->id,
+                'id' => 'comp-'.$s->id,
                 'profile_id' => $profileByUser[$s->user_id] ?? null,
                 'name' => $s->user?->name ?? 'Unknown',
                 'detail' => $s->requirement?->name ?? 'Compliance requirement',
@@ -431,7 +425,7 @@ class EmployeeProfileController extends Controller
                 'date' => $s->expires_at?->toDateString(),
             ])->values(),
             'probation' => $probation->map(fn ($p) => [
-                'id' => 'prob-' . $p->id,
+                'id' => 'prob-'.$p->id,
                 'profile_id' => $p->id,
                 'name' => $p->user?->name ?? 'Unknown',
                 'detail' => $p->position_title ?: 'Employee',
@@ -439,7 +433,7 @@ class EmployeeProfileController extends Controller
                 'date' => $p->probation_end_date?->toDateString(),
             ])->values(),
             'invites' => $invites->map(fn ($u) => [
-                'id' => 'inv-' . $u->id,
+                'id' => 'inv-'.$u->id,
                 'profile_id' => $u->hrEmployeeProfile?->id,
                 'name' => $u->name,
                 'detail' => $u->hrEmployeeProfile?->position_title ?: $u->email,
@@ -450,7 +444,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  resendInvite — (re)send a login invite from the triage modal        */
+    /*  resendInvite — (re)send a login invite from the triage modal */
     /* ------------------------------------------------------------------ */
 
     public function resendInvite(Request $request, HrEmployeeProfile $profile)
@@ -458,19 +452,29 @@ class EmployeeProfileController extends Controller
         abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
 
         $account = $profile->user;
+        $this->assertHrTenantAccess(
+            $this->resolveHrTenantIdForUser($request->user()),
+            $profile->tenant_id,
+        );
+
         if (! $account) {
             return back()->with('error', 'This employee has no login account to invite.');
         }
 
-        // Same path the intake service uses — the reset link doubles as the
-        // "set your password" invite.
-        Password::broker()->sendResetLink(['email' => $account->email]);
+        if ($account->approved_at !== null) {
+            return back()->withErrors([
+                'invite' => 'This employee already has an active login and does not need another invitation.',
+            ]);
+        }
+
+        $token = Password::broker()->createToken($account);
+        $account->notify(new EmployeeInviteNotification($token, $profile));
 
         return back()->with('success', "Login invite sent to {$account->name}.");
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — create a new employee (User + profile + role)               */
+    /*  Store — create a new employee (User + profile + role) */
     /* ------------------------------------------------------------------ */
 
     public function store(StoreEmployeeRequest $request, EmployeeIntakeService $intake)
@@ -535,7 +539,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  setActive — deactivate / reactivate a single employee (row menu)    */
+    /*  setActive — deactivate / reactivate a single employee (row menu) */
     /* ------------------------------------------------------------------ */
 
     public function setActive(Request $request, HrEmployeeProfile $profile)
@@ -572,7 +576,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  rehire — full welcome-back workflow for a former employee           */
+    /*  rehire — full welcome-back workflow for a former employee */
     /* ------------------------------------------------------------------ */
 
     public function rehire(Request $request, HrEmployeeProfile $profile, EmployeeIntakeService $intake)
@@ -617,7 +621,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  bulkAction — multi-select bulk operations from the People table     */
+    /*  bulkAction — multi-select bulk operations from the People table */
     /* ------------------------------------------------------------------ */
 
     public function bulkAction(Request $request)
@@ -666,11 +670,11 @@ class EmployeeProfileController extends Controller
 
         $count = $profiles->count();
 
-        return back()->with('success', "{$count} " . ($count === 1 ? 'person' : 'people') . ' updated.');
+        return back()->with('success', "{$count} ".($count === 1 ? 'person' : 'people').' updated.');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show — tabbed profile with related data                            */
+    /*  Show — tabbed profile with related data */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrEmployeeProfile $profile)
@@ -1039,18 +1043,18 @@ class EmployeeProfileController extends Controller
      * Safe Work Procedures applicable to this employee's role(s), with the employee's
      * own acknowledgement status (read-only compliance view for the manager).
      */
-    private function employeeProcedures($viewer, HrEmployeeProfile $profile): \Illuminate\Support\Collection
+    private function employeeProcedures($viewer, HrEmployeeProfile $profile): Collection
     {
         if (! $viewer?->canDo('procedures.view')) {
             return collect();
         }
 
         $roleKeys = $profile->user?->roles()->pluck('name')->all() ?? [];
-        $acked = \App\Models\ProcedureAcknowledgement::query()
+        $acked = ProcedureAcknowledgement::query()
             ->where('user_id', $profile->user_id)
             ->pluck('version_acknowledged', 'safe_work_procedure_id');
 
-        return \App\Models\SafeWorkProcedure::query()->applicableToRoles($roleKeys)
+        return SafeWorkProcedure::query()->applicableToRoles($roleKeys)
             ->orderBy('title')
             ->limit(25)
             ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date', 'current_version'])
@@ -1066,7 +1070,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Edit                                                               */
+    /*  Edit */
     /* ------------------------------------------------------------------ */
 
     public function edit(Request $request, HrEmployeeProfile $profile)
@@ -1103,7 +1107,7 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Update                                                             */
+    /*  Update */
     /* ------------------------------------------------------------------ */
 
     public function update(UpdateEmployeeProfileRequest $request, HrEmployeeProfile $profile)

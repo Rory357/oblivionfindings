@@ -1170,6 +1170,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::middleware('permission:hr.approvals.manage')->group(function () {
             Route::post('/chains', [ApprovalController::class, 'storeChain'])->name('chains.store');
+            Route::post('/leave-chains', [ApprovalController::class, 'storeLeaveChain'])->name('leave-chains.store');
+            Route::put('/leave-chains/{leaveChain}', [ApprovalController::class, 'updateLeaveChain'])->name('leave-chains.update');
+            Route::post('/leave-chains/reorder', [ApprovalController::class, 'reorderLeaveChains'])->name('leave-chains.reorder');
+            Route::patch('/leave-chains/{leaveChain}/active', [ApprovalController::class, 'setLeaveChainActive'])->name('leave-chains.active');
+            Route::delete('/leave-chains/{leaveChain}', [ApprovalController::class, 'destroyLeaveChain'])->name('leave-chains.destroy');
             Route::post('/{instance}/action', [ApprovalController::class, 'action'])->name('action');
         });
     });
