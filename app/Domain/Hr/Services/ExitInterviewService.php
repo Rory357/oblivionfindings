@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrExitInterview;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class ExitInterviewService
@@ -29,6 +30,28 @@ class ExitInterviewService
                 'is_confidential' => $data['is_confidential'] ?? true,
                 'created_by' => $data['created_by'],
             ]);
+        });
+    }
+
+    /**
+     * Append a correction without rewriting the submitted interview answers.
+     */
+    public function appendAddendum(HrExitInterview $exitInterview, string $note, User $actor): HrExitInterview
+    {
+        return DB::transaction(function () use ($exitInterview, $note, $actor) {
+            $submittedComments = trim((string) $exitInterview->additional_comments);
+            $recordedAt = now()
+                ->timezone(config('app.worker_timezone', 'Pacific/Auckland'))
+                ->format('d M Y H:i');
+            $addendum = "[Addendum — {$recordedAt} — {$actor->name}]\n".trim($note);
+
+            $exitInterview->update([
+                'additional_comments' => $submittedComments === ''
+                    ? $addendum
+                    : $submittedComments."\n\n".$addendum,
+            ]);
+
+            return $exitInterview->refresh();
         });
     }
 

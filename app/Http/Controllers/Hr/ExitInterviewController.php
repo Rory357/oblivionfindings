@@ -149,6 +149,49 @@ class ExitInterviewController extends Controller
     }
 
     /**
+     * Persisted exit interviews are submitted records, not drafts. Keep the
+     * endpoint explicit so stale or future edit clients fail safely.
+     */
+    public function update(Request $request, HrExitInterview $exitInterview)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess(
+            $this->resolveHrTenantIdForUser($user),
+            $exitInterview->tenant_id,
+        );
+
+        return redirect()->back()->with(
+            'error',
+            'Submitted exit interviews are locked. Add an addendum instead.',
+        );
+    }
+
+    /**
+     * Append an addendum while preserving every submitted answer.
+     */
+    public function storeAddendum(Request $request, HrExitInterview $exitInterview)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess(
+            $this->resolveHrTenantIdForUser($user),
+            $exitInterview->tenant_id,
+        );
+
+        $data = $request->validate([
+            'note' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $this->exitInterviewService->appendAddendum($exitInterview, $data['note'], $user);
+
+        return redirect()->back()->with(
+            'success',
+            'Addendum appended. The submitted interview remains unchanged.',
+        );
+    }
+
+    /**
      * Show a single exit interview.
      */
     public function show(Request $request, HrExitInterview $exitInterview)

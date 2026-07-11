@@ -1221,6 +1221,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.exit-interviews.manage')->group(function () {
             Route::get('/create', [ExitInterviewController::class, 'create'])->name('create');
             Route::post('/', [ExitInterviewController::class, 'store'])->name('store');
+            Route::patch('/{exitInterview}', [ExitInterviewController::class, 'update'])->name('update');
+            Route::post('/{exitInterview}/addenda', [ExitInterviewController::class, 'storeAddendum'])->name('addenda.store');
         });
 
         Route::get('/{exitInterview}', [ExitInterviewController::class, 'show'])->name('show');

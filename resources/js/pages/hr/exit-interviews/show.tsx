@@ -1,10 +1,22 @@
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { Lock, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Head, useForm } from '@inertiajs/react';
+import { FilePlus2, Lock, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -100,6 +112,8 @@ function FeedbackSection({
 }
 
 export default function ExitInterviewShow({ interview, can }: Props) {
+    const [addendumOpen, setAddendumOpen] = useState(false);
+    const addendumForm = useForm({ note: '' });
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Exit Interviews', href: '/hr/exit-interviews' },
@@ -109,6 +123,16 @@ export default function ExitInterviewShow({ interview, can }: Props) {
         },
     ];
 
+    const submitAddendum = () => {
+        addendumForm.post(`/hr/exit-interviews/${interview.id}/addenda`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                addendumForm.reset();
+                setAddendumOpen(false);
+            },
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head
@@ -116,12 +140,38 @@ export default function ExitInterviewShow({ interview, can }: Props) {
             />
 
             <PageShell>
-                <PageHero category="hr" variant="compact"
+                <PageHero
+                    category="hr"
+                    variant="compact"
                     title={`Exit Interview: ${interview.employee_profile?.user?.name ?? 'Unknown'}`}
                     description={`Conducted on ${formatDate(interview.interview_date)}`}
                 />
 
                 <div className="space-y-4">
+                    <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/35 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm font-medium">
+                                    Submitted interview — answers locked
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    Preserve the original record. Add a dated
+                                    addendum when clarification is needed.
+                                </p>
+                            </div>
+                        </div>
+                        {can.manage && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setAddendumOpen(true)}
+                            >
+                                <FilePlus2 className="mr-2 h-4 w-4" />
+                                Add addendum
+                            </Button>
+                        )}
+                    </div>
+
                     {/* Overview */}
                     <Card>
                         <CardHeader>
@@ -251,6 +301,57 @@ export default function ExitInterviewShow({ interview, can }: Props) {
                     </Card>
                 </div>
             </PageShell>
+
+            <Dialog open={addendumOpen} onOpenChange={setAddendumOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add interview addendum</DialogTitle>
+                        <DialogDescription>
+                            This note will be dated and appended. It will not
+                            replace any submitted answer.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="exit-interview-addendum">
+                            Clarification or correction
+                        </Label>
+                        <Textarea
+                            id="exit-interview-addendum"
+                            value={addendumForm.data.note}
+                            onChange={(event) =>
+                                addendumForm.setData('note', event.target.value)
+                            }
+                            rows={5}
+                            maxLength={5000}
+                            placeholder="Record what needs to be clarified…"
+                        />
+                        {addendumForm.errors.note && (
+                            <p className="text-sm text-destructive">
+                                {addendumForm.errors.note}
+                            </p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAddendumOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={submitAddendum}
+                            disabled={
+                                addendumForm.processing ||
+                                addendumForm.data.note.trim() === ''
+                            }
+                        >
+                            {addendumForm.processing
+                                ? 'Appending…'
+                                : 'Append addendum'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
