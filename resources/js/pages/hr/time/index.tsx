@@ -145,7 +145,7 @@ export default function TimeIndex({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // On-now soft-refresh: while a manager is watching the Overview tab and the
+    // Timekeeping soft-refresh: while a manager is watching the Overview tab and the
     // page is visible, poll the live props every 30s so "on now" elapsed times,
     // exceptions and recent activity stay current without a manual reload. Paused
     // when the tab is hidden or a dialog/drawer is open (avoid yanking state).
@@ -154,7 +154,8 @@ export default function TimeIndex({
         const tick = () => {
             if (document.hidden || dialogMode || drawerEntry) return;
             router.reload({
-                only: ['onNow', 'recentActivity', 'kpiStats', 'exceptions', 'weeklyTeam'],
+                only: ['entries', 'onNow', 'recentActivity', 'kpiStats', 'exceptions', 'weeklyTeam'],
+                preserveState: true,
                 preserveScroll: true,
             });
         };

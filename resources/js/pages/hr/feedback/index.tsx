@@ -5,7 +5,8 @@ import {
     reviewTypeLabel,
     type FeedbackWizardData,
 } from '@/components/hr/feedback-wizards';
-import { PageHero, PageLayout } from '@/components/page';
+import { FeedbackHero } from '@/components/hr/feedback-hero';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,7 +32,6 @@ import {
     BellRing,
     Eye,
     FileText,
-    MessageCircle,
     MessageSquare,
     MoreHorizontal,
     Plus,
@@ -225,8 +225,6 @@ export default function FeedbackIndex({
         allData.filter((request) => request.status === 'completed').length;
     const overdueCount =
         stats?.overdue ?? allData.filter((request) => isOverdue(request)).length;
-    const responseRate =
-        totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
     const filtered =
         statusFilter === 'overdue'
@@ -269,17 +267,13 @@ export default function FeedbackIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        icon={MessageCircle}
-                        title="360-Degree Feedback"
-                        description="Manage and respond to feedback requests across your team."
-                        stats={[
-                            { label: 'Pending', value: pendingTotal },
-                            { label: 'Overdue', value: overdueCount },
-                            { label: 'Completed', value: completedCount },
-                            { label: 'Response rate', value: `${responseRate}%` },
-                            { label: 'Total', value: totalCount },
-                        ]}
+                    <FeedbackHero
+                        stats={{
+                            total: totalCount,
+                            pending: pendingTotal,
+                            completed: completedCount,
+                            overdue: overdueCount,
+                        }}
                         actions={
                             canManage ? (
                                 <>

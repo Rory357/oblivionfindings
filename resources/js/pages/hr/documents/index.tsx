@@ -44,7 +44,7 @@ import { toast } from 'sonner';
 import { DOC_CATEGORY_ICON } from '@/components/hr/document-library-kit';
 import { DocumentsHero, type DocsHeroNeed } from '@/components/hr/documents-hero';
 import { useLeaveContextMenu, type LeaveCtxItem } from '@/components/hr/leave-context-menu';
-import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
+import { TextPromptDialog } from '@/components/hr/text-prompt-dialog';
 import {
     AlertDialog,
     AlertDialogAction,

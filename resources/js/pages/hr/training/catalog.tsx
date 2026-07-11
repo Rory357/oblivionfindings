@@ -4,15 +4,14 @@ import {
     type WizardLookups,
     type WizardType,
 } from '@/components/hr/training/training-wizard-dialog';
+import { TrainingHero } from '@/components/hr/training-hero';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Award,
     BookOpen,
-    Calendar,
     CheckSquare,
-    ChevronRight,
     ClipboardList,
     Download,
     ExternalLink,
@@ -140,7 +139,6 @@ const SOURCE_LABEL: Record<string, string> = {
     hs_requirement: 'H&S requirement',
 };
 
-const today = new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 function completionTone(pct: number) {
     return pct >= 88 ? 'success' : pct >= 75 ? 'warning' : 'critical';
@@ -376,15 +374,6 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
             ...(can.record || can.manage ? [{ label: 'Waive (reason…)', tone: 'danger' as const, onClick: () => waiveAssignment(a) }] : []),
         ]);
 
-    const heroStats: { label: string; value: string | number; tab?: Tab; amber?: boolean }[] = [
-        { label: 'Courses', value: summary.total_courses, tab: 'catalog' },
-        { label: 'Mandatory', value: summary.mandatory_courses, tab: 'catalog' },
-        { label: 'Enrolments', value: summary.total_enrollments.toLocaleString('en-NZ'), tab: 'assignments' },
-        { label: 'Completion', value: `${summary.completion_rate}%`, tab: 'dashboard' },
-        { label: 'Expiring ≤90d', value: summary.expiring_soon, tab: 'dashboard' },
-        { label: 'Overdue', value: summary.overdue_assignments, tab: 'assignments', amber: true },
-    ];
-
     const TABS: { id: Tab; label: string; icon: typeof BookOpen; badge?: string; tone: 'primary' | 'warning' }[] = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tone: 'primary' },
         { id: 'catalog', label: 'Catalog', icon: BookOpen, badge: String(courses.length), tone: 'primary' },
@@ -397,53 +386,15 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Training & development" />
             <div className="space-y-[18px] p-4 lg:p-6">
-                {/* ───────── HERO ───────── */}
-                <div className="relative overflow-hidden rounded-[24px] text-white shadow-[var(--shadow-hero,0_24px_60px_-22px_rgba(80,40,160,.45))]" style={{ background: 'linear-gradient(120deg,color-mix(in oklch,var(--primary) 72%,black 22%),var(--primary) 60%,color-mix(in oklch,var(--primary) 92%,white 6%))' }}>
-                    <div className="pointer-events-none absolute top-[-80px] right-[22%] h-[240px] w-[240px] rounded-full bg-white/5" />
-                    <div className="relative px-[34px] pt-[30px] pb-1">
-                        <div className="flex flex-wrap items-start justify-between gap-5">
-                            <div className="min-w-0">
-                                <h1 className="m-0 text-[27px] font-bold leading-[1.05] tracking-[-.5px]">Training &amp; development</h1>
-                                <p className="mt-[9px] flex flex-wrap items-center gap-x-[14px] gap-y-2 text-[13px] text-white/[.78]">
-                                    <span className="inline-flex items-center gap-[6px] font-semibold">
-                                        <Calendar className="h-[14px] w-[14px]" />
-                                        {today}
-                                    </span>
-                                    <span className="opacity-40">·</span>
-                                    <span>All sites</span>
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-[9px]">
-                                {can.manage && <HeroBtn icon={Plus} label="New course" onClick={() => openWizard('createCourse')} />}
-                                {can.enroll && <HeroBtn icon={UserPlus} label="Assign training" onClick={() => openWizard('assign')} />}
-                                {can.record && <HeroBtn icon={CheckSquare} label="Record completion" onClick={() => openWizard('record')} />}
-                                <HeroBtn icon={Download} label="Export" onClick={() => doExport('catalog')} />
-                            </div>
-                        </div>
-                        <div className="mt-[18px] mb-1 -ml-3 flex flex-wrap gap-[2px]">
-                            {heroStats.map((s) => (
-                                <GuardrailButton unstyled key={s.label} type="button" onClick={() => s.tab && setTab(s.tab)} className="flex flex-col items-start gap-[2px] rounded-[10px] px-[13px] py-2 text-left hover:bg-white/10">
-                                    <span className="text-[10px] font-bold tracking-[.09em] text-white/[.62] uppercase">{s.label}</span>
-                                    <span className="text-[21px] font-bold tabular-nums" style={s.amber ? { color: 'var(--hr-amber,oklch(0.86 0.13 90))' } : undefined}>
-                                        {s.value}
-                                    </span>
-                                </GuardrailButton>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-white/15 bg-black/[.08] px-[22px] py-[11px]">
-                        <span className="text-[11.5px] text-white/70">
-                            Compliance: <strong className="text-white">{dashboard.mandatoryCurrentPct}%</strong> of mandatory training current
-                        </span>
-                        {summary.overdue_assignments > 0 && (
-                            <GuardrailButton unstyled type="button" onClick={() => setTab('assignments')} className="inline-flex items-center gap-2 rounded-[9px] border border-white/25 bg-white/15 px-[11px] py-[6px] text-[12px] font-bold text-white">
-                                <span className="h-[6px] w-[6px] rounded-full" style={{ background: 'var(--hr-amber,oklch(0.86 0.13 90))', boxShadow: '0 0 0 3px color-mix(in oklch,var(--hr-amber,oklch(0.86 0.13 90)) 32%,transparent)' }} />
-                                {summary.overdue_assignments} overdue renewals
-                                <ChevronRight className="h-3 w-3" />
-                            </GuardrailButton>
-                        )}
-                    </div>
-                </div>
+                <TrainingHero
+                    summary={summary}
+                    mandatoryCurrentPct={dashboard.mandatoryCurrentPct}
+                    can={can}
+                    onCreate={() => openWizard('createCourse')}
+                    onAssign={() => openWizard('assign')}
+                    onRecord={() => openWizard('record')}
+                    onExport={() => doExport('catalog')}
+                />
 
                 {/* ───────── TAB STRIP ───────── */}
                 <div role="tablist" className="flex flex-wrap items-center gap-1 rounded-[14px] border border-border bg-card p-[6px] shadow-sm">

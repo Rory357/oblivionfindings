@@ -33,7 +33,7 @@ import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { BulkRejectDialog } from '@/components/hr/recruitment/bulk-reject-dialog';
-import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
+import { TextPromptDialog } from '@/components/hr/text-prompt-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
