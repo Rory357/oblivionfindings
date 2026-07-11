@@ -34,11 +34,11 @@
 - Create: `HR_DEFERRED_BACKLOG_PROGRESS.md`
 - Modify: `docs/superpowers/plans/2026-07-11-hr-deferred-audit-backlog.md`
 
-- [ ] **Step 1: Create the requirement ledger**
+- [x] **Step 1: Create the requirement ledger**
 
 Create rows A1, A2, E1, R1, R2, O1–O4, X1–X2, Q1–Q2, W1–W7, U1–U5, C1, and L1 with status `⬜` and columns for red evidence, green evidence, commit, and notes. Include the baseline release `9eaab3a5` and design commit `d84cd099`.
 
-- [ ] **Step 2: Verify generated routes and clean baselines**
+- [x] **Step 2: Verify generated routes and clean baselines**
 
 Run:
 
@@ -51,7 +51,7 @@ php artisan test tests/Feature/Hr --compact
 
 Expected: Vitest 44/44 files and 184/184 tests; build transforms 4,939 modules; HR suite exits zero after the build manifest exists. Record exact counts and any pre-existing warnings without changing application code.
 
-- [ ] **Step 3: Commit the ledger**
+- [x] **Step 3: Commit the ledger**
 
 ```powershell
 git add HR_DEFERRED_BACKLOG_PROGRESS.md docs/superpowers/plans/2026-07-11-hr-deferred-audit-backlog.md
