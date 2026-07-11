@@ -205,7 +205,10 @@ export default function SiteTypePlanBuilderDialog({
                 : typePlan.status === 'draft'
                   ? 'Draft'
                   : 'New plan';
-    const emergencyKinds = typePlan.emergency_pin_kinds ?? [];
+    const emergencyKinds = useMemo(
+        () => typePlan.emergency_pin_kinds ?? [],
+        [typePlan.emergency_pin_kinds],
+    );
 
     // When the dialog opens we re-seed the editor from the current source.
     useLayoutEffect(() => {

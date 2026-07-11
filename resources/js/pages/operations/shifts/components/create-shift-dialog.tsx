@@ -252,7 +252,7 @@ export function CreateShiftDialog({
             if (found) return found;
         }
         return clients[0] ?? null;
-    }, [clients, defaultClientId, defaultSiteId]);
+    }, [clients, defaultClientId, defaultSiteId, initialShift?.client?.id]);
 
     // Every client lives at a site — the location field follows it (the
     // coordinator can still type a custom location for community shifts).

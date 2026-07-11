@@ -154,7 +154,7 @@ export default function ShoppingListPanel({ siteId, site, lists, canManage, prod
 }
 
 function DraftCard({ siteId, list, canManage, products, showAdd, setShowAdd, onGenerate, onChanged, onExportPrint }: { siteId: number; list: ShoppingList; canManage: boolean; products: { id: number; name: string; default_unit: string }[]; showAdd: boolean; setShowAdd: (v: boolean) => void; onGenerate: () => void; onChanged: () => void; onExportPrint: () => void }) {
-    const items = list.items ?? [];
+    const items = useMemo(() => list.items ?? [], [list.items]);
     const totalCents = items.reduce((s, i) => s + (i.estimated_cost_cents ?? 0), 0);
     // "Tick as you shop" — client-only, but persisted to localStorage so a same-device
     // reload doesn't lose progress; Mark received commits it to inventory (P2-15).

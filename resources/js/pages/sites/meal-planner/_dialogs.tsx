@@ -170,7 +170,13 @@ export function PlanEntryDialog({
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [open, siteId, form.data.source_type, form.data.recipe_id, JSON.stringify(form.data.client_ids)]);
+    }, [
+        open,
+        siteId,
+        form.data.source_type,
+        form.data.recipe_id,
+        form.data.client_ids,
+    ]);
 
     // Explicit, non-debounced re-check (the "Retry check" button + submit-time re-verify).
     function retryCheck() {

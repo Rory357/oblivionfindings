@@ -1585,8 +1585,6 @@ export default function PlanCanvas(props: Props) {
     const cursor = isSelectMode(activeKind)
         ? 'cursor-default'
         : 'cursor-crosshair';
-    const pendingRefs =
-        interaction.mode === 'marquee' ? interaction.pendingRefs : [];
     const groupBounds = groupDragging
         ? selectionBounds(layout, pins, selection)
         : null;
@@ -1603,8 +1601,9 @@ export default function PlanCanvas(props: Props) {
     );
     const hasPendingRef = useCallback(
         (ref: SelectionRef) =>
-            pendingRefs.some((pending) => sameRef(pending, ref)),
-        [pendingRefs],
+            interaction.mode === 'marquee' &&
+            interaction.pendingRefs.some((pending) => sameRef(pending, ref)),
+        [interaction],
     );
 
     function renderSnapPair(

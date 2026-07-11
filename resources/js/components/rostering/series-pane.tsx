@@ -225,7 +225,7 @@ export function SeriesPane({
     const [search, setSearch] = useState('');
     const [activeOnly, setActiveOnly] = useState(false);
 
-    const list = series ?? [];
+    const list = useMemo(() => series ?? [], [series]);
 
     const stats: MicroStat[] = useMemo(() => {
         const open = list.reduce((sum, s) => sum + s.open_occurrences_count, 0);

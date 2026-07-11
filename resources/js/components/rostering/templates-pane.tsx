@@ -335,7 +335,7 @@ export function TemplatesPane({
     const [pendingDelete, setPendingDelete] =
         useState<RosterTemplateRow | null>(null);
 
-    const list = templates ?? [];
+    const list = useMemo(() => templates ?? [], [templates]);
 
     const stats: MicroStat[] = useMemo(() => {
         const rows = list.reduce(

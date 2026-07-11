@@ -62,14 +62,14 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
             seed[r.template_item_id] = { value: r.response_value ?? '', notes: r.notes ?? '' };
         });
         setResp(seed);
-    }, [ready, runDetail?.id]);
+    }, [ready, runDetail]);
 
     useEffect(() => {
         const id = requestAnimationFrame(() => setShow(true));
         return () => cancelAnimationFrame(id);
     }, []);
 
-    const items = runDetail?.items ?? [];
+    const items = useMemo(() => runDetail?.items ?? [], [runDetail?.items]);
     const readOnly = runDetail?.status === 'completed' || !cfg.can.run;
 
     const answered = items.filter((it) => isAnswered(resp[it.id]?.value)).length;

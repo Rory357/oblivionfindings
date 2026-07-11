@@ -230,7 +230,7 @@ export default function ResidentTrackingHistory({
     available_event_types,
     filters,
 }: Props) {
-    const safeLocations = locations ?? [];
+    const safeLocations = useMemo(() => locations ?? [], [locations]);
     const safeAvailableTypes = available_event_types ?? [];
     const availableSafetyTypes = SAFETY_EVENTS.filter((t) => safeAvailableTypes.includes(t));
 
