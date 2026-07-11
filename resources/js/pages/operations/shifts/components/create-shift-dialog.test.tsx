@@ -204,6 +204,47 @@ describe('CreateShiftDialog edit mode', () => {
             screen.queryByRole('button', { name: /Repeat weekly/ }),
         ).toBeNull();
     });
+
+    it('can clear an existing shift licence requirement', () => {
+        render(
+            <CreateShiftDialog
+                open
+                onClose={vi.fn()}
+                clients={[
+                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
+                ]}
+                staff={[{ id: 7, name: 'Aroha King' }]}
+                initialShift={{
+                    id: 44,
+                    starts_at: '2026-05-04T09:00:00+12:00',
+                    ends_at: '2026-05-04T13:00:00+12:00',
+                    status: 'scheduled',
+                    client: { id: 10 },
+                    staff: { id: 7 },
+                    required_licence_class: '2',
+                    required_licence_endorsements: ['P'],
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Who & where/ }));
+        fireEvent.change(screen.getByLabelText(/Required licence class/i), {
+            target: { value: '' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /Passenger endorsement/i }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
+
+        expect(inertiaSpies.put).toHaveBeenCalledWith(
+            '/operations/shifts/44',
+            expect.objectContaining({
+                required_licence_class: '',
+                required_licence_endorsements: [],
+            }),
+        );
+    });
 });
 
 describe('CreateShiftDialog create mode wizard', () => {
@@ -244,6 +285,43 @@ describe('CreateShiftDialog create mode wizard', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
         expect(screen.getByText(/Step 2 of 6/)).toBeVisible();
+    });
+
+    it('submits optional licence class and endorsement requirements', () => {
+        renderCreate();
+
+        fireEvent.click(screen.getByRole('button', { name: /Who & where/ }));
+        fireEvent.change(screen.getByLabelText(/Required licence class/i), {
+            target: { value: '2' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /Passenger endorsement/i }),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Create shift$/ }));
+
+        expect(inertiaSpies.post).toHaveBeenCalledWith(
+            '/operations/shifts',
+            expect.objectContaining({
+                required_licence_class: '2',
+                required_licence_endorsements: ['P'],
+            }),
+        );
+    });
+
+    it('omits licence requirement keys for an ordinary shift', () => {
+        renderCreate();
+
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Create shift$/ }));
+
+        const payload = inertiaSpies.post.mock.calls.at(-1)?.[1] as Record<
+            string,
+            unknown
+        >;
+        expect(payload).not.toHaveProperty('required_licence_class');
+        expect(payload).not.toHaveProperty('required_licence_endorsements');
     });
 
     it("prefills location from the client's site and follows client changes", () => {

@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\SiteCoverageRequirement;
+use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\NotificationService;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
+use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use App\Services\Sites\SiteChecklistScheduler;
@@ -18,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class CalendarController extends Controller
 {
@@ -143,6 +147,8 @@ class CalendarController extends Controller
                     'is_on_call' => (bool) $shift->is_on_call,
                     'expected_break_minutes' => $shift->expected_break_minutes,
                     'coverage_roles' => $shift->coverage_roles ?? [],
+                    'required_licence_class' => $shift->required_licence_class,
+                    'required_licence_endorsements' => $shift->required_licence_endorsements ?? [],
                     'tasks_total' => (int) ($shift->tasks_total ?? 0),
                     'tasks_completed' => (int) ($shift->tasks_completed ?? 0),
                     'tasks' => ShiftTaskSupport::payloadsForShift($shift),
@@ -230,6 +236,9 @@ class CalendarController extends Controller
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
             'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'required_licence_class' => ['nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
@@ -274,6 +283,15 @@ class CalendarController extends Controller
             422,
             $this->shiftConflictService->blockingMessage($blockingConflicts),
         );
+
+        if (! empty($data['user_id'])) {
+            $assignee = User::findOrFail((int) $data['user_id']);
+            $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+            $tempShift->organization_id = $auth->organization_id ?: 1;
+            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
+
+            abort_if($eligibility->hasBlocks(), 422, $eligibility->blocking_reasons[0]);
+        }
 
         $reservation = app(CoverageReservationService::class)->validateToken(
             $data['coverage_reservation_token'] ?? null,
@@ -360,6 +378,9 @@ class CalendarController extends Controller
             'coverage_rule_id' => ['sometimes', 'nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['sometimes', 'nullable', 'array'],
             'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'required_licence_class' => ['sometimes', 'nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['sometimes', 'nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'coverage_reservation_token' => ['sometimes', 'nullable', 'string', 'max:120'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
@@ -419,6 +440,23 @@ class CalendarController extends Controller
             422,
             $this->shiftConflictService->blockingMessage($blockingConflicts),
         );
+
+        $eligibilityRelevant = $resolvedUserId && collect([
+            'user_id',
+            'starts_at',
+            'ends_at',
+            'required_licence_class',
+            'required_licence_endorsements',
+        ])->contains(fn (string $key) => array_key_exists($key, $data));
+
+        if ($eligibilityRelevant) {
+            $assignee = User::findOrFail((int) $resolvedUserId);
+            $tempShift = clone $shift;
+            $tempShift->fill(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
+
+            abort_if($eligibility->hasBlocks(), 422, $eligibility->blocking_reasons[0]);
+        }
 
         // If the client changes and service context is not explicitly set,
         // inherit from the client to keep classification consistent.

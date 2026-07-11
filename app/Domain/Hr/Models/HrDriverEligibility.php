@@ -15,6 +15,10 @@ class HrDriverEligibility extends Model
 
     protected $table = 'hr_driver_eligibility';
 
+    public const LICENCE_CLASSES = ['1', '2', '3', '4', '5', '6'];
+
+    public const LICENCE_ENDORSEMENTS = ['P', 'V', 'I', 'O', 'F', 'D', 'T', 'R', 'W'];
+
     protected $fillable = [
         'tenant_id',
         'user_id',

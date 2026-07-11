@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Clock, MapPin, UserRound } from 'lucide-react';
+import { Car, Clock, MapPin, UserRound } from 'lucide-react';
 
 import StaffStatus from '@/components/staff-status';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,34 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
                             <div className="font-medium">{shift.location}</div>
                             <div className="text-muted-foreground">
                                 Location
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+                {shift.required_licence_class ||
+                shift.required_licence_endorsements?.length ? (
+                    <div className="flex gap-2">
+                        <Car className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                        <div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {shift.required_licence_class ? (
+                                    <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium">
+                                        Class {shift.required_licence_class}
+                                    </span>
+                                ) : null}
+                                {shift.required_licence_endorsements?.map(
+                                    (endorsement) => (
+                                        <span
+                                            key={endorsement}
+                                            className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
+                                        >
+                                            {endorsement} endorsement
+                                        </span>
+                                    ),
+                                )}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                                Required driving licence
                             </div>
                         </div>
                     </div>

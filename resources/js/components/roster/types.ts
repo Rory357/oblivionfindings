@@ -31,6 +31,8 @@ export interface RosterShift {
     status_state: ShiftState;
     location: string | null;
     service_type: string | null;
+    required_licence_class?: string | null;
+    required_licence_endorsements?: string[];
     client: RosterClient | null;
     tasks: RosterTask[];
     task_progress: number;

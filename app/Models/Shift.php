@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Domain\Rostering\RosterPublishingService;
 use App\Models\Concerns\AuditableChanges;
+use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +43,8 @@ class Shift extends Model
         'is_lone_worker',
         'expected_break_minutes',
         'coverage_roles',
+        'required_licence_class',
+        'required_licence_endorsements',
         'created_by',
     ];
 
@@ -58,6 +61,7 @@ class Shift extends Model
         'is_lone_worker' => 'boolean',
         'expected_break_minutes' => 'integer',
         'coverage_roles' => 'array',
+        'required_licence_endorsements' => 'array',
     ];
 
     protected static function booted(): void
@@ -75,7 +79,7 @@ class Shift extends Model
         });
 
         static::saving(function (self $shift): void {
-            app(\App\Services\ShiftSafetyInvariantService::class)->assertShift($shift);
+            app(ShiftSafetyInvariantService::class)->assertShift($shift);
         });
 
         static::updating(function (self $shift): void {
@@ -207,12 +211,12 @@ class Shift extends Model
 
     public function formSubmissions()
     {
-        return $this->hasMany(\App\Models\CustomFormSubmission::class);
+        return $this->hasMany(CustomFormSubmission::class);
     }
 
     public function medicationAdministrations()
     {
-        return $this->hasMany(\App\Models\ClientMedicationAdministration::class);
+        return $this->hasMany(ClientMedicationAdministration::class);
     }
 
     public function tasks()
@@ -227,27 +231,27 @@ class Shift extends Model
 
     public function residentTransports()
     {
-        return $this->hasMany(\App\Models\FleetResidentTransport::class);
+        return $this->hasMany(FleetResidentTransport::class);
     }
 
     public function clientNotes()
     {
-        return $this->hasMany(\App\Models\ClientNote::class, 'shift_id');
+        return $this->hasMany(ClientNote::class, 'shift_id');
     }
 
     public function outgoingHandovers()
     {
-        return $this->hasMany(\App\Models\ShiftHandover::class, 'outgoing_shift_id');
+        return $this->hasMany(ShiftHandover::class, 'outgoing_shift_id');
     }
 
     public function incomingHandovers()
     {
-        return $this->hasMany(\App\Models\ShiftHandover::class, 'incoming_shift_id');
+        return $this->hasMany(ShiftHandover::class, 'incoming_shift_id');
     }
 
     public function replacementRequests()
     {
-        return $this->hasMany(\App\Models\ShiftReplacementRequest::class)->orderByDesc('requested_at');
+        return $this->hasMany(ShiftReplacementRequest::class)->orderByDesc('requested_at');
     }
 
     public function openPositions()

@@ -50,6 +50,8 @@ class MyShiftResource extends JsonResource
                 'photo_url' => $shift->client->profile_photo_url ?? null,
             ] : null,
             'service_type' => $shift->serviceContext?->name,
+            'required_licence_class' => $shift->required_licence_class,
+            'required_licence_endorsements' => $shift->required_licence_endorsements ?? [],
             'tasks' => $tasks->map(fn ($task) => [
                 'id' => $task->id,
                 'label' => $task->label,
