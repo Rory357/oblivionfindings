@@ -92,6 +92,19 @@ const WEEKDAY_LABEL: Record<Weekday, string> = {
     sun: 'Sun',
 };
 
+const LICENCE_CLASSES = ['1', '2', '3', '4', '5', '6'] as const;
+const LICENCE_ENDORSEMENTS = [
+    { value: 'P', label: 'Passenger' },
+    { value: 'V', label: 'Vehicle recovery' },
+    { value: 'I', label: 'Dangerous goods' },
+    { value: 'O', label: 'Tracks' },
+    { value: 'F', label: 'Forklift' },
+    { value: 'D', label: 'Driving instructor' },
+    { value: 'T', label: 'Testing officer' },
+    { value: 'R', label: 'Roller' },
+    { value: 'W', label: 'Wheels' },
+] as const;
+
 export type EditableShift = {
     id: number;
     starts_at: string;
@@ -109,6 +122,8 @@ export type EditableShift = {
     site?: { id: number; name: string } | null;
     service_context_id?: number | null;
     coverage_roles?: string[] | null;
+    required_licence_class?: string | null;
+    required_licence_endorsements?: string[] | null;
     tasks?: Array<{
         id: number;
         label: string;
@@ -302,6 +317,10 @@ export function CreateShiftDialog({
         coverage_roles: (initialShift?.coverage_roles ??
             defaultCoverageRoles ??
             []) as string[],
+        required_licence_class:
+            initialShift?.required_licence_class ?? '',
+        required_licence_endorsements:
+            initialShift?.required_licence_endorsements ?? ([] as string[]),
         coverage_rule_id: (coverageRuleId ?? '') as number | string,
         coverage_reservation_token: (coverageReservationToken ?? '') as string,
         tasks: (initialShift?.tasks?.map((t) => ({
@@ -375,6 +394,8 @@ export function CreateShiftDialog({
             user_id: defaultUserId ?? '',
             location: siteNameFor(initialClient?.site_id),
             coverage_roles: defaultCoverageRoles ?? [],
+            required_licence_class: '',
+            required_licence_endorsements: [],
             coverage_rule_id: coverageRuleId ?? '',
             coverage_reservation_token: coverageReservationToken ?? '',
             starts_at:
@@ -413,6 +434,13 @@ export function CreateShiftDialog({
         if (set.has(d)) set.delete(d);
         else set.add(d);
         form.setData('repeat_by_weekday', Array.from(set) as Weekday[]);
+    }
+
+    function toggleLicenceEndorsement(endorsement: string) {
+        const selected = new Set(form.data.required_licence_endorsements);
+        if (selected.has(endorsement)) selected.delete(endorsement);
+        else selected.add(endorsement);
+        form.setData('required_licence_endorsements', Array.from(selected));
     }
 
     function addTask() {
@@ -581,6 +609,14 @@ export function CreateShiftDialog({
                 if (form.data.coverage_roles?.length) {
                     query.coverage_roles = form.data.coverage_roles;
                 }
+                if (form.data.required_licence_class) {
+                    query.required_licence_class =
+                        form.data.required_licence_class;
+                }
+                if (form.data.required_licence_endorsements.length) {
+                    query.required_licence_endorsements =
+                        form.data.required_licence_endorsements;
+                }
 
                 const res = await fetch(eligibilityPreview.url({ query }), {
                     signal: controller.signal,
@@ -605,6 +641,8 @@ export function CreateShiftDialog({
         form.data.ends_at,
         form.data.shift_type,
         form.data.coverage_roles,
+        form.data.required_licence_class,
+        form.data.required_licence_endorsements,
         selectedClient?.site_id,
         initialShift?.id,
         initialShift?.site?.id,
@@ -629,18 +667,36 @@ export function CreateShiftDialog({
         // stores the correct UTC instant. Otherwise the naive local time
         // is interpreted as UTC and the saved shift drifts by the user's
         // offset (e.g. NZST shifts get pushed 12 hours into the future).
-        form.transform((data) => ({
-            ...data,
-            starts_at:
-                localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
-            ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
-            return_to:
-                typeof window !== 'undefined'
-                    ? window.location.pathname + window.location.search
-                    : data.return_to,
-            override_acknowledged: Boolean(overrideReason),
-            override_reason: overrideReason ?? '',
-        }));
+        form.transform((data) => {
+            const payload = {
+                ...data,
+                starts_at:
+                    localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
+                ends_at:
+                    localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
+                return_to:
+                    typeof window !== 'undefined'
+                        ? window.location.pathname + window.location.search
+                        : data.return_to,
+                override_acknowledged: Boolean(overrideReason),
+                override_reason: overrideReason ?? '',
+            };
+
+            if (
+                !isEdit &&
+                !data.required_licence_class &&
+                data.required_licence_endorsements.length === 0
+            ) {
+                const {
+                    required_licence_class: _class,
+                    required_licence_endorsements: _endorsements,
+                    ...ordinaryShift
+                } = payload;
+                return ordinaryShift;
+            }
+
+            return payload;
+        });
         if (isEdit && initialShift) {
             // Edit mode: PUT to update; recurring options don't apply.
             form.put(updateShift.url(initialShift.id), {
@@ -685,6 +741,15 @@ export function CreateShiftDialog({
                 tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
                 coverage_rule_id: form.data.coverage_rule_id || undefined,
                 coverage_roles: form.data.coverage_roles,
+                ...(form.data.required_licence_class ||
+                form.data.required_licence_endorsements.length
+                    ? {
+                          required_licence_class:
+                              form.data.required_licence_class || null,
+                          required_licence_endorsements:
+                              form.data.required_licence_endorsements,
+                      }
+                    : {}),
                 coverage_reservation_token:
                     form.data.coverage_reservation_token || undefined,
                 return_to:
@@ -1142,6 +1207,117 @@ export function CreateShiftDialog({
                                             message={form.errors.user_id}
                                         />
                                     </div>
+
+                                    <div className="sm:col-span-2 rounded-xl border border-border bg-muted/25 p-3">
+                                        <div className="mb-3">
+                                            <div className="text-xs font-semibold text-foreground">
+                                                Driving requirement
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Optional. Leave blank for an
+                                                ordinary shift.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+                                            <div>
+                                                <Label htmlFor="csd-licence-class">
+                                                    Required licence class
+                                                </Label>
+                                                <select
+                                                    id="csd-licence-class"
+                                                    className="select"
+                                                    value={
+                                                        form.data
+                                                            .required_licence_class
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'required_licence_class',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="">
+                                                        No class requirement
+                                                    </option>
+                                                    {LICENCE_CLASSES.map(
+                                                        (licenceClass) => (
+                                                            <option
+                                                                key={
+                                                                    licenceClass
+                                                                }
+                                                                value={
+                                                                    licenceClass
+                                                                }
+                                                            >
+                                                                Class{' '}
+                                                                {licenceClass}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <Label>
+                                                    Required endorsements
+                                                </Label>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {LICENCE_ENDORSEMENTS.map(
+                                                        (endorsement) => {
+                                                            const selected =
+                                                                form.data.required_licence_endorsements.includes(
+                                                                    endorsement.value,
+                                                                );
+                                                            return (
+                                                                <GuardrailButton
+                                                                    unstyled
+                                                                    key={
+                                                                        endorsement.value
+                                                                    }
+                                                                    type="button"
+                                                                    aria-label={`${endorsement.label} endorsement`}
+                                                                    aria-pressed={
+                                                                        selected
+                                                                    }
+                                                                    onClick={() =>
+                                                                        toggleLicenceEndorsement(
+                                                                            endorsement.value,
+                                                                        )
+                                                                    }
+                                                                    className={cn(
+                                                                        'min-h-9 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                        selected
+                                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                                            : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        endorsement.value
+                                                                    }{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        endorsement.label
+                                                                    }
+                                                                </GuardrailButton>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <FieldError
+                                            message={
+                                                form.errors
+                                                    .required_licence_class
+                                            }
+                                        />
+                                        <FieldError
+                                            message={
+                                                form.errors
+                                                    .required_licence_endorsements
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </Section>
                             ) : null}
@@ -1495,6 +1671,30 @@ export function CreateShiftDialog({
                                                 value={
                                                     selectedStaff?.name ??
                                                     'Open shift (unassigned)'
+                                                }
+                                                onEdit={() => jumpTo('people')}
+                                            />
+                                            <ReviewRow
+                                                label="Driving requirement"
+                                                value={
+                                                    form.data
+                                                        .required_licence_class ||
+                                                    form.data
+                                                        .required_licence_endorsements
+                                                        .length
+                                                        ? [
+                                                              form.data
+                                                                  .required_licence_class
+                                                                  ? `Class ${form.data.required_licence_class}`
+                                                                  : null,
+                                                              form.data.required_licence_endorsements
+                                                                  .length
+                                                                  ? `${form.data.required_licence_endorsements.join(', ')} endorsement${form.data.required_licence_endorsements.length === 1 ? '' : 's'}`
+                                                                  : null,
+                                                          ]
+                                                              .filter(Boolean)
+                                                              .join(' · ')
+                                                        : 'None'
                                                 }
                                                 onEdit={() => jumpTo('people')}
                                             />

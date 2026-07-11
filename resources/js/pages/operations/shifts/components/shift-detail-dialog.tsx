@@ -3,6 +3,7 @@ import {
     ArrowUpRight,
     Briefcase,
     CalendarClock,
+    Car,
     CheckCircle2,
     Clock,
     Coffee,
@@ -212,6 +213,26 @@ export function ShiftDetailDialog({
                                     {type.label}
                                 </span>
                             </SDRow>
+                            {shift.required_licence_class ||
+                            shift.required_licence_endorsements?.length ? (
+                                <SDRow label="Driving" icon={Car}>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {shift.required_licence_class ? (
+                                            <Tag
+                                                label={`Class ${shift.required_licence_class}`}
+                                            />
+                                        ) : null}
+                                        {shift.required_licence_endorsements?.map(
+                                            (endorsement) => (
+                                                <Tag
+                                                    key={endorsement}
+                                                    label={`${endorsement} endorsement`}
+                                                />
+                                            ),
+                                        )}
+                                    </div>
+                                </SDRow>
+                            ) : null}
                         </SDSection>
 
                         <SDSection icon={Clock} title="Schedule">

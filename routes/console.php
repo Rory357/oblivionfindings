@@ -360,6 +360,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// Persisted one-shot reminders for worker police-vetting and driver-licence expiry.
+app(Schedule::class)
+    ->command('hr:send-worker-compliance-expiry-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:05')
+    ->withoutOverlapping();
+
 // HR asset reminders (warranty expiring, returns overdue, repairs overdue,
 // leaver-held): daily at 07:30
 app(Schedule::class)

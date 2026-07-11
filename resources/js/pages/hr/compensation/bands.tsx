@@ -1,5 +1,15 @@
 import { Button } from '@/components/ui/button';
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -52,12 +62,14 @@ import {
     ClipboardCheck,
     ClipboardList,
     Copy,
+    CircleOff,
     DollarSign,
     Download,
     Layers,
     Pencil,
     Plus,
     Receipt,
+    RotateCcw,
     Search,
     Tag,
     Users,
@@ -85,6 +97,7 @@ type SalaryBand = {
     currency: string;
     effective_from: string;
     effective_to: string | null;
+    is_active: boolean;
     employee_count?: number;
     in_band?: number;
     under_band?: number;
@@ -160,6 +173,8 @@ const initials = (name: string) =>
 
 /** Lifecycle of a band derived from its effective dates. */
 function bandLifecycle(band: SalaryBand): { status: string; tone: StatusTone } {
+    if (!band.is_active) return { status: 'inactive', tone: 'neutral' };
+
     const now = Date.now();
     const from = new Date(band.effective_from).getTime();
     const to = band.effective_to ? new Date(band.effective_to).getTime() : null;
@@ -292,12 +307,16 @@ function BandRow({
     onView,
     onEdit,
     onDuplicate,
+    onDeactivate,
+    onReactivate,
 }: {
     band: SalaryBand;
     canManage: boolean;
     onView: () => void;
     onEdit: () => void;
     onDuplicate: () => void;
+    onDeactivate: () => void;
+    onReactivate: () => void;
 }) {
     const life = bandLifecycle(band);
     const count = band.employee_count ?? 0;
@@ -385,6 +404,15 @@ function BandRow({
                                 <Copy className="h-3.5 w-3.5" /> Duplicate
                                 <DropdownMenuShortcut>D</DropdownMenuShortcut>
                             </DropdownMenuItem>
+                            {band.is_active ? (
+                                <DropdownMenuItem onClick={onDeactivate}>
+                                    <CircleOff className="h-3.5 w-3.5" /> Deactivate band
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem onClick={onReactivate}>
+                                    <RotateCcw className="h-3.5 w-3.5" /> Reactivate band
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -993,6 +1021,10 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
     const [wizardInitial, setWizardInitial] = useState<BandForm>(emptyForm);
     const [drawerBand, setDrawerBand] = useState<SalaryBand | null>(null);
     const [roleQuery, setRoleQuery] = useState(filters.role ?? '');
+    const [lifecycleTarget, setLifecycleTarget] = useState<{
+        band: SalaryBand;
+        action: 'deactivate' | 'reactivate';
+    } | null>(null);
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -1036,6 +1068,18 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
             effective_to: '',
         });
         setWizardOpen(true);
+    };
+
+    const confirmLifecycleChange = () => {
+        if (!lifecycleTarget) return;
+        const { band, action } = lifecycleTarget;
+        router.post(`/hr/compensation/bands/${band.id}/${action}`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(action === 'deactivate' ? 'Salary band deactivated' : 'Salary band reactivated');
+                setLifecycleTarget(null);
+            },
+        });
     };
 
     const exportUrl = useMemo(() => {
@@ -1154,6 +1198,8 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                                 onView={() => setDrawerBand(band)}
                                 onEdit={() => openEdit(band)}
                                 onDuplicate={() => openDuplicate(band)}
+                                onDeactivate={() => setLifecycleTarget({ band, action: 'deactivate' })}
+                                onReactivate={() => setLifecycleTarget({ band, action: 'reactivate' })}
                             />
                         ))}
                     </div>
@@ -1205,6 +1251,30 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                     onClose={() => setWizardOpen(false)}
                 />
             ) : null}
+
+            <AlertDialog
+                open={lifecycleTarget !== null}
+                onOpenChange={(open) => !open && setLifecycleTarget(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {lifecycleTarget?.action === 'reactivate' ? 'Reactivate band?' : 'Deactivate band?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {lifecycleTarget?.action === 'reactivate'
+                                ? 'This band will return to active selectors when its effective dates apply.'
+                                : 'Historical pay placement remains available. The band will be removed from active selectors and can be reactivated later.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmLifecycleChange}>
+                            {lifecycleTarget?.action === 'reactivate' ? 'Reactivate band' : 'Deactivate band'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ShiftSeries extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $table = 'shift_series';
 
@@ -33,6 +33,8 @@ class ShiftSeries extends Model
         'is_lone_worker',
         'expected_break_minutes',
         'coverage_roles',
+        'required_licence_class',
+        'required_licence_endorsements',
         'created_by',
     ];
 
@@ -45,6 +47,7 @@ class ShiftSeries extends Model
         'is_lone_worker' => 'boolean',
         'expected_break_minutes' => 'integer',
         'coverage_roles' => 'array',
+        'required_licence_endorsements' => 'array',
     ];
 
     public function client()

@@ -4,18 +4,20 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrExitInterviewFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrExitInterview extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrExitInterviewFactory::new();
+        return HrExitInterviewFactory::new();
     }
 
     protected $fillable = [
@@ -43,7 +45,7 @@ class HrExitInterview extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employeeProfile(): BelongsTo
@@ -61,8 +63,13 @@ class HrExitInterview extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function offboardingTask(): HasOne
+    {
+        return $this->hasOne(HrOffboardingTask::class, 'exit_interview_id');
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

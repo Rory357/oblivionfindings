@@ -169,6 +169,7 @@ export default function ShowReview({ review, reviewGoals = [], nextSteps = null,
     // equivalent process is already underway. Nothing is auto-created.
     const wizardSupport: WizardSupport = {
         staff: nextSteps?.staff ?? [],
+        sessionTypes: [],
         reviewTypes: [],
         competencyOptions: [],
         successionEmployees: nextSteps?.successionEmployees ?? [],

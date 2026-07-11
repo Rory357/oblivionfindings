@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalCycle;
@@ -10,6 +11,7 @@ use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Notifications\GoalAssignedNotification;
 use App\Domain\Hr\Services\CycleService;
 use App\Domain\Hr\Services\GoalService;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -23,6 +25,7 @@ class GoalController extends Controller
     public function __construct(
         protected GoalService $goalService,
         protected CycleService $cycleService,
+        protected HrNotificationService $notificationService,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -111,7 +114,7 @@ class GoalController extends Controller
                 ]),
             'allTags' => HrGoal::forTenant($tenantId)->whereNotNull('tags')->pluck('tags')
                 ->flatMap(fn ($t) => is_array($t) ? $t : [])->unique()->sort()->values(),
-            'competencies' => \App\Domain\Hr\Models\HrCompetency::query()
+            'competencies' => HrCompetency::query()
                 ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
                 ->orderBy('name')->get(['id', 'name'])
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]),
@@ -504,7 +507,9 @@ class GoalController extends Controller
             $data['confidence'] = 'on_track';
         }
 
+        $wasCompleted = $goal->status === 'completed';
         $goal->update($data);
+        $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Objective updated.');
     }
@@ -546,16 +551,18 @@ class GoalController extends Controller
         // a manual slider must never clobber the weighted roll-up.
         abort_if($goal->hasKeyResults(), 422, 'This objective derives progress from its key results. Check in on the key results instead.');
 
+        $wasCompleted = $goal->status === 'completed';
         $this->goalService->updateProgress($goal, [
             'user_id' => $user->id,
             ...$data,
         ]);
+        $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Progress updated.');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Check-in — the unified wizard endpoint                            */
+    /*  Check-in — the unified wizard endpoint */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -582,6 +589,8 @@ class GoalController extends Controller
         ]);
 
         $goal->loadMissing('keyResults');
+
+        $wasCompleted = $goal->status === 'completed';
 
         DB::transaction(function () use ($goal, $data, $user) {
             if ($goal->hasKeyResults() && ! empty($data['key_results'])) {
@@ -614,6 +623,7 @@ class GoalController extends Controller
                 ]);
             }
         });
+        $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Check-in logged.');
     }
@@ -689,9 +699,21 @@ class GoalController extends Controller
             $keyResult->save();
         }
 
+        $goal = $keyResult->goal;
+        $wasCompleted = $goal->status === 'completed';
         $this->goalService->updateKeyResultProgress($keyResult, $data, $user->id);
+        $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Key result updated.');
+    }
+
+    private function notifyCompletionTransition(HrGoal $goal, bool $wasCompleted): void
+    {
+        $goal->refresh();
+
+        if (! $wasCompleted && $goal->status === 'completed') {
+            $this->notificationService->notifyGoalCompleted($goal);
+        }
     }
 
     public function destroyKeyResult(Request $request, HrKeyResult $keyResult)
@@ -709,7 +731,7 @@ class GoalController extends Controller
     }
 
     /* ================================================================== */
-    /*  Bulk · Duplicate · Re-parent · Export                             */
+    /*  Bulk · Duplicate · Re-parent · Export */
     /* ================================================================== */
 
     /** Back the multi-select bar on the objectives table. */
@@ -908,6 +930,7 @@ class GoalController extends Controller
 
                 if ($g->keyResults->isEmpty()) {
                     $this->putCsv($out, [...$base, '', '', '', '', '', '', '', '']);
+
                     continue;
                 }
 

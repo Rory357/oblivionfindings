@@ -53,6 +53,7 @@ export type WizardState = { kind: WizardKind; context?: WizardContext };
 
 export type WizardSupport = {
     staff: Opt[];
+    sessionTypes: Opt[];
     reviewTypes: Opt[];
     competencyOptions: Opt[];
     successionEmployees: Opt[];
@@ -175,6 +176,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                         { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
                         { key: 'session_date', label: 'Session date', type: 'date', required: true },
                         { key: 'next_session_date', label: 'Next session', type: 'date' },
+                        { key: 'session_type', label: 'Session type', type: 'select', options: support.sessionTypes, required: true },
                         {
                             key: 'cadence',
                             label: 'Cadence',
@@ -214,7 +216,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     employee_user_id: Number(d.employee),
                     session_date: d.session_date,
                     next_session_date: d.next_session_date || null,
-                    session_type: 'supervision',
+                    session_type: d.session_type,
                     cadence: d.cadence || null,
                     topics_discussed: d.topics,
                     actions_agreed: lines(d.actions),

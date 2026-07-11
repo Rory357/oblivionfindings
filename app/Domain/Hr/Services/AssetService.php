@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrAssetMaintenanceLog;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Notifications\AssetAssignedNotification;
 use App\Models\Asset;
 use Carbon\CarbonImmutable;
@@ -59,6 +60,21 @@ class AssetService
                 'asset_id' => $asset->id,
                 'error' => $e->getMessage(),
             ]);
+        }
+
+        $checklist = HrOffboardingChecklist::query()
+            ->where('tenant_id', $asset->tenant_id)
+            ->where('employee_profile_id', $profile->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->latest('id')
+            ->first();
+
+        if ($checklist) {
+            app(OnboardingService::class)->reconcileAssetReturnTask(
+                $checklist,
+                $asset->fresh(),
+                (int) $data['assigned_by'],
+            );
         }
 
         return $assignment;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
@@ -49,6 +50,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ShiftController extends Controller
@@ -829,18 +831,24 @@ class ShiftController extends Controller
             'site_id' => ['nullable', 'integer'],
             'shift_type' => ['nullable', 'string'],
             'coverage_roles' => ['nullable', 'array'],
+            'required_licence_class' => ['nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'shift_id' => ['nullable', 'integer'],
         ]);
 
         $assignee = User::findOrFail($data['user_id']);
         $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
         $tempShift = new Shift([
+            'organization_id' => $auth->organization_id ?: 1,
             'user_id' => $data['user_id'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
             'site_id' => $data['site_id'] ?? null,
             'shift_type' => $data['shift_type'] ?? 'standard',
             'coverage_roles' => $data['coverage_roles'] ?? [],
+            'required_licence_class' => $data['required_licence_class'] ?? null,
+            'required_licence_endorsements' => $data['required_licence_endorsements'] ?? [],
         ]);
 
         // If editing an existing shift, set the ID so conflict detection can exclude it.
@@ -877,6 +885,9 @@ class ShiftController extends Controller
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
             'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'required_licence_class' => ['nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'return_to' => ['nullable', 'string', 'max:2048'],
             'tasks' => ['sometimes', 'array', 'max:50'],
@@ -925,6 +936,7 @@ class ShiftController extends Controller
             try {
                 $assignee = User::findOrFail($data['user_id']);
                 $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+                $tempShift->organization_id = $auth->organization_id ?: 1;
                 $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
 
                 if ($eligibility->hasBlocks()) {
@@ -1087,6 +1099,8 @@ class ShiftController extends Controller
                 'is_on_call' => $shift->is_on_call,
                 'expected_break_minutes' => $shift->expected_break_minutes,
                 'coverage_roles' => $shift->coverage_roles,
+                'required_licence_class' => $shift->required_licence_class,
+                'required_licence_endorsements' => $shift->required_licence_endorsements,
                 'published_at' => null,
                 'publish_dirty_at' => null,
                 'created_by' => $auth->id,
@@ -1170,6 +1184,8 @@ class ShiftController extends Controller
             'notes' => $shift->notes,
             'service_context_id' => $shift->service_context_id,
             'coverage_roles' => array_values($shift->coverage_roles ?? []),
+            'required_licence_class' => $shift->required_licence_class,
+            'required_licence_endorsements' => array_values($shift->required_licence_endorsements ?? []),
             'client' => $shift->client ? [
                 'id' => $shift->client->id,
             ] : null,
@@ -1234,6 +1250,9 @@ class ShiftController extends Controller
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
             'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'required_licence_class' => ['sometimes', 'nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['sometimes', 'nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'series_scope' => ['nullable', 'in:this,future'],
             'tasks' => ['sometimes', 'array', 'max:50'],
@@ -1377,9 +1396,11 @@ class ShiftController extends Controller
             $userChanged = $resolvedUserId && ((int) $resolvedUserId !== (int) $shift->user_id);
             $timesChanged = (array_key_exists('starts_at', $data) && $startsAt->ne($shift->starts_at))
                          || (array_key_exists('ends_at', $data) && $endsAt->ne($shift->ends_at));
+            $licenceRequirementsChanged = array_key_exists('required_licence_class', $data)
+                || array_key_exists('required_licence_endorsements', $data);
 
             $overrideData = null;
-            if ($resolvedUserId && ($userChanged || $timesChanged)) {
+            if ($resolvedUserId && ($userChanged || $timesChanged || $licenceRequirementsChanged)) {
                 $this->assertCanAssignShiftToUser($auth, (int) $resolvedUserId);
                 try {
                     $assignee = User::findOrFail($resolvedUserId);
@@ -1753,6 +1774,8 @@ class ShiftController extends Controller
                 'is_on_call' => (bool) $shift->is_on_call,
                 'expected_break_minutes' => $shift->expected_break_minutes,
                 'coverage_roles' => $shift->coverage_roles,
+                'required_licence_class' => $shift->required_licence_class,
+                'required_licence_endorsements' => $shift->required_licence_endorsements,
                 'created_by' => $auth->id,
             ]);
 
@@ -1775,6 +1798,17 @@ class ShiftController extends Controller
         }
 
         $hasAssignee = ! empty($shift->user_id);
+
+        if ($hasAssignee) {
+            $assignee = User::findOrFail((int) $shift->user_id);
+            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($shift, $assignee);
+
+            if ($eligibility->hasBlocks()) {
+                return back()->withErrors([
+                    'user_id' => $eligibility->blocking_reasons[0] ?? 'This assigned worker cannot be published on this shift.',
+                ]);
+            }
+        }
 
         $shift->forceFill([
             'status' => $hasAssignee ? 'scheduled' : 'draft',
@@ -2250,6 +2284,8 @@ class ShiftController extends Controller
                         'is_on_call',
                         'expected_break_minutes',
                         'coverage_roles',
+                        'required_licence_class',
+                        'required_licence_endorsements',
                     ]),
                     [
                         'starts_time' => $editedStart->format('H:i'),

@@ -44,6 +44,8 @@ interface Task {
     completed_at: string | null;
     sort_order: number;
     assigned_to?: { id: number; name: string } | null;
+    notes: string | null;
+    exit_interview_id: number | null;
 }
 
 interface Checklist {
@@ -83,19 +85,21 @@ interface Props {
 }
 
 const isExitInterviewTask = (task: Task) =>
-    task.category === 'hr' && /exit interview/i.test(task.title);
+    task.notes?.includes('workflow_key=exit_interview') ?? false;
 
 /** Record a real HrExitInterview from the offboarding checklist's task. */
 function ExitInterviewDialog({
     open,
     onClose,
     employeeProfileId,
+    offboardingTaskId,
     interviewers,
     departureReasons,
 }: {
     open: boolean;
     onClose: () => void;
     employeeProfileId: number;
+    offboardingTaskId: number;
     interviewers: Interviewer[];
     departureReasons: DepartureReason[];
 }) {
@@ -108,6 +112,7 @@ function ExitInterviewDialog({
         what_went_well: string;
         what_could_improve: string;
         from_offboarding: boolean;
+        offboarding_task_id: number;
     }>({
         employee_profile_id: employeeProfileId,
         interviewer_user_id: '',
@@ -117,6 +122,7 @@ function ExitInterviewDialog({
         what_went_well: '',
         what_could_improve: '',
         from_offboarding: true,
+        offboarding_task_id: offboardingTaskId,
     });
 
     const close = () => {
@@ -526,7 +532,8 @@ export default function OffboardingShow({
                                                         {can.manage &&
                                                             isExitInterviewTask(
                                                                 task,
-                                                            ) && (
+                                                            ) &&
+                                                            !task.exit_interview_id && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant="outline"
@@ -588,6 +595,9 @@ export default function OffboardingShow({
                     open={exitDialogOpen}
                     onClose={() => setExitDialogOpen(false)}
                     employeeProfileId={checklist.employee_profile.id}
+                    offboardingTaskId={
+                        checklist.tasks.find(isExitInterviewTask)?.id ?? 0
+                    }
                     interviewers={interviewers}
                     departureReasons={departureReasons}
                 />

@@ -101,3 +101,17 @@ Fetched current `origin/main` and found the branch 61 commits behind / 10 closeo
 **Safe housekeeping:** audited every registered worktree for clean status and `HEAD` ancestry in `origin/main`. Removed only clean merged `complete-warning-cleanup`, `it-ticketing-stretch`, and `hr-employees-fix`; their branches were deleted with safe `-d`. The HR-fix worktree's shared `node_modules` junction was verified and removed as a link before removing the worktree. Preserved the dirty root checkout, dedicated main checkout, active HR worktree, every finance-related worktree, and unmerged `claude/frosty-leavitt-f99798`. No force deletion/reset was used.
 
 The clean dedicated main checkout can fast-forward to this exact tested tree. Push-triggered deployment is verified terminal-only against `/var/www/oblivionfindings`: the final task report records the exact main/live revision match, Laravel/root health, migrations and authenticated/HTTP smoke results. Browser tooling remains intentionally unused under the user's containment instruction. The historical prompt's auto-memory step is not mutated here because current Codex memory policy permits changes only after a new explicit request; this does not affect repository or deployment completion.
+
+## Deferred-backlog continuation addendum — 2026-07-12
+
+The historical closeout above remains complete for release `9eaab3a5`; its evidence is not rewritten.
+
+Three architecture/defer notes from that closeout became explicit deferred-backlog requirements:
+
+- The split legacy HR audit viewer and missing organisation scope were resolved by **A1/A2**, `2c4f1f08`.
+- The two non-payroll service CSV paths called out beside C1 were resolved by **E1**, `c36ce490`.
+- The operational-calendar retention exception recorded in C4 was resolved by **R1**, `145f5e5f`.
+
+The remaining deferred-audit observations are classified in `HR_DEFERRED_BACKLOG_PROGRESS.md` under **L1 historical-observation disposition**, including earlier C1–C9 decisions, stale findings, and approved no-action/redesign boundaries.
+
+**Current verification boundary:** browser verification for the deferred-backlog changes was attempted but interrupted by a Codex crash. No complete changed-surface browser evidence matrix exists. Terminal evidence and the historical C0/C10 smoke checks do not substitute for that missing proof, so L1 and the new release closeout remain partial.

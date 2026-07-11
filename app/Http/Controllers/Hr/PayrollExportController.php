@@ -11,6 +11,8 @@ use App\Domain\Hr\Services\PayrollExportService;
 use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -290,7 +292,7 @@ class PayrollExportController extends Controller
         $csv = $this->payrollJournalService->buildNetPayDirectCreditCsv($run);
 
         return response()->streamDownload(
-            fn () => print($csv),
+            fn () => print ($csv),
             "net-pay-run-{$run->id}.csv",
             ['Content-Type' => 'text/csv'],
         );
@@ -373,13 +375,20 @@ class PayrollExportController extends Controller
         }
 
         DB::transaction(function () use ($validated, $normalizedMappings, $tenantId, $user) {
+            $demotedProfileIds = [];
             if (! empty($validated['is_default'])) {
+                $demotedProfileIds = HrPayrollExportProfile::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_default', true)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
                 HrPayrollExportProfile::query()
                     ->where('tenant_id', $tenantId)
                     ->update(['is_default' => false]);
             }
 
-            HrPayrollExportProfile::query()->create([
+            $profile = HrPayrollExportProfile::query()->create([
                 'tenant_id' => $tenantId,
                 'name' => $validated['name'],
                 'provider_key' => $validated['provider_key'] ?? null,
@@ -393,6 +402,8 @@ class PayrollExportController extends Controller
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
             ]);
+
+            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
         });
 
         return redirect()->back()->with('success', 'Payroll export profile created.');
@@ -446,8 +457,16 @@ class PayrollExportController extends Controller
             $updatePayload['mappings'] = $normalizedMappings;
         }
 
-        DB::transaction(function () use ($updatePayload, $tenantId, $profile) {
+        DB::transaction(function () use ($updatePayload, $tenantId, $profile, $user) {
+            $demotedProfileIds = [];
             if (! empty($updatePayload['is_default'])) {
+                $demotedProfileIds = HrPayrollExportProfile::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', '!=', $profile->id)
+                    ->where('is_default', true)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
                 HrPayrollExportProfile::query()
                     ->where('tenant_id', $tenantId)
                     ->where('id', '!=', $profile->id)
@@ -455,6 +474,7 @@ class PayrollExportController extends Controller
             }
 
             $profile->update($updatePayload);
+            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
         });
 
         return redirect()->back()->with('success', 'Payroll export profile updated.');
@@ -468,6 +488,14 @@ class PayrollExportController extends Controller
         $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         DB::transaction(function () use ($tenantId, $profile, $user) {
+            $demotedProfileIds = HrPayrollExportProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', '!=', $profile->id)
+                ->where('is_default', true)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
             HrPayrollExportProfile::query()
                 ->where('tenant_id', $tenantId)
                 ->update(['is_default' => false]);
@@ -476,9 +504,30 @@ class PayrollExportController extends Controller
                 'is_default' => true,
                 'updated_by' => $user->id,
             ]);
+
+            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
         });
 
         return redirect()->back()->with('success', 'Default payroll export profile updated.');
+    }
+
+    /**
+     * @param  array<int, int>  $demotedProfileIds
+     */
+    private function auditDefaultProfileChange(
+        HrPayrollExportProfile $profile,
+        array $demotedProfileIds,
+        User $actor,
+    ): void {
+        if ($demotedProfileIds === []) {
+            return;
+        }
+
+        AuditLogger::log('hr.payroll_export_profile.default_changed', $profile, [
+            'actor_id' => $actor->id,
+            'promoted_profile_id' => $profile->id,
+            'demoted_profile_ids' => array_values($demotedProfileIds),
+        ]);
     }
 
     /**

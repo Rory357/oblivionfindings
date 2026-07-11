@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrCompensationReviewItem;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
-use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -38,7 +38,8 @@ class CompensationController extends Controller
         // date picker in the toolbar.
         $asOf = $request->query('as_of') ? Carbon::parse($request->query('as_of')) : Carbon::today();
         $activeAsOf = function ($q) use ($asOf) {
-            $q->where('effective_from', '<=', $asOf)
+            $q->where('is_active', true)
+                ->where('effective_from', '<=', $asOf)
                 ->where(fn ($qq) => $qq->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf));
         };
 
@@ -130,6 +131,7 @@ class CompensationController extends Controller
             ->forTenant($tenantId)
             ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
             ->when($request->boolean('active_only'), fn ($q) => $q
+                ->where('is_active', true)
                 ->where('effective_from', '<=', $asOf)
                 ->where(fn ($qq) => $qq->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf)))
             ->orderBy('position_role')
@@ -246,6 +248,36 @@ class CompensationController extends Controller
         $band->update($data);
 
         return redirect()->back()->with('success', 'Salary band updated.');
+    }
+
+    public function deactivateBand(Request $request, HrSalaryBand $band)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
+
+        $band->update([
+            'is_active' => false,
+            'deactivated_at' => now(),
+            'deactivated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Salary band deactivated. Historical pay placement was retained.');
+    }
+
+    public function reactivateBand(Request $request, HrSalaryBand $band)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
+
+        $band->update([
+            'is_active' => true,
+            'deactivated_at' => null,
+            'deactivated_by' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Salary band reactivated.');
     }
 
     /**

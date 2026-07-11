@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrICalToken;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -32,10 +32,10 @@ class ICalController extends Controller
 
         foreach ($leaves as $leave) {
             $events[] = $this->formatEvent(
-                'Leave: ' . ucfirst(str_replace('_', ' ', $leave->leave_type)),
+                'Leave: '.ucfirst(str_replace('_', ' ', $leave->leave_type)),
                 $leave->starts_at,
                 $leave->ends_at,
-                'leave-' . $leave->id,
+                'leave-'.$leave->id,
             );
         }
 
@@ -43,6 +43,7 @@ class ICalController extends Controller
         // Limit raised 100→500 (audit fix round 2): busy orgs were silently
         // truncated after ~1 month of events.
         $calEvents = HrCalendarEvent::forTenant($tenantId)
+            ->active()
             ->where('starts_at', '>=', now()->subMonths(3))
             ->orderBy('starts_at')
             ->limit(500)
@@ -53,7 +54,7 @@ class ICalController extends Controller
                 $event->title,
                 $event->starts_at,
                 $event->ends_at,
-                'event-' . $event->id,
+                'event-'.$event->id,
                 $event->description,
                 $event->location,
             );
@@ -78,10 +79,10 @@ class ICalController extends Controller
                 continue;
             }
             $events[] = $this->formatEvent(
-                'Shift' . ($shift->site?->name ? ': ' . $shift->site->name : ''),
+                'Shift'.($shift->site?->name ? ': '.$shift->site->name : ''),
                 $shift->starts_at,
                 $shift->ends_at,
-                'shift-' . $shift->id,
+                'shift-'.$shift->id,
                 null,
                 $shift->site?->name ?? $shift->location,
             );
@@ -96,10 +97,10 @@ class ICalController extends Controller
 
         foreach ($holidays as $holiday) {
             $events[] = $this->formatEvent(
-                'Public holiday: ' . $holiday->name,
+                'Public holiday: '.$holiday->name,
                 $holiday->date->copy()->startOfDay(),
                 $holiday->date->copy()->addDay()->startOfDay(),
-                'holiday-' . $holiday->id,
+                'holiday-'.$holiday->id,
             );
         }
 
@@ -134,21 +135,22 @@ class ICalController extends Controller
     {
         $event = "BEGIN:VEVENT\r\n";
         $event .= "UID:{$uid}@oblivionfindings\r\n";
-        $event .= "DTSTART:" . $start->format('Ymd\THis') . "\r\n";
-        $event .= "DTEND:" . $end->format('Ymd\THis') . "\r\n";
-        $event .= "SUMMARY:" . $this->escapeIcal($summary) . "\r\n";
+        $event .= 'DTSTART:'.$start->format('Ymd\THis')."\r\n";
+        $event .= 'DTEND:'.$end->format('Ymd\THis')."\r\n";
+        $event .= 'SUMMARY:'.$this->escapeIcal($summary)."\r\n";
         if ($description) {
-            $event .= "DESCRIPTION:" . $this->escapeIcal($description) . "\r\n";
+            $event .= 'DESCRIPTION:'.$this->escapeIcal($description)."\r\n";
         }
         if ($location) {
-            $event .= "LOCATION:" . $this->escapeIcal($location) . "\r\n";
+            $event .= 'LOCATION:'.$this->escapeIcal($location)."\r\n";
         }
         $event .= "END:VEVENT\r\n";
+
         return $event;
     }
 
     private function escapeIcal(string $text): string
     {
-        return str_replace(["\n", ",", ";"], ["\\n", "\\,", "\\;"], $text);
+        return str_replace(["\n", ',', ';'], ['\\n', '\\,', '\\;'], $text);
     }
 }

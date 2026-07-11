@@ -19,14 +19,13 @@ beforeEach(function () {
 });
 
 test('the performance hub ships the wizard staff options', function () {
-    // The hub redesign replaced the SupervisionDialog with the performance
-    // wizards, which need `staff` for the employee picker. The `sessionTypes`
-    // prop was retired with the dialog — session_type acceptance is covered by
-    // the endpoint tests below.
+    // The hub redesign replaced the old dialog with the performance wizard,
+    // which receives staff and the canonical session taxonomy from the hub.
     $response = $this->actingAs($this->hr)->get('/hr/performance');
     $response->assertOk();
 
     expect($response->inertiaProps('staff'))->not->toBeNull();
+    expect($response->inertiaProps('sessionTypes'))->toHaveCount(6);
 });
 
 test('a supervision note can be created via the dialog endpoint', function () {

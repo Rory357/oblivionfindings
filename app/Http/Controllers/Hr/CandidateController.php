@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
@@ -24,13 +22,20 @@ use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Services\HrWebhookService;
+use App\Domain\Hr\Services\InterviewNotificationService;
 use App\Domain\Hr\Services\RecruitmentService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\AuditLog;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditLogger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -45,7 +50,7 @@ class CandidateController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Create / Store                                                     */
+    /*  Create / Store */
     /* ------------------------------------------------------------------ */
 
     public function create(Request $request)
@@ -83,25 +88,25 @@ class CandidateController extends Controller
         }
 
         $validated = $request->validate([
-            'first_name'     => ['required', 'string', 'max:255'],
-            'last_name'      => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'personal_email' => ['required', 'email', 'max:255'],
             'personal_phone' => ['nullable', 'string', 'max:50'],
-            'source'         => ['nullable', 'string', 'max:100'],
-            'source_detail'  => ['nullable', 'string', 'max:255'],
-            'notes'          => ['nullable', 'string', 'max:5000'],
-            'tags'           => ['nullable', 'array'],
+            'source' => ['nullable', 'string', 'max:100'],
+            'source_detail' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'tags' => ['nullable', 'array'],
             // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
             // here and normalise below rather than failing the whole request.
-            'tags.*'         => ['nullable', 'string', 'max:100'],
+            'tags.*' => ['nullable', 'string', 'max:100'],
 
             // Optional initial application fields
-            'position_title'  => ['nullable', 'string', 'max:255'],
-            'position_role'   => ['nullable', 'string', 'max:100'],
-            'target_site_id'  => ['nullable', 'integer', $siteRule],
-            'cover_letter'    => ['nullable', 'string', 'max:10000'],
-            'cv'              => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'position_title' => ['nullable', 'string', 'max:255'],
+            'position_role' => ['nullable', 'string', 'max:100'],
+            'target_site_id' => ['nullable', 'integer', $siteRule],
+            'cover_letter' => ['nullable', 'string', 'max:10000'],
+            'cv' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
 
         $validated['tags'] = $this->normaliseTags($validated['tags'] ?? null);
@@ -131,9 +136,9 @@ class CandidateController extends Controller
                 if (! empty($validated['position_title'])) {
                     $applicationData = [
                         'position_title' => $validated['position_title'],
-                        'position_role'  => $validated['position_role'] ?? null,
+                        'position_role' => $validated['position_role'] ?? null,
                         'target_site_id' => $validated['target_site_id'] ?? null,
-                        'cover_letter'   => $validated['cover_letter'] ?? null,
+                        'cover_letter' => $validated['cover_letter'] ?? null,
                     ];
 
                     if ($request->hasFile('cv')) {
@@ -149,6 +154,7 @@ class CandidateController extends Controller
             return redirect()->back()->withErrors(['candidate' => $exception->getMessage()]);
         } catch (\Throwable $exception) {
             report($exception);
+
             return redirect()->back()->withErrors(['candidate' => 'Candidate could not be created.']);
         }
 
@@ -160,7 +166,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show                                                               */
+    /*  Show */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrCandidate $candidate)
@@ -308,7 +314,7 @@ class CandidateController extends Controller
             foreach ($app->interviews as $interview) {
                 $activityLog[] = [
                     'type' => 'interview',
-                    'description' => ucfirst($interview->interview_type) . " interview {$interview->status}",
+                    'description' => ucfirst($interview->interview_type)." interview {$interview->status}",
                     'timestamp' => optional($interview->scheduled_at)->diffForHumans() ?? '',
                     'actor' => $interview->completedBy?->name,
                 ];
@@ -410,7 +416,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Update                                                             */
+    /*  Update */
     /* ------------------------------------------------------------------ */
 
     public function update(Request $request, HrCandidate $candidate)
@@ -420,20 +426,19 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
 
-
         $validated = $request->validate([
-            'first_name'     => ['sometimes', 'required', 'string', 'max:255'],
-            'last_name'      => ['sometimes', 'required', 'string', 'max:255'],
+            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'personal_email' => ['sometimes', 'required', 'email', 'max:255'],
             'personal_phone' => ['nullable', 'string', 'max:50'],
-            'source'         => ['nullable', 'string', 'max:100'],
-            'source_detail'  => ['nullable', 'string', 'max:255'],
-            'notes'          => ['nullable', 'string', 'max:5000'],
-            'tags'           => ['nullable', 'array'],
+            'source' => ['nullable', 'string', 'max:100'],
+            'source_detail' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'tags' => ['nullable', 'array'],
             // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
             // here and normalise below rather than failing the whole request.
-            'tags.*'         => ['nullable', 'string', 'max:100'],
+            'tags.*' => ['nullable', 'string', 'max:100'],
         ]);
 
         if (array_key_exists('tags', $validated)) {
@@ -562,7 +567,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Advance Stage                                                      */
+    /*  Advance Stage */
     /* ------------------------------------------------------------------ */
 
     public function advanceApplication(Request $request, HrApplication $application)
@@ -574,6 +579,7 @@ class CandidateController extends Controller
 
         $validated = $request->validate([
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
+            'scorecard_override_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         try {
@@ -582,6 +588,7 @@ class CandidateController extends Controller
                 $candidate,
                 $validated['target_stage'] ?? null,
                 $user->id,
+                $validated['scorecard_override_reason'] ?? null,
             );
         } catch (\InvalidArgumentException|\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -591,7 +598,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reject Application                                                 */
+    /*  Reject Application */
     /* ------------------------------------------------------------------ */
 
     public function rejectApplication(Request $request, HrApplication $application)
@@ -835,7 +842,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Talent pool                                                        */
+    /*  Talent pool */
     /* ------------------------------------------------------------------ */
 
     public function addToPool(Request $request, HrCandidate $candidate)
@@ -923,7 +930,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Interviews                                                         */
+    /*  Interviews */
     /* ------------------------------------------------------------------ */
 
     public function storeInterview(Request $request, HrApplication $application)
@@ -933,30 +940,29 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
-
         $validated = $request->validate([
-            'scheduled_at'     => ['required', 'date', 'after_or_equal:today'],
+            'scheduled_at' => ['required', 'date', 'after_or_equal:today'],
             'duration_minutes' => ['required', 'integer', 'min:15', 'max:480'],
-            'location'         => ['nullable', 'string', 'max:255'],
-            'interview_type'   => ['required', 'string', Rule::in(['phone', 'video', 'in_person', 'panel'])],
-            'interviewers'     => ['nullable', 'array'],
-            'interviewers.*'   => ['integer', 'exists:users,id'],
-            'notes'            => ['nullable', 'string', 'max:5000'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'interview_type' => ['required', 'string', Rule::in(['phone', 'video', 'in_person', 'panel'])],
+            'interviewers' => ['nullable', 'array'],
+            'interviewers.*' => ['integer', 'exists:users,id'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $interview = HrInterview::create([
-            'application_id'   => $application->id,
-            'scheduled_at'     => $validated['scheduled_at'],
+            'application_id' => $application->id,
+            'scheduled_at' => $validated['scheduled_at'],
             'duration_minutes' => $validated['duration_minutes'],
-            'location'         => $validated['location'] ?? null,
-            'interview_type'   => $validated['interview_type'],
-            'interviewers'     => $validated['interviewers'] ?? [],
-            'status'           => 'scheduled',
-            'notes'            => $validated['notes'] ?? null,
+            'location' => $validated['location'] ?? null,
+            'interview_type' => $validated['interview_type'],
+            'interviewers' => $validated['interviewers'] ?? [],
+            'status' => 'scheduled',
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         try {
-            app(\App\Domain\Hr\Services\InterviewNotificationService::class)->sendInvites($interview);
+            app(InterviewNotificationService::class)->sendInvites($interview);
         } catch (\Throwable $exception) {
             report($exception);
         }
@@ -1054,7 +1060,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  References                                                         */
+    /*  References */
     /* ------------------------------------------------------------------ */
 
     public function storeReference(Request $request, HrApplication $application)
@@ -1064,23 +1070,22 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
-
         $validated = $request->validate([
-            'referee_name'        => ['required', 'string', 'max:255'],
-            'referee_email'       => ['nullable', 'email', 'max:255'],
-            'referee_phone'       => ['nullable', 'string', 'max:50'],
+            'referee_name' => ['required', 'string', 'max:255'],
+            'referee_email' => ['nullable', 'email', 'max:255'],
+            'referee_phone' => ['nullable', 'string', 'max:50'],
             'referee_relationship' => ['required', 'string', 'max:255'],
         ]);
 
         $reference = HrReferenceCheck::create([
-            'application_id'       => $application->id,
-            'referee_name'         => $validated['referee_name'],
-            'referee_email'        => $validated['referee_email'] ?? null,
-            'referee_phone'        => $validated['referee_phone'] ?? null,
+            'application_id' => $application->id,
+            'referee_name' => $validated['referee_name'],
+            'referee_email' => $validated['referee_email'] ?? null,
+            'referee_phone' => $validated['referee_phone'] ?? null,
             'referee_relationship' => $validated['referee_relationship'],
-            'status'               => 'requested',
-            'requested_at'         => now(),
-            'response_token'       => Str::random(64),
+            'status' => 'requested',
+            'requested_at' => now(),
+            'response_token' => Str::random(64),
         ]);
 
         // Email the referee a token-guarded questionnaire link.
@@ -1129,7 +1134,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Offers                                                             */
+    /*  Offers */
     /* ------------------------------------------------------------------ */
 
     public function createOffer(Request $request, HrApplication $application)
@@ -1138,7 +1143,6 @@ class CandidateController extends Controller
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
-
 
         $application->load([
             'candidate.documents',
@@ -1218,25 +1222,24 @@ class CandidateController extends Controller
             $siteRule = $siteRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
         }
 
-
         $positionRule = Rule::exists('hr_positions', 'id');
         if ($tenantId !== null) {
             $positionRule = $positionRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
         }
 
         $validated = $request->validate([
-            'application_id'     => ['required', 'integer', $applicationRule],
-            'position_title'     => ['required', 'string', 'max:255'],
-            'position_role'      => ['nullable', 'string', 'max:100'],
-            'position_id'        => ['nullable', 'integer', $positionRule],
+            'application_id' => ['required', 'integer', $applicationRule],
+            'position_title' => ['required', 'string', 'max:255'],
+            'position_role' => ['nullable', 'string', 'max:100'],
+            'position_id' => ['nullable', 'integer', $positionRule],
             'proposed_start_date' => ['required', 'date', 'after_or_equal:today'],
-            'employment_type'    => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
-            'hours_per_week'     => ['required', 'numeric', 'min:1', 'max:60'],
-            'hourly_rate'        => ['nullable', 'numeric', 'min:0'],
-            'annual_salary'      => ['nullable', 'numeric', 'min:0'],
-            'primary_site_id'    => ['required', 'integer', $siteRule],
-            'conditions'         => ['nullable', 'string', 'max:5000'],
-            'offer_letter'       => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
+            'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
+            'hours_per_week' => ['required', 'numeric', 'min:1', 'max:60'],
+            'hourly_rate' => ['nullable', 'numeric', 'min:0'],
+            'annual_salary' => ['nullable', 'numeric', 'min:0'],
+            'primary_site_id' => ['required', 'integer', $siteRule],
+            'conditions' => ['nullable', 'string', 'max:5000'],
+            'offer_letter' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
         $application = HrApplication::query()
@@ -1265,21 +1268,21 @@ class CandidateController extends Controller
         }
 
         HrOffer::create([
-            'application_id'      => $application->id,
-            'position_title'      => $validated['position_title'],
-            'position_role'       => ($validated['position_role'] ?? null) ?: ($application->position_role ?: 'support_worker'),
-            'position_id'         => $validated['position_id'] ?? $application->requisition?->position_id,
+            'application_id' => $application->id,
+            'position_title' => $validated['position_title'],
+            'position_role' => ($validated['position_role'] ?? null) ?: ($application->position_role ?: 'support_worker'),
+            'position_id' => $validated['position_id'] ?? $application->requisition?->position_id,
             'proposed_start_date' => $validated['proposed_start_date'],
-            'employment_type'     => $validated['employment_type'],
-            'hours_per_week'      => $validated['hours_per_week'],
-            'hourly_rate'         => $validated['hourly_rate'] ?? null,
-            'annual_salary'       => $validated['annual_salary'] ?? null,
-            'primary_site_id'     => $validated['primary_site_id'],
-            'conditions'          => $validated['conditions'] ?? null,
-            'offer_letter_path'   => $letterPath,
-            'offer_letter_name'   => $letterName,
-            'approval_status'     => 'draft',
-            'created_by'          => $user->id,
+            'employment_type' => $validated['employment_type'],
+            'hours_per_week' => $validated['hours_per_week'],
+            'hourly_rate' => $validated['hourly_rate'] ?? null,
+            'annual_salary' => $validated['annual_salary'] ?? null,
+            'primary_site_id' => $validated['primary_site_id'],
+            'conditions' => $validated['conditions'] ?? null,
+            'offer_letter_path' => $letterPath,
+            'offer_letter_name' => $letterName,
+            'approval_status' => 'draft',
+            'created_by' => $user->id,
         ]);
 
         if ($application->candidate) {
@@ -1298,7 +1301,6 @@ class CandidateController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
-
 
         $application = $offer->application()->with('candidate')->firstOrFail();
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
@@ -1329,6 +1331,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
             report($exception);
+
             return redirect()->back()->with('error', 'Offer could not be sent.');
         }
 
@@ -1368,14 +1371,40 @@ class CandidateController extends Controller
         }
 
         $offer->update([
-            'candidate_portal_token' => $offer->candidate_portal_token ?: Str::random(64),
+            'candidate_portal_token' => Str::random(64),
             'portal_expires_at' => now()->addDays(14),
+            'expired_by' => null,
+            'expiry_reason' => null,
+            'expiry_reminder_sent_at' => null,
+            'expired_notice_sent_at' => null,
             'updated_by' => $user->id,
         ]);
 
         $this->emailOfferLink($offer->fresh(), $application->candidate);
 
         return redirect()->back()->with('success', 'Offer link resent to the candidate.');
+    }
+
+    public function expireOffer(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $application = $offer->application()->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->recruitmentService->forceExpireOffer($offer, $user->id, $validated['reason']);
+        } catch (\InvalidArgumentException|\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Offer expired. Its portal link is no longer valid.');
     }
 
     /**
@@ -1409,7 +1438,7 @@ class CandidateController extends Controller
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         // Prefer a manually-uploaded letter when one exists.
-        $disk = \Illuminate\Support\Facades\Storage::disk('private');
+        $disk = Storage::disk('private');
         if ($offer->offer_letter_path && $disk->exists($offer->offer_letter_path)) {
             return $disk->download($offer->offer_letter_path, $offer->offer_letter_name ?? 'offer-letter.pdf');
         }
@@ -1418,14 +1447,14 @@ class CandidateController extends Controller
         $candidate = $application->candidate;
         abort_unless($candidate, 404);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('hr.recruitment.offer-letter', [
+        $pdf = Pdf::loadView('hr.recruitment.offer-letter', [
             'offer' => $offer,
             'candidate' => $candidate,
             'site' => $offer->primarySite()->first(),
             'orgName' => config('app.name', 'Our Organisation'),
         ]);
 
-        $slug = \Illuminate\Support\Str::slug($candidate->full_name ?: 'candidate') ?: 'candidate';
+        $slug = Str::slug($candidate->full_name ?: 'candidate') ?: 'candidate';
 
         return $pdf->download("offer-letter-{$slug}.pdf");
     }
@@ -1460,7 +1489,7 @@ class CandidateController extends Controller
         ]);
 
         // Tell the offer's creator it's cleared to send (unless they approved it themselves).
-        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        $creator = $offer->created_by ? User::find($offer->created_by) : null;
         if ($creator && (int) $creator->id !== (int) $user->id) {
             $this->notifyOfferApproval($creator, $offer, 'approved', $application->candidate?->full_name ?? 'a candidate');
         }
@@ -1521,7 +1550,7 @@ class CandidateController extends Controller
             'updated_by' => $user->id,
         ]);
 
-        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        $creator = $offer->created_by ? User::find($offer->created_by) : null;
         if ($creator) {
             $this->notifyOfferApproval($creator, $offer, 'declined', $application->candidate?->full_name ?? 'a candidate', $validated['reason'] ?? null);
         }
@@ -1530,7 +1559,7 @@ class CandidateController extends Controller
     }
 
     /** Best-effort offer-approval notification to a real user. */
-    private function notifyOfferApproval(\App\Models\User $recipient, HrOffer $offer, string $type, string $candidateName, ?string $reason = null): void
+    private function notifyOfferApproval(User $recipient, HrOffer $offer, string $type, string $candidateName, ?string $reason = null): void
     {
         try {
             $recipient->notify(new OfferApprovalNotification($offer, $type, $candidateName, $reason));
@@ -1547,7 +1576,7 @@ class CandidateController extends Controller
      */
     private function offerApprovalTrail(HrOffer $offer): array
     {
-        $logs = \App\Models\AuditLog::query()
+        $logs = AuditLog::query()
             ->where('auditable_type', $offer->getMorphClass())
             ->where('auditable_id', $offer->getKey())
             ->where('action', 'hroffer.update')
@@ -1558,7 +1587,7 @@ class CandidateController extends Controller
             return [];
         }
 
-        $names = \App\Models\User::query()
+        $names = User::query()
             ->whereIn('id', $logs->pluck('user_id')->filter()->unique()->all())
             ->pluck('name', 'id');
 
@@ -1642,6 +1671,7 @@ class CandidateController extends Controller
 
                 if ($response === 'accepted') {
                     $this->recruitmentService->advanceStage($candidate, 'offer_accepted', $user->id);
+
                     return;
                 }
 
@@ -1663,6 +1693,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
             report($exception);
+
             return redirect()->back()->with('error', 'Offer response could not be recorded.');
         }
 
@@ -1730,7 +1761,7 @@ class CandidateController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Convert to Employee                                                */
+    /*  Convert to Employee */
     /* ------------------------------------------------------------------ */
 
     public function convertToEmployee(Request $request, HrOffer $offer)
@@ -1820,7 +1851,7 @@ class CandidateController extends Controller
 
             $recipients = collect([
                 $requisition?->hiringManager,
-                $offer->created_by ? \App\Models\User::find($offer->created_by) : null,
+                $offer->created_by ? User::find($offer->created_by) : null,
             ])->filter()->unique('id');
 
             foreach ($recipients as $recipient) {
@@ -1853,8 +1884,8 @@ class CandidateController extends Controller
     }
 
     /**
-     * @param array<int, array<string, mixed>>|null $criteriaScores
-     * @param array<int, mixed> $kitCriteria
+     * @param  array<int, array<string, mixed>>|null  $criteriaScores
+     * @param  array<int, mixed>  $kitCriteria
      * @return array<int, array{label: string, score: float, weight: float|null}>|null
      */
     private function normalizeCriteriaScores(?array $criteriaScores, array $kitCriteria): ?array
@@ -1908,8 +1939,8 @@ class CandidateController extends Controller
     }
 
     /**
-     * @param array<int, array{label: string, score: float, weight: float|null}> $criteriaScores
-     * @param array<int, mixed> $kitCriteria
+     * @param  array<int, array{label: string, score: float, weight: float|null}>  $criteriaScores
+     * @param  array<int, mixed>  $kitCriteria
      */
     private function calculateWeightedScore(array $criteriaScores, array $kitCriteria): float
     {
@@ -1949,7 +1980,7 @@ class CandidateController extends Controller
     }
 
     /* ================================================================== */
-    /*  CANDIDATE DOCUMENTS                                                */
+    /*  CANDIDATE DOCUMENTS */
     /* ================================================================== */
 
     public function storeDocument(Request $request, HrCandidate $candidate)
@@ -1988,7 +2019,7 @@ class CandidateController extends Controller
             'candidate_id' => $candidate->id,
             'application_id' => $applicationId,
             'category' => $validated['category'],
-            'title' => $categoryLabel . ' - ' . $file->getClientOriginalName(),
+            'title' => $categoryLabel.' - '.$file->getClientOriginalName(),
             'storage_path' => $path,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
@@ -2008,7 +2039,7 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
-        $disk = \Illuminate\Support\Facades\Storage::disk('private');
+        $disk = Storage::disk('private');
         abort_unless($disk->exists($document->storage_path), 404);
 
         return $disk->download($document->storage_path, $document->original_name);
@@ -2021,7 +2052,7 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
-        \Illuminate\Support\Facades\Storage::disk('private')->delete($document->storage_path);
+        Storage::disk('private')->delete($document->storage_path);
         $document->delete();
 
         return redirect()->back()->with('success', 'Document deleted.');

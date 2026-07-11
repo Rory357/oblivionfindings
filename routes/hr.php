@@ -63,7 +63,6 @@ use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
 use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
-use App\Http\Controllers\Hr\TrainingDashboardController;
 use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\WellbeingController;
 use Illuminate\Support\Facades\Route;
@@ -205,6 +204,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/resend', [CandidateController::class, 'resendOffer'])->name('offers.resend')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/expire', [CandidateController::class, 'expireOffer'])->name('offers.expire')
             ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
@@ -798,6 +799,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.compensation.manage')->group(function () {
             Route::post('/bands', [CompensationController::class, 'storeBand'])->name('bands.store');
             Route::put('/bands/{band}', [CompensationController::class, 'updateBand'])->name('bands.update');
+            Route::post('/bands/{band}/deactivate', [CompensationController::class, 'deactivateBand'])->name('bands.deactivate');
+            Route::post('/bands/{band}/reactivate', [CompensationController::class, 'reactivateBand'])->name('bands.reactivate');
             Route::get('/reviews/create', [CompensationController::class, 'createReview'])->name('reviews.create');
             Route::post('/reviews', [CompensationController::class, 'storeReview'])->name('reviews.store');
             Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
@@ -1114,12 +1117,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Calendar
     |--------------------------------------------------------------------------
     */
-    Route::prefix('calendar')->name('calendar.')->group(function () {
+    Route::middleware('permission:hr.calendar.view')->prefix('calendar')->name('calendar.')->group(function () {
         Route::get('/', [CalendarController::class, 'index'])->name('index');
         Route::get('/feed', [CalendarController::class, 'feed'])->name('feed');
         Route::post('/events', [CalendarController::class, 'store'])->name('events.store');
         Route::put('/events/{event}', [CalendarController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [CalendarController::class, 'destroy'])->name('events.destroy');
+        Route::post('/events/{event}/restore', [CalendarController::class, 'restore'])->name('events.restore');
         Route::post('/events/{event}/rsvp', [CalendarController::class, 'rsvp'])->name('events.rsvp');
         Route::post('/events/{event}/attachments', [CalendarController::class, 'storeAttachment'])->name('events.attachments.store');
         Route::delete('/attachments/{attachment}', [CalendarController::class, 'destroyAttachment'])->name('attachments.destroy');
@@ -1166,6 +1170,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::middleware('permission:hr.approvals.manage')->group(function () {
             Route::post('/chains', [ApprovalController::class, 'storeChain'])->name('chains.store');
+            Route::post('/leave-chains', [ApprovalController::class, 'storeLeaveChain'])->name('leave-chains.store');
+            Route::put('/leave-chains/{leaveChain}', [ApprovalController::class, 'updateLeaveChain'])->name('leave-chains.update');
+            Route::post('/leave-chains/reorder', [ApprovalController::class, 'reorderLeaveChains'])->name('leave-chains.reorder');
+            Route::patch('/leave-chains/{leaveChain}/active', [ApprovalController::class, 'setLeaveChainActive'])->name('leave-chains.active');
+            Route::delete('/leave-chains/{leaveChain}', [ApprovalController::class, 'destroyLeaveChain'])->name('leave-chains.destroy');
             Route::post('/{instance}/action', [ApprovalController::class, 'action'])->name('action');
         });
     });

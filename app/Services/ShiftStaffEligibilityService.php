@@ -12,6 +12,7 @@ use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
 use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\MedicationCompetencyRule;
+use App\Services\Eligibility\Rules\RequiredDriverLicenceRule;
 use App\Services\Eligibility\Rules\SiteAssignmentRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -28,6 +29,7 @@ class ShiftStaffEligibilityService
         protected FatigueRule $fatigueRule,
         protected SiteAssignmentRule $siteAssignmentRule,
         protected DriverLicenceExpiryRule $driverLicenceRule,
+        protected RequiredDriverLicenceRule $requiredDriverLicenceRule,
         protected HsTrainingRule $hsTrainingRule,
         protected MedicationCompetencyRule $medicationCompetencyRule,
     ) {}
@@ -39,11 +41,11 @@ class ShiftStaffEligibilityService
      * callers using the old array shape can call ->toArray() on the result.
      *
      * @param  Collection<int, Shift>|null  $preloadedUserShifts  Optional
-     *   batch-loaded set of the user's active shifts (non-cancelled/
-     *   non-completed, with client) supplied by evaluateMany() so the
-     *   conflict/turnaround checks reuse one query per user instead of
-     *   querying per pair. When null (the default, single-call path) the
-     *   original per-pair queries run unchanged.
+     *                                                            batch-loaded set of the user's active shifts (non-cancelled/
+     *                                                            non-completed, with client) supplied by evaluateMany() so the
+     *                                                            conflict/turnaround checks reuse one query per user instead of
+     *                                                            querying per pair. When null (the default, single-call path) the
+     *                                                            original per-pair queries run unchanged.
      */
     public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): EligibilityResult
     {
@@ -67,6 +69,7 @@ class ShiftStaffEligibilityService
         $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user));
         $checks[] = $this->siteAssignmentRule->evaluate($shift, $user);
         $checks[] = $this->driverLicenceRule->evaluate($shift, $user);
+        $checks[] = $this->requiredDriverLicenceRule->evaluate($shift, $user);
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
         $checks[] = $this->medicationCompetencyRule->evaluate($shift, $user);
 
@@ -79,7 +82,7 @@ class ShiftStaffEligibilityService
      * user id, so callers can format existing cards without re-querying.
      *
      * @param  iterable<Shift>  $shifts
-     * @param  iterable<User>   $users
+     * @param  iterable<User>  $users
      * @return array<int, array<int, EligibilityResult>>
      */
     public function evaluateMany(iterable $shifts, iterable $users): array
@@ -313,7 +316,7 @@ class ShiftStaffEligibilityService
 
         if (! empty($warnings)) {
             $warningMessages = collect($warnings)
-                ->map(fn ($w) => ($w['requirement'] ?? 'Requirement') . ' is ' . ($w['status'] ?? 'expiring') . '.')
+                ->map(fn ($w) => ($w['requirement'] ?? 'Requirement').' is '.($w['status'] ?? 'expiring').'.')
                 ->implode(' ');
 
             return [
@@ -367,7 +370,7 @@ class ShiftStaffEligibilityService
                 'passed' => false,
                 'severity' => 'block',
                 'overrideable' => false,
-                'message' => 'This staff member does not meet the required coverage role(s): ' . implode(', ', $missingLabels) . '.',
+                'message' => 'This staff member does not meet the required coverage role(s): '.implode(', ', $missingLabels).'.',
             ], $base)];
         }
 
