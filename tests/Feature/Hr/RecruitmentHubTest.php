@@ -241,7 +241,7 @@ test('a view-only user cannot drive manager actions', function () {
 
 test('sending an offer emails the candidate the portal link', function () {
     Notification::fake();
-    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'interview_completed');
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'offer_pending');
     $offer = makeOffer(['application' => $application], 'draft_approved', $this->hr->id, $this->site->id);
 
     $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();

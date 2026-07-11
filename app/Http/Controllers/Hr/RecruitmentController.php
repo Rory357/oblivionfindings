@@ -2,19 +2,23 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCandidateDocument;
+use App\Domain\Hr\Models\HrCandidateEmailTemplate;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewKit;
+use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Services\RecruitmentAnalyticsService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class RecruitmentController extends Controller
@@ -76,7 +80,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Hero                                                              */
+    /*  Hero */
     /* ------------------------------------------------------------------ */
 
     private function buildHero(?int $tenantId, RecruitmentAnalyticsService $analytics): array
@@ -187,7 +191,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Pipeline + board candidates                                       */
+    /*  Pipeline + board candidates */
     /* ------------------------------------------------------------------ */
 
     private function buildCandidates(?int $tenantId, int $staleDays): array
@@ -203,7 +207,7 @@ class RecruitmentController extends Controller
 
         // Average interview scorecard rating per candidate (across all their
         // applications' interviews) — lets recruiters rank/shortlist.
-        $scoreByCandidate = \App\Domain\Hr\Models\HrInterviewScore::query()
+        $scoreByCandidate = HrInterviewScore::query()
             ->join('hr_interviews', 'hr_interview_scores.interview_id', '=', 'hr_interviews.id')
             ->join('hr_applications', 'hr_interviews.application_id', '=', 'hr_applications.id')
             ->whereIn('hr_applications.candidate_id', $candidates->pluck('id'))
@@ -241,7 +245,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Requisitions                                                      */
+    /*  Requisitions */
     /* ------------------------------------------------------------------ */
 
     private function buildRequisitions(?int $tenantId): array
@@ -285,7 +289,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Interviews                                                        */
+    /*  Interviews */
     /* ------------------------------------------------------------------ */
 
     private function buildInterviews(?int $tenantId): array
@@ -325,7 +329,7 @@ class RecruitmentController extends Controller
     private function buildConsensus(?int $tenantId): ?array
     {
         // Most-recently-scored application's panel roll-up.
-        $latestScore = \App\Domain\Hr\Models\HrInterviewScore::query()
+        $latestScore = HrInterviewScore::query()
             ->with(['interview.application.candidate:id,first_name,last_name,tenant_id', 'interview.application:id,candidate_id,position_title'])
             ->latest('submitted_at')
             ->first();
@@ -335,7 +339,7 @@ class RecruitmentController extends Controller
             return null;
         }
 
-        $scores = \App\Domain\Hr\Models\HrInterviewScore::query()
+        $scores = HrInterviewScore::query()
             ->whereHas('interview', fn ($q) => $q->where('application_id', $application->id))
             ->get();
 
@@ -382,7 +386,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Offers                                                            */
+    /*  Offers */
     /* ------------------------------------------------------------------ */
 
     private function buildOffers(?int $tenantId): array
@@ -403,6 +407,7 @@ class RecruitmentController extends Controller
 
             $meta = match ($status) {
                 'sent' => $o->portal_expires_at ? 'Expires '.$o->portal_expires_at->diffForHumans() : 'Sent',
+                'expired' => 'Expired'.($o->expiry_reason ? ' — '.str($o->expiry_reason)->limit(28) : ''),
                 'accepted' => 'Ready to convert',
                 'declined' => 'Declined'.($o->response_notes ? ' — '.str($o->response_notes)->limit(20) : ''),
                 'approved' => 'Ready to send',
@@ -433,6 +438,7 @@ class RecruitmentController extends Controller
                 ['key' => 'pending_approval', 'label' => 'Awaiting approval', 'count' => $count('pending_approval'), 'color' => 'var(--status-warning)'],
                 ['key' => 'approved', 'label' => 'Ready to send', 'count' => $count('approved'), 'color' => 'var(--status-info)'],
                 ['key' => 'sent', 'label' => 'Sent', 'count' => $count('sent'), 'color' => 'var(--status-info)'],
+                ['key' => 'expired', 'label' => 'Expired', 'count' => $count('expired'), 'color' => 'var(--status-critical)'],
                 ['key' => 'accepted', 'label' => 'Accepted', 'count' => $count('accepted'), 'color' => 'var(--status-success)'],
                 ['key' => 'declined', 'label' => 'Declined', 'count' => $count('declined'), 'color' => 'var(--status-critical)'],
             ],
@@ -450,6 +456,9 @@ class RecruitmentController extends Controller
         }
         if ($o->response === 'withdrawn') {
             return 'withdrawn';
+        }
+        if ($o->sent_at !== null && ($o->expired_by !== null || $o->portal_expires_at?->isPast())) {
+            return 'expired';
         }
         if ($o->sent_at !== null) {
             return 'sent';
@@ -470,7 +479,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Analytics                                                         */
+    /*  Analytics */
     /* ------------------------------------------------------------------ */
 
     private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
@@ -527,18 +536,18 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Kits + pool                                                       */
+    /*  Kits + pool */
     /* ------------------------------------------------------------------ */
 
     private function buildEmailTemplates(?int $tenantId): array
     {
         // Resilient to the deploy window where new code is live before the
         // migration has created the table — never 500 the whole hub for it.
-        if (! \Illuminate\Support\Facades\Schema::hasTable('hr_candidate_email_templates')) {
+        if (! Schema::hasTable('hr_candidate_email_templates')) {
             return [];
         }
 
-        return \App\Domain\Hr\Models\HrCandidateEmailTemplate::query()
+        return HrCandidateEmailTemplate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->limit(50)
@@ -575,7 +584,7 @@ class RecruitmentController extends Controller
     {
         // Durable talent pool — explicit hr_talent_pool membership (D5 / item 22),
         // not any non-empty tags. Membership survives candidate anonymisation.
-        return \App\Domain\Hr\Models\HrTalentPool::query()
+        return HrTalentPool::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->with([
                 'candidate' => fn ($q) => $q->withTrashed()->select('id', 'first_name', 'last_name', 'deleted_at'),
@@ -595,7 +604,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Wizard support lists                                              */
+    /*  Wizard support lists */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -689,7 +698,7 @@ class RecruitmentController extends Controller
             'positions' => $positions,
             'sources' => self::SOURCES,
             'employment_types' => self::EMPLOYMENT_TYPES,
-            'document_categories' => \App\Domain\Hr\Models\HrCandidateDocument::CATEGORIES ?? [],
+            'document_categories' => HrCandidateDocument::CATEGORIES ?? [],
             'stages' => self::FLOW,
             'tags' => $this->buildTagVocabulary($tenantId),
         ];

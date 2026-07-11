@@ -63,7 +63,6 @@ use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
 use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
-use App\Http\Controllers\Hr\TrainingDashboardController;
 use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\WellbeingController;
 use Illuminate\Support\Facades\Route;
@@ -205,6 +204,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/resend', [CandidateController::class, 'resendOffer'])->name('offers.resend')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/expire', [CandidateController::class, 'expireOffer'])->name('offers.expire')
             ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')

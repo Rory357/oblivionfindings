@@ -10,10 +10,9 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 
 class RecruitmentService
 {
@@ -131,8 +130,12 @@ class RecruitmentService
      * @throws \InvalidArgumentException
      * @throws \LogicException
      */
-    public function advanceStage(HrCandidate $candidate, ?string $targetStage, int $advancedBy): HrCandidate
-    {
+    public function advanceStage(
+        HrCandidate $candidate,
+        ?string $targetStage,
+        int $advancedBy,
+        ?string $scorecardOverrideReason = null,
+    ): HrCandidate {
         if (in_array($candidate->status, self::TERMINAL, true)) {
             throw new \LogicException("Cannot advance candidate in terminal status '{$candidate->status}'.");
         }
@@ -153,9 +156,14 @@ class RecruitmentService
             throw new \InvalidArgumentException("Cannot move candidate backward from '{$candidate->status}' to '{$resolvedTarget}'.");
         }
 
-        $this->assertStagePrerequisites($candidate, $resolvedTarget);
+        $scorecardOverride = $this->assertStagePrerequisites(
+            $candidate,
+            $resolvedTarget,
+            $advancedBy,
+            $scorecardOverrideReason,
+        );
 
-        return DB::transaction(function () use ($candidate, $resolvedTarget, $advancedBy) {
+        return DB::transaction(function () use ($candidate, $resolvedTarget, $advancedBy, $scorecardOverride) {
             $candidate->update([
                 'status' => $resolvedTarget,
                 'current_stage_entered_at' => now(),
@@ -172,7 +180,51 @@ class RecruitmentService
                 ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
                 ->update(['status' => $applicationStatus]);
 
+            if ($scorecardOverride) {
+                AuditLogger::log('recruitment.scorecard_quorum_overridden', $candidate, $scorecardOverride);
+            }
+
             return $candidate->fresh();
+        });
+    }
+
+    /**
+     * Immediately invalidate an unanswered sent offer. Resend is the only
+     * intentional revival path and will mint a fresh token.
+     */
+    public function forceExpireOffer(HrOffer $offer, int $actorId, string $reason): HrOffer
+    {
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new \InvalidArgumentException('An expiry reason is required.');
+        }
+        if (! $offer->sent_at) {
+            throw new \LogicException('Only a sent offer can be expired.');
+        }
+        if ($offer->response !== null) {
+            throw new \LogicException('Accepted, declined, or withdrawn offers cannot be expired.');
+        }
+        if ($offer->expired_by !== null && $offer->candidate_portal_token === null) {
+            throw new \LogicException('This offer is already explicitly expired. Use resend to revive it.');
+        }
+
+        return DB::transaction(function () use ($offer, $actorId, $reason) {
+            $offer->update([
+                'candidate_portal_token' => null,
+                'portal_expires_at' => now()->subSecond(),
+                'expired_by' => $actorId,
+                'expiry_reason' => $reason,
+                'updated_by' => $actorId,
+            ]);
+
+            AuditLogger::log('recruitment.offer_force_expired', $offer, [
+                'actor_id' => $actorId,
+                'organization_id' => $offer->application?->tenant_id,
+                'reason' => $reason,
+                'expired_at' => $offer->portal_expires_at?->toDateTimeString(),
+            ]);
+
+            return $offer->fresh();
         });
     }
 
@@ -398,9 +450,13 @@ class RecruitmentService
     /**
      * @throws \LogicException
      */
-    protected function assertStagePrerequisites(HrCandidate $candidate, string $targetStage): void
-    {
-        $application = $candidate->applications()->with(['interviews', 'referenceChecks', 'offer'])->latest('id')->first();
+    protected function assertStagePrerequisites(
+        HrCandidate $candidate,
+        string $targetStage,
+        int $advancedBy,
+        ?string $scorecardOverrideReason,
+    ): ?array {
+        $application = $candidate->applications()->with(['interviews.scores', 'referenceChecks', 'offer'])->latest('id')->first();
 
         if (! $application && ! in_array($targetStage, ['screening'], true)) {
             throw new \LogicException('Candidate has no application record for stage advancement.');
@@ -414,6 +470,83 @@ class RecruitmentService
             'offer_accepted', 'onboarding', 'hired' => $this->assertOfferAccepted($application),
             default => null,
         };
+
+        $targetIndex = array_search($targetStage, self::STAGES, true);
+        $currentIndex = array_search($candidate->status, self::STAGES, true);
+        $interviewScheduledIndex = array_search('interview_scheduled', self::STAGES, true);
+        $interviewCompletedIndex = array_search('interview_completed', self::STAGES, true);
+
+        if (
+            $targetIndex !== false
+            && $currentIndex !== false
+            && $currentIndex >= $interviewScheduledIndex
+            && $currentIndex <= $interviewCompletedIndex
+            && $targetIndex > $interviewCompletedIndex
+        ) {
+            return $this->assertScorecardQuorum(
+                $candidate,
+                $application,
+                $targetStage,
+                $advancedBy,
+                $scorecardOverrideReason,
+            );
+        }
+
+        return null;
+    }
+
+    protected function assertScorecardQuorum(
+        HrCandidate $candidate,
+        ?HrApplication $application,
+        string $targetStage,
+        int $advancedBy,
+        ?string $overrideReason,
+    ): ?array {
+        $interview = $application?->interviews
+            ->where('status', 'completed')
+            ->sortByDesc(fn ($item) => sprintf('%020d-%020d', $item->scheduled_at?->getTimestamp() ?? 0, $item->id))
+            ->first();
+
+        if (! $interview) {
+            throw new \LogicException('Scorecard quorum cannot be met because there is no completed interview.');
+        }
+
+        $assignedIds = collect($interview->interviewers ?? [])
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($assignedIds->isEmpty()) {
+            throw new \LogicException('Scorecard quorum cannot be met because the completed interview has no assigned interviewers.');
+        }
+
+        $submittedIds = $interview->scores
+            ->whereNotNull('submitted_at')
+            ->pluck('interviewer_user_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+        $missingIds = $assignedIds->diff($submittedIds)->values();
+
+        if ($missingIds->isEmpty()) {
+            return null;
+        }
+
+        $overrideReason = trim((string) $overrideReason);
+        if ($overrideReason === '') {
+            throw new \LogicException('Scorecard quorum is incomplete. Every assigned interviewer must submit before the candidate advances, or a manager must provide an override reason.');
+        }
+
+        return [
+            'actor_id' => $advancedBy,
+            'organization_id' => $candidate->tenant_id,
+            'application_id' => $application?->id,
+            'interview_id' => $interview->id,
+            'target_stage' => $targetStage,
+            'missing_interviewer_ids' => $missingIds->all(),
+            'reason' => $overrideReason,
+        ];
     }
 
     protected function assertCompletedInterview(?HrApplication $application): void
