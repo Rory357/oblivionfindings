@@ -104,8 +104,8 @@ export function JobBoardHero({
                     aria-hidden="true"
                     className="relative inline-flex h-2 w-2"
                 >
-                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
                 </span>
                 Live board · refreshed just now · {openCount} open shifts
             </span>
@@ -167,7 +167,7 @@ export function JobBoardHero({
                         }
                         className={
                             alertsEnabled
-                                ? 'border-emerald-300/60 bg-emerald-400/15 text-primary-foreground hover:bg-emerald-400/25'
+                                  ? 'border-status-success/60 bg-status-success/15 text-primary-foreground hover:bg-status-success/25'
                                 : 'border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10'
                         }
                         onClick={onAlertMe}

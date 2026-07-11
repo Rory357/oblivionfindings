@@ -41,7 +41,7 @@ const SHORTCUTS: Record<string, string> = {
 function ShortcutChip({ keyName }: { keyName: string | undefined }) {
     if (!keyName) return null;
     return (
-        <kbd className="ml-auto hidden rounded border bg-slate-100 px-1 font-mono text-[10px] leading-none text-slate-600 sm:inline">
+        <kbd className="ml-auto hidden rounded border bg-muted px-1 font-mono text-[10px] leading-none text-muted-foreground sm:inline">
             {keyName}
         </kbd>
     );
@@ -95,7 +95,7 @@ export default function ToolPalette({
 
     if (!taxonomy) {
         return (
-            <div className="rounded-md border bg-amber-50 p-3 text-xs text-amber-900">
+            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning">
                 Taxonomy unavailable — the plan builder needs server-provided
                 configuration.
             </div>
@@ -105,7 +105,7 @@ export default function ToolPalette({
     return (
         <div className="space-y-2 rounded-md border bg-white p-2">
             <div>
-                <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                     Selection
                 </div>
                 <Button
@@ -119,7 +119,7 @@ export default function ToolPalette({
                     className={cn(
                         'h-8 gap-1.5 px-2',
                         (activeKind === SELECT_TOOL || activeKind === null) &&
-                            'ring-2 ring-blue-300',
+                            'ring-2 ring-primary/40',
                     )}
                     onClick={() => onPickTool(SELECT_TOOL)}
                     title="Select and marquee (Q)"
@@ -132,7 +132,7 @@ export default function ToolPalette({
             </div>
             {groups.map((group) => (
                 <div key={group.id}>
-                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         {group.label}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -166,7 +166,7 @@ export default function ToolPalette({
                                                     className={cn(
                                                         'h-8 gap-1.5 px-2',
                                                         active &&
-                                                            'ring-2 ring-blue-300',
+                                                            'ring-2 ring-primary/40',
                                                     )}
                                                     title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                                     onClick={() =>
@@ -193,7 +193,7 @@ export default function ToolPalette({
                                                 className="w-56 p-1"
                                                 align="start"
                                             >
-                                                <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                                                <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                                     Door style
                                                 </div>
                                                 {(
@@ -205,11 +205,11 @@ export default function ToolPalette({
                                                         key={value}
                                                         type="button"
                                                         className={cn(
-                                                            'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                            'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted',
                                                             active &&
                                                                 activeDoorSubkind ===
                                                                     value &&
-                                                                'bg-slate-100 font-medium',
+                                                                'bg-muted font-medium',
                                                         )}
                                                         onClick={() =>
                                                             onPickTool(
@@ -235,7 +235,7 @@ export default function ToolPalette({
                                         variant={active ? 'default' : 'outline'}
                                         className={cn(
                                             'h-8 gap-1.5 px-2',
-                                            active && 'ring-2 ring-blue-300',
+                                            active && 'ring-2 ring-primary/40',
                                         )}
                                         onClick={() => onPickTool(kindKey)}
                                         title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
@@ -271,7 +271,7 @@ export default function ToolPalette({
                                         variant={active ? 'default' : 'outline'}
                                         className={cn(
                                             'h-8 gap-1.5 px-2',
-                                            active && 'ring-2 ring-blue-300',
+                                            active && 'ring-2 ring-primary/40',
                                         )}
                                         style={
                                             active
@@ -318,7 +318,7 @@ export default function ToolPalette({
                                             className={cn(
                                                 'h-8 gap-1.5 px-2',
                                                 active &&
-                                                    'ring-2 ring-blue-300',
+                                                    'ring-2 ring-primary/40',
                                             )}
                                             style={
                                                 active
@@ -351,16 +351,16 @@ export default function ToolPalette({
                                         className="w-56 p-1"
                                         align="start"
                                     >
-                                        <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                                        <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                             {kind.label} type
                                         </div>
                                         <button
                                             type="button"
                                             className={cn(
-                                                'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted',
                                                 active &&
                                                     !activeSubkind &&
-                                                    'bg-slate-100 font-medium',
+                                                    'bg-muted font-medium',
                                             )}
                                             onClick={() =>
                                                 onPickTool(kindKey, null)
@@ -373,11 +373,11 @@ export default function ToolPalette({
                                                 key={sub.value}
                                                 type="button"
                                                 className={cn(
-                                                    'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                    'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted',
                                                     active &&
                                                         activeSubkind ===
                                                             sub.value &&
-                                                        'bg-slate-100 font-medium',
+                                                        'bg-muted font-medium',
                                                 )}
                                                 onClick={() =>
                                                     onPickTool(
@@ -399,7 +399,7 @@ export default function ToolPalette({
 
             {mode === 'full' && (
                 <div className="border-t pt-2">
-                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Measure
                     </div>
                     <div className="flex flex-wrap gap-1.5">

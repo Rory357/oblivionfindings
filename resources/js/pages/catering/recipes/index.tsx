@@ -118,7 +118,7 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
                                     </TableCell>
                                     <TableCell>
                                         {r.is_active
-                                            ? <Badge variant="outline" className="border-green-200 bg-green-50 text-green-800">Active</Badge>
+                                                        ? <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">Active</Badge>
                                             : <Badge variant="outline">Draft</Badge>}
                                     </TableCell>
                                     <TableCell>

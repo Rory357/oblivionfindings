@@ -337,7 +337,7 @@ export function PlanThumbnail({
                 })}
             </svg>
             {showScale && (
-                <div className="pointer-events-none absolute right-2 bottom-2 rounded-md border bg-white/90 px-2 py-1 text-xs text-slate-600 shadow-sm">
+            <div className="pointer-events-none absolute right-2 bottom-2 rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
                     Scale: {formatMeters(100, mpu)} ≈ 100 units
                 </div>
             )}

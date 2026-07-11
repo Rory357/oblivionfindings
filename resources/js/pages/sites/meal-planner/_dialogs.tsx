@@ -282,13 +282,13 @@ export function PlanEntryDialog({
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     {!isNew && entry?.allergen_override_at && existingOverrideReason && (
-                        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50/60 p-2 text-xs text-red-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg/60 p-2 text-xs text-status-critical">
                             <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
                             <div>
                                 <div className="font-medium">Allergen override on file</div>
                                 <div className="mt-0.5">&ldquo;{existingOverrideReason}&rdquo;</div>
                                 {entry.allergen_override_by && (
-                                    <div className="mt-0.5 text-red-800/80">by {entry.allergen_override_by.name} · {new Date(entry.allergen_override_at).toLocaleString('en-NZ')}</div>
+                                        <div className="mt-0.5 text-status-critical/80">by {entry.allergen_override_by.name} · {new Date(entry.allergen_override_at).toLocaleString('en-NZ')}</div>
                                 )}
                             </div>
                         </div>
@@ -368,7 +368,7 @@ export function PlanEntryDialog({
                                 <Input value={form.data.ad_hoc_name} onChange={(e) => form.setData('ad_hoc_name', e.target.value)} placeholder="e.g. Cheese toasties" />
                             </div>
                             {allergenReminder ? (
-                                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                                <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                                     <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
                                     <span>{allergenReminder} Ad-hoc meals aren't auto-checked — confirm ingredients before serving.</span>
                                 </div>
@@ -423,7 +423,7 @@ export function PlanEntryDialog({
                                     />
                                 </div>
                             </div>
-                            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                                 {allergenReminder ? <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" /> : <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />}
                                 <span><strong>Takeaway meal</strong> — {allergenReminder ? `${allergenReminder} Confirm dietary suitability with the vendor before serving.` : 'allergen check unavailable. Confirm dietary suitability with the vendor before serving.'}</span>
                             </div>
@@ -469,7 +469,7 @@ export function PlanEntryDialog({
                     )}
 
                     {careClauses.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Soup className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
                             <div>
                                 <div className="font-semibold">{textureResidents.length > 0 ? 'Texture-modified diet' : 'Thickened fluids'}</div>
@@ -479,7 +479,7 @@ export function PlanEntryDialog({
                     )}
 
                     {dietaryMismatchList.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Leaf className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
                             <div>
                                 <div className="font-semibold">Dietary requirement</div>
@@ -554,11 +554,11 @@ export function PlanEntryDialog({
                     )}
 
                     {hasSoft && !hasHard && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-                            <div className="mb-2 flex items-center gap-2 font-medium text-amber-900">
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
+                                <div className="mb-2 flex items-center gap-2 font-medium text-status-warning">
                                 <AlertTriangle className="h-4 w-4" /> Heads up — soft warnings
                             </div>
-                            <ul className="space-y-1 text-amber-900">
+                                <ul className="space-y-1 text-status-warning">
                                 {report.soft_warnings.map((panel) => (
                                     <li key={panel.client_id}>
                                         <strong>{panel.client_name}</strong>:{' '}
@@ -566,7 +566,7 @@ export function PlanEntryDialog({
                                     </li>
                                 ))}
                             </ul>
-                            <label className="mt-2 flex items-center gap-2 text-xs text-amber-900">
+                                <label className="mt-2 flex items-center gap-2 text-xs text-status-warning">
                                 <input
                                     type="checkbox"
                                     checked={acknowledgedSoft}
@@ -578,7 +578,7 @@ export function PlanEntryDialog({
                     )}
 
                     {hasHard && hasSoft && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                             <strong>Also noted:</strong>{' '}
                             {report.soft_warnings.flatMap((p) => p.matches.map((m) => `${p.client_name} — ${m.label}`)).join('; ')}
                         </div>
@@ -1149,7 +1149,7 @@ export function ShoppingListGenerateDialog({
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     {noMeals && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                             <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
                             <span>No planned meals this week to build a list from — plan meals first. You can still top up stock to par.</span>
                         </div>

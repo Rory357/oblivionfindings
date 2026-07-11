@@ -337,7 +337,7 @@ export function WeekPicker({
                     </div>
                     <div className="mt-0.5 text-[11px] opacity-80">
                         {isThisWeek ? (
-                            <span className="text-emerald-100">
+                                            <span className="text-primary-foreground/90">
                                 ● Current week
                             </span>
                         ) : (

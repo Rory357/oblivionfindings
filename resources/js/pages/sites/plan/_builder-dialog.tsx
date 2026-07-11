@@ -420,7 +420,7 @@ export default function SiteTypePlanBuilderDialog({
                                     </span>
                                     {mode === 'emergency' && (
                                         <span
-                                            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                                            className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2 py-0.5 text-xs font-medium text-status-critical"
                                             data-test="site-plan-emergency-mode-badge"
                                         >
                                             Emergency mode
@@ -467,7 +467,7 @@ export default function SiteTypePlanBuilderDialog({
                                 }
                             />
                         </div>
-                        <div className="min-h-0 rounded-lg border bg-slate-100 p-2 shadow-sm">
+                        <div className="min-h-0 rounded-lg border bg-muted p-2 shadow-sm">
                             <PlanCanvas
                                 layout={state.layout}
                                 pins={state.pins}
@@ -620,7 +620,7 @@ export default function SiteTypePlanBuilderDialog({
                     </DialogHeader>
                     {calibrationDialog && (
                         <div className="space-y-3">
-                            <div className="rounded-md border bg-slate-50 p-3 text-xs">
+                            <div className="rounded-md border bg-muted/50 p-3 text-xs">
                                 <div className="flex justify-between">
                                     <span>Measured distance</span>
                                     <strong>

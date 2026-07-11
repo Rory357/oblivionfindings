@@ -48,7 +48,7 @@ export default function EmergencyChecklist({ pins, emergencyKinds, taxonomy, dis
                     return (
                         <div key={`${row.kind}-${row.label}`} className="flex items-center gap-2 rounded-md border p-2 text-xs">
                             {done ? (
-                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                    <CheckCircle2 className="h-4 w-4 text-status-success" />
                             ) : (
                                 <CircleDashed className="h-4 w-4 text-muted-foreground" />
                             )}

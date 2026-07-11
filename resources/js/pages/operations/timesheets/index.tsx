@@ -220,7 +220,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                    className={cn('h-full rounded-full', taskPct === 100 ? 'bg-status-success' : 'bg-primary')}
                                     style={{ width: taskPct + '%' }}
                                 />
                             </div>
@@ -233,7 +233,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
                         </div>
                     </div>
                     {t.status === 'returned' && t.returned_notes ? (
-                        <div className="flex items-start gap-1.5 rounded-md bg-rose-50 px-2 py-1.5 text-[11.5px] text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                                <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-[11.5px] text-status-critical">
                             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                             <span>{t.returned_notes}</span>
                         </div>
@@ -741,7 +741,7 @@ export default function TimesheetsIndex({
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                             <div
-                                                                className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                                                className={cn('h-full rounded-full', taskPct === 100 ? 'bg-status-success' : 'bg-primary')}
                                                                 style={{ width: taskPct + '%' }}
                                                             />
                                                         </div>
@@ -786,7 +786,7 @@ export default function TimesheetsIndex({
                         </table>
                         {rows.length === 0 ? (
                             <div className="grid place-items-center px-6 py-14 text-center text-muted-foreground">
-                                <Sun className="mb-2 h-8 w-8 text-amber-400" />
+                                    <Sun className="mb-2 h-8 w-8 text-status-warning" />
                                 <div className="text-sm font-medium text-foreground">No timesheets in this tab</div>
                                 <div className="text-xs">Try switching to another status or clear filters.</div>
                             </div>

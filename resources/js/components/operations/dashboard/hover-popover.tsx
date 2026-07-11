@@ -229,8 +229,8 @@ export function useHoverPopover() {
 export function PulseDot({ className }: { className?: string }): ReactNode {
     return (
         <span aria-hidden="true" className={cn('relative inline-flex h-2 w-2', className)}>
-            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
         </span>
     );
 }

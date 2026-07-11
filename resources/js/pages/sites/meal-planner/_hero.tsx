@@ -76,7 +76,7 @@ function HeroStat({ label, value, sub, emphasis, onClick, warning }: { label: st
         <>
             <div className="text-[22px] font-bold leading-none tabular-nums text-primary-foreground">{value}</div>
             <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary-foreground/70">{label}</div>
-            {sub && <div className={cn('mt-0.5 text-[10.5px]', warning ? 'text-amber-50' : 'text-primary-foreground/55')}>{sub}</div>}
+            {sub && <div className={cn('mt-0.5 text-[10.5px]', warning ? 'text-primary-foreground/90' : 'text-primary-foreground/55')}>{sub}</div>}
         </>
     );
     if (onClick) {
@@ -200,7 +200,7 @@ function HeroBell({ notifications, onClick, light, compact }: { notifications: H
             >
                 <Bell className="h-[17px] w-[17px]" aria-hidden="true" />
                 {count > 0 && (
-                    <span aria-hidden="true" className={cn('absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2', light ? 'ring-card' : 'ring-[var(--hero-base)]')}>
+                            <span aria-hidden="true" className={cn('absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white ring-2', light ? 'ring-card' : 'ring-[var(--hero-base)]')}>
                         {count}
                     </span>
                 )}
@@ -523,7 +523,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                                     {stats.overrides > 0 && (
                                         <>
                                             {' '}
-                                            · <span className="font-semibold text-amber-50">{stats.overrides} allergen override{stats.overrides === 1 ? '' : 's'}</span> on file
+                                · <span className="font-semibold text-primary-foreground/90">{stats.overrides} allergen override{stats.overrides === 1 ? '' : 's'}</span> on file
                                         </>
                                     )}{' '}
                                     · <span className="border-b-2 border-primary-foreground/40 pb-px">{rangeStart} → {rangeEnd}</span>
@@ -534,7 +534,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                                     {stats.lowStock > 0 && (
                                         <>
                                             {' '}
-                                            · <span className="font-semibold text-amber-50">{stats.lowStock} below par</span>
+                                · <span className="font-semibold text-primary-foreground/90">{stats.lowStock} below par</span>
                                         </>
                                     )}{' '}
                                     · <span className="border-b-2 border-primary-foreground/40 pb-px">{rangeStart} → {rangeEnd}</span>
