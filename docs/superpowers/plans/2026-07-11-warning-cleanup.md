@@ -23,7 +23,7 @@
 - After `php artisan wayfinder:generate`, `npm run types` passes.
 - The baseline Vitest run has 8 pre-existing failures in 4 suites. Three are stale fixtures/mocks; the sidebar failure overlaps the separate `codex/move-billing-nav-finance` worktree and must not be overwritten.
 
-### Task 1: Make warning-free output an enforced gate
+### Task 1: Make warning-free output an enforced gate — COMPLETE
 
 **Files:**
 - Modify: `package.json`
@@ -62,7 +62,7 @@ git add package.json
 git commit -m "chore: enforce zero-warning lint"
 ```
 
-### Task 2: Remediate all dependency advisories without major upgrades
+### Task 2: Remediate all dependency advisories without major upgrades — COMPLETE
 
 **Files:**
 - Modify: `package.json`
@@ -120,7 +120,7 @@ git add package.json package-lock.json
 git commit -m "chore: remediate frontend dependency advisories"
 ```
 
-### Task 3: Fix all React hook dependency warnings
+### Task 3: Fix all React hook dependency warnings — COMPLETE
 
 **Files:**
 - Modify: `resources/js/components/checklists/run-modal.tsx`
@@ -180,7 +180,7 @@ git add resources/js
 git commit -m "fix: stabilize React hook dependencies"
 ```
 
-### Task 4: Resolve semantic-colour guardrails
+### Task 4: Resolve semantic-colour guardrails — COMPLETE
 
 **Files:**
 - Modify: `resources/js/components/job-board/job-board-hero.tsx`
@@ -232,7 +232,7 @@ git add resources/js
 git commit -m "fix: resolve semantic colour guardrails"
 ```
 
-### Task 5: Resolve shared-component, checklist, safety, and control-room guardrails
+### Task 5: Resolve shared-component, checklist, safety, and control-room guardrails — COMPLETE
 
 **Files:**
 - Modify all listed files under `resources/js/components/checklists/`: `context-menu.tsx`, `embedded-header.tsx`, `hero-footer.tsx`, `panes/assignments.tsx`, `panes/due-now.tsx`, `panes/library.tsx`, `panes/overview.tsx`, `panes/reports.tsx`, `panes/runs.tsx`, `panes/schedule.tsx`, `primitives.tsx`, `run-cards.tsx`, `run-modal.tsx`, `template-builder.tsx`.
@@ -281,7 +281,7 @@ git add resources/js
 git commit -m "fix: resolve shared UI guardrails"
 ```
 
-### Task 6: Resolve HR, rostering, respite, fleet, and job-board guardrails
+### Task 6: Resolve HR, rostering, respite, fleet, and job-board guardrails — COMPLETE
 
 **Files:**
 - Modify warning-bearing files in `resources/js/components/hr/`: `asset-wizards.tsx`, `onboarding/email-dialog.tsx`, `onboarding/provision-asset-dialog.tsx`, `onboarding/reassign-dialog.tsx`, `training/training-wizard-dialog.tsx`.
@@ -299,7 +299,7 @@ git commit -m "fix: resolve shared UI guardrails"
 - [ ] **Step 3: Run focused lint, module tests, and types**
 - [ ] **Step 4: Commit as `fix: resolve workforce UI guardrails`**
 
-### Task 7: Resolve HR pages and operations workflow guardrails
+### Task 7: Resolve HR pages and operations workflow guardrails — COMPLETE
 
 **Files:**
 - Modify warning-bearing HR pages: `resources/js/pages/hr/candidates/show.tsx`, `compliance/calendar.tsx`, `compliance/components/wizard-fields.tsx`, `compliance/index.tsx`, `compliance/matrix.tsx`, `compliance/staff-detail.tsx`, `drivers/index.tsx`, `drivers/show.tsx`, `performance/competencies/profile.tsx`, `training/catalog.tsx`, `vetting/index.tsx`, `wellbeing/index.tsx`.
@@ -316,7 +316,7 @@ git commit -m "fix: resolve shared UI guardrails"
 - [ ] **Step 3: Run focused lint, operations Vitest tests, and types**
 - [ ] **Step 4: Commit as `fix: resolve operations UI guardrails`**
 
-### Task 8: Resolve site-management, meal-planner, floor-plan, and remaining page guardrails
+### Task 8: Resolve site-management, meal-planner, floor-plan, and remaining page guardrails — COMPLETE
 
 **Files:**
 - Modify site calendar files: `resources/js/pages/sites/calendar/_parts.tsx`, `SiteCalendar.tsx`.
@@ -337,7 +337,7 @@ git commit -m "fix: resolve shared UI guardrails"
 - [ ] **Step 3: Run focused lint, site/meal-planner tests, and types**
 - [ ] **Step 4: Commit as `fix: resolve site UI guardrails`**
 
-### Task 9: Repair stale baseline test fixtures without changing product behaviour
+### Task 9: Repair stale baseline test fixtures without changing product behaviour — COMPLETE
 
 **Files:**
 - Modify: `resources/js/pages/my-day/index-audit-fixes.test.tsx`
@@ -377,7 +377,7 @@ git add resources/js/pages/my-day/index-audit-fixes.test.tsx resources/js/test/b
 git commit -m "test: refresh frontend fixture contracts"
 ```
 
-### Task 10: Run the complete zero-warning release gates
+### Task 10: Run the complete zero-warning release gates — COMPLETE
 
 **Files:**
 - Verify: `package.json`
@@ -419,6 +419,64 @@ Record final dependency versions, warning counts, test counts, and build outcome
 git add docs/superpowers/plans/2026-07-11-warning-cleanup.md
 git commit -m "docs: close zero-warning cleanup ledger"
 ```
+
+## Local completion ledger — 2026-07-11
+
+Tasks 1–10 are complete on `codex/complete-warning-cleanup`. Task 11 remains the
+publish and staging-verification boundary.
+
+### Implemented warning inventory
+
+- ESLint moved from 737 warnings in 172 files to 0 errors and 0 warnings.
+- All 29 `react-hooks/exhaustive-deps` findings were fixed through stable values,
+  corrected dependencies, or ref-backed imperative listeners; no hook-rule
+  suppressions were added.
+- All 93 semantic-colour findings now use the existing semantic token system;
+  no colour-rule suppressions were needed.
+- The 452 raw-button and 163 card-panel findings were converted structurally to
+  shared `Button` and `Card` primitives. The primitives gained an explicit
+  `unstyled` mode so custom desktop interactions keep their existing layout,
+  disabled state, and focus behavior without bypassing the shared component
+  contract.
+- No mobile-specific redesign was introduced.
+
+### Dependency result
+
+- `npm ci`: exit 0; 637 packages installed and 638 audited.
+- `npm audit --package-lock-only`: `found 0 vulnerabilities`.
+- Verified safe graph: `concurrently@9.2.3`, `vite@7.3.6`,
+  `@babel/core@7.29.7`, `form-data@4.0.6`, `js-yaml@4.3.0`,
+  `shell-quote@1.10.0`, and `undici@7.28.0`.
+
+### Behaviour and regression result
+
+- Focused primitive contract: 2/2 tests pass.
+- Stale frontend contract repairs: 3 files and 15/15 tests pass.
+- Finance navigation contract: 4/4 tests pass. `origin/main` still contained the
+  test and all five `/finance/...` routes but not the matching sidebar entries,
+  so only those five entries were restored; the separate
+  `codex/move-billing-nav-finance` worktree was not modified or cherry-picked.
+- Full Vitest suite: 44/44 files and 184/184 tests pass.
+- IT ticketing suite: process exit 0, 164/164 tests and 1,316 assertions pass in
+  429.41s with no warning output. The first run exposed an environmental
+  `file_get_contents(.../.env)` warning for every test because the isolated
+  worktree lacked its ignored `.env`; adding a one-line, credential-free local
+  marker removed the notice. The marker is ignored and is not committed or
+  deployed; PHPUnit continues to source all test settings from `phpunit.xml`.
+
+### Release-gate evidence
+
+- `php artisan wayfinder:generate`: exit 0.
+- `npm run lint`: exit 0 with `eslint . --fix --max-warnings=0` and no output
+  findings.
+- `npm run types`: exit 0.
+- `npm test`: exit 0; 184 tests pass.
+- `npm run build`: exit 0 with Vite 7.3.6 client production build.
+- `npx vite build --ssr`: exit 0 with Vite 7.3.6 SSR production build.
+- `git diff --check`: exit 0.
+- `git fetch origin --prune`: `origin/main` remains `1027c5ed`; it is an
+  ancestor of this branch, so no rebase is required before integration.
+- The worktree was clean after all implementation commits and release gates.
 
 ### Task 11: Integrate, push, deploy, and verify staging
 
