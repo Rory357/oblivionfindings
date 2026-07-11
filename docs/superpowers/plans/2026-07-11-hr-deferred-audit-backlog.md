@@ -152,21 +152,21 @@ git commit -m "fix(hr): consolidate audit viewer on canonical organization store
 - Modify: `app/Domain/Hr/Services/EmployeeImportExportService.php`
 - Modify: `app/Domain/Hr/Services/ReportBuilderService.php`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Export rows containing `=cmd`, `+SUM(1,1)`, `-1+2`, `@HYPERLINK`, tab, and carriage-return prefixes. Assert text cells receive a leading apostrophe while `-42.50` and `123` remain numeric strings.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `php artisan test tests/Feature/Hr/HrServiceCsvInjectionGuardTest.php --compact`
 
 Expected: FAIL with raw formula-leading cells.
 
-- [ ] **Step 3: Reuse the shared trait**
+- [x] **Step 3: Reuse the shared trait**
 
 Add `use SanitizesCsvOutput;` to both services and map every output cell through `sanitizeCsvCell((string) $value)`. Preserve values satisfying `is_numeric()` unchanged.
 
-- [ ] **Step 4: Audit all HR CSV writers**
+- [x] **Step 4: Audit all HR CSV writers**
 
 Run:
 
@@ -176,7 +176,7 @@ rg -n "fputcsv|streamDownload" app/Domain/Hr app/Http/Controllers/Hr
 
 For each result, record in the ledger whether it inherits the base-controller trait, uses a local equivalent already covered by tests, or was updated in this slice.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 php artisan test tests/Feature/Hr/HrServiceCsvInjectionGuardTest.php tests/Feature/Hr/PayrollCsvInjectionGuardTest.php tests/Feature/Hr/PeopleExportTest.php --compact
