@@ -281,12 +281,18 @@ class HrCalendarAggregator
             return true;
         }
 
-        return HrEmployeeProfile::query()
+        $viewerTeam = HrEmployeeProfile::query()
             ->where('tenant_id', $event->tenant_id)
             ->where('user_id', $viewer->id)
             ->where('is_active', true)
-            ->where('team', $teamAudience->audience_ref)
-            ->exists();
+            ->value('team');
+
+        $normalisedViewerTeam = HrEmployeeProfile::normalizeTeam($viewerTeam);
+        $normalisedAudienceTeam = HrEmployeeProfile::normalizeTeam($teamAudience->audience_ref);
+
+        return $normalisedViewerTeam !== null
+            && $normalisedAudienceTeam !== null
+            && mb_strtolower($normalisedViewerTeam) === mb_strtolower($normalisedAudienceTeam);
     }
 
     /**

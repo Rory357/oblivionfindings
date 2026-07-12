@@ -47,13 +47,18 @@ function cleanupClientProfilePhaseOneFixtures() {
     const ids = [...fixtureClientIds];
     runLaravelPhp(`
 $ids = ${JSON.stringify(ids)};
-foreach (\\App\\Models\\Client::query()->whereIn('id', $ids)->get() as $client) {
-    $client->delete();
-}
+\\App\\Models\\Client::withoutEvents(function () use ($ids) {
+    foreach (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->get() as $client) {
+        $client->forceDelete();
+    }
+});
 \\Illuminate\\Support\\Facades\\DB::table('audit_logs')
     ->where('auditable_type', 'client')
     ->whereIn('auditable_id', $ids)
     ->delete();
+if (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->exists()) {
+    throw new \\RuntimeException('Client profile fixture hard-delete did not remove every exact ID.');
+}
 `);
     fixtureClientIds.clear();
 }

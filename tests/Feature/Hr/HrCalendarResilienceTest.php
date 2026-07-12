@@ -111,7 +111,7 @@ test('an active team member can see a team event while other and inactive profil
         'tenant_id' => 1,
         'user_id' => $member->id,
         'employee_number' => 'TEAM-ACTIVE',
-        'team' => 'Clinical',
+        'team' => 'Clinical   Support',
         'is_active' => true,
     ]);
 
@@ -131,7 +131,7 @@ test('an active team member can see a team event while other and inactive profil
         'tenant_id' => 1,
         'user_id' => $inactive->id,
         'employee_number' => 'TEAM-INACTIVE',
-        'team' => 'Clinical',
+        'team' => 'Clinical Support',
         'is_active' => false,
     ]);
 
@@ -142,7 +142,7 @@ test('an active team member can see a team event while other and inactive profil
             'starts_at' => now()->addWeek()->toDateTimeString(),
             'ends_at' => now()->addWeek()->addHour()->toDateTimeString(),
             'audience_type' => 'team',
-            'audience_team' => 'Clinical',
+            'audience_team' => ' clinical support ',
         ])
         ->assertRedirect();
 
@@ -150,7 +150,20 @@ test('an active team member can see a team event while other and inactive profil
     $this->assertDatabaseHas('hr_calendar_event_attendees', [
         'event_id' => $event->id,
         'audience_type' => 'team',
-        'audience_ref' => 'Clinical',
+        'audience_ref' => 'Clinical Support',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->put("/hr/calendar/events/{$event->id}", [
+            'audience_type' => 'team',
+            'audience_team' => ' CLINICAL   SUPPORT ',
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('hr_calendar_event_attendees', [
+        'event_id' => $event->id,
+        'audience_type' => 'team',
+        'audience_ref' => 'Clinical Support',
     ]);
 
     $from = now()->startOfMonth()->toDateString();
@@ -162,7 +175,7 @@ test('an active team member can see a team event while other and inactive profil
     $inactiveEvents = collect($this->actingAs($inactive)->getJson($url)->assertOk()->json('events'));
 
     expect($memberEvents->pluck('title'))->toContain('Clinical team hui')
-        ->and($memberEvents->firstWhere('title', 'Clinical team hui')['extendedProps']['audienceRef'])->toBe('Clinical')
+        ->and($memberEvents->firstWhere('title', 'Clinical team hui')['extendedProps']['audienceRef'])->toBe('Clinical Support')
         ->and($otherEvents->pluck('title'))->not->toContain('Clinical team hui')
         ->and($inactiveEvents->pluck('title'))->not->toContain('Clinical team hui');
 });

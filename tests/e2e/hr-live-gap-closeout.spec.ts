@@ -25,6 +25,8 @@ type Fixture = {
     offboardingTaskId: number;
     offerId: number;
     offerToken: string;
+    overrideCandidateId: number;
+    overrideApplicationId: number;
     approvalChainId: number;
     leaveChainIds: number[];
     payrollRunId: number;
@@ -70,12 +72,12 @@ function formatMyPayPeriod(start: string, end: string): string {
     return `${startDate.getDate()} ${startMonth} – ${endDate.getDate()} ${endMonth}`;
 }
 
-function cleanupFixtures() {
+function cleanupFixtures(targetMarker = marker) {
     runLaravelPhp(`
-$prefix = 'CODEX-LIVE-HR-GAPS-';
+$marker = ${JSON.stringify(targetMarker)};
 
 $eventIds = \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()
-    ->where('title', 'like', $prefix.'%')->pluck('id');
+    ->where('title', $marker.' Team event')->pluck('id');
 $attachmentPaths = \\App\\Domain\\Hr\\Models\\HrCalendarEventAttachment::query()
     ->whereIn('event_id', $eventIds)->get(['disk', 'path']);
 foreach ($attachmentPaths as $attachment) {
@@ -87,11 +89,14 @@ foreach ($attachmentPaths as $attachment) {
 \\Illuminate\\Support\\Facades\\DB::table('hr_calendar_events')->whereIn('id', $eventIds)->delete();
 
 $profileIds = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::withTrashed()
-    ->where('employee_number', 'like', $prefix.'%')->pluck('id');
+    ->whereIn('employee_number', [$marker.'-EMP', $marker.'-PAY'])->pluck('id');
 $userIds = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::withTrashed()
     ->whereIn('id', $profileIds)->pluck('user_id');
 $userIds = $userIds->merge(
-    \\App\\Models\\User::query()->where('email', 'like', strtolower($prefix).'%@example.test')->pluck('id')
+    \\App\\Models\\User::query()->whereIn('email', [
+        strtolower($marker).'.worker@example.test',
+        strtolower($marker).'.payroll@example.test',
+    ])->pluck('id')
 )->unique()->values();
 $checklistIds = \\Illuminate\\Support\\Facades\\DB::table('hr_offboarding_checklists')
     ->whereIn('employee_profile_id', $profileIds)->pluck('id');
@@ -110,25 +115,32 @@ $leaveChainIds = \\Illuminate\\Support\\Facades\\DB::table('hr_leave_approval_ch
 \\Illuminate\\Support\\Facades\\DB::table('hr_leave_approval_chains')->whereIn('user_id', $userIds)->delete();
 
 $candidateIds = \\App\\Domain\\Hr\\Models\\HrCandidate::withTrashed()
-    ->where('notes', 'like', $prefix.'%')->pluck('id');
+    ->whereIn('notes', [$marker.' candidate', $marker.' override candidate'])->pluck('id');
 $applicationIds = \\Illuminate\\Support\\Facades\\DB::table('hr_applications')
     ->whereIn('candidate_id', $candidateIds)->pluck('id');
+$interviewIds = \\Illuminate\\Support\\Facades\\DB::table('hr_interviews')
+    ->whereIn('application_id', $applicationIds)->pluck('id');
+$referenceIds = \\Illuminate\\Support\\Facades\\DB::table('hr_reference_checks')
+    ->whereIn('application_id', $applicationIds)->pluck('id');
 $offerIds = \\Illuminate\\Support\\Facades\\DB::table('hr_offers')
     ->whereIn('application_id', $applicationIds)->pluck('id');
 \\Illuminate\\Support\\Facades\\DB::table('hr_offers')->whereIn('application_id', $applicationIds)->delete();
+\\Illuminate\\Support\\Facades\\DB::table('hr_interview_scores')->whereIn('interview_id', $interviewIds)->delete();
+\\Illuminate\\Support\\Facades\\DB::table('hr_interviews')->whereIn('id', $interviewIds)->delete();
+\\Illuminate\\Support\\Facades\\DB::table('hr_reference_checks')->whereIn('id', $referenceIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_applications')->whereIn('id', $applicationIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_candidates')->whereIn('id', $candidateIds)->delete();
 
 $chainIds = \\Illuminate\\Support\\Facades\\DB::table('hr_approval_chains')
-    ->where('name', 'like', $prefix.'%')->pluck('id');
+    ->where('name', $marker.' Generic approvals')->pluck('id');
 $bandIds = \\Illuminate\\Support\\Facades\\DB::table('hr_salary_bands')
-    ->where('band_name', 'like', $prefix.'%')->pluck('id');
+    ->where('band_name', $marker.' Band')->pluck('id');
 $payrollRunIds = \\Illuminate\\Support\\Facades\\DB::table('hr_payroll_runs')
-    ->where('notes', 'like', $prefix.'%')->pluck('id');
+    ->where('notes', $marker.' payroll run')->pluck('id');
 \\Illuminate\\Support\\Facades\\DB::table('hr_approval_chain_steps')->whereIn('approval_chain_id', $chainIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_approval_chains')->whereIn('id', $chainIds)->delete();
-\\Illuminate\\Support\\Facades\\DB::table('hr_salary_bands')->where('band_name', 'like', $prefix.'%')->delete();
-\\Illuminate\\Support\\Facades\\DB::table('hr_payroll_runs')->where('notes', 'like', $prefix.'%')->delete();
+\\Illuminate\\Support\\Facades\\DB::table('hr_salary_bands')->whereIn('id', $bandIds)->delete();
+\\Illuminate\\Support\\Facades\\DB::table('hr_payroll_runs')->whereIn('id', $payrollRunIds)->delete();
 
 \\Illuminate\\Support\\Facades\\DB::table('hr_employee_profiles')->whereIn('id', $profileIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('role_user')->whereIn('user_id', $userIds)->delete();
@@ -142,6 +154,8 @@ $auditableIds = [
     \\App\\Domain\\Hr\\Models\\HrExitInterview::class => $exitInterviewIds,
     \\App\\Domain\\Hr\\Models\\HrCandidate::class => $candidateIds,
     \\App\\Domain\\Hr\\Models\\HrApplication::class => $applicationIds,
+    \\App\\Domain\\Hr\\Models\\HrInterview::class => $interviewIds,
+    \\App\\Domain\\Hr\\Models\\HrReferenceCheck::class => $referenceIds,
     \\App\\Domain\\Hr\\Models\\HrOffer::class => $offerIds,
     \\App\\Domain\\Hr\\Models\\HrApprovalChain::class => $chainIds,
     \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::class => $leaveChainIds,
@@ -152,9 +166,10 @@ $auditableIds = [
 ];
 
 \\Illuminate\\Support\\Facades\\DB::table('audit_logs')
-    ->where(function ($query) use ($prefix, $auditableIds) {
-        $query->where('action', 'like', 'codex.live_hr_gaps%')
-            ->orWhere('meta', 'like', '%'.$prefix.'%');
+    ->where(function ($query) use ($marker, $auditableIds) {
+        $query->where(function ($markerQuery) use ($marker) {
+            $markerQuery->where('meta', 'like', '%'.$marker.'%');
+        });
         foreach ($auditableIds as $type => $ids) {
             if ($ids->isEmpty()) {
                 continue;
@@ -244,29 +259,7 @@ $band = \\App\\Domain\\Hr\\Models\\HrSalaryBand::query()->create([
     'created_by' => $admin->id,
 ]);
 
-$event = \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()->create([
-    'tenant_id' => 1,
-    'title' => $marker.' Team event',
-    'description' => 'Marker-scoped team lifecycle proof',
-    'event_type' => 'team',
-    'starts_at' => now()->addDays(2)->setTime(10, 0),
-    'ends_at' => now()->addDays(2)->setTime(11, 0),
-    'is_all_day' => false,
-    'created_by' => $admin->id,
-]);
-$event->attendees()->create(['audience_type' => 'team', 'audience_ref' => 'Community Support']);
-$event->reminders()->create(['offset_minutes' => 60, 'channel' => 'notification']);
 $attachmentPath = 'hr/calendar/1/'.$marker.'.txt';
-\\Illuminate\\Support\\Facades\\Storage::disk('private')->put($attachmentPath, $marker);
-$event->attachments()->create([
-    'tenant_id' => 1,
-    'uploaded_by' => $admin->id,
-    'disk' => 'private',
-    'original_name' => $marker.'.txt',
-    'path' => $attachmentPath,
-    'mime' => 'text/plain',
-    'size' => strlen($marker),
-]);
 
 $checklist = \\App\\Domain\\Hr\\Models\\HrOffboardingChecklist::query()->create([
     'tenant_id' => 1,
@@ -325,9 +318,44 @@ $offer = \\App\\Domain\\Hr\\Models\\HrOffer::query()->create([
     'created_by' => $admin->id,
 ]);
 
+$overrideCandidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
+    'tenant_id' => 1,
+    'first_name' => 'Codex',
+    'last_name' => $marker.' Override',
+    'personal_email' => strtolower($marker).'.override@example.test',
+    'source' => 'referral',
+    'status' => 'interview_completed',
+    'notes' => $marker.' override candidate',
+    'created_by' => $admin->id,
+    'updated_by' => $admin->id,
+]);
+$overrideApplication = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
+    'tenant_id' => 1,
+    'candidate_id' => $overrideCandidate->id,
+    'position_title' => 'Smoke Support Worker',
+    'position_role' => 'support_worker',
+    'status' => 'active',
+]);
+\\App\\Domain\\Hr\\Models\\HrInterview::query()->create([
+    'application_id' => $overrideApplication->id,
+    'scheduled_at' => now()->subDay(),
+    'duration_minutes' => 60,
+    'interview_type' => 'panel',
+    'interviewers' => [$admin->id, $employee->id],
+    'status' => 'completed',
+    'completed_by' => $admin->id,
+]);
+\\App\\Domain\\Hr\\Models\\HrReferenceCheck::query()->create([
+    'application_id' => $overrideApplication->id,
+    'referee_name' => 'Synthetic Reference',
+    'referee_relationship' => 'Manager',
+    'status' => 'requested',
+    'requested_at' => now(),
+]);
+
 $chain = \\App\\Domain\\Hr\\Models\\HrApprovalChain::query()->create([
     'tenant_id' => 1,
-    'name' => $marker.' Approval chain',
+    'name' => $marker.' Generic approvals',
     'process_type' => 'expense',
     'is_active' => true,
     'created_by' => $admin->id,
@@ -403,12 +431,14 @@ echo json_encode([
     'employeeProfileId' => $profile->id,
     'payrollUserId' => $payrollEmployee->id,
     'payrollProfileId' => $payrollProfile->id,
-    'calendarEventId' => $event->id,
+    'calendarEventId' => 0,
     'salaryBandId' => $band->id,
     'offboardingId' => $checklist->id,
     'offboardingTaskId' => $exitTask->id,
     'offerId' => $offer->id,
     'offerToken' => $offerToken,
+    'overrideCandidateId' => $overrideCandidate->id,
+    'overrideApplicationId' => $overrideApplication->id,
     'approvalChainId' => $chain->id,
     'leaveChainIds' => [$leaveOne->id, $leaveTwo->id],
     'payrollRunId' => $run->id,
@@ -434,10 +464,66 @@ test.describe.serial('HR live gap closeout', () => {
         cleanupFixtures();
     });
 
+    test('cleanup deletes only the requested marker', () => {
+        const probeMarker = `${fixture.marker}-CLEANUP-PROBE`;
+        const sentinelMarker = `${fixture.marker}-CLEANUP-SENTINEL`;
+        runLaravelPhp(`
+foreach ([${JSON.stringify(probeMarker)}, ${JSON.stringify(sentinelMarker)}] as $probe) {
+    \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()->create([
+        'tenant_id' => 1,
+        'title' => $probe.' Team event',
+        'event_type' => 'team',
+        'starts_at' => now()->addDay(),
+        'ends_at' => now()->addDay()->addHour(),
+        'is_all_day' => false,
+        'created_by' => ${fixture.adminId},
+    ]);
+    \\App\\Models\\AuditLog::query()->create([
+        'organization_id' => 1,
+        'user_id' => null,
+        'action' => 'codex.cleanup_scope',
+        'auditable_type' => null,
+        'auditable_id' => null,
+        'meta' => ['marker' => $probe],
+    ]);
+}
+`);
+
+        cleanupFixtures(probeMarker);
+        const remaining = Number(
+            runLaravelPhp(`
+echo \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()
+    ->where('title', ${JSON.stringify(`${sentinelMarker} Team event`)})
+    ->count();
+`).trim(),
+        );
+        expect(remaining).toBe(1);
+        const probeAuditCount = Number(
+            runLaravelPhp(`
+echo \\App\\Models\\AuditLog::query()
+    ->where('action', 'codex.cleanup_scope')
+    ->where('meta', 'like', '%'.${JSON.stringify(probeMarker)}.'%')
+    ->count();
+`).trim(),
+        );
+        const sentinelAuditCount = Number(
+            runLaravelPhp(`
+echo \\App\\Models\\AuditLog::query()
+    ->where('action', 'codex.cleanup_scope')
+    ->where('meta', 'like', '%'.${JSON.stringify(sentinelMarker)}.'%')
+    ->count();
+`).trim(),
+        );
+        expect(probeAuditCount).toBe(0);
+        expect(sentinelAuditCount).toBe(1);
+        cleanupFixtures(sentinelMarker);
+    });
+
     test('proves marker-scoped HR lifecycle surfaces and controls', async ({
         page,
     }) => {
-        test.setTimeout(180_000);
+        test.setTimeout(900_000);
+        page.setDefaultTimeout(15_000);
         const consoleErrors = collectConsoleErrors(page);
         const failedHrRequests: string[] = [];
         page.on('response', (response) => {
@@ -466,6 +552,66 @@ test.describe.serial('HR live gap closeout', () => {
         await expect(
             page.getByRole('heading', { name: /Calendar/i }),
         ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'New event', exact: true })
+            .first()
+            .click();
+        const eventDialog = page.getByRole('dialog', { name: 'New event' });
+        await eventDialog
+            .getByPlaceholder('e.g. All-staff hui, Fire drill, Team lunch')
+            .fill(`${fixture.marker} Team event`);
+        await eventDialog.getByText('Team', { exact: true }).click();
+        await eventDialog.getByRole('button', { name: 'Continue' }).click();
+        const startsAt = new Date(Date.now() + 2 * 86_400_000)
+            .toISOString()
+            .slice(0, 16);
+        const endsAt = new Date(Date.now() + 2 * 86_400_000 + 3_600_000)
+            .toISOString()
+            .slice(0, 16);
+        await eventDialog
+            .locator('input[type="datetime-local"]')
+            .nth(0)
+            .fill(startsAt);
+        await eventDialog
+            .locator('input[type="datetime-local"]')
+            .nth(1)
+            .fill(endsAt);
+        await eventDialog.getByRole('button', { name: 'Continue' }).click();
+        await eventDialog.getByRole('button', { name: 'A team' }).click();
+        await eventDialog
+            .getByRole('combobox', { name: 'Audience team' })
+            .click();
+        await page.getByRole('option', { name: 'Community Support' }).click();
+        await eventDialog.getByRole('button', { name: 'Continue' }).click();
+        await eventDialog.getByRole('button', { name: 'Continue' }).click();
+        const createCompleted = page.waitForResponse(
+            (response) =>
+                response.url().endsWith('/hr/calendar/events') &&
+                response.request().method() === 'POST',
+        );
+        await eventDialog.getByRole('button', { name: 'Create event' }).click();
+        expect((await createCompleted).status()).toBeLessThan(400);
+        await eventDialog.getByRole('button', { name: 'Done' }).click();
+        fixture.calendarEventId = Number(
+            runLaravelPhp(`
+$event = \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()
+    ->where('title', ${JSON.stringify(`${fixture.marker} Team event`)})
+    ->firstOrFail();
+$event->reminders()->create(['offset_minutes' => 60, 'channel' => 'notification']);
+$path = ${JSON.stringify(fixture.attachmentPath)};
+\\Illuminate\\Support\\Facades\\Storage::disk('private')->put($path, ${JSON.stringify(fixture.marker)});
+$event->attachments()->create([
+    'tenant_id' => 1,
+    'uploaded_by' => ${fixture.adminId},
+    'disk' => 'private',
+    'original_name' => ${JSON.stringify(`${fixture.marker}.txt`)},
+    'path' => $path,
+    'mime' => 'text/plain',
+    'size' => strlen(${JSON.stringify(fixture.marker)}),
+]);
+echo $event->id;
+`).trim(),
+        );
         await page.getByPlaceholder('Search events…').fill(fixture.marker);
         const calendarEvent = page
             .locator('button[title]')
@@ -638,6 +784,25 @@ echo json_encode([
         await expect(
             offerCard.getByRole('button', { name: 'Resend link' }),
         ).toBeVisible();
+        const mailSafety = parseLaravelJson<{
+            defaultMailer: string;
+            transport: string;
+            safe: boolean;
+        }>(
+            runLaravelPhp(`
+$defaultMailer = (string) config('mail.default');
+$transport = (string) config('mail.mailers.'.$defaultMailer.'.transport', $defaultMailer);
+echo json_encode([
+    'defaultMailer' => $defaultMailer,
+    'transport' => $transport,
+    'safe' => in_array($transport, ['array', 'log'], true),
+]);
+`),
+        );
+        expect(
+            mailSafety.safe,
+            `Offer resend requires a non-delivering mail transport, got ${mailSafety.defaultMailer}/${mailSafety.transport}`,
+        ).toBe(true);
         const resendCompleted = page.waitForResponse(
             (response) =>
                 response
@@ -671,16 +836,118 @@ echo json_encode([
             expiryReason: null,
         });
 
+        await page.goto('/hr/recruitment?tab=pipeline');
+        const overrideCandidateButton = page
+            .getByRole('button', {
+                name: new RegExp(`Codex ${fixture.marker} Override`),
+            })
+            .first();
+        await expect(overrideCandidateButton).toBeVisible();
+        await overrideCandidateButton
+            .locator('..')
+            .getByRole('button', { name: 'Row menu' })
+            .click();
+        await page.getByText('Advance stage', { exact: true }).click();
+        const overrideDialog = page.getByRole('dialog', {
+            name: 'Advance without every scorecard?',
+        });
+        await expect(overrideDialog).toBeVisible();
+        const advanceWithOverride = overrideDialog.getByRole('button', {
+            name: 'Advance with override',
+        });
+        await expect(advanceWithOverride).toBeDisabled();
+        const overrideReason = `${fixture.marker} panel member unavailable`;
+        await overrideDialog.getByRole('textbox').fill(overrideReason);
+        await expect(advanceWithOverride).toBeEnabled();
+        const overrideCompleted = page.waitForResponse(
+            (response) =>
+                response
+                    .url()
+                    .includes(
+                        `/hr/recruitment/applications/${fixture.overrideApplicationId}/advance`,
+                    ) && response.request().method() === 'POST',
+        );
+        await advanceWithOverride.click();
+        expect((await overrideCompleted).status()).toBeLessThan(400);
+        const overrideProof = parseLaravelJson<{
+            status: string;
+            auditRecorded: boolean;
+        }>(
+            runLaravelPhp(`
+$candidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->findOrFail(${fixture.overrideCandidateId});
+$auditRecorded = \\App\\Models\\AuditLog::query()
+    ->where('action', 'recruitment.scorecard_quorum_overridden')
+    ->where('auditable_type', \\App\\Domain\\Hr\\Models\\HrCandidate::class)
+    ->where('auditable_id', $candidate->id)
+    ->where('meta', 'like', '%'.${JSON.stringify(overrideReason)}.'%')
+    ->exists();
+echo json_encode(['status' => $candidate->status, 'auditRecorded' => $auditRecorded]);
+`),
+        );
+        expect(overrideProof).toEqual({
+            status: 'reference_check',
+            auditRecorded: true,
+        });
+
         await page.goto('/hr/approvals/chains');
         await expect(
             page.getByText('Native leave approval routing'),
         ).toBeVisible();
+        await expect(
+            page.getByText(`${fixture.marker} Generic approvals`),
+        ).toBeVisible();
+        const leaveForm = page.locator('form').filter({
+            has: page.getByRole('button', { name: 'Add route' }),
+        });
+        await leaveForm.getByRole('combobox').nth(0).click();
+        await page
+            .getByRole('option', {
+                name: `${fixture.marker} Payroll Worker`,
+            })
+            .click();
+        await leaveForm.getByRole('combobox').nth(1).click();
+        await page.getByRole('option', { name: 'Demo Admin' }).click();
+        await leaveForm.getByPlaceholder('Level').fill('1');
+        await leaveForm.getByPlaceholder('Escalate hours').fill('12');
+        const addRouteCompleted = page.waitForResponse(
+            (response) =>
+                response.url().endsWith('/hr/approvals/leave-chains') &&
+                response.request().method() === 'POST',
+        );
+        await leaveForm.getByRole('button', { name: 'Add route' }).click();
+        expect((await addRouteCompleted).status()).toBeLessThan(400);
+        const addedLeaveRoute = page
+            .locator('tr')
+            .filter({ hasText: `${fixture.marker} Payroll Worker` });
+        await expect(addedLeaveRoute).toContainText('12h');
+
         const leaveRoute = page
             .locator('tr')
             .filter({ hasText: `${fixture.marker} Worker` })
             .first();
         await expect(leaveRoute).toBeVisible();
-        const reorderCompleted = page.waitForResponse(
+        await leaveRoute
+            .getByRole('button', { name: 'Edit leave approval route' })
+            .click();
+        const editLeaveForm = page.locator('form').filter({
+            has: page.getByRole('button', { name: 'Save', exact: true }),
+        });
+        await editLeaveForm.getByPlaceholder('Escalate hours').fill('36');
+        const editRouteCompleted = page.waitForResponse(
+            (response) =>
+                response
+                    .url()
+                    .includes(
+                        `/hr/approvals/leave-chains/${fixture.leaveChainIds[0]}`,
+                    ) && response.request().method() === 'PUT',
+        );
+        await editLeaveForm
+            .getByRole('button', { name: 'Save', exact: true })
+            .click();
+        expect((await editRouteCompleted).status()).toBeLessThan(400);
+        await expect(leaveRoute).toContainText('36h');
+
+        const moveDownCompleted = page.waitForResponse(
             (response) =>
                 response.url().includes('/hr/approvals/leave-chains/reorder') &&
                 response.request().method() === 'POST',
@@ -688,12 +955,27 @@ echo json_encode([
         await leaveRoute
             .getByRole('button', { name: 'Move approval level down' })
             .click();
-        expect((await reorderCompleted).status()).toBeLessThan(400);
-        await leaveRoute
-            .getByRole('button', { name: 'Edit leave approval route' })
-            .click();
-        await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
-        await page.getByRole('button', { name: 'Cancel' }).first().click();
+        expect((await moveDownCompleted).status()).toBeLessThan(400);
+        await page.reload();
+        const movedLeaveRoute = page
+            .locator('tr')
+            .filter({ hasText: `${fixture.marker} Worker` })
+            .filter({ hasText: '36h' });
+        await expect(movedLeaveRoute).toBeVisible();
+        const [moveUpCompleted] = await Promise.all([
+            page.waitForResponse(
+                (response) =>
+                    response
+                        .url()
+                        .includes('/hr/approvals/leave-chains/reorder') &&
+                    response.request().method() === 'POST',
+            ),
+            movedLeaveRoute
+                .getByRole('button', { name: 'Move approval level up' })
+                .click(),
+        ]);
+        expect(moveUpCompleted.status()).toBeLessThan(400);
+
         const deactivateCompleted = page.waitForResponse(
             (response) =>
                 response.url().includes('/hr/approvals/leave-chains/') &&
@@ -717,6 +999,26 @@ echo json_encode([
             .getByRole('button', { name: 'Activate' })
             .click();
         expect((await activateCompleted).status()).toBeLessThan(400);
+        const addedRouteId = Number(
+            runLaravelPhp(`
+echo \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()
+    ->where('user_id', ${fixture.payrollUserId})
+    ->where('escalation_after_hours', 12)
+    ->value('id');
+`).trim(),
+        );
+        const removeCompleted = page.waitForResponse(
+            (response) =>
+                response
+                    .url()
+                    .endsWith(`/hr/approvals/leave-chains/${addedRouteId}`) &&
+                response.request().method() === 'DELETE',
+        );
+        await addedLeaveRoute
+            .getByRole('button', { name: 'Remove leave approval route' })
+            .click();
+        expect((await removeCompleted).status()).toBeLessThan(400);
+        await expect(addedLeaveRoute).toHaveCount(0);
 
         await page.goto('/hr/payroll');
         const payrollRun = page
@@ -726,9 +1028,25 @@ echo json_encode([
         await expect(payrollRun).toContainText('Locked');
         await expect(payrollRun).toContainText('$2,400.00');
         await page.goto('/hr/payroll/payslips');
+        const desktopPayslipRow = page
+            .locator('tr')
+            .filter({ hasText: `${fixture.marker} Payroll Worker` });
+        await expect(desktopPayslipRow).toBeVisible();
+        await desktopPayslipRow.getByRole('link', { name: 'View' }).click();
+        await expect(page).toHaveURL(
+            new RegExp(`/hr/payroll/payslips/${fixture.payslipId}$`),
+        );
         await expect(
             page.getByText(`${fixture.marker} Payroll Worker`).first(),
         ).toBeVisible();
+        const managerDownload = await page.request.get(
+            `/hr/payroll/payslips/${fixture.payslipId}/download`,
+        );
+        expect(managerDownload.status()).toBe(200);
+        expect(managerDownload.headers()['content-type']).toContain(
+            'application/pdf',
+        );
+        await page.goto('/hr/payroll/payslips');
         await page.setViewportSize({ width: 390, height: 844 });
         const mobilePayslips = page.locator('[data-payroll-mobile]');
         await expect(mobilePayslips).toBeVisible();
@@ -755,24 +1073,90 @@ echo json_encode([
             ),
         ).toBeVisible();
         await expect(page.getByText('$1,814.00').first()).toBeVisible();
-
-        await page.setViewportSize({ width: 1440, height: 1000 });
-        await page.context().clearCookies();
-        await loginAsStaff(page);
-        const regressionRoutes = [
-            '/hr/training/catalog',
-            '/hr/feedback',
-            '/hr/performance?tab=supervision',
-            '/hr/time?tab=overview',
-            '/operations/shifts',
-        ];
-        for (const route of regressionRoutes) {
-            const response = await page.goto(route);
-            expect(response?.status(), route).toBe(200);
-            await expect(page.locator('main')).toBeVisible();
-        }
+        const employeeDownload = await page.request.get(
+            `/hr/my/payslips/${fixture.payslipId}/download`,
+        );
+        expect(employeeDownload.status()).toBe(200);
+        expect(employeeDownload.headers()['content-type']).toContain(
+            'application/pdf',
+        );
 
         expectNoConsoleErrors(consoleErrors);
         expect(failedHrRequests).toEqual([]);
+    });
+
+    test('rechecks the five previously green HR controls', async ({ page }) => {
+        test.setTimeout(120_000);
+        page.setDefaultTimeout(15_000);
+        const consoleErrors = collectConsoleErrors(page);
+        const failedTargetRequests: string[] = [];
+        page.on('response', (response) => {
+            if (
+                (response.url().includes('/hr/') ||
+                    response.url().includes('/operations/shifts')) &&
+                response.status() >= 400
+            ) {
+                failedTargetRequests.push(
+                    `${response.status()} ${response.request().method()} ${response.url()}`,
+                );
+            }
+        });
+
+        await loginAsStaff(page);
+        await page.goto('/hr/training/catalog');
+        await page.getByRole('tab', { name: /^Catalog/ }).click();
+        const trainingSearch = page.getByPlaceholder(
+            'Search title, code, provider…  ( / )',
+        );
+        await trainingSearch.fill(fixture.marker);
+        await expect(trainingSearch).toHaveValue(fixture.marker);
+
+        await page.goto('/hr/feedback');
+        await page.getByRole('button', { name: /^Pending/ }).click();
+        await expect(
+            page.getByText(/No pending feedback requests|Feedback for/).first(),
+        ).toBeVisible();
+
+        await page.goto('/hr/performance?tab=supervision');
+        const supervisionSearch = page.getByPlaceholder(
+            'Search supervision notes…',
+        );
+        await supervisionSearch.fill(fixture.marker);
+        await expect(supervisionSearch).toHaveValue(fixture.marker);
+
+        await page.goto('/hr/time?tab=overview');
+        const overviewTab = page.getByRole('tab', { name: /^Overview/ });
+        await expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+        const softRefresh = page.waitForResponse(
+            (response) => {
+                const partialData =
+                    response.request().headers()['x-inertia-partial-data'] ??
+                    '';
+                return (
+                    response.url().includes('/hr/time') &&
+                    response.request().method() === 'GET' &&
+                    partialData.includes('entries') &&
+                    partialData.includes('onNow')
+                );
+            },
+            { timeout: 35_000 },
+        );
+        expect((await softRefresh).status()).toBe(200);
+        await expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+        await expect(page).toHaveURL(/\/hr\/time\?tab=overview/);
+
+        await page.goto('/operations/shifts');
+        await page.getByRole('tab', { name: /^Open/ }).click();
+        await expect(page.getByRole('tab', { name: /^Open/ })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
+        await page.getByRole('button', { name: 'Calendar view' }).click();
+        await expect(
+            page.getByRole('button', { name: 'Calendar view' }),
+        ).toBeVisible();
+
+        expectNoConsoleErrors(consoleErrors);
+        expect(failedTargetRequests).toEqual([]);
     });
 });
