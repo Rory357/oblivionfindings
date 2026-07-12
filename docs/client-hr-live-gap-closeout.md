@@ -34,7 +34,7 @@
 ### Slice 1 — Client tab canonicalisation
 
 - Start SHA: `19892c89a66d5670d004ffd93ea56f6e0635455c`
-- End SHA: pending
+- End SHA: `e2958ca0a1ef64bb7c4729ffe506e5f14b71a43d`
 - Ownership decision: legacy aliases stay in `_groups.ts`; the canonical care-plan workspace remains `care_plans`.
 - Files changed: `resources/js/pages/operations/clients/tabs/_groups.ts`, `resources/js/test/client-profile-navigation.test.tsx`, `tests/e2e/operations-client-profile-phase-1.spec.ts`, and this ledger.
 - Root cause: the alias canonicaliser called the browser History API directly, bypassing Inertia's history-state ownership. The visible URL changed, but Inertia navigation state was not updated safely.
@@ -45,14 +45,14 @@
 - Console/network evidence: the targeted Playwright case asserted zero console errors and zero `>=400` responses for the target client route.
 - Full-file classification: **1 passed / 2 failed**. The new alias case passed. Both pre-existing note-capture cases could not find the permission-gated quick-note action after canonical global setup failed on the existing duplicate `EMP0003` unique key in `SystemUsersSeeder`; the same two failures reproduced with reseeding skipped. This is a local fixture/seeder blocker, not an alias regression.
 - Smoke marker and record IDs: exact local synthetic clients `5-38`, alternating `Playwright Profile` and `Recent Playwright Client`.
-- Cleanup: deleted exactly client IDs `5-38` from the local testing database through model deletion; verified `remaining=0` for that ID set.
+- Cleanup: deleted exactly client IDs `5-38` from the local testing database through model deletion; verified `remaining=0` for that ID set. The release rerun exposed that the spec itself did not automate this cleanup, so ID-scoped `afterEach` teardown now deletes each run's synthetic clients and their exact `auditable_type=client` audit rows. The final rerun passed with `synthetic_clients=0` and audit logs restored to `584`.
 - Commit SHA: `e2958ca0a1ef64bb7c4729ffe506e5f14b71a43d`
 - Remaining: post-deployment Chrome acceptance.
 
 ### Slice 2 — HR team ownership and Calendar configuration
 
 - Start SHA: `e2958ca0a1ef64bb7c4729ffe506e5f14b71a43d`
-- End SHA: pending
+- End SHA: `e75047ab63ad57684e29ced57fbc678cab3e52ff`
 - Ownership decision: `HrEmployeeProfile.team` is the single employee-membership fact and the current Calendar contract. `HrPosition.team` remains an independent position-template attribute and is not dual-written. Calendar, manager create/edit, and demo assignments all use the profile field; no schema, route, taxonomy, or parallel configuration surface was added.
 - Files changed: `HrEmployeeProfile`, the two employee requests, `EmployeeProfileController`, `CalendarController`, `HrDemoSeeder`, manager create/edit UI, shared segmented-control disabled support, Calendar wizard empty state, focused feature tests, demo-seeder test, and this ledger.
 - Red proof: the first genuine focused test asserted that create input `clinical support` must resolve to the tenant's existing `Clinical Support`; it failed because the newly created profile team was `NULL`.
@@ -70,7 +70,7 @@
 ### Slice 3 — Fixture-gated HR browser matrix
 
 - Start SHA: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
-- End SHA: pending
+- End SHA: `50b27bf9686a7b3dc9c553a87ed83caaae680c5f`
 - Ownership decision: exercise canonical HR lifecycle workflows and existing demo ownership; do not create parallel implementations.
 - Files changed: `tests/e2e/hr-live-gap-closeout.spec.ts` and this ledger. No Slice 3 application source, route, schema, or parallel workflow was added.
 - Baseline counts: users `35`; profiles `33`; audit logs `584`; calendar events/attendees/reminders/attachments `0/0/0/0`; salary bands `3`; offboarding checklists/tasks/exit interviews `0/0/0`; candidates/applications/offers `5/5/0`; approval chains/steps `2/2`; payroll runs/payslips `1/0`.
@@ -83,13 +83,13 @@
 - Cleanup and final counts: reverse cleanup deletes the attachment and every marker record, pivot, and exact auditable ID. After a second full green run, marker users/profiles/events/files/audits were all `0`, and every baseline count above returned exactly, including audit logs `584`.
 - Backend suites: `CanonicalAuditOrganizationTest`, `DeferredRetentionLifecycleTest`, `HrCalendarResilienceTest`, `SalaryBandPlacementTest`, `ExitInterviewWizardTest`, `OffboardingWizardStoreTest`, `RecruitmentDeferredLifecycleTest`, `ApprovalChainTenantTest`, `MyPayslipsSelfServiceTest`, `PayslipPdfTest`, and `PayrollRunIntegrityTest` passed **59 tests / 426 assertions**.
 - Static gates: new spec Prettier passed, ESLint passed with zero warnings, TypeScript passed, and `git diff --check` passed.
-- Commit SHA: pending
+- Commit SHA: `50b27bf9686a7b3dc9c553a87ed83caaae680c5f`
 - Remaining: commit, aggregate release gates, deployment, and the required post-deployment real Chrome acceptance session.
 
 ### Slice 4 — Control Room scheduled escalation
 
 - Start SHA: `e75047ab63ad57684e29ced57fbc678cab3e52ff`
-- End SHA: pending
+- End SHA: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
 - Ownership decision: keep escalation in `AutoEscalateControlRoomQueues`; apply only required callback capture changes.
 - Files changed: `app/Jobs/AutoEscalateControlRoomQueues.php`, `tests/Feature/ControlRoom/AutoEscalateControlRoomQueuesTest.php`, and this ledger.
 - Red proof: the eligible-alert regression reproduced `Undefined variable $automationService` at `AutoEscalateControlRoomQueues.php:91` after entering the nested alert chunk.
@@ -113,16 +113,16 @@
 
 ## Release gates
 
-- Focused and aggregate tests: pending
-- PHP syntax: pending
-- Pint: pending
-- Prettier: pending
-- ESLint zero-warning: pending
-- Wayfinder: pending
-- TypeScript: pending
-- Client build: pending
-- SSR build: pending
-- `git diff --check`: pending
+- Focused and aggregate tests: green — Slice 3 HR lifecycle pack **59 tests / 426 assertions**; HR team plus Control Room pack **30 tests / 149 assertions**; Client navigation Vitest **14/14**; post-build Client alias Playwright **1/1**; post-build HR lifecycle Playwright **1/1**. The known two non-alias Client scenarios remain locally blocked by the pre-existing duplicate-`EMP0003` seeder failure recorded in Slice 1.
+- PHP syntax: green for all 10 changed PHP/test files.
+- Pint: seven changed PHP files green. The two employee request files retain their starting-revision `binary_operator_spaces` failure and `HrDemoSeeder` retains its starting-revision `fully_qualified_strict_types` / `ordered_imports` failures; the broad unrelated formatting sweep remains intentionally excluded.
+- Prettier: the Client files and new HR matrix are green. The four touched legacy HR UI files retain their starting-revision whole-file failures recorded in Slice 2; no new formatter failure was introduced.
+- ESLint zero-warning: green across all eight changed TS/TSX files.
+- Wayfinder: green; actions and routes regenerated with no tracked diff.
+- TypeScript: green after Wayfinder regeneration and after the final Slice 3 changes.
+- Client build: green — `4943` modules transformed in `5m 2s`; manifest generated.
+- SSR build: green — `1595` modules transformed in `1m 40s`; SSR manifest and bundle generated.
+- `git diff --check`: green.
 
 ## Integration and deployment
 

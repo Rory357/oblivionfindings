@@ -7,6 +7,8 @@ import {
     runLaravelPhp,
 } from './helpers';
 
+const fixtureClientIds = new Set<number>();
+
 function seedClientProfilePhaseOneFixture() {
     const output = runLaravelPhp(`
 $client = \\App\\Models\\Client::factory()->create([
@@ -26,13 +28,41 @@ echo json_encode([
 ]);
 `);
 
-    return JSON.parse(output) as {
+    const fixture = JSON.parse(output) as {
         clientId: number;
         recentClientId: number;
     };
+
+    fixtureClientIds.add(fixture.clientId);
+    fixtureClientIds.add(fixture.recentClientId);
+
+    return fixture;
+}
+
+function cleanupClientProfilePhaseOneFixtures() {
+    if (fixtureClientIds.size === 0) {
+        return;
+    }
+
+    const ids = [...fixtureClientIds];
+    runLaravelPhp(`
+$ids = ${JSON.stringify(ids)};
+foreach (\\App\\Models\\Client::query()->whereIn('id', $ids)->get() as $client) {
+    $client->delete();
+}
+\\Illuminate\\Support\\Facades\\DB::table('audit_logs')
+    ->where('auditable_type', 'client')
+    ->whereIn('auditable_id', $ids)
+    ->delete();
+`);
+    fixtureClientIds.clear();
 }
 
 test.describe('operations client profile phase 1', () => {
+    test.afterEach(() => {
+        cleanupClientProfilePhaseOneFixtures();
+    });
+
     test('canonicalizes the legacy care plan tab without breaking Inertia history or dialog state', async ({
         page,
     }) => {
