@@ -463,6 +463,55 @@ class MedicationIncidentJourneyTest extends TestCase
         );
     }
 
+    public function test_submitted_source_journey_rolls_back_when_signal_source_is_unavailable(): void
+    {
+        Log::spy();
+        [$actor, $client, $medication] = $this->medicationFixture();
+        $discrepancy = ClientControlledDrugDiscrepancy::create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'on_hand_before' => 15,
+            'on_hand_after' => 14,
+            'difference' => -1,
+            'reason' => 'Forced signal-source failure test.',
+            'reported_at' => now()->subMinutes(5)->startOfSecond(),
+            'reported_by' => $actor->id,
+            'status' => 'open',
+        ]);
+        $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            protected function getSignalSource(): ?SignalSource
+            {
+                return null;
+            }
+        };
+        $service = new MedicationIncidentIntegrationService(
+            $signals,
+            app(IncidentJourneyService::class),
+        );
+
+        try {
+            $service->handleControlledDiscrepancy($discrepancy, $actor->id);
+            $this->fail('Missing incident journey signal source must abort the owning transaction.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Medication signal source is unavailable for an incident journey.', $exception->getMessage());
+        }
+
+        $this->assertNull($discrepancy->fresh()->incident_id);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('medication_dashboard_alerts', 0);
+        Log::shouldHaveReceived('error')->withArgs(
+            fn (string $message, array $context): bool => $message === 'incident_journey_repair_required'
+                && is_int($context['incident_id'])
+                && $context['signal_id'] === null
+                && $context['signal_type'] === MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY
+                && $context['exception'] === \RuntimeException::class,
+        );
+    }
+
     public function test_medication_signal_rejects_ambiguous_incident_alert_claims_without_attachment(): void
     {
         [, $client] = $this->medicationFixture();

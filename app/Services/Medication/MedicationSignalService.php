@@ -94,7 +94,6 @@ class MedicationSignalService
         array $context = [],
     ): void {
         $signal = null;
-        $source = $this->getSignalSource();
 
         $idempotencyKey = $this->buildIdempotencyKey(
             $signalType,
@@ -102,25 +101,31 @@ class MedicationSignalService
             $context,
         );
 
-        $signalData = [
-            'signal_source_id' => $source?->id,
-            'signal_type_code' => $signalType,
-            'idempotency_key' => $idempotencyKey,
-            'site_id' => $context['site_id'] ?? null,
-            'client_id' => $clientId,
-            'severity_hint' => $severity,
-            'occurred_at' => $context['occurred_at'] ?? now(),
-            'payload' => [],
-            'normalized_data' => array_merge([
-                'title' => $message,
-                'description' => $message,
-                'source_module' => 'medication',
-                'signal_type' => $signalType,
-                'client_id' => $clientId,
-            ], $context),
-        ];
-
         try {
+            $source = $this->getSignalSource();
+
+            if (is_numeric($context['incident_id'] ?? null) && $source === null) {
+                throw new \RuntimeException('Medication signal source is unavailable for an incident journey.');
+            }
+
+            $signalData = [
+                'signal_source_id' => $source?->id,
+                'signal_type_code' => $signalType,
+                'idempotency_key' => $idempotencyKey,
+                'site_id' => $context['site_id'] ?? null,
+                'client_id' => $clientId,
+                'severity_hint' => $severity,
+                'occurred_at' => $context['occurred_at'] ?? now(),
+                'payload' => [],
+                'normalized_data' => array_merge([
+                    'title' => $message,
+                    'description' => $message,
+                    'source_module' => 'medication',
+                    'signal_type' => $signalType,
+                    'client_id' => $clientId,
+                ], $context),
+            ];
+
             $signal = $this->signalProcessor->ingest($signalData);
             $alert = $this->signalProcessor->process($signal);
 
