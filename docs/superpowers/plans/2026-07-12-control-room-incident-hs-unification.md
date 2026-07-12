@@ -244,7 +244,7 @@ git commit -m "feat(incidents): add explicit journey and handover schema"
 - Modify: `app/Services/HealthSafety/HsEventService.php`
 - Test: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
 
-- [ ] **Step 1: Write failing alert-to-incident and retry tests**
+- [x] **Step 1: Write failing alert-to-incident and retry tests**
 
 ```php
 it('creates one submitted incident and one hs event from an existing alert and is idempotent', function () {
@@ -264,13 +264,13 @@ it('creates one submitted incident and one hs event from an existing alert and i
 });
 ```
 
-- [ ] **Step 2: Run and confirm the missing-service failure**
+- [x] **Step 2: Run and confirm the missing-service failure**
 
 Run: `php artisan test tests/Feature/Incidents/IncidentJourneyServiceTest.php`
 
 Expected: FAIL because `IncidentJourneyService` does not exist.
 
-- [ ] **Step 3: Implement the service API and transaction**
+- [x] **Step 3: Implement the service API and transaction**
 
 ```php
 public function submitFromAlert(ControlRoomAlert $alert, array $input, User $actor): IncidentJourney;
@@ -283,26 +283,36 @@ Lock the alert/incident rows, prefer direct links, enforce all three backlinks, 
 
 Map a critical operational alert to the incident model's supported `high` severity while preserving critical on the alert and in journey provenance; do not silently coerce or lose the original severity.
 
-- [ ] **Step 4: Add distinct-incident deduplication tests**
+- [x] **Step 4: Add distinct-incident deduplication tests**
 
 Create two same-client, same-type submitted incidents less than 30 minutes apart. Call `ensureAlertForIncident()` twice per incident and assert two alerts total, one stable alert per incident, and no orphan.
 
-- [ ] **Step 5: Add low/medium and high rules**
+- [x] **Step 5: Add low/medium and high rules**
 
 `ensureForSubmittedIncident()` creates an H&S event for every submitted incident. It creates an alert automatically only for high/critical-equivalent rules or explicit escalation. It never creates an H&S event for a draft.
 
-- [ ] **Step 6: Run the service tests**
+- [x] **Step 6: Run the service tests**
 
 Run: `php artisan test tests/Feature/Incidents/IncidentJourneyServiceTest.php`
 
 Expected: PASS, including retries and two distinct incidents in one fuzzy dedup window.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/Incidents app/Models/ControlRoomAlert.php app/Models/ClientIncident.php app/Models/HsEvent.php app/Services/HealthSafety/HsEventService.php tests/Feature/Incidents/IncidentJourneyServiceTest.php
 git commit -m "feat(incidents): orchestrate one incident journey"
 ```
+
+**Task 3 completion evidence — 2026-07-13**
+
+- Initial implementation: `b6748d2f`; lifecycle/WorkSafe/tuple/provenance correction: `e2c2ed40`; ownership/discriminator/context hardening: `441f8c1f`.
+- Initial TDD evidence: missing-service RED 1 failure; full-behaviour RED 12 failures / 1 pass / 2 assertions; initial GREEN 13 tests / 157 assertions.
+- Independent specification review then found four blockers: non-draft lifecycle regression, H&S WorkSafe demotion, non-canonical H&S source tuples, and lost sensor provenance. Fix-round RED was 5 failures / 12 passes / 159 assertions; GREEN was 17 tests / 200 assertions.
+- Independent quality review then found foreign H&S re-parenting, over-broad signal classification, and destructive alert-context collisions. Quality-round RED was 3 failures / 17 passes / 206 assertions; final focused GREEN was 20 tests / 228 assertions.
+- Final reviewed behaviour preserves reviewed/closed incident state, keeps all seven WorkSafe fields H&S-authoritative after first canonical linkage, allows only monotonic initial legacy adoption, rejects foreign H&S ownership before writes, safely repairs same-incident tuple drift, requires a real signal plus trusted sensor source, and deep-fills reused alert context without replacing operational provenance.
+- Regression proof: `HsEventBackboneTest` 26 tests / 44 assertions; `HsEventWorksafeTest` 6 tests / 21 assertions. Root-owned post-review rerun: `IncidentJourneyServiceTest` 20 tests / 228 assertions on `441f8c1f`.
+- Final independent specification re-review: pass. Final independent code-quality re-review: approved with no High/Medium defect. PHP lint, Pint, and `git diff --check` passed. No observer, bridge, controller, route, UI, mobile, Task 4, merge, push, or deployment work was included.
 
 ---
 
