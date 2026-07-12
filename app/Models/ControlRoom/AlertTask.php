@@ -114,7 +114,7 @@ class AlertTask extends Model
     {
         return $query->whereNotNull('due_at')
             ->where('due_at', '<', now())
-            ->whereNotIn('status', ['completed', 'cancelled']);
+            ->whereNotIn('status', self::TERMINAL_STATUSES);
     }
 
     public function scopeAssignedTo($query, $userId)

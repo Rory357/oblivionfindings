@@ -325,7 +325,7 @@ class ClientIncident extends Model implements EmitsToTimeline
             'actor_user_id' => $this->reported_by,
             'client_id' => $this->client_id,
             'shift_id' => $this->shift_id,
-            'site_id' => $this->client?->site_id,
+            'site_id' => $this->site_id ?? $this->client?->site_id,
             'subject' => 'Incident: '.($this->title ?? $this->type),
             'body' => $this->description,
             'meta' => array_filter([

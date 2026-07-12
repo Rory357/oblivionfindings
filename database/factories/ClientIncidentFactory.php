@@ -67,9 +67,4 @@ class ClientIncidentFactory extends Factory
             'hs_event_id' => $event->id,
         ]);
     }
-
-    public function forJourney(Site $site, HsEvent $event): static
-    {
-        return $this->atSite($site)->linkedToHsEvent($event);
-    }
 }

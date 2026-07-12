@@ -13,18 +13,22 @@ class HsEventFactory extends Factory
 
     public function definition(): array
     {
+        $sourceType = HsEvent::class;
+        $sourceId = fake()->unique()->numberBetween(1_000_000, 2_000_000_000);
+        $eventCategory = HsEvent::CATEGORY_INCIDENT;
+
         return [
             'reference_number' => HsEvent::generateReferenceNumber(),
-            'source_type' => ClientIncident::class,
-            'source_id' => fake()->unique()->numberBetween(1_000_000, 2_000_000_000),
-            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'event_category' => $eventCategory,
             'severity' => fake()->randomElement(['low', 'medium', 'high', 'critical']),
             'status' => HsEvent::STATUS_OPEN,
             'occurred_at' => fake()->dateTimeBetween('-1 month', 'now'),
             'reported_at' => now(),
             'worksafe_notifiable' => false,
             'investigation_required' => false,
-            'idempotency_key' => hash('sha256', fake()->uuid()),
+            'idempotency_key' => HsEvent::buildIdempotencyKey($sourceType, $sourceId, $eventCategory),
             'created_by' => User::factory(),
         ];
     }

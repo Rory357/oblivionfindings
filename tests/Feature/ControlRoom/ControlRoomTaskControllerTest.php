@@ -122,6 +122,32 @@ class ControlRoomTaskControllerTest extends TestCase
             ->assertSessionHasErrors('status');
     }
 
+    public function test_overdue_scope_excludes_every_terminal_status(): void
+    {
+        foreach ([
+            AlertTask::STATUS_OPEN,
+            AlertTask::STATUS_IN_PROGRESS,
+            AlertTask::STATUS_BLOCKED,
+            AlertTask::STATUS_COMPLETED,
+            AlertTask::STATUS_CANCELLED,
+            AlertTask::STATUS_TRANSFERRED,
+        ] as $status) {
+            AlertTask::create([
+                'alert_id' => $this->alert->id,
+                'title' => "{$status} overdue task",
+                'priority' => 'medium',
+                'status' => $status,
+                'due_at' => now()->subHour(),
+                'created_by_user_id' => $this->admin->id,
+            ]);
+        }
+
+        $this->assertSame(
+            [AlertTask::STATUS_BLOCKED, AlertTask::STATUS_IN_PROGRESS, AlertTask::STATUS_OPEN],
+            AlertTask::overdue()->orderBy('status')->pluck('status')->all()
+        );
+    }
+
     public function test_destroy_removes_task(): void
     {
         $task = AlertTask::create([

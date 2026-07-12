@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Incidents;
 
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
@@ -165,32 +166,28 @@ class IncidentJourneySchemaTest extends TestCase
         $this->assertTrue(method_exists(HsEvent::class, 'clientIncident'));
 
         $site = Site::factory()->create();
-        $directEvent = HsEvent::factory()->create(['site_id' => $site->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'site_id' => $site->id,
-            'hs_event_id' => $directEvent->id,
             'type' => 'injury',
         ]));
-        $fallbackEvent = HsEvent::factory()->create([
-            'source_type' => ClientIncident::class,
-            'source_id' => $incident->id,
-            'event_category' => HsEvent::CATEGORY_INCIDENT,
-            'idempotency_key' => HsEvent::buildIdempotencyKey(
-                ClientIncident::class,
-                $incident->id,
-                HsEvent::CATEGORY_INCIDENT
-            ),
-        ]);
+        $event = HsEvent::factory()->forClientIncident($incident)->create();
+
+        DB::table('client_incidents')->where('id', $incident->id)->update(['hs_event_id' => $event->id]);
+        $incident->refresh();
 
         $this->assertTrue($incident->site->is($site));
-        $this->assertTrue($incident->hsEvent->is($directEvent));
-        $this->assertTrue($directEvent->clientIncident->is($incident));
-        $this->assertTrue($incident->linkedHsEvent()?->is($directEvent));
+        $this->assertTrue($incident->hsEvent->is($event));
+        $this->assertTrue($event->source->is($incident));
+        $this->assertTrue($event->clientIncident->is($incident));
+        $this->assertSame($incident->client_id, $event->client_id);
+        $this->assertSame($incident->site_id, $event->site_id);
+        $this->assertTrue($event->site->is($site));
+        $this->assertTrue($incident->linkedHsEvent()?->is($event));
 
         DB::table('client_incidents')->where('id', $incident->id)->update(['hs_event_id' => null]);
         $incident->refresh();
 
-        $this->assertTrue($incident->linkedHsEvent()?->is($fallbackEvent));
+        $this->assertTrue($incident->linkedHsEvent()?->is($event));
     }
 
     public function test_incident_journey_links_are_unique_and_null_when_their_targets_are_deleted(): void
@@ -213,7 +210,7 @@ class IncidentJourneySchemaTest extends TestCase
             $duplicate = $exception;
         }
 
-        $this->assertDuplicateKeyViolation($duplicate);
+        $this->assertDuplicateKeyViolation($duplicate, 'client_incidents_hs_event_id_unique');
 
         $incident = ClientIncident::query()->where('hs_event_id', $event->id)->firstOrFail();
         $site->forceDelete();
@@ -222,6 +219,42 @@ class IncidentJourneySchemaTest extends TestCase
         $incident->refresh();
         $this->assertNull($incident->site_id);
         $this->assertNull($incident->hs_event_id);
+    }
+
+    public function test_multiple_incidents_can_have_a_null_hs_event_link(): void
+    {
+        $this->assertJourneySchemaAvailable();
+
+        $first = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'hs_event_id' => null,
+        ]));
+        $second = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'hs_event_id' => null,
+        ]));
+
+        $this->assertNull($first->hs_event_id);
+        $this->assertNull($second->hs_event_id);
+        $this->assertSame(2, ClientIncident::query()->whereNull('hs_event_id')->count());
+    }
+
+    public function test_incident_timeline_prefers_explicit_site_then_falls_back_to_client_site(): void
+    {
+        $this->assertJourneySchemaAvailable();
+
+        $clientSite = Site::factory()->create();
+        $incidentSite = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $clientSite->id]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $incidentSite->id,
+        ]));
+
+        $this->assertSame($incidentSite->id, $incident->toTimelineEvent()['site_id']);
+
+        DB::table('client_incidents')->where('id', $incident->id)->update(['site_id' => null]);
+        $incident->refresh();
+
+        $this->assertSame($clientSite->id, $incident->toTimelineEvent()['site_id']);
     }
 
     public function test_hs_handover_acceptance_fields_are_cast_and_user_links_null_on_delete(): void
@@ -400,34 +433,46 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_journey_factory_states_are_explicit_and_hs_event_defaults_do_not_create_incidents(): void
     {
         $this->assertJourneySchemaAvailable();
-        $this->assertTrue(method_exists(ClientIncident::factory(), 'forJourney'));
         $this->assertTrue(method_exists(HsEvent::factory(), 'forClientIncident'));
         $this->assertTrue(method_exists(HsEvent::factory(), 'awaitingHandoverAcceptance'));
         $this->assertTrue(method_exists(HsEvent::factory(), 'handoverAccepted'));
         $this->assertTrue(class_exists(HsRecommendationDisposition::class));
 
         $incidentCount = ClientIncident::query()->count();
-        HsEvent::factory()->create();
+        $syntheticEvent = HsEvent::factory()->create();
         $this->assertSame($incidentCount, ClientIncident::query()->count());
+        $this->assertSame(HsEvent::class, $syntheticEvent->source_type);
+        $this->assertSame(
+            HsEvent::buildIdempotencyKey(
+                $syntheticEvent->source_type,
+                $syntheticEvent->source_id,
+                $syntheticEvent->event_category
+            ),
+            $syntheticEvent->idempotency_key
+        );
+        $this->assertNull($syntheticEvent->source);
 
         $site = Site::factory()->create();
         $owner = User::factory()->create();
         $acceptor = User::factory()->create();
-        $sourceIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
+        $sourceIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()
+            ->atSite($site)
+            ->create());
         $event = HsEvent::factory()->forClientIncident($sourceIncident)
             ->awaitingHandoverAcceptance($owner)
             ->create();
-        $journeyIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()
-            ->forJourney($site, $event)
-            ->create());
+        DB::table('client_incidents')->where('id', $sourceIncident->id)->update(['hs_event_id' => $event->id]);
+        $sourceIncident->refresh();
         $accepted = HsEvent::factory()->handoverAccepted($owner, $acceptor)->create();
         $factoryDisposition = HsRecommendationDisposition::factory()->create();
 
         $this->assertSame(ClientIncident::class, $event->source_type);
         $this->assertSame($sourceIncident->id, $event->source_id);
+        $this->assertTrue($event->source->is($sourceIncident));
+        $this->assertTrue($event->clientIncident->is($sourceIncident));
         $this->assertSame('awaiting_acceptance', $event->handover_status);
-        $this->assertSame($site->id, $journeyIncident->site_id);
-        $this->assertSame($event->id, $journeyIncident->hs_event_id);
+        $this->assertSame($site->id, $sourceIncident->site_id);
+        $this->assertSame($event->id, $sourceIncident->hs_event_id);
         $this->assertSame('accepted', $accepted->handover_status);
         $this->assertSame($acceptor->id, $accepted->accepted_by_user_id);
         $this->assertNotNull($factoryDisposition->id);

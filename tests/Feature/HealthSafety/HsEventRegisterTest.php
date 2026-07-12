@@ -2,8 +2,9 @@
 
 namespace Tests\Feature\HealthSafety;
 
-use App\Models\Client;
 use App\Models\Asset;
+use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
@@ -132,7 +133,10 @@ class HsEventRegisterTest extends TestCase
 
     public function test_detail_resolves_the_originating_source_link(): void
     {
-        $event = HsEvent::factory()->create(); // the factory's source is a ClientIncident
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
+        $event = HsEvent::factory()->forClientIncident($incident)->create();
+
+        $this->assertTrue($event->source->is($incident));
 
         $this->actingAs($this->hsOfficer())
             ->get('/health-safety/events?event='.$event->id)
