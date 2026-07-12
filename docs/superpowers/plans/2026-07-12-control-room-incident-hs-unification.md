@@ -67,7 +67,7 @@
 - Test: `tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php`
 - Test: `tests/Feature/HealthSafety/HsEventSiteIsolationTest.php`
 
-- [ ] **Step 1: Write failing read-isolation tests**
+- [x] **Step 1: Write failing read-isolation tests**
 
 ```php
 it('does not return another sites incidents clients sites or hs events', function () {
@@ -86,13 +86,13 @@ it('does not return another sites incidents clients sites or hs events', functio
 });
 ```
 
-- [ ] **Step 2: Run the isolation tests and confirm the current leak**
+- [x] **Step 2: Run the isolation tests and confirm the current leak**
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php tests/Feature/HealthSafety/HsEventSiteIsolationTest.php`
 
 Expected: FAIL because the Incident Tracker/H&S event register returns or opens the other-site rows.
 
-- [ ] **Step 3: Add explicit incident and H&S scope helpers**
+- [x] **Step 3: Add explicit incident and H&S scope helpers**
 
 ```php
 public function applyClientIncidentScope(Builder $query, ?User $user, array $bypass = []): Builder;
@@ -105,11 +105,11 @@ Use `ClientIncident.site_id` when populated and the incident's client/shift site
 
 H&S record IDs use non-disclosing scoped resolution: inaccessible and nonexistent IDs both return 404 for overlays, direct reads, and record mutations. Explicit attempts to select an inaccessible `site_id` filter return 403. Organisation-wide H&S access requires the explicit `healthSafety.viewAllSites` permission; absence of a site assignment never grants access by itself.
 
-- [ ] **Step 4: Scope reads, pickers, queue counts, and nested parent records**
+- [x] **Step 4: Scope reads, pickers, queue counts, and nested parent records**
 
 Apply the helpers before pagination/detail lookup. Every task/evidence/discussion/watcher/time-entry/message mutation must resolve its parent alert and call `assertCanAccessAlert()` before validation or write.
 
-- [ ] **Step 5: Write failing out-of-scope write tests**
+- [x] **Step 5: Write failing out-of-scope write tests**
 
 ```php
 it('rejects creating alerts or incidents for an inaccessible client or source', function () {
@@ -123,18 +123,27 @@ it('rejects creating alerts or incidents for an inaccessible client or source', 
 });
 ```
 
-- [ ] **Step 6: Enforce site/client/source agreement and run the security suite**
+- [x] **Step 6: Enforce site/client/source agreement and run the security suite**
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php tests/Feature/HealthSafety/HsEventSiteIsolationTest.php tests/Unit/Services/UserSiteAccessServiceTest.php`
 
 Expected: PASS with all cross-site IDs absent; Control Room out-of-scope writes and forbidden site filters return 403, while inaccessible H&S record IDs return the same 404 as nonexistent IDs.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/UserSiteAccessService.php app/Http/Controllers/ControlRoom app/Http/Controllers/HealthSafety/HsEventController.php tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php tests/Feature/HealthSafety/HsEventSiteIsolationTest.php
 git commit -m "fix(control-room): enforce incident journey visibility"
 ```
+
+**Task 1 completion evidence — 2026-07-13**
+
+- Phase A visibility and H&S isolation: `34a8ad4e`, `5d71e917`, `d22ecf9d`, and `083f030d`; focused proof 20 tests / 165 assertions; specification and quality reviews approved.
+- Phase B1 nested alert records and task hierarchy: `df6c9815` and `a89721f9`; combined proof 88 tests / 229 assertions; specification and quality reviews approved.
+- Phase B2 scoped messaging and shared authorization concern: `911f0648`, nondisclosure correction `69cebcfe`, and deterministic thread-summary correction `62386a68`.
+- Phase B2 TDD proof: initial security RED 6 failed / 4 passed, ordering RED 1 failed, query-quality RED 4 failed / 11 passed; final messaging GREEN 15 tests / 104 assertions.
+- Phase B1 regressions after the shared concern: nested authorization 36 tests / 96 assertions and task controller 13 tests / 51 assertions.
+- Independent Phase B2 specification re-review: compliant with fresh 11 tests / 82 assertions. Independent code-quality re-review: approved. PHP lint, Pint, and `git diff --check` passed; no mobile test was run.
 
 ---
 
