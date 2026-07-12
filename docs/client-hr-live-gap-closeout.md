@@ -69,17 +69,18 @@
 
 ### Slice 3 — Fixture-gated HR browser matrix
 
-- Start SHA: pending
+- Start SHA: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
 - End SHA: pending
 - Ownership decision: exercise canonical HR lifecycle workflows and existing demo ownership; do not create parallel implementations.
-- Files changed: pending
+- Files changed: this checkpoint ledger only; no Slice 3 application/test source has been added.
 - Baseline counts: pending
-- Smoke marker and record IDs: pending
-- Mail-driver safety: pending
-- Browser URLs and results: pending
+- Local discovery state: the existing `HrDemoSeeder` was run idempotently and exact synthetic demo workers were confirmed (`3`). It currently supplies `1` payroll run and `2` approval chains but `0` offers, `0` payslips, `0` offboarding checklists, and `0` exit interviews, confirming the fixture gaps. Local RBAC/HR/Operations permissions were refreshed for `admin@demo.test` without modifying source.
+- Smoke marker and record IDs: none created for Slice 3 yet.
+- Mail-driver safety: not yet checked; no offer/notification lifecycle was triggered.
+- Browser URLs and results: none; no Slice 3 preview or browser session was started.
 - Cleanup and final counts: pending
 - Commit SHA: pending
-- Remaining: all acceptance rows.
+- Remaining: capture baseline counts, verify safe mail driver, remove stale exact-marker fixtures, create one unique marker through canonical models/services, execute all named desktop/mobile browser rows, record IDs/files, clean in reverse order, and prove final counts return to baseline.
 
 ### Slice 4 — Control Room scheduled escalation
 
@@ -92,8 +93,19 @@
 - Green tests and exact counts: focused job regression plus `AlertAutomationServiceTest` passed **14 tests / 31 assertions**. The regression verifies old assignment closure, new assignment creation, alert queue/level/context update, notification call, automation call, and clean completion.
 - PHP gates: syntax passed for both changed PHP files; scoped Pint passed; `git diff --check` passed.
 - Scheduled-interval server evidence: pending
-- Commit SHA: pending
-- Remaining: exact commit SHA, deployment, and one normal scheduled-interval log observation.
+- Commit SHA: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
+- Remaining: deployment and one normal scheduled-interval log observation.
+
+## Crash-containment checkpoint — 2026-07-12
+
+- Stop request received after Slice 3 discovery began. No further slice work, merge, push, deployment, or browser activity was performed.
+- Worktree: `C:\Users\steph\Herd\oblivionfindings-client-hr-live-gap-closeout`
+- Branch: `codex/client-hr-live-gap-closeout`
+- HEAD before this checkpoint commit: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
+- Dirty state before ledger update: clean.
+- Last safe command: `npm run build` completed successfully with `4943` modules transformed in `3m 52s`.
+- Running-process state: no preview, Playwright, Vite, or browser process started by this task remains. Port `4173` is not listening. An older PHP server owned by another task is listening on `127.0.0.1:8768` (PHP PID `37228`, started 2026-07-11); it was not started or stopped here.
+- Next step on resume: start from this ledger and branch, create the unique marker-scoped Slice 3 fixtures only after baseline counts and mail-driver safety are recorded, then run the required HR browser lifecycle matrix and cleanup proof.
 
 ## Release gates
 
