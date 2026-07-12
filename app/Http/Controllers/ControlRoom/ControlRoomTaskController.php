@@ -5,8 +5,11 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoomAlert;
+use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ControlRoomTaskController extends Controller
 {
@@ -17,6 +20,7 @@ class ControlRoomTaskController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $tasks = AlertTask::where('alert_id', $alert->id)
             ->with('assignedTo:id,name')
@@ -52,6 +56,7 @@ class ControlRoomTaskController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'],
@@ -60,8 +65,17 @@ class ControlRoomTaskController extends Controller
             'priority' => ['required', 'in:critical,high,medium,low'],
             'due_at' => ['nullable', 'date'],
             'estimated_minutes' => ['nullable', 'integer'],
-            'parent_task_id' => ['nullable', 'integer'],
+            'parent_task_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('control_room_alert_tasks', 'id')
+                    ->where(fn ($query) => $query->where('alert_id', $alert->id)),
+            ],
         ]);
+
+        if (isset($data['assigned_to_user_id'])) {
+            $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
+        }
 
         $maxSort = AlertTask::where('alert_id', $alert->id)->max('sort_order') ?? 0;
 
@@ -94,6 +108,8 @@ class ControlRoomTaskController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $alert = $task->alert;
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
@@ -102,8 +118,17 @@ class ControlRoomTaskController extends Controller
             'priority' => ['nullable', 'in:critical,high,medium,low'],
             'due_at' => ['nullable', 'date'],
             'estimated_minutes' => ['nullable', 'integer'],
-            'parent_task_id' => ['nullable', 'integer'],
+            'parent_task_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('control_room_alert_tasks', 'id')
+                    ->where(fn ($query) => $query->where('alert_id', $alert->id)),
+            ],
         ]);
+
+        if (isset($data['assigned_to_user_id'])) {
+            $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
+        }
 
         $task->update(array_filter($data, fn ($v) => $v !== null));
 
@@ -122,6 +147,7 @@ class ControlRoomTaskController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $task->alert);
 
         $data = $request->validate([
             'status' => ['required', 'in:open,in_progress,blocked,completed,cancelled'],
@@ -158,6 +184,7 @@ class ControlRoomTaskController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
         $alert = $task->alert;
+        $this->assertCanAccessAlert($user, $alert);
         $taskId = $task->id;
 
         $task->delete();
@@ -176,6 +203,7 @@ class ControlRoomTaskController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'task_ids' => ['required', 'array'],
@@ -194,5 +222,33 @@ class ControlRoomTaskController extends Controller
         ]);
 
         return back()->with('success', 'Tasks reordered.');
+    }
+
+    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
+    {
+        app(UserSiteAccessService::class)->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to access alerts for this site.',
+        );
+    }
+
+    private function assertCanAssignAlertToUser(User $user, int $assigneeUserId): void
+    {
+        app(UserSiteAccessService::class)->assertCanAssignControlRoomAlertToUser(
+            $user,
+            $assigneeUserId,
+            $this->alertBypassPermissions(),
+            'You are not authorized to assign alerts to that staff member.',
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

@@ -6,9 +6,11 @@ use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertDiscussion;
 use App\Models\ControlRoomAlert;
+use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class ControlRoomDiscussionController extends Controller
 {
@@ -21,6 +23,7 @@ class ControlRoomDiscussionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $discussions = AlertDiscussion::where('alert_id', $alert->id)
             ->whereNull('parent_id')
@@ -65,15 +68,23 @@ class ControlRoomDiscussionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
             'type' => ['sometimes', 'string', 'in:comment,internal_note,status_update,escalation_note,resolution_note'],
             'is_internal' => ['sometimes', 'boolean'],
-            'parent_id' => ['nullable', 'integer', 'exists:control_room_alert_discussions,id'],
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('control_room_alert_discussions', 'id')
+                    ->where(fn ($query) => $query->where('alert_id', $alert->id)),
+            ],
             'mentions' => ['nullable', 'array'],
-            'mentions.*' => ['integer'],
+            'mentions.*' => ['integer', 'distinct', 'exists:users,id'],
         ]);
+
+        $this->assertCanUseMentionedStaff($user, $data['mentions'] ?? []);
 
         // Handle file attachments
         $attachments = [];
@@ -96,7 +107,7 @@ class ControlRoomDiscussionController extends Controller
             'content' => $data['content'],
             'type' => $data['type'] ?? 'comment',
             'is_internal' => $data['is_internal'] ?? true,
-            'attachments' => !empty($attachments) ? $attachments : null,
+            'attachments' => ! empty($attachments) ? $attachments : null,
             'mentions' => $data['mentions'] ?? null,
         ]);
 
@@ -119,7 +130,9 @@ class ControlRoomDiscussionController extends Controller
     public function update(Request $request, AlertDiscussion $discussion)
     {
         $user = $request->user();
-        abort_unless($user && $discussion->user_id === $user->id, 403);
+        abort_unless($user, 403);
+        $this->assertCanAccessAlert($user, $discussion->alert);
+        abort_unless($discussion->user_id === $user->id, 403);
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
@@ -148,6 +161,8 @@ class ControlRoomDiscussionController extends Controller
     public function destroy(Request $request, AlertDiscussion $discussion)
     {
         $user = $request->user();
+        abort_unless($user, 403);
+        $this->assertCanAccessAlert($user, $discussion->alert);
         $isOwner = $user && $discussion->user_id === $user->id;
         $canManage = $user && $user->canDo('controlRoom.alerts.manage');
         abort_unless($isOwner || $canManage, 403);
@@ -167,5 +182,52 @@ class ControlRoomDiscussionController extends Controller
         }
 
         return response()->json(['message' => 'Discussion deleted.']);
+    }
+
+    /**
+     * @param  array<int, int|string>  $userIds
+     */
+    private function assertCanUseMentionedStaff(User $user, array $userIds): void
+    {
+        $uniqueUserIds = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($uniqueUserIds === []) {
+            return;
+        }
+
+        $query = User::staff()->whereIn('id', $uniqueUserIds);
+        app(UserSiteAccessService::class)->applyStaffScope(
+            $query,
+            $user,
+            $this->alertBypassPermissions(),
+        );
+
+        abort_if(
+            $query->count() !== count($uniqueUserIds),
+            403,
+            'You are not authorized to mention one or more staff members for this alert.',
+        );
+    }
+
+    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
+    {
+        app(UserSiteAccessService::class)->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to access alerts for this site.',
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }
