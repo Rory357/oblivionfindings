@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
@@ -40,6 +41,13 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
 
         $visible = $this->clientIncident($clientA, $operator, 'Visible incident');
         $hidden = $this->clientIncident($clientB, $operator, 'Hidden incident');
+        $hiddenMedication = $this->medicationError($clientB, $operator, 'MED-TEST-HIDDEN-LIST');
+        $hiddenSafeguarding = SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
+            'reference_number' => 'SG-TEST-HIDDEN-LIST',
+            'site_id' => $siteB->id,
+            'is_sensitive' => false,
+            'reported_by_user_id' => $operator->id,
+        ]));
         $queue = TriageQueue::query()->create([
             'name' => 'Journey queue',
             'code' => 'journey_queue',
@@ -91,7 +99,25 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             );
 
         $this->assertNotSame($visible->id, $hidden->id);
+        $this->assertNotNull($hiddenMedication->id);
+        $this->assertNotNull($hiddenSafeguarding->id);
         $this->assertNotNull($restricted->id);
+    }
+
+    public function test_site_bound_operator_cannot_filter_the_incident_tracker_by_an_inaccessible_site_or_client(): void
+    {
+        $siteA = Site::factory()->create(['type' => 'house']);
+        $siteB = Site::factory()->create(['type' => 'house']);
+        $clientB = Client::factory()->create(['site_id' => $siteB->id, 'status' => 'active']);
+        $operator = $this->siteBoundUser($siteA, ['controlRoom.viewAny']);
+
+        $this->actingAs($operator)
+            ->get('/control-room/incidents?site_id='.$siteB->id)
+            ->assertForbidden();
+
+        $this->actingAs($operator)
+            ->get('/control-room/incidents?client_id='.$clientB->id)
+            ->assertForbidden();
     }
 
     public function test_site_bound_operator_cannot_create_a_manual_alert_for_an_inaccessible_site_or_client(): void
@@ -166,6 +192,44 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
+    public function test_site_bound_operator_cannot_create_an_alert_from_other_site_medication_or_safeguarding_sources(): void
+    {
+        $siteA = Site::factory()->create(['type' => 'house']);
+        $siteB = Site::factory()->create(['type' => 'house']);
+        $clientB = Client::factory()->create(['site_id' => $siteB->id, 'status' => 'active']);
+        $operator = $this->siteBoundUser($siteA, [
+            'controlRoom.alerts.create',
+            'safeguarding.viewAny',
+        ]);
+        $medication = $this->medicationError($clientB, $operator, 'MED-TEST-HIDDEN-SOURCE');
+        $safeguarding = SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
+            'reference_number' => 'SG-TEST-HIDDEN-SOURCE',
+            'site_id' => $siteB->id,
+            'is_sensitive' => false,
+            'reported_by_user_id' => $operator->id,
+        ]));
+
+        $this->actingAs($operator)
+            ->post('/control-room/incidents/create-alert', [
+                'source_type' => 'medication_error',
+                'source_id' => $medication->id,
+                'severity' => 'high',
+                'notes' => 'Attempted other-site medication hand-off.',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($operator)
+            ->post('/control-room/incidents/create-alert', [
+                'source_type' => 'safeguarding',
+                'source_id' => $safeguarding->id,
+                'severity' => 'high',
+                'notes' => 'Attempted other-site safeguarding hand-off.',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
     public function test_site_bound_operator_cannot_hand_off_a_restricted_safeguarding_source(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
@@ -228,6 +292,22 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
 
         $this->clientIncident($clientA, $globalOperator, 'Site A incident');
         $this->clientIncident($clientB, $globalOperator, 'Site B incident');
+        $queue = TriageQueue::query()->create([
+            'name' => 'Global journey queue',
+            'code' => 'global_journey_queue',
+            'tier' => 1,
+            'is_active' => true,
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'queue_id' => $queue->id,
+            'site_id' => $siteA->id,
+            'client_id' => $clientA->id,
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'queue_id' => $queue->id,
+            'site_id' => $siteB->id,
+            'client_id' => $clientB->id,
+        ]);
 
         $this->actingAs($globalOperator)
             ->get('/control-room/incidents')
@@ -236,6 +316,15 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
                 ->has('incidents.data', 2)
                 ->has('sites', 2)
                 ->has('clients', 2)
+            );
+
+        $this->actingAs($globalOperator)
+            ->get('/control-room/alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('alerts.data', 2)
+                ->has('queues', 1)
+                ->where('queues.0.active_alerts', 2)
             );
     }
 
@@ -250,6 +339,20 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             'status' => 'submitted',
             'occurred_at' => now()->subHour(),
             'description' => $title,
+        ]));
+    }
+
+    private function medicationError(Client $client, User $reporter, string $reference): MedicationError
+    {
+        return MedicationError::withoutEvents(fn () => MedicationError::query()->create([
+            'reference_number' => $reference,
+            'client_id' => $client->id,
+            'error_type' => 'wrong_dose',
+            'severity' => 'major',
+            'description' => 'Medication error at another site.',
+            'reported_by' => $reporter->id,
+            'reported_at' => now()->subHour(),
+            'status' => 'reported',
         ]));
     }
 

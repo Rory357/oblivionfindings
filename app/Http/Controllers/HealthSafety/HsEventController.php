@@ -165,8 +165,13 @@ class HsEventController extends Controller
         // ── Detail-over-list (?event=) ──
         $detail = null;
         if ($request->filled('event')) {
-            $target = $this->scopedBase($request)->find($request->integer('event'));
-            $detail = $target ? $this->buildEventDetail($target) : null;
+            $target = HsEvent::query()->find($request->integer('event'));
+
+            if ($target) {
+                $this->assertCanAccessEvent($request, $target);
+                $target = $this->scopedBase($request)->whereKey($target->id)->first();
+                $detail = $target ? $this->buildEventDetail($target) : null;
+            }
         }
 
         $siteIds = $this->scopedBase($request)->whereNotNull('site_id')->distinct()->pluck('site_id');
@@ -684,14 +689,12 @@ class HsEventController extends Controller
 
         $detail = null;
         if ($request->filled('event')) {
-            $targetQuery = HsEvent::query();
-            $this->siteAccess->applyHsEventScope(
-                $targetQuery,
-                $request->user(),
-                $this->hsEventBypassPermissions(),
-            );
-            $target = $targetQuery->find($request->integer('event'));
-            $detail = $target ? $this->buildEventDetail($target) : null;
+            $target = HsEvent::query()->find($request->integer('event'));
+
+            if ($target) {
+                $this->assertCanAccessEvent($request, $target);
+                $detail = $this->buildEventDetail($target);
+            }
         }
 
         $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))

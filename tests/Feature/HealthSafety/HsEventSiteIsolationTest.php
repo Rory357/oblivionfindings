@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\Permission;
 use App\Models\Role;
@@ -32,16 +33,29 @@ class HsEventSiteIsolationTest extends TestCase
         $hidden = HsEvent::factory()->critical()->create(['site_id' => $siteB->id]);
 
         $this->actingAs($user)
-            ->get('/health-safety/events?event='.$hidden->id)
+            ->get('/health-safety/events')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('events.data', 1)
                 ->where('events.data.0.id', $visible->id)
                 ->where('tabCounts.all', 1)
-                ->where('detail', null)
                 ->has('sites', 1)
                 ->where('sites.0.id', $siteA->id)
             );
+
+        $this->assertNotSame($visible->id, $hidden->id);
+    }
+
+    public function test_site_bound_user_cannot_open_another_sites_event_overlay(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.view']);
+        $hidden = HsEvent::factory()->create(['site_id' => $siteB->id]);
+
+        $this->actingAs($user)
+            ->get('/health-safety/events?event='.$hidden->id)
+            ->assertForbidden();
     }
 
     public function test_site_bound_user_cannot_open_another_sites_event_deep_link(): void
@@ -70,6 +84,80 @@ class HsEventSiteIsolationTest extends TestCase
             ->assertForbidden();
 
         $this->assertNotSame(HsEvent::STATUS_CLOSED, $hidden->fresh()->status);
+    }
+
+    public function test_site_bound_manager_cannot_notify_or_acknowledge_worksafe_for_another_sites_event(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.manage']);
+        $pending = HsEvent::factory()->worksafeNotifiable()->create(['site_id' => $siteB->id]);
+        $notified = HsEvent::factory()->worksafeNotifiable()->create([
+            'site_id' => $siteB->id,
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_notified_at' => now(),
+            'worksafe_method' => 'online',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/health-safety/events/'.$pending->id.'/worksafe/notify', [
+                'notified_at' => now()->toDateString(),
+                'method' => 'phone',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->post('/health-safety/events/'.$notified->id.'/worksafe/acknowledge', [
+                'acknowledged_at' => now()->toDateString(),
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(HsEvent::WORKSAFE_PENDING, $pending->fresh()->worksafe_status);
+        $this->assertSame(HsEvent::WORKSAFE_NOTIFIED, $notified->fresh()->worksafe_status);
+        $this->assertNull($notified->fresh()->worksafe_acknowledged_at);
+    }
+
+    public function test_site_bound_user_cannot_filter_events_by_an_inaccessible_site(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.view']);
+
+        $this->actingAs($user)
+            ->get('/health-safety/events?site_id='.$siteB->id)
+            ->assertForbidden();
+    }
+
+    public function test_site_bound_user_only_receives_corrective_actions_for_their_site(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.view']);
+        $visibleEvent = HsEvent::factory()->create(['site_id' => $siteA->id]);
+        $hiddenEvent = HsEvent::factory()->create(['site_id' => $siteB->id]);
+        $visibleAction = HsCorrectiveAction::factory()->create(['hs_event_id' => $visibleEvent->id]);
+        HsCorrectiveAction::factory()->create(['hs_event_id' => $hiddenEvent->id]);
+
+        $this->actingAs($user)
+            ->get('/health-safety/corrective-actions')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('actions.data', 1)
+                ->where('actions.data.0.id', $visibleAction->id)
+                ->where('actions.data.0.event.id', $visibleEvent->id)
+            );
+    }
+
+    public function test_site_bound_user_cannot_open_another_sites_event_in_the_corrective_actions_overlay(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.view']);
+        $hidden = HsEvent::factory()->create(['site_id' => $siteB->id]);
+
+        $this->actingAs($user)
+            ->get('/health-safety/corrective-actions?event='.$hidden->id)
+            ->assertForbidden();
     }
 
     public function test_global_user_retains_access_to_all_events_and_detail(): void
