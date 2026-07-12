@@ -15,8 +15,14 @@ const clientShowHarness = vi.hoisted(() => ({
     router: {
         delete: vi.fn(),
         post: vi.fn(),
+        push: vi.fn(({ url }: { url: string }) => {
+            window.history.pushState(window.history.state, '', url);
+        }),
         put: vi.fn(),
         reload: vi.fn(),
+        replace: vi.fn(({ url }: { url: string }) => {
+            window.history.replaceState(window.history.state, '', url);
+        }),
         visit: vi.fn(),
     },
 }));
@@ -595,6 +601,27 @@ describe('client profile navigation registry', () => {
             'href',
             '/operations/clients/2?tab=care_plans',
         );
+    });
+
+    it('canonicalizes a legacy tab through Inertia replace while preserving the complete query', async () => {
+        window.history.replaceState(
+            { encryptedPage: 'preserve-me' },
+            '',
+            '/operations/clients/1?tab=support_plan&dialog=quick_note&record=99&source=legacy',
+        );
+
+        render(<ClientShow {...clientShowProps()} />);
+
+        await waitFor(() => {
+            expect(clientShowHarness.router.replace).toHaveBeenCalledWith({
+                url: '/operations/clients/1?tab=care_plans&dialog=quick_note&record=99&source=legacy',
+                preserveScroll: true,
+                preserveState: true,
+            });
+        });
+        expect(window.history.state).toEqual({
+            encryptedPage: 'preserve-me',
+        });
     });
 
     it('keeps family-note lifecycle actions hidden until manage access is explicit', async () => {

@@ -79,4 +79,19 @@ test('hr demo seeder fills production-readiness demo workflows without duplicate
     foreach ($firstRunCounts as $table => $count) {
         expect(DB::table($table)->count())->toBe($count, "Expected {$table} to stay idempotent");
     }
+
+    $demoTeams = HrEmployeeProfile::query()
+        ->whereHas('user', fn ($query) => $query->whereIn('email', [
+            'hrdemo.worker1@example.test',
+            'hrdemo.worker2@example.test',
+            'hrdemo.worker3@example.test',
+        ]))
+        ->with('user:id,email')
+        ->get()
+        ->pluck('team', 'user.email');
+
+    expect($demoTeams)->toHaveCount(3)
+        ->and($demoTeams->get('hrdemo.worker1@example.test'))->toBe('Community Support')
+        ->and($demoTeams->get('hrdemo.worker2@example.test'))->toBe('Community Support')
+        ->and($demoTeams->get('hrdemo.worker3@example.test'))->toBe('Operations');
 });

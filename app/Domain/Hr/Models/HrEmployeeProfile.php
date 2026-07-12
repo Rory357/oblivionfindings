@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class HrEmployeeProfile extends Model
 {
@@ -202,5 +203,30 @@ class HrEmployeeProfile extends Model
     public function getFullNameAttribute(): string
     {
         return $this->user?->name ?? 'Unknown';
+    }
+
+    public static function normalizeTeam(?string $team): ?string
+    {
+        $normalised = preg_replace('/\s+/u', ' ', trim((string) $team));
+
+        return $normalised === '' ? null : $normalised;
+    }
+
+    public static function canonicalTeamForTenant(?string $team, int $tenantId): ?string
+    {
+        $normalised = self::normalizeTeam($team);
+        if ($normalised === null) {
+            return null;
+        }
+
+        $match = self::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('team')
+            ->pluck('team')
+            ->map(fn (string $existing) => self::normalizeTeam($existing))
+            ->first(fn (?string $existing) => $existing !== null
+                && Str::lower($existing) === Str::lower($normalised));
+
+        return $match ?? $normalised;
     }
 }

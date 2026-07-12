@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class CalendarController extends Controller
@@ -67,6 +66,10 @@ class CalendarController extends Controller
             ->distinct()
             ->orderBy('team')
             ->pluck('team')
+            ->map(fn (string $team) => HrEmployeeProfile::normalizeTeam($team))
+            ->filter()
+            ->unique(fn (string $team) => mb_strtolower($team))
+            ->sort(fn (string $left, string $right) => strnatcasecmp($left, $right))
             ->values();
 
         $icalToken = HrICalToken::query()
@@ -277,9 +280,11 @@ class CalendarController extends Controller
                 'required_if:audience_type,team',
                 'string',
                 'max:255',
-                Rule::exists('hr_employee_profiles', 'team')->where(fn ($query) => $query
-                    ->where('tenant_id', $tenantId)
-                    ->where('is_active', true)),
+                function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
+                    if ($this->canonicalActiveTeamForTenant((string) $value, $tenantId) === null) {
+                        $fail('The selected team is not an active team in this organisation.');
+                    }
+                },
             ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
@@ -289,7 +294,9 @@ class CalendarController extends Controller
         ]);
 
         $audienceType = $data['audience_type'] ?? null;
-        $audienceTeam = $data['audience_team'] ?? null;
+        $audienceTeam = $audienceType === 'team'
+            ? $this->canonicalActiveTeamForTenant($data['audience_team'] ?? null, $tenantId)
+            : null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $reminders = $data['reminders'] ?? [];
         unset($data['audience_type'], $data['audience_team'], $data['audience_user_ids'], $data['reminders']);
@@ -415,9 +422,11 @@ class CalendarController extends Controller
                 'required_if:audience_type,team',
                 'string',
                 'max:255',
-                Rule::exists('hr_employee_profiles', 'team')->where(fn ($query) => $query
-                    ->where('tenant_id', $tenantId)
-                    ->where('is_active', true)),
+                function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
+                    if ($this->canonicalActiveTeamForTenant((string) $value, $tenantId) === null) {
+                        $fail('The selected team is not an active team in this organisation.');
+                    }
+                },
             ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
@@ -432,7 +441,9 @@ class CalendarController extends Controller
         $scope = $data['scope'] ?? 'all';
         $occurrenceDate = $data['occurrence_date'] ?? null;
         $audienceType = $data['audience_type'] ?? null;
-        $audienceTeam = $data['audience_team'] ?? null;
+        $audienceTeam = $audienceType === 'team'
+            ? $this->canonicalActiveTeamForTenant($data['audience_team'] ?? null, $tenantId)
+            : null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $audienceProvided = $request->has('audience_type');
         $reminders = $data['reminders'] ?? [];
@@ -776,5 +787,22 @@ class CalendarController extends Controller
             || $user->canDo('calendar.create')
             || $user->canDo('calendar.manage_recurring')
         );
+    }
+
+    private function canonicalActiveTeamForTenant(?string $team, int $tenantId): ?string
+    {
+        $normalised = HrEmployeeProfile::normalizeTeam($team);
+        if ($normalised === null) {
+            return null;
+        }
+
+        return HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('team')
+            ->pluck('team')
+            ->map(fn (string $existing) => HrEmployeeProfile::normalizeTeam($existing))
+            ->first(fn (?string $existing) => $existing !== null
+                && mb_strtolower($existing) === mb_strtolower($normalised));
     }
 }

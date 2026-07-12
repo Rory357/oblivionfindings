@@ -104,6 +104,7 @@ class HrCalendarAggregator
         }
 
         $this->viewerId = $viewer?->id;
+        $teamFilter = HrEmployeeProfile::normalizeTeam($filters['team'] ?? null);
 
         // Top-level events only (exception/override children are folded into
         // their parent's expansion below). Pull non-recurring events overlapping
@@ -127,7 +128,8 @@ class HrCalendarAggregator
             ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments'])
             ->orderBy('starts_at')
             ->get()
-            ->filter(fn (HrCalendarEvent $event) => $this->teamAudienceIsVisible($event, $viewer));
+            ->filter(fn (HrCalendarEvent $event) => $this->teamAudienceIsVisible($event, $viewer))
+            ->filter(fn (HrCalendarEvent $event) => $this->eventMatchesTeamFilter($event, $teamFilter));
 
         // Override children for the recurring bases in scope.
         $recurringIds = $base->whereNotNull('rrule')->pluck('id');
@@ -281,12 +283,35 @@ class HrCalendarAggregator
             return true;
         }
 
-        return HrEmployeeProfile::query()
+        $viewerTeam = HrEmployeeProfile::query()
             ->where('tenant_id', $event->tenant_id)
             ->where('user_id', $viewer->id)
             ->where('is_active', true)
-            ->where('team', $teamAudience->audience_ref)
-            ->exists();
+            ->value('team');
+
+        $normalisedViewerTeam = HrEmployeeProfile::normalizeTeam($viewerTeam);
+        $normalisedAudienceTeam = HrEmployeeProfile::normalizeTeam($teamAudience->audience_ref);
+
+        return $normalisedViewerTeam !== null
+            && $normalisedAudienceTeam !== null
+            && mb_strtolower($normalisedViewerTeam) === mb_strtolower($normalisedAudienceTeam);
+    }
+
+    private function eventMatchesTeamFilter(HrCalendarEvent $event, ?string $teamFilter): bool
+    {
+        if ($teamFilter === null) {
+            return true;
+        }
+
+        $teamAudience = $event->attendees->firstWhere('audience_type', 'team');
+        if (! $teamAudience) {
+            return true;
+        }
+
+        $audienceTeam = HrEmployeeProfile::normalizeTeam($teamAudience->audience_ref);
+
+        return $audienceTeam !== null
+            && mb_strtolower($audienceTeam) === mb_strtolower($teamFilter);
     }
 
     /**
