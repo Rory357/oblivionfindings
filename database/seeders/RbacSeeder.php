@@ -459,6 +459,7 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.close', 'description' => 'Close/resolve hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.viewAllSites', 'description' => 'View health and safety records across all sites', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
@@ -827,6 +828,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($healthSafetyOfficer, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
+            'healthSafety.viewAllSites',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',

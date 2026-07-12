@@ -165,13 +165,9 @@ class HsEventController extends Controller
         // ── Detail-over-list (?event=) ──
         $detail = null;
         if ($request->filled('event')) {
-            $target = HsEvent::query()->find($request->integer('event'));
-
-            if ($target) {
-                $this->assertCanAccessEvent($request, $target);
-                $target = $this->scopedBase($request)->whereKey($target->id)->first();
-                $detail = $target ? $this->buildEventDetail($target) : null;
-            }
+            $target = $this->resolveAccessibleEvent($request, $request->integer('event'));
+            $target = $this->scopedBase($request)->whereKey($target->id)->first();
+            $detail = $target ? $this->buildEventDetail($target) : null;
         }
 
         $siteIds = $this->scopedBase($request)->whereNotNull('site_id')->distinct()->pluck('site_id');
@@ -268,9 +264,9 @@ class HsEventController extends Controller
      * governance modal (HsEventDialog) on a thin shell as the over-the-list
      * modal opened from the register.
      */
-    public function show(Request $request, HsEvent $hsEvent): Response
+    public function show(Request $request, int $hsEvent): Response
     {
-        $this->assertCanAccessEvent($request, $hsEvent);
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         return Inertia::render('health-safety/events/show', [
             'detail' => $this->buildEventDetail($hsEvent),
@@ -282,9 +278,9 @@ class HsEventController extends Controller
      * (incomplete required investigation / unverified actions) requires a logged
      * override reason; a closure summary is always required.
      */
-    public function close(Request $request, HsEvent $hsEvent)
+    public function close(Request $request, int $hsEvent)
     {
-        $this->assertCanAccessEvent($request, $hsEvent);
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'closure_summary' => ['required', 'string', 'max:2000'],
@@ -309,9 +305,9 @@ class HsEventController extends Controller
      * Record the WorkSafe NZ notification for a notifiable event (E-Gap 2):
      * pending → notified, persisting date/method/reference + site preservation.
      */
-    public function worksafeNotify(Request $request, HsEvent $hsEvent)
+    public function worksafeNotify(Request $request, int $hsEvent)
     {
-        $this->assertCanAccessEvent($request, $hsEvent);
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'notified_at' => ['required', 'date'],
@@ -338,9 +334,9 @@ class HsEventController extends Controller
     /**
      * Record WorkSafe's acknowledgement of the notification (notified → acknowledged).
      */
-    public function worksafeAcknowledge(Request $request, HsEvent $hsEvent)
+    public function worksafeAcknowledge(Request $request, int $hsEvent)
     {
-        $this->assertCanAccessEvent($request, $hsEvent);
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'acknowledged_at' => ['required', 'date'],
@@ -689,12 +685,8 @@ class HsEventController extends Controller
 
         $detail = null;
         if ($request->filled('event')) {
-            $target = HsEvent::query()->find($request->integer('event'));
-
-            if ($target) {
-                $this->assertCanAccessEvent($request, $target);
-                $detail = $this->buildEventDetail($target);
-            }
+            $target = $this->resolveAccessibleEvent($request, $request->integer('event'));
+            $detail = $this->buildEventDetail($target);
         }
 
         $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
@@ -798,13 +790,16 @@ class HsEventController extends Controller
         };
     }
 
-    private function assertCanAccessEvent(Request $request, HsEvent $event): void
+    private function resolveAccessibleEvent(Request $request, int $eventId): HsEvent
     {
-        $this->siteAccess->assertCanAccessHsEvent(
+        $query = HsEvent::query();
+        $this->siteAccess->applyHsEventScope(
+            $query,
             $request->user(),
-            $event,
             $this->hsEventBypassPermissions(),
         );
+
+        return $query->findOrFail($eventId);
     }
 
     /**
@@ -812,15 +807,7 @@ class HsEventController extends Controller
      */
     private function hsEventBypassPermissions(): array
     {
-        $permissions = ['reports.viewAny'];
-        $user = auth()->user();
-
-        if ($user?->hasRole('health_safety_officer')
-            && $this->siteAccess->accessibleSiteIds($user, $permissions) === []) {
-            $permissions[] = 'hazards.manage';
-        }
-
-        return $permissions;
+        return ['healthSafety.viewAllSites'];
     }
 
     /**

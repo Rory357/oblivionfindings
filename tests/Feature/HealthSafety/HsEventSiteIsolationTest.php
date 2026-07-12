@@ -55,7 +55,11 @@ class HsEventSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/health-safety/events?event='.$hidden->id)
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get('/health-safety/events?event=999999')
+            ->assertNotFound();
     }
 
     public function test_site_bound_user_cannot_open_another_sites_event_deep_link(): void
@@ -67,7 +71,11 @@ class HsEventSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/health-safety/events/'.$hidden->id)
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get('/health-safety/events/999999')
+            ->assertNotFound();
     }
 
     public function test_site_bound_manager_cannot_mutate_another_sites_event(): void
@@ -81,7 +89,7 @@ class HsEventSiteIsolationTest extends TestCase
             ->post('/health-safety/events/'.$hidden->id.'/close', [
                 'closure_summary' => 'This must not be accepted across sites.',
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertNotSame(HsEvent::STATUS_CLOSED, $hidden->fresh()->status);
     }
@@ -104,13 +112,13 @@ class HsEventSiteIsolationTest extends TestCase
                 'notified_at' => now()->toDateString(),
                 'method' => 'phone',
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->actingAs($user)
             ->post('/health-safety/events/'.$notified->id.'/worksafe/acknowledge', [
                 'acknowledged_at' => now()->toDateString(),
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertSame(HsEvent::WORKSAFE_PENDING, $pending->fresh()->worksafe_status);
         $this->assertSame(HsEvent::WORKSAFE_NOTIFIED, $notified->fresh()->worksafe_status);
@@ -125,6 +133,10 @@ class HsEventSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/health-safety/events?site_id='.$siteB->id)
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get('/health-safety/corrective-actions?site_id='.$siteB->id)
             ->assertForbidden();
     }
 
@@ -145,6 +157,11 @@ class HsEventSiteIsolationTest extends TestCase
                 ->has('actions.data', 1)
                 ->where('actions.data.0.id', $visibleAction->id)
                 ->where('actions.data.0.event.id', $visibleEvent->id)
+                ->where('tabCounts.all', 1)
+                ->where('tabCounts.open', 1)
+                ->where('hero.live.open', 1)
+                ->has('sites', 1)
+                ->where('sites.0.id', $siteA->id)
             );
     }
 
@@ -157,14 +174,38 @@ class HsEventSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/health-safety/corrective-actions?event='.$hidden->id)
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get('/health-safety/corrective-actions?event=999999')
+            ->assertNotFound();
+    }
+
+    public function test_unassigned_hazards_user_without_global_permission_is_not_treated_as_global(): void
+    {
+        $site = Site::factory()->create();
+        $user = $this->userWithPermissions(['hazards.view']);
+        $event = HsEvent::factory()->create(['site_id' => $site->id]);
+
+        $this->actingAs($user)
+            ->get('/health-safety/events')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('events.data', 0)
+                ->where('tabCounts.all', 0)
+                ->has('sites', 0)
+            );
+
+        $this->actingAs($user)
+            ->get('/health-safety/events/'.$event->id)
+            ->assertNotFound();
     }
 
     public function test_global_user_retains_access_to_all_events_and_detail(): void
     {
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
-        $globalUser = $this->userWithPermissions(['hazards.view', 'reports.viewAny']);
+        $globalUser = $this->userWithPermissions(['hazards.view', 'healthSafety.viewAllSites']);
         HsEvent::factory()->create(['site_id' => $siteA->id]);
         $target = HsEvent::factory()->create(['site_id' => $siteB->id]);
 
@@ -179,13 +220,19 @@ class HsEventSiteIsolationTest extends TestCase
             );
     }
 
+    public function test_health_safety_officer_role_has_explicit_global_hs_visibility(): void
+    {
+        $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
+
+        $this->assertTrue($role->permissions()->where('key', 'healthSafety.viewAllSites')->exists());
+    }
+
     /**
      * @param  array<int, string>  $permissionKeys
      */
     private function siteBoundUser(Site $site, array $permissionKeys): User
     {
         $user = $this->userWithPermissions($permissionKeys);
-        $user->roles()->attach(Role::query()->where('name', 'health_safety_officer')->firstOrFail());
 
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,

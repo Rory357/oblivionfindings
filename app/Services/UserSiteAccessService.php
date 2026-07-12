@@ -12,11 +12,13 @@ use App\Models\ShiftHandover;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
 
 class UserSiteAccessService
 {
     public const DEFAULT_MESSAGE = 'You are not authorized to access records for this site.';
+
+    /** @var array<string, bool> */
+    private array $clientIncidentSiteColumnCache = [];
 
     /**
      * @param  array<int, string>  $bypassPermissions
@@ -327,10 +329,48 @@ class UserSiteAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        if (Schema::hasColumn($query->getModel()->getTable(), 'site_id')) {
-            return $query->whereIn('site_id', $siteIds);
+        if (! $this->clientIncidentSiteColumnExists($query)) {
+            return $this->applyClientIncidentRelationshipScopeForSiteIds($query, $siteIds);
         }
 
+        return $query->where(function (Builder $nested) use ($siteIds) {
+            $nested->whereIn($nested->qualifyColumn('site_id'), $siteIds)
+                ->orWhere(function (Builder $legacy) use ($siteIds) {
+                    $legacy->whereNull($legacy->qualifyColumn('site_id'));
+                    $this->applyClientIncidentRelationshipScopeForSiteIds($legacy, $siteIds);
+                });
+        });
+    }
+
+    protected function clientIncidentSiteColumnExists(Builder $query): bool
+    {
+        $connection = $query->getConnection();
+        $cacheKey = implode('|', [
+            (string) spl_object_id($connection),
+            (string) $connection->getName(),
+            (string) $connection->getDatabaseName(),
+            $query->getModel()->getTable(),
+        ]);
+
+        if (! array_key_exists($cacheKey, $this->clientIncidentSiteColumnCache)) {
+            $this->clientIncidentSiteColumnCache[$cacheKey] = $this->schemaHasColumn($query, 'site_id');
+        }
+
+        return $this->clientIncidentSiteColumnCache[$cacheKey];
+    }
+
+    protected function schemaHasColumn(Builder $query, string $column): bool
+    {
+        return $query->getConnection()
+            ->getSchemaBuilder()
+            ->hasColumn($query->getModel()->getTable(), $column);
+    }
+
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    protected function applyClientIncidentRelationshipScopeForSiteIds(Builder $query, array $siteIds): Builder
+    {
         return $query->where(function (Builder $nested) use ($siteIds) {
             $nested->whereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds))
                 ->orWhereHas('shift', fn (Builder $shiftQuery) => $this->applyShiftScopeForSiteIds($shiftQuery, $siteIds));
