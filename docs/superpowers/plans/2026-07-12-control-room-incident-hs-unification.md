@@ -224,9 +224,9 @@ git commit -m "feat(incidents): add explicit journey and handover schema"
 
 **Task 2 completion evidence — 2026-07-13**
 
-- Schema/model implementation: `6304a3e7`; provenance, terminal-scope, timeline-site, and constraint-quality correction: `264cbca9`.
+- Schema/model implementation: `6304a3e7`; provenance, terminal-scope, timeline-site, and constraint-quality correction: `264cbca9`; direct contract-evidence hardening: `7e0f7908`.
 - TDD evidence: initial missing-schema RED 1 failed / 1 assertion; model-contract RED 10 failed / 2 passed / 35 assertions; quality RED 2 failed / 12 passed / 117 assertions plus transferred-overdue RED 1 failed.
-- Final focused proof: `IncidentJourneySchemaTest` 14 tests / 130 assertions; real H&S source-link 1 test / 16 assertions; transferred-task overdue scope 1 test / 1 assertion.
+- Final focused proof: `IncidentJourneySchemaTest` 14 tests / 217 assertions; real H&S source-link 1 test / 16 assertions; transferred-task overdue scope 1 test / 1 assertion. The final schema suite directly proves fillability/guarded persistence and the complete near-miss, handover-acceptance, idempotency, ownership, timing, and recommendation-disposition factory contracts rather than relying on factory unguarding.
 - Migration proof on the MySQL test database: all six applied `000100 → 000500`, rolled back `000500 → 000100`, and reapplied `000100 → 000500`. Legacy incident/event/SLA/shift rows survived; defaults remained H&S `not_required`, SLA cycle `1`, shift `none` with version `1`.
 - Independent specification review: compliant. Independent code-quality re-review: approved. PHP lint, Pint, and `git diff --check` passed; no controller, service, route, UI, lifecycle, or mobile work was included.
 
