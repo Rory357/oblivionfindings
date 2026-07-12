@@ -13,7 +13,7 @@
 - The dedicated `main` worktree is clean but currently carries five unpushed Fleet commits ending at `ab7f3636`; those commits must be preserved and reconciled before the final explicit merge.
 - Client tab aliases remain owned by `resources/js/pages/operations/clients/tabs/_groups.ts`.
 - Care & Support Plan remains owned by the canonical `care_plans` workspace.
-- HR team ownership is not yet decided. Record the source audit and canonical owner here before editing Slice 2.
+- HR team ownership is `HrEmployeeProfile.team`; `HrPosition.team` remains an independent position-template attribute and is not dual-written.
 - Durable synthetic HR data must extend the existing HR demo seeding path. Transient live lifecycle fixtures use one unique marker and must be removed.
 - Control Room escalation remains owned by `AutoEscalateControlRoomQueues`.
 
@@ -72,15 +72,19 @@
 - Start SHA: `abd84351b30f495b9bdefdf6ba7dce3d75784e5e`
 - End SHA: pending
 - Ownership decision: exercise canonical HR lifecycle workflows and existing demo ownership; do not create parallel implementations.
-- Files changed: this checkpoint ledger only; no Slice 3 application/test source has been added.
-- Baseline counts: pending
-- Local discovery state: the existing `HrDemoSeeder` was run idempotently and exact synthetic demo workers were confirmed (`3`). It currently supplies `1` payroll run and `2` approval chains but `0` offers, `0` payslips, `0` offboarding checklists, and `0` exit interviews, confirming the fixture gaps. Local RBAC/HR/Operations permissions were refreshed for `admin@demo.test` without modifying source.
-- Smoke marker and record IDs: none created for Slice 3 yet.
-- Mail-driver safety: not yet checked; no offer/notification lifecycle was triggered.
-- Browser URLs and results: none; no Slice 3 preview or browser session was started.
-- Cleanup and final counts: pending
+- Files changed: `tests/e2e/hr-live-gap-closeout.spec.ts` and this ledger. No Slice 3 application source, route, schema, or parallel workflow was added.
+- Baseline counts: users `35`; profiles `33`; audit logs `584`; calendar events/attendees/reminders/attachments `0/0/0/0`; salary bands `3`; offboarding checklists/tasks/exit interviews `0/0/0`; candidates/applications/offers `5/5/0`; approval chains/steps `2/2`; payroll runs/payslips `1/0`.
+- Local discovery state: `HrDemoSeeder` was run idempotently and exact synthetic demo workers were confirmed (`3`). It supplies one payroll run and two generic approval chains but no offer, payslip, offboarding, or exit-interview lifecycle fixture, so the Playwright spec creates transient canonical-model records under one exact marker.
+- Marker: `CODEX-LIVE-HR-GAPS-20260712T151828`. Final green-run IDs: leaver user/profile `57/54`; active payroll user/profile `58/55`; calendar event `16`; salary band `19`; offboarding checklist/task `16/16`; offer `14`; generic approval chain `16`; leave-chain routes `27/28`; payroll run/payslip `15/14`; private attachment `hr/calendar/1/CODEX-LIVE-HR-GAPS-20260712T151828.txt`.
+- Mail-driver safety: local default and resolved transport were both `array`, so offer resend exercised notification construction without external delivery.
+- Browser URLs and results: Chromium desktop covered `/hr/settings/audit-log?action=codex.live_hr_gaps`, `/hr/calendar`, `/hr/compensation/bands`, `/hr/offboarding/{id}`, `/hr/recruitment?tab=offers`, `/careers/offers/{old-token}`, `/hr/approvals/chains`, `/hr/payroll`, `/hr/payroll/payslips`, and `/hr/my/payslips`; it also loaded `/hr/training/catalog`, `/hr/feedback`, `/hr/performance?tab=supervision`, `/hr/time?tab=overview`, and `/operations/shifts` as regression routes. Payroll payslips were asserted at `390x844`; other rows ran at desktop width.
+- Lifecycle evidence: audit filtering and System attribution; calendar archive/restore with `1/1/1` attendees/reminders/attachments retained; salary-band placement/deactivate/reactivate; one canonical exit interview after reload with offboarding-completion login revocation preserved; required offer-expiry reason, immediate old-token invalidation, actor/reason attribution, resend token rotation and attribution reset; native leave-route reorder/edit/deactivate/reactivate; payroll run/admin payslip/mobile actions; and active employee self-service net pay.
+- Green browser proof: final matrix **1 passed** in **1.6m**. The spec asserted zero captured console errors and zero `>=400` HR responses.
+- Cleanup and final counts: reverse cleanup deletes the attachment and every marker record, pivot, and exact auditable ID. After a second full green run, marker users/profiles/events/files/audits were all `0`, and every baseline count above returned exactly, including audit logs `584`.
+- Backend suites: `CanonicalAuditOrganizationTest`, `DeferredRetentionLifecycleTest`, `HrCalendarResilienceTest`, `SalaryBandPlacementTest`, `ExitInterviewWizardTest`, `OffboardingWizardStoreTest`, `RecruitmentDeferredLifecycleTest`, `ApprovalChainTenantTest`, `MyPayslipsSelfServiceTest`, `PayslipPdfTest`, and `PayrollRunIntegrityTest` passed **59 tests / 426 assertions**.
+- Static gates: new spec Prettier passed, ESLint passed with zero warnings, TypeScript passed, and `git diff --check` passed.
 - Commit SHA: pending
-- Remaining: capture baseline counts, verify safe mail driver, remove stale exact-marker fixtures, create one unique marker through canonical models/services, execute all named desktop/mobile browser rows, record IDs/files, clean in reverse order, and prove final counts return to baseline.
+- Remaining: commit, aggregate release gates, deployment, and the required post-deployment real Chrome acceptance session.
 
 ### Slice 4 — Control Room scheduled escalation
 
