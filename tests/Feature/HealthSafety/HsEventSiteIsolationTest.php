@@ -125,6 +125,34 @@ class HsEventSiteIsolationTest extends TestCase
         $this->assertNull($notified->fresh()->worksafe_acknowledged_at);
     }
 
+    public function test_hs_event_mutations_return_not_found_for_a_nonexistent_event_id(): void
+    {
+        $site = Site::factory()->create();
+        $user = $this->siteBoundUser($site, ['hazards.manage']);
+        $missingEventId = ((int) HsEvent::query()->max('id')) + 1000;
+
+        $this->assertDatabaseMissing('hs_events', ['id' => $missingEventId]);
+
+        $this->actingAs($user)
+            ->post('/health-safety/events/'.$missingEventId.'/close', [
+                'closure_summary' => 'This event does not exist.',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->post('/health-safety/events/'.$missingEventId.'/worksafe/notify', [
+                'notified_at' => now()->toDateString(),
+                'method' => 'phone',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->post('/health-safety/events/'.$missingEventId.'/worksafe/acknowledge', [
+                'acknowledged_at' => now()->toDateString(),
+            ])
+            ->assertNotFound();
+    }
+
     public function test_site_bound_user_cannot_filter_events_by_an_inaccessible_site(): void
     {
         $siteA = Site::factory()->create();
