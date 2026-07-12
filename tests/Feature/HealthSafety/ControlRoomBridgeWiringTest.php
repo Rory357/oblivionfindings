@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
@@ -496,6 +497,9 @@ class ControlRoomBridgeWiringTest extends TestCase
                 ->once()
                 ->andThrow(new \RuntimeException('Forced journey failure'));
         });
+        $this->mock(IncidentEscalationService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('escalateClientIncident');
+        });
 
         $incident = ClientIncident::factory()->create([
             'severity' => 'high',
@@ -507,6 +511,7 @@ class ControlRoomBridgeWiringTest extends TestCase
         ]);
         $this->assertDatabaseCount('hs_events', 0);
         $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('incident_governance_escalations', 0);
         Log::shouldHaveReceived('error')->withArgs(
             fn (string $message, array $context): bool => $message === 'incident_journey_repair_required'
                 && $context['incident_id'] === $incident->id

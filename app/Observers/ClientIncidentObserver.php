@@ -38,8 +38,9 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
-        $this->ensureJourney($incident);
-        $this->maybeEscalateToGovernance($incident);
+        if ($this->ensureJourney($incident)) {
+            $this->maybeEscalateToGovernance($incident);
+        }
     }
 
     public function updated(ClientIncident $incident): void
@@ -48,8 +49,9 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
-        $this->ensureJourney($incident);
-        $this->maybeEscalateToGovernance($incident);
+        if ($this->ensureJourney($incident)) {
+            $this->maybeEscalateToGovernance($incident);
+        }
     }
 
     private function journeyNeedsSynchronising(ClientIncident $incident): bool
@@ -64,10 +66,12 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
         return $incident->wasChanged(self::JOURNEY_RELEVANT_FIELDS);
     }
 
-    private function ensureJourney(ClientIncident $incident): void
+    private function ensureJourney(ClientIncident $incident): bool
     {
         try {
             $this->bridge->bridgeClientIncident($incident);
+
+            return true;
         } catch (\Throwable $exception) {
             Log::error('incident_journey_repair_required', [
                 'incident_id' => $incident->id,
@@ -76,6 +80,8 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
                 'exception' => $exception::class,
                 'error' => $exception->getMessage(),
             ]);
+
+            return false;
         }
     }
 

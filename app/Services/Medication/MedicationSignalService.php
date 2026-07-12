@@ -3,7 +3,6 @@
 namespace App\Services\Medication;
 
 use App\Enums\AlertSeverity;
-use App\Models\ClientIncident;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
@@ -94,6 +93,7 @@ class MedicationSignalService
         string $message,
         array $context = [],
     ): void {
+        $signal = null;
         $source = $this->getSignalSource();
 
         $idempotencyKey = $this->buildIdempotencyKey(
@@ -122,15 +122,10 @@ class MedicationSignalService
 
         try {
             $signal = $this->signalProcessor->ingest($signalData);
-            $incident = $this->trustedIncident($signal, $context);
-            $alert = $incident === null ? null : $this->exactIncidentAlert($incident);
+            $alert = $this->signalProcessor->process($signal);
 
-            if ($alert === null) {
-                $alert = $this->signalProcessor->process($signal);
-            }
-
-            if ($alert !== null && $incident !== null) {
-                $this->attachSignalToIncidentAlert($signal, $alert, $incident);
+            if ($alert !== null && is_numeric($context['incident_id'] ?? null)) {
+                $this->attachSignalToIncidentAlert($signal, $alert, (int) $context['incident_id']);
             }
 
             if ($alert) {
@@ -141,12 +136,25 @@ class MedicationSignalService
                     'client_id' => $clientId,
                 ]);
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable $exception) {
+            if (is_numeric($context['incident_id'] ?? null)) {
+                Log::error('incident_journey_repair_required', [
+                    'incident_id' => (int) $context['incident_id'],
+                    'signal_id' => $signal?->id,
+                    'signal_type' => $signalType,
+                    'signal_client_id' => $clientId,
+                    'exception' => $exception::class,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                throw $exception;
+            }
+
             Log::error('MedicationSignalService: signal emission failed', [
                 'signal_type' => $signalType,
                 'client_id' => $clientId,
                 'severity' => $severity,
-                'error' => $e->getMessage(),
+                'error' => $exception->getMessage(),
             ]);
         }
     }
@@ -254,58 +262,21 @@ class MedicationSignalService
         return [null, null];
     }
 
-    private function trustedIncident(Signal $signal, array $context): ?ClientIncident
-    {
-        $incidentId = $context['incident_id'] ?? null;
-        if (! is_numeric($incidentId)) {
-            return null;
-        }
-
-        $incident = ClientIncident::query()->find((int) $incidentId);
-        if ($incident === null || (int) $incident->client_id !== (int) $signal->client_id) {
-            Log::warning('MedicationSignalService: rejected untrusted incident correlation', [
-                'signal_id' => $signal->id,
-                'incident_id' => $incidentId,
-                'signal_client_id' => $signal->client_id,
-                'incident_client_id' => $incident?->client_id,
-            ]);
-
-            return null;
-        }
-
-        return $incident;
-    }
-
-    private function exactIncidentAlert(ClientIncident $incident): ?ControlRoomAlert
-    {
-        if ($incident->control_room_alert_id !== null) {
-            $direct = ControlRoomAlert::query()->find($incident->control_room_alert_id);
-            if ($direct !== null) {
-                return $direct;
-            }
-        }
-
-        return ControlRoomAlert::query()
-            ->where('context->incident_id', $incident->id)
-            ->orderBy('id')
-            ->first();
-    }
-
     private function attachSignalToIncidentAlert(
         Signal $signal,
         ControlRoomAlert $alert,
-        ClientIncident $incident,
+        int $incidentId,
     ): void {
         $context = $alert->context ?? [];
         $normalizedData = array_replace_recursive(
             (array) ($context['normalized_data'] ?? []),
             (array) ($signal->normalized_data ?? []),
-            ['incident_id' => $incident->id],
+            ['incident_id' => $incidentId],
         );
 
         $alert->updateQuietly([
             'context' => array_replace($context, [
-                'incident_id' => $incident->id,
+                'incident_id' => $incidentId,
                 'signal_id' => $signal->id,
                 'signal_type_code' => $signal->signal_type_code,
                 'signal_payload' => $signal->payload,

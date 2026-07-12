@@ -126,6 +126,69 @@ class SensorIncidentJourneyTest extends TestCase
         $this->assertDatabaseCount('hs_events', 1);
     }
 
+    public function test_confirmed_alert_repairs_a_missing_hs_link_without_reconfirming(): void
+    {
+        $operator = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $confirmedAt = now()->subMinutes(4)->startOfSecond();
+        $acknowledgedAt = now()->subMinutes(5)->startOfSecond();
+        $alert = ControlRoomAlert::factory()->create([
+            'source' => 'sensor',
+            'alert_type' => 'sensor.fall_detected',
+            'severity' => 'critical',
+            'status' => ControlRoomAlert::STATUS_CONFIRMED,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'acknowledged_at' => $acknowledgedAt,
+            'acknowledged_by_user_id' => $operator->id,
+            'context' => [
+                'confirmed_by' => $operator->name,
+                'confirmed_at' => $confirmedAt->toISOString(),
+            ],
+        ]);
+        Signal::create([
+            'alert_id' => $alert->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'signal_type_code' => 'fall_detected',
+            'severity_hint' => 'critical',
+            'occurred_at' => now()->subMinutes(6),
+            'payload' => ['confidence' => 0.98],
+            'status' => 'processed',
+        ]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'reported_by' => $operator->id,
+            'source' => 'sensor',
+            'severity' => 'high',
+            'status' => 'submitted',
+            'submitted_at' => now()->subMinutes(4),
+            'control_room_alert_id' => $alert->id,
+            'hs_event_id' => null,
+        ]));
+
+        $result = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+        $alert->refresh();
+        $incident->refresh();
+        $event = HsEvent::query()->sole();
+
+        $this->assertTrue($result->is($incident));
+        $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $alert->status);
+        $this->assertSame($confirmedAt->toISOString(), data_get($alert->context, 'confirmed_at'));
+        $this->assertSame($acknowledgedAt->toISOString(), $alert->acknowledged_at?->toISOString());
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertSame($event->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $event->control_room_alert_id);
+        $this->assertSame(0, AuditLog::query()
+            ->where('action', 'controlRoom.alert.confirm')
+            ->where('auditable_id', $alert->id)
+            ->count());
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
     public function test_dismiss_suppresses_the_signal_without_creating_an_incident_journey(): void
     {
         $operator = User::factory()->create();

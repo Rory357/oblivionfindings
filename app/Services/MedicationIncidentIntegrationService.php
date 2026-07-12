@@ -37,58 +37,63 @@ class MedicationIncidentIntegrationService
         ClientMedicationAdministration $administration,
         ?int $createdBy = null
     ): ?ClientIncident {
-        $medication = $administration->medication;
-        $client = $administration->client;
-
-        // Check if we should auto-create
-        if (! $this->shouldAutoCreateIncident('missed_dose', $medication)) {
-            return null;
-        }
-
-        $incident = new ClientIncident;
-        $incident->client_id = $client->id;
-        $incident->title = "Missed medication: {$medication->name}";
-        $incident->description = $this->buildMissedDoseDescription($administration, $medication);
-        $incident->category = 'medication';
-        $incident->severity = $this->determineSeverity('missed_dose', $medication);
-        $incident->status = 'draft';
-        $incident->occurred_at = $administration->scheduled_for ?? now();
-        $incident->reported_by = $createdBy;
-        $this->assignIncidentServiceContext($incident, $administration->service_context_id);
-        $incident->save();
-
-        // Link to medication
-        $this->linkToMedication($incident, $medication);
-
-        // Dashboard alert (UI compat)
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
+        return $this->withLockedMedicationSource(
+            $administration,
             'missed_dose',
-            'warning',
-            "Missed dose: {$medication->name} scheduled for ".($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
-            $medication->id
-        );
+            function (ClientMedicationAdministration $locked, ?ClientIncident $incident) use ($createdBy): ?ClientIncident {
+                $medication = $locked->medication;
+                $client = $locked->client;
 
-        // Operational signal → Control Room
-        $severity = $medication->controlled_drug ? 'high' : ($medication->high_risk ? 'high' : 'medium');
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_MISSED_DOSE,
-            $client->id,
-            $severity,
-            "Missed dose: {$medication->name} scheduled for ".($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
-            [
-                'incident_id' => $incident->id,
-                'client_medication_id' => $medication->id,
-                'administration_id' => $administration->id,
-                'medication_name' => $medication->name,
-                'scheduled_for' => $administration->scheduled_for?->toIso8601String(),
-                'controlled_drug' => $medication->controlled_drug,
-                'high_risk' => $medication->high_risk,
-                'site_id' => $client->site_id,
-            ],
-        );
+                if (! $this->shouldAutoCreateIncident('missed_dose', $medication)) {
+                    return null;
+                }
 
-        return $incident;
+                if ($incident === null) {
+                    $incident = new ClientIncident;
+                    $incident->client_id = $client->id;
+                    $incident->title = "Missed medication: {$medication->name}";
+                    $incident->description = $this->buildMissedDoseDescription($locked, $medication);
+                    $incident->category = 'medication';
+                    $incident->severity = $this->determineSeverity('missed_dose', $medication);
+                    $incident->status = 'draft';
+                    $incident->occurred_at = $locked->scheduled_for ?? now();
+                    $incident->reported_by = $createdBy;
+                    $this->assignIncidentServiceContext($incident, $locked->service_context_id);
+                    $this->stampMedicationIncidentSource($incident, $locked, 'missed_dose');
+                    $incident->save();
+                    $this->linkToMedication($incident, $medication);
+                }
+
+                MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    'missed_dose',
+                    'warning',
+                    "Missed dose: {$medication->name} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
+                    $medication->id
+                );
+
+                $severity = $medication->controlled_drug ? 'high' : ($medication->high_risk ? 'high' : 'medium');
+                $this->signalService->emit(
+                    MedicationSignalService::TYPE_MISSED_DOSE,
+                    $client->id,
+                    $severity,
+                    "Missed dose: {$medication->name} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
+                    [
+                        'incident_id' => $incident->id,
+                        'client_medication_id' => $medication->id,
+                        'administration_id' => $locked->id,
+                        'medication_name' => $medication->name,
+                        'scheduled_for' => $locked->scheduled_for?->toIso8601String(),
+                        'controlled_drug' => $medication->controlled_drug,
+                        'high_risk' => $medication->high_risk,
+                        'site_id' => $client->site_id,
+                        'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                    ],
+                );
+
+                return $incident->fresh();
+            },
+        );
     }
 
     /**
@@ -235,58 +240,80 @@ class MedicationIncidentIntegrationService
         int $correctedBy,
         ?ClientMedicationAdministration $correction = null
     ): ?ClientIncident {
-        // Only flag if significant time has passed
-        $hoursSince = $original->created_at?->diffInHours(now()) ?? 0;
+        $anchor = $correction ?? $original;
 
-        if ($hoursSince < 4) {
-            return null; // Don't auto-create for quick corrections
-        }
-
-        $medication = $original->medication;
-        $client = $original->client;
-
-        $incident = new ClientIncident;
-        $incident->client_id = $client->id;
-        $incident->title = "Medication correction after {$hoursSince}h: {$medication->name}";
-        $incident->description = $this->buildCorrectionDescription($original, $correctionData, $hoursSince);
-        $incident->category = 'medication';
-        $incident->severity = $hoursSince > 24 ? 'high' : 'medium';
-        $incident->status = 'draft';
-        $incident->occurred_at = now();
-        $incident->reported_by = $correctedBy;
-        $this->assignIncidentServiceContext($incident, $original->service_context_id);
-        $incident->save();
-
-        $this->linkToMedication($incident, $medication);
-
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
+        return $this->withLockedMedicationSource(
+            $anchor,
             'unsafe_correction',
-            $hoursSince > 24 ? 'critical' : 'warning',
-            "Medication correction after {$hoursSince}h: {$medication->name}",
-            $medication->id
-        );
+            function (ClientMedicationAdministration $lockedAnchor, ?ClientIncident $incident) use (
+                $original,
+                $correctionData,
+                $correctedBy,
+                $correction,
+            ): ?ClientIncident {
+                $lockedOriginal = $lockedAnchor->is($original)
+                    ? $lockedAnchor
+                    : ClientMedicationAdministration::query()
+                        ->with(['medication', 'client'])
+                        ->whereKey($original->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                $hoursSince = $lockedOriginal->created_at?->diffInHours(now()) ?? 0;
 
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_UNSAFE_CORRECTION,
-            $client->id,
-            $hoursSince > 24 ? 'high' : 'medium',
-            "Medication correction after {$hoursSince}h: {$medication->name}",
-            [
-                'incident_id' => $incident->id,
-                'client_medication_id' => $medication->id,
-                'administration_id' => $original->id,
-                'correction_id' => $correction?->id,
-                'medication_name' => $medication->name,
-                'hours_since_original' => $hoursSince,
-                'corrected_by' => $correctedBy,
-                'controlled_drug' => $medication->controlled_drug,
-                'high_risk' => $medication->high_risk,
-                'site_id' => $client->site_id,
-            ],
-        );
+                if ($hoursSince < 4) {
+                    return null;
+                }
 
-        return $incident;
+                $medication = $lockedOriginal->medication;
+                $client = $lockedOriginal->client;
+
+                if ($incident === null) {
+                    $incident = new ClientIncident;
+                    $incident->client_id = $client->id;
+                    $incident->title = "Medication correction after {$hoursSince}h: {$medication->name}";
+                    $incident->description = $this->buildCorrectionDescription($lockedOriginal, $correctionData, $hoursSince);
+                    $incident->category = 'medication';
+                    $incident->severity = $hoursSince > 24 ? 'high' : 'medium';
+                    $incident->status = 'draft';
+                    $incident->occurred_at = $lockedAnchor->created_at ?? now();
+                    $incident->reported_by = $correctedBy;
+                    $this->assignIncidentServiceContext($incident, $lockedOriginal->service_context_id);
+                    $this->stampMedicationIncidentSource($incident, $lockedAnchor, 'unsafe_correction');
+                    $incident->save();
+                    $this->linkToMedication($incident, $medication);
+                }
+
+                MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    'unsafe_correction',
+                    $hoursSince > 24 ? 'critical' : 'warning',
+                    "Medication correction after {$hoursSince}h: {$medication->name}",
+                    $medication->id
+                );
+
+                $this->signalService->emit(
+                    MedicationSignalService::TYPE_UNSAFE_CORRECTION,
+                    $client->id,
+                    $hoursSince > 24 ? 'high' : 'medium',
+                    "Medication correction after {$hoursSince}h: {$medication->name}",
+                    [
+                        'incident_id' => $incident->id,
+                        'client_medication_id' => $medication->id,
+                        'administration_id' => $lockedOriginal->id,
+                        'correction_id' => $correction?->id,
+                        'medication_name' => $medication->name,
+                        'hours_since_original' => $hoursSince,
+                        'corrected_by' => $correctedBy,
+                        'controlled_drug' => $medication->controlled_drug,
+                        'high_risk' => $medication->high_risk,
+                        'site_id' => $client->site_id,
+                        'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                    ],
+                );
+
+                return $incident->fresh();
+            },
+        );
     }
 
     /**
@@ -296,63 +323,69 @@ class MedicationIncidentIntegrationService
         ClientMedicationAdministration $administration,
         int $lateMinutes
     ): ?ClientIncident {
-        // Only create incident if significantly late (> 2 hours)
         if ($lateMinutes < 120) {
             return null;
         }
-
-        $medication = $administration->medication;
-        $client = $administration->client;
-
         $hoursLate = round($lateMinutes / 60, 1);
 
-        $incident = new ClientIncident;
-        $incident->client_id = $client->id;
-        $incident->title = "Late medication: {$medication->name} ({$hoursLate}h late)";
-        $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n".
-            'Scheduled: '.($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
-            'Given: '.($administration->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n".
-            'Reason: '.($administration->reason ?? 'Not provided');
-        $incident->category = 'medication';
-        $incident->severity = $hoursLate > 4 ? 'high' : 'medium';
-        $incident->status = 'draft';
-        $incident->occurred_at = $administration->administered_at ?? now();
-        $incident->reported_by = $administration->administered_by;
-        $this->assignIncidentServiceContext($incident, $administration->service_context_id);
-        $incident->save();
-
-        $this->linkToMedication($incident, $medication);
-
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
+        return $this->withLockedMedicationSource(
+            $administration,
             'late_dose',
-            $hoursLate > 4 ? 'critical' : 'warning',
-            "Late dose: {$medication->name} ({$hoursLate}h late)",
-            $medication->id
-        );
+            function (ClientMedicationAdministration $locked, ?ClientIncident $incident) use ($hoursLate): ClientIncident {
+                $medication = $locked->medication;
+                $client = $locked->client;
 
-        // Operational signal → Control Room
-        $severity = $hoursLate > 4 ? 'high' : 'medium';
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_LATE_DOSE,
-            $client->id,
-            $severity,
-            "Late dose: {$medication->name} ({$hoursLate}h late)",
-            [
-                'incident_id' => $incident->id,
-                'client_medication_id' => $medication->id,
-                'administration_id' => $administration->id,
-                'medication_name' => $medication->name,
-                'hours_late' => $hoursLate,
-                'scheduled_for' => $administration->scheduled_for?->toIso8601String(),
-                'administered_at' => $administration->administered_at?->toIso8601String(),
-                'controlled_drug' => $medication->controlled_drug,
-                'high_risk' => $medication->high_risk,
-                'site_id' => $client->site_id,
-            ],
-        );
+                if ($incident === null) {
+                    $incident = new ClientIncident;
+                    $incident->client_id = $client->id;
+                    $incident->title = "Late medication: {$medication->name} ({$hoursLate}h late)";
+                    $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n".
+                        'Scheduled: '.($locked->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
+                        'Given: '.($locked->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n".
+                        'Reason: '.($locked->reason ?? 'Not provided');
+                    $incident->category = 'medication';
+                    $incident->severity = $hoursLate > 4 ? 'high' : 'medium';
+                    $incident->status = 'draft';
+                    $incident->occurred_at = $locked->administered_at ?? now();
+                    $incident->reported_by = $locked->administered_by;
+                    $this->assignIncidentServiceContext($incident, $locked->service_context_id);
+                    $this->stampMedicationIncidentSource($incident, $locked, 'late_dose');
+                    $incident->save();
+                    $this->linkToMedication($incident, $medication);
+                }
 
-        return $incident;
+                MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    'late_dose',
+                    $hoursLate > 4 ? 'critical' : 'warning',
+                    "Late dose: {$medication->name} ({$hoursLate}h late)",
+                    $medication->id
+                );
+
+                $severity = $hoursLate > 4 ? 'high' : 'medium';
+                $this->signalService->emit(
+                    MedicationSignalService::TYPE_LATE_DOSE,
+                    $client->id,
+                    $severity,
+                    "Late dose: {$medication->name} ({$hoursLate}h late)",
+                    [
+                        'incident_id' => $incident->id,
+                        'client_medication_id' => $medication->id,
+                        'administration_id' => $locked->id,
+                        'medication_name' => $medication->name,
+                        'hours_late' => $hoursLate,
+                        'scheduled_for' => $locked->scheduled_for?->toIso8601String(),
+                        'administered_at' => $locked->administered_at?->toIso8601String(),
+                        'controlled_drug' => $medication->controlled_drug,
+                        'high_risk' => $medication->high_risk,
+                        'site_id' => $client->site_id,
+                        'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                    ],
+                );
+
+                return $incident->fresh();
+            },
+        );
     }
 
     /**
@@ -361,59 +394,67 @@ class MedicationIncidentIntegrationService
     public function handleRefusedDose(
         ClientMedicationAdministration $administration
     ): ?ClientIncident {
-        $medication = $administration->medication;
-
-        // Only create incident for high-risk or controlled medications
-        if (! $medication->high_risk && ! $medication->controlled_drug) {
-            return null;
-        }
-
-        $client = $administration->client;
-
-        $incident = new ClientIncident;
-        $incident->client_id = $client->id;
-        $incident->title = "Refused medication: {$medication->name}";
-        $incident->description = "Client refused {$medication->name}.\n\n".
-            'Classification: '.($medication->high_risk ? 'High Risk' : '').
-            ($medication->controlled_drug ? ' Controlled Drug' : '')."\n".
-            'Reason given: '.($administration->reason ?? 'Not provided')."\n".
-            'Follow-up may be required.';
-        $incident->category = 'medication';
-        $incident->severity = $medication->controlled_drug ? 'high' : 'medium';
-        $incident->status = 'draft';
-        $incident->occurred_at = $administration->administered_at ?? now();
-        $incident->reported_by = $administration->administered_by;
-        $this->assignIncidentServiceContext($incident, $administration->service_context_id);
-        $incident->save();
-
-        $this->linkToMedication($incident, $medication);
-
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
+        return $this->withLockedMedicationSource(
+            $administration,
             'refused_dose',
-            $medication->controlled_drug ? 'critical' : 'warning',
-            "Refused dose: {$medication->name}",
-            $medication->id
-        );
+            function (ClientMedicationAdministration $locked, ?ClientIncident $incident): ?ClientIncident {
+                $medication = $locked->medication;
 
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_REFUSED_DOSE,
-            $client->id,
-            $medication->controlled_drug ? 'high' : 'medium',
-            "Refused dose: {$medication->name}",
-            [
-                'incident_id' => $incident->id,
-                'client_medication_id' => $medication->id,
-                'administration_id' => $administration->id,
-                'medication_name' => $medication->name,
-                'reason' => $administration->reason,
-                'controlled_drug' => $medication->controlled_drug,
-                'high_risk' => $medication->high_risk,
-                'site_id' => $client->site_id,
-            ],
-        );
+                if (! $medication->high_risk && ! $medication->controlled_drug) {
+                    return null;
+                }
 
-        return $incident;
+                $client = $locked->client;
+
+                if ($incident === null) {
+                    $incident = new ClientIncident;
+                    $incident->client_id = $client->id;
+                    $incident->title = "Refused medication: {$medication->name}";
+                    $incident->description = "Client refused {$medication->name}.\n\n".
+                        'Classification: '.($medication->high_risk ? 'High Risk' : '').
+                        ($medication->controlled_drug ? ' Controlled Drug' : '')."\n".
+                        'Reason given: '.($locked->reason ?? 'Not provided')."\n".
+                        'Follow-up may be required.';
+                    $incident->category = 'medication';
+                    $incident->severity = $medication->controlled_drug ? 'high' : 'medium';
+                    $incident->status = 'draft';
+                    $incident->occurred_at = $locked->administered_at ?? now();
+                    $incident->reported_by = $locked->administered_by;
+                    $this->assignIncidentServiceContext($incident, $locked->service_context_id);
+                    $this->stampMedicationIncidentSource($incident, $locked, 'refused_dose');
+                    $incident->save();
+                    $this->linkToMedication($incident, $medication);
+                }
+
+                MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    'refused_dose',
+                    $medication->controlled_drug ? 'critical' : 'warning',
+                    "Refused dose: {$medication->name}",
+                    $medication->id
+                );
+
+                $this->signalService->emit(
+                    MedicationSignalService::TYPE_REFUSED_DOSE,
+                    $client->id,
+                    $medication->controlled_drug ? 'high' : 'medium',
+                    "Refused dose: {$medication->name}",
+                    [
+                        'incident_id' => $incident->id,
+                        'client_medication_id' => $medication->id,
+                        'administration_id' => $locked->id,
+                        'medication_name' => $medication->name,
+                        'reason' => $locked->reason,
+                        'controlled_drug' => $medication->controlled_drug,
+                        'high_risk' => $medication->high_risk,
+                        'site_id' => $client->site_id,
+                        'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                    ],
+                );
+
+                return $incident->fresh();
+            },
+        );
     }
 
     public function handleRefusalEscalation(
@@ -891,6 +932,59 @@ class MedicationIncidentIntegrationService
         $description .= 'Reported to pharmacy: '.($report->reported_to_pharmacy ? 'Yes' : 'No');
 
         return $description;
+    }
+
+    /**
+     * Use the medication source row as the serialization point, then resolve the
+     * one draft incident owned by that source and incident kind.
+     *
+     * @param  callable(ClientMedicationAdministration, ?ClientIncident): ?ClientIncident  $callback
+     */
+    private function withLockedMedicationSource(
+        ClientMedicationAdministration $source,
+        string $kind,
+        callable $callback,
+    ): ?ClientIncident {
+        return DB::transaction(function () use ($source, $kind, $callback): ?ClientIncident {
+            $lockedSource = ClientMedicationAdministration::query()
+                ->with(['medication', 'client'])
+                ->whereKey($source->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $sourceType = $lockedSource::class;
+            $incident = ClientIncident::query()
+                ->where('client_id', $lockedSource->client_id)
+                ->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.medication_incident_source.type')) = ?",
+                    [$sourceType],
+                )
+                ->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.medication_incident_source.id')) = ?",
+                    [(string) $lockedSource->id],
+                )
+                ->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.medication_incident_source.kind')) = ?",
+                    [$kind],
+                )
+                ->lockForUpdate()
+                ->first();
+
+            return $callback($lockedSource, $incident);
+        });
+    }
+
+    private function stampMedicationIncidentSource(
+        ClientIncident $incident,
+        ClientMedicationAdministration $source,
+        string $kind,
+    ): void {
+        $metadata = $incident->metadata ?? [];
+        $metadata['medication_incident_source'] = [
+            'type' => $source::class,
+            'id' => $source->id,
+            'kind' => $kind,
+        ];
+        $incident->metadata = $metadata;
     }
 
     /**

@@ -41,22 +41,8 @@ class SensorIncidentBridgeService
                 ->whereKey($alert->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $linkedIncident = ClientIncident::query()
-                ->where('control_room_alert_id', $lockedAlert->id)
-                ->lockForUpdate()
-                ->first();
-            if ($linkedIncident === null && is_numeric(data_get($lockedAlert->context, 'incident_id'))) {
-                $linkedIncident = ClientIncident::query()
-                    ->whereKey((int) data_get($lockedAlert->context, 'incident_id'))
-                    ->lockForUpdate()
-                    ->first();
-            }
-
-            if ($lockedAlert->status === ControlRoomAlert::STATUS_CONFIRMED && $linkedIncident !== null) {
-                return $linkedIncident;
-            }
-
-            if (! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_CONFIRMED)) {
+            $isConfirmedRepair = $lockedAlert->status === ControlRoomAlert::STATUS_CONFIRMED;
+            if (! $isConfirmedRepair && ! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_CONFIRMED)) {
                 throw new InvalidArgumentException(
                     "Alert {$lockedAlert->id} cannot be confirmed from status '{$lockedAlert->status}'.",
                 );
@@ -76,6 +62,10 @@ class SensorIncidentBridgeService
                 'metadata' => ['sensor_evidence' => $evidence],
             ], $operator);
             $incident = $journey->incident;
+
+            if ($isConfirmedRepair) {
+                return $incident;
+            }
 
             $context = $lockedAlert->context ?? [];
             $context['incident_id'] = $incident->id;
