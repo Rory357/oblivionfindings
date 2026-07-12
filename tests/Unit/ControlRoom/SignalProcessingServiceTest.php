@@ -2,6 +2,8 @@
 
 namespace Tests\Unit\ControlRoom;
 
+use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Signal;
@@ -231,6 +233,9 @@ class SignalProcessingServiceTest extends TestCase
 
     public function test_incident_tagged_signals_correlate_only_to_the_exact_incident(): void
     {
+        $client = Client::factory()->create();
+        $firstIncident = ClientIncident::factory()->create(['client_id' => $client->id]);
+        $secondIncident = ClientIncident::factory()->create(['client_id' => $client->id]);
         $source = SignalSource::create([
             'name' => 'Incident Signals',
             'slug' => 'incident-signals',
@@ -261,7 +266,8 @@ class SignalProcessingServiceTest extends TestCase
             'signal_type_id' => $signalType->id,
             'signal_type_code' => $signalType->code,
             'idempotency_key' => 'incident-501-first',
-            'normalized_data' => ['incident_id' => 501],
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $firstIncident->id],
             'received_at' => now(),
             'occurred_at' => now(),
             'status' => 'pending',
@@ -271,7 +277,8 @@ class SignalProcessingServiceTest extends TestCase
             'signal_type_id' => $signalType->id,
             'signal_type_code' => $signalType->code,
             'idempotency_key' => 'incident-502-first',
-            'normalized_data' => ['incident_id' => 502],
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $secondIncident->id],
             'received_at' => now(),
             'occurred_at' => now(),
             'status' => 'pending',
@@ -281,7 +288,8 @@ class SignalProcessingServiceTest extends TestCase
             'signal_type_id' => $signalType->id,
             'signal_type_code' => $signalType->code,
             'idempotency_key' => 'incident-501-retry',
-            'normalized_data' => ['incident_id' => 501],
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $firstIncident->id],
             'received_at' => now(),
             'occurred_at' => now(),
             'status' => 'pending',
@@ -293,6 +301,124 @@ class SignalProcessingServiceTest extends TestCase
 
         $this->assertNotSame($firstAlert?->id, $secondAlert?->id);
         $this->assertSame($firstAlert?->id, $retryAlert?->id);
+        $this->assertSame(2, ControlRoomAlert::query()->count());
+    }
+
+    public function test_incident_tagged_signal_prefers_its_direct_alert_outside_fuzzy_constraints(): void
+    {
+        $client = Client::factory()->create();
+        $incident = ClientIncident::factory()->create(['client_id' => $client->id]);
+        $directAlert = ControlRoomAlert::factory()->resolved()->create([
+            'source' => 'incident',
+            'alert_type' => 'legacy.unrelated_type',
+            'client_id' => $client->id,
+            'triggered_at' => now()->subHours(2),
+            'context' => ['incident_id' => $incident->id],
+        ]);
+        $incident->updateQuietly(['control_room_alert_id' => $directAlert->id]);
+        $source = SignalSource::create([
+            'name' => 'Direct Incident Signals',
+            'slug' => 'direct-incident-signals',
+            'category' => 'medication',
+            'vendor' => 'internal',
+            'status' => 'active',
+        ]);
+        $signalType = SignalType::create([
+            'code' => 'medication.direct_incident',
+            'name' => 'Direct Medication Incident',
+            'category' => 'medication',
+            'default_severity' => 'high',
+        ]);
+        SignalRule::create([
+            'name' => 'Direct incident correlation',
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'conditions' => [],
+            'alert_type' => 'Completely different alert type',
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+            'priority' => 1,
+        ]);
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'direct-incident-outside-fuzzy-constraints',
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $incident->id],
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        $result = $this->service->process($signal);
+
+        $this->assertSame($directAlert->id, $result?->id);
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $directAlert->fresh()->status);
+        $this->assertSame($directAlert->id, $signal->fresh()->correlated_alert_id);
+        $this->assertSame(1, ControlRoomAlert::query()->count());
+    }
+
+    public function test_incident_tagged_signal_rejects_ambiguous_context_claims(): void
+    {
+        $client = Client::factory()->create();
+        $incident = ClientIncident::factory()->create(['client_id' => $client->id]);
+        $source = SignalSource::create([
+            'name' => 'Ambiguous Incident Signals',
+            'slug' => 'ambiguous-incident-signals',
+            'category' => 'medication',
+            'vendor' => 'internal',
+            'status' => 'active',
+        ]);
+        $signalType = SignalType::create([
+            'code' => 'medication.ambiguous_incident',
+            'name' => 'Ambiguous Medication Incident',
+            'category' => 'medication',
+            'default_severity' => 'high',
+        ]);
+        SignalRule::create([
+            'name' => 'Ambiguous incident correlation',
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'conditions' => [],
+            'alert_type' => 'Medication incident',
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+            'priority' => 1,
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'alert_type' => 'Medication incident',
+            'context' => ['incident_id' => $incident->id],
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'alert_type' => 'Medication incident',
+            'context' => ['normalized_data' => ['incident_id' => $incident->id]],
+        ]);
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'ambiguous-incident-claim',
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $incident->id],
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        try {
+            $this->service->process($signal);
+            $this->fail('Ambiguous incident alert claims must not be selected implicitly.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Incident signal correlation is ambiguous: multiple alerts claim the same incident.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame('pending', $signal->fresh()->status);
         $this->assertSame(2, ControlRoomAlert::query()->count());
     }
 

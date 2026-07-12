@@ -3,6 +3,7 @@
 namespace App\Services\ControlRoom;
 
 use App\Enums\AlertSeverity;
+use App\Models\ClientIncident;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
@@ -136,19 +137,30 @@ class SignalProcessingService
                 return null;
             }
 
+            $incident = $this->trustedIncidentForSignal($signal);
+            if ($incident !== null) {
+                $existingAlert = $this->exactAlertForIncident($incident);
+                if ($existingAlert !== null) {
+                    $signal->markCorrelated($existingAlert);
+                    $this->addSignalToAlert($signal, $existingAlert);
+
+                    return $existingAlert;
+                }
+            }
+
             // Find matching rules
             $rules = SignalRule::findMatchingRules($signal);
 
             if ($rules->isEmpty()) {
                 // No rules match - create alert with defaults
-                return $this->createAlertFromSignal($signal);
+                return $this->createAlertForSignal($signal, null, $incident);
             }
 
             // Use the highest priority (lowest number) rule
             $rule = $rules->first();
 
             // Check for deduplication
-            if ($rule->deduplicate) {
+            if ($rule->deduplicate && $incident === null) {
                 $existingAlert = $this->findCorrelatedAlert($signal, $rule);
                 if ($existingAlert) {
                     $signal->markCorrelated($existingAlert);
@@ -159,8 +171,22 @@ class SignalProcessingService
             }
 
             // Create new alert
-            return $this->createAlertFromSignal($signal, $rule);
+            return $this->createAlertForSignal($signal, $rule, $incident);
         });
+    }
+
+    private function createAlertForSignal(
+        Signal $signal,
+        ?SignalRule $rule,
+        ?ClientIncident $incident,
+    ): ControlRoomAlert {
+        $alert = $this->createAlertFromSignal($signal, $rule);
+
+        if ($incident !== null) {
+            $this->linkAlertToIncident($alert, $incident);
+        }
+
+        return $alert;
     }
 
     /**
@@ -330,23 +356,6 @@ class SignalProcessingService
 
         $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
 
-        if (! empty($normalizedData['incident_id'])) {
-            $incidentId = (int) $normalizedData['incident_id'];
-
-            return $query
-                ->where(function ($query) use ($incidentId) {
-                    $query->whereRaw(
-                        "JSON_UNQUOTE(JSON_EXTRACT(context, '$.incident_id')) = ?",
-                        [(string) $incidentId]
-                    )->orWhereRaw(
-                        "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.incident_id')) = ?",
-                        [(string) $incidentId]
-                    );
-                })
-                ->latest('triggered_at')
-                ->first();
-        }
-
         if (! empty($normalizedData['shift_id'])) {
             $query->whereRaw(
                 "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.shift_id')) = ?",
@@ -370,6 +379,83 @@ class SignalProcessingService
         }
 
         return $query->latest('triggered_at')->first();
+    }
+
+    private function trustedIncidentForSignal(Signal $signal): ?ClientIncident
+    {
+        $incidentId = data_get($signal->normalized_data, 'incident_id');
+        if ($incidentId === null || $incidentId === '') {
+            return null;
+        }
+
+        if (! is_numeric($incidentId)) {
+            throw new \DomainException('Incident signal correlation requires a valid incident.');
+        }
+
+        $incident = ClientIncident::query()
+            ->whereKey((int) $incidentId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($incident === null
+            || $signal->client_id === null
+            || (int) $incident->client_id !== (int) $signal->client_id
+        ) {
+            throw new \DomainException('Incident signal correlation does not match the signal client.');
+        }
+
+        return $incident;
+    }
+
+    private function exactAlertForIncident(ClientIncident $incident): ?ControlRoomAlert
+    {
+        if ($incident->control_room_alert_id !== null) {
+            $direct = ControlRoomAlert::query()
+                ->whereKey($incident->control_room_alert_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        $claims = ControlRoomAlert::query()
+            ->where(function ($query) use ($incident) {
+                $query->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(context, '$.incident_id')) = ?",
+                    [(string) $incident->id]
+                )->orWhereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.incident_id')) = ?",
+                    [(string) $incident->id]
+                );
+            })
+            ->lockForUpdate()
+            ->get();
+
+        if ($claims->count() > 1) {
+            throw new \DomainException(
+                'Incident signal correlation is ambiguous: multiple alerts claim the same incident.',
+            );
+        }
+
+        $alert = $claims->first();
+        if ($alert !== null) {
+            $this->linkAlertToIncident($alert, $incident);
+        }
+
+        return $alert;
+    }
+
+    private function linkAlertToIncident(ControlRoomAlert $alert, ClientIncident $incident): void
+    {
+        $context = $alert->context ?? [];
+        $context['incident_id'] = $incident->id;
+        $alert->updateQuietly(['context' => $context]);
+
+        if ($incident->control_room_alert_id === null) {
+            $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
+        }
     }
 
     /**
