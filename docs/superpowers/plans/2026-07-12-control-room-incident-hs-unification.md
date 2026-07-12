@@ -998,3 +998,68 @@ Do not declare the feature complete until all of the following are proven on the
 - Dashboard first viewport shows the next operational action, not historical analytics.
 - Client build and SSR build both exit 0.
 - No tracked work outside the isolated branch was changed.
+
+---
+
+## Crash-containment checkpoint — 2026-07-12
+
+This work is intentionally paused at a safe boundary following the Fleet task's crash-containment request. No merge, push, deploy, reset, discard, archive, UI implementation, schema work, or additional audit section was started during containment.
+
+### Exact branch state
+
+- Worktree: `C:\Users\steph\.config\superpowers\worktrees\oblivionfindings\codex-control-room-incident-hs-unification`
+- Branch: `codex/control-room-incident-hs-unification`
+- Current product HEAD before this checkpoint commit: `911f0648829522a090c65dcb239c8b8930024c80`
+- Planning baseline: `0dff98b7`
+- Product worktree was clean before this checkpoint was added.
+
+### Scope completed so far
+
+- Design specification and the 16-task implementation plan are committed.
+- Phase A is implemented: Control Room and H&S list/detail/mutation site visibility, safeguarding need-to-know filtering, scoped create/mutation paths, and explicit `healthSafety.viewAllSites` permission handling.
+- Phase B1 is implemented: parent-alert authorization for task, evidence, discussion, watcher, and time-entry routes; cross-alert relationship checks; task hierarchy/cycle validation; atomic reorder validation; and site-scoped people pickers.
+- Phase B2 implementation is present at `911f0648`: messaging list/thread/send/read paths are scoped to visible alerts and site-visible direct targets, and the five nested-record controllers use a shared authorization concern.
+- No dashboard modernization, shared visual-system implementation, incident/H&S journey schema, workflow orchestration, acceptance flow, reconciliation, or five-scenario desktop E2E implementation has started.
+
+### Honest verification boundary
+
+- Baseline targeted suites before product changes: 279 tests passed, 1,251 assertions.
+- Phase A focused proof: 20 tests passed, 165 assertions; its specification and quality reviews were approved.
+- Phase B1 combined proof after hardening: 88 tests passed, 229 assertions; its specification and quality reviews were approved.
+- The Phase B2 implementer reported 56 tests passed, 195 assertions across the required combined suites, plus PHP lint, Pint, and diff checks.
+- Phase B2's independent specification reviewer was interrupted for containment before returning a verdict. A quality review and a fresh root-owned verification run are still required; therefore Phase B2 is implemented but not review-approved.
+- No browser E2E scenario, dashboard visual verification, client build, SSR build, or final R1–R20 re-audit has been run on this branch.
+
+### Browser and preview containment
+
+- The in-app browser had zero task-session tabs and zero open tabs matching `127.0.0.1:8768` or `localhost:8768`; no browser tab was closed.
+- The task-owned orphaned local preview chain (`pwsh` PID 36860, `cmd` PID 36668, `php` PID 37228) was stopped.
+- Port `127.0.0.1:8768` was confirmed not listening after shutdown.
+- The active Phase B2 specification reviewer was interrupted. No implementation or review subagent remains intentionally active for this audit.
+
+### Files changed from `0dff98b7` through `911f0648`
+
+- Added: `app/Http/Controllers/ControlRoom/Concerns/AuthorizesControlRoomAlertAccess.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomAlertController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomDiscussionController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomTaskController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomTimeEntryController.php`
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomWatcherController.php`
+- Modified: `app/Http/Controllers/HealthSafety/HsEventController.php`
+- Modified: `app/Services/UserSiteAccessService.php`
+- Modified: `database/seeders/RbacSeeder.php`
+- Added: `docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md`
+- Added: `docs/superpowers/specs/2026-07-12-control-room-incident-hs-unified-journey-design.md`
+- Added: `tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php`
+- Added: `tests/Feature/ControlRoom/ControlRoomMessagingAuthorizationTest.php`
+- Added: `tests/Feature/ControlRoom/ControlRoomNestedRecordAuthorizationTest.php`
+- Modified: `tests/Feature/ControlRoom/ControlRoomTaskControllerTest.php`
+- Added: `tests/Feature/HealthSafety/HsEventSiteIsolationTest.php`
+- Modified: `tests/Unit/Services/UserSiteAccessServiceTest.php`
+
+### Next safe step
+
+Resume with an independent specification review of `911f0648`, then a code-quality review and fresh focused authorization test run with exclusive access to the shared test database. Only after Phase B2 is approved should Task 2 schema work begin. Continue to exclude mobile testing.
