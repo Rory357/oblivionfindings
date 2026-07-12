@@ -64,8 +64,8 @@
 - Browser URLs: pending
 - Smoke marker and record IDs: pending
 - Cleanup: no Slice 2 local transient records remain; feature tests use isolated per-process databases that are dropped at shutdown. Durable known demo assignments are intentionally idempotent.
-- Commit SHA: pending
-- Remaining: exact commit SHA and post-deployment browser lifecycle acceptance.
+- Commit SHA: `e75047ab63ad57684e29ced57fbc678cab3e52ff`
+- Remaining: post-deployment browser lifecycle acceptance.
 
 ### Slice 3 — Fixture-gated HR browser matrix
 
@@ -83,15 +83,17 @@
 
 ### Slice 4 — Control Room scheduled escalation
 
-- Start SHA: pending
+- Start SHA: `e75047ab63ad57684e29ced57fbc678cab3e52ff`
 - End SHA: pending
 - Ownership decision: keep escalation in `AutoEscalateControlRoomQueues`; apply only required callback capture changes.
-- Files changed: pending
-- Red proof: pending
-- Green tests and exact counts: pending
+- Files changed: `app/Jobs/AutoEscalateControlRoomQueues.php`, `tests/Feature/ControlRoom/AutoEscalateControlRoomQueuesTest.php`, and this ledger.
+- Red proof: the eligible-alert regression reproduced `Undefined variable $automationService` at `AutoEscalateControlRoomQueues.php:91` after entering the nested alert chunk.
+- Fix: capture the injected automation service in the outer queue chunk and inner alert chunk. No escalation behavior, service, route, model, or schema was changed.
+- Green tests and exact counts: focused job regression plus `AlertAutomationServiceTest` passed **14 tests / 31 assertions**. The regression verifies old assignment closure, new assignment creation, alert queue/level/context update, notification call, automation call, and clean completion.
+- PHP gates: syntax passed for both changed PHP files; scoped Pint passed; `git diff --check` passed.
 - Scheduled-interval server evidence: pending
 - Commit SHA: pending
-- Remaining: all acceptance rows.
+- Remaining: exact commit SHA, deployment, and one normal scheduled-interval log observation.
 
 ## Release gates
 
