@@ -169,6 +169,16 @@
 - Merged HR cleanup proof: exact marker counts are events `0`, profiles `0`, users `0`, candidates `0`, approval chains `0`, salary bands `0`, payroll runs `0`, audits `0`; `hr/calendar/1/CODEX-LIVE-HR-GAPS-20260712071119.txt` is absent from private storage.
 - Independent review clearance remains current: no Critical or Important findings after the cross-tenant Shift task and Calendar team-filter regressions were fixed and rerun.
 
+### First live deployment and acceptance checkpoint — 2026-07-13
+
+- Production checkout was already clean on pushed SHA `115cd5e96d467dc49613acf15e054925fc5a49f1`. Wayfinder generation passed, the required `NODE_OPTIONS=--max-old-space-size=4096 npm run build` transformed **4,944 modules** in **2m48s**, `optimize:clear`, `optimize`, and `queue:restart` passed, the manifest was regenerated at `2026-07-12 15:21:37 UTC`, the Redis queue worker was running, `/login` returned `200`, protected target routes returned the expected unauthenticated `302`, and there were zero pending migrations.
+- Real Chrome Client acceptance at `1440x900`: `https://oblivionfindings.com/operations/clients/9040?tab=support_plan` visibly replaced the legacy alias with `?tab=care_plans`; Plans & goals and Care & Support Plan were active, the canonical support-plan content rendered, all visible recent-client links used `tab=care_plans`, the dialog/record/source query survived canonicalisation, and the captured console error list was empty.
+- The idempotent canonical `HrDemoSeeder` populated only the three known demo profiles: `Community Support`, `Community Support`, and `Operations`. Live `/hr/calendar` then exposed exactly the active canonical options `Community Support` and `Operations`.
+- Live UI discovery: `/hr/people/48/edit` rendered `start_date` blank even though the profile had `2025-11-03`, so native form validation prevented the normal Save Changes path from issuing an update request. Root cause was direct model serialization turning all four edit-date props into ISO timestamps that native `type=date` inputs reject.
+- TDD evidence: the new Inertia boundary regression failed **1 test / 12 assertions** because `profile.start_date` was `2025-11-03T00:00:00.000000Z`; the minimal controller payload fix serializes `start_date`, `end_date`, `probation_end_date`, and `visa_expires_at` as date-only strings, and the focused rerun passed **1 test / 18 assertions**.
+- Post-fix focused gate: the complete `HrTeamConfigurationTest` passed **6 tests / 54 assertions** in **182.37s**; PHP syntax, scoped Pint, and `git diff --check` passed.
+- Remaining: commit/push/redeploy the date-input fix, rerun the normal team-edit acceptance, complete the marker-scoped HR lifecycle matrix and cleanup, observe the next normal Control Room interval, and close the durable ledgers.
+
 ## Final acceptance status
 
 - Client browser row: Partial — exact post-deployment Chrome evidence not yet captured.

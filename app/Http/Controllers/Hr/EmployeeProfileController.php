@@ -1090,6 +1090,11 @@ class EmployeeProfileController extends Controller
 
         $profile->load('user:id,name,email');
 
+        $profilePayload = $profile->toArray();
+        foreach (['start_date', 'end_date', 'probation_end_date', 'visa_expires_at'] as $dateField) {
+            $profilePayload[$dateField] = $profile->{$dateField}?->toDateString();
+        }
+
         $sites = Site::orderBy('name')
             ->get(['id', 'name']);
 
@@ -1106,7 +1111,7 @@ class EmployeeProfileController extends Controller
         ], $values);
 
         return Inertia::render('hr/employees/edit', [
-            'profile' => $profile,
+            'profile' => $profilePayload,
             'sites' => $sites,
             'departments' => $departments,
             'employmentTypes' => $options(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor']),

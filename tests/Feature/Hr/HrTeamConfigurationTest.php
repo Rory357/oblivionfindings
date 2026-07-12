@@ -57,6 +57,26 @@ test('a manager can change and clear a profile team with whitespace normalised',
     expect($profile->fresh()->team)->toBeNull();
 });
 
+test('employee edit dates are rendered as native date input values', function () {
+    $profile = HrEmployeeProfile::factory()->create([
+        'tenant_id' => 1,
+        'start_date' => '2025-11-03',
+        'end_date' => '2026-11-03',
+        'probation_end_date' => '2026-02-03',
+        'visa_expires_at' => '2027-11-03',
+    ]);
+
+    $this->actingAs($this->manager)
+        ->get("/hr/people/{$profile->id}/edit")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('hr/employees/edit')
+            ->where('profile.start_date', '2025-11-03')
+            ->where('profile.end_date', '2026-11-03')
+            ->where('profile.probation_end_date', '2026-02-03')
+            ->where('profile.visa_expires_at', '2027-11-03'));
+});
+
 test('team changes enforce maximum length and tenant isolation', function () {
     $foreign = HrEmployeeProfile::factory()->create([
         'tenant_id' => 2,
