@@ -24,6 +24,8 @@ class ClientIncident extends Model implements EmitsToTimeline
     protected $fillable = [
         'reference_number',
         'client_id',
+        'site_id',
+        'hs_event_id',
         'reported_by',
         'shift_id',
         'control_room_alert_id',
@@ -131,6 +133,16 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->belongsTo(Client::class);
     }
 
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    public function hsEvent(): BelongsTo
+    {
+        return $this->belongsTo(HsEvent::class, 'hs_event_id');
+    }
+
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reported_by');
@@ -217,12 +229,21 @@ class ClientIncident extends Model implements EmitsToTimeline
     }
 
     /**
-     * The governance HsEvent this incident converged into, created by the observer.
-     * Category is incident vs near_miss exactly as ClientIncidentObserver records it.
-     * Linked by idempotency key rather than an FK, so resolve on demand.
+     * The governance HsEvent this incident converged into. Prefer the explicit
+     * journey link, while retaining the idempotency lookup for legacy rows.
      */
     public function linkedHsEvent(): ?HsEvent
     {
+        if ($this->hs_event_id !== null) {
+            $direct = $this->relationLoaded('hsEvent')
+                ? $this->getRelation('hsEvent')
+                : $this->hsEvent()->first();
+
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
         $category = $this->type === 'near_miss'
             ? HsEvent::CATEGORY_NEAR_MISS
             : HsEvent::CATEGORY_INCIDENT;

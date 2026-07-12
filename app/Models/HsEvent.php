@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,42 +19,70 @@ class HsEvent extends Model
     protected $table = 'hs_events';
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     // Event categories — maps to source model types
     public const CATEGORY_INCIDENT = 'incident';
+
     public const CATEGORY_NEAR_MISS = 'near_miss';
+
     public const CATEGORY_HAZARD = 'hazard';
+
     public const CATEGORY_INJURY = 'injury';
+
     public const CATEGORY_EXPOSURE = 'exposure';
+
     public const CATEGORY_RESTRAINT = 'restraint';
+
     public const CATEGORY_SAFEGUARDING = 'safeguarding';
+
     public const CATEGORY_DRILL_FAILURE = 'drill_failure';
+
     public const CATEGORY_INSPECTION_FAILURE = 'inspection_failure';
+
     public const CATEGORY_EQUIPMENT_FAULT = 'equipment_fault';
+
     public const CATEGORY_VEHICLE_INCIDENT = 'vehicle_incident';
 
     // Normalised severity levels
     public const SEVERITY_LOW = 'low';
+
     public const SEVERITY_MEDIUM = 'medium';
+
     public const SEVERITY_HIGH = 'high';
+
     public const SEVERITY_CRITICAL = 'critical';
 
     // Lifecycle statuses
     public const STATUS_OPEN = 'open';
+
     public const STATUS_INVESTIGATING = 'investigating';
+
     public const STATUS_CORRECTIVE_ACTION = 'corrective_action';
+
     public const STATUS_MONITORING = 'monitoring';
+
     public const STATUS_CLOSED = 'closed';
 
     // WorkSafe notification statuses
     public const WORKSAFE_PENDING = 'pending';
+
     public const WORKSAFE_NOTIFIED = 'notified';
+
     public const WORKSAFE_ACKNOWLEDGED = 'acknowledged';
 
+    // H&S handover acceptance states
+    public const HANDOVER_NOT_READY = 'not_ready';
+
+    public const HANDOVER_AWAITING_ACCEPTANCE = 'awaiting_acceptance';
+
+    public const HANDOVER_ACCEPTED = 'accepted';
+
+    public const HANDOVER_NOT_REQUIRED = 'not_required';
+
     /* ------------------------------------------------------------------ */
-    /*  Fillable / Casts                                                   */
+    /*  Fillable / Casts */
     /* ------------------------------------------------------------------ */
 
     protected $fillable = [
@@ -80,6 +109,11 @@ class HsEvent extends Model
         'worksafe_site_preserved',
         'investigation_required',
         'control_room_alert_id',
+        'handover_status',
+        'owner_user_id',
+        'accepted_by_user_id',
+        'accepted_at',
+        'acceptance_notes',
         'closed_at',
         'closed_by',
         'closure_summary',
@@ -96,10 +130,11 @@ class HsEvent extends Model
         'worksafe_acknowledged_at' => 'datetime',
         'worksafe_site_preserved' => 'boolean',
         'investigation_required' => 'boolean',
+        'accepted_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function source(): MorphTo
@@ -145,6 +180,25 @@ class HsEvent extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function acceptedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'accepted_by_user_id');
+    }
+
+    /**
+     * Incident linked through the explicit journey FK. The polymorphic source
+     * relation remains available for provenance and legacy event sources.
+     */
+    public function clientIncident(): HasOne
+    {
+        return $this->hasOne(ClientIncident::class, 'hs_event_id');
     }
 
     /**
@@ -199,7 +253,7 @@ class HsEvent extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeOpen($query)
@@ -233,7 +287,7 @@ class HsEvent extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     public function isOpen(): bool
@@ -311,6 +365,6 @@ class HsEvent extends Model
      */
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('HS');
+        return app(ReferenceNumberGenerator::class)->next('HS');
     }
 }

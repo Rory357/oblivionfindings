@@ -29,6 +29,10 @@ class AlertSla extends Model
         'response_breached',
         'resolution_breached',
         'first_breach_at',
+        'cycle_number',
+        'cycle_started_at',
+        'cycle_history',
+        'ended_as',
     ];
 
     protected $casts = [
@@ -42,6 +46,10 @@ class AlertSla extends Model
         'acknowledge_breached' => 'boolean',
         'response_breached' => 'boolean',
         'resolution_breached' => 'boolean',
+        'cycle_number' => 'integer',
+        'cycle_started_at' => 'datetime',
+        'cycle_history' => 'array',
+        'ended_as' => 'string',
     ];
 
     public function alert(): BelongsTo
@@ -109,7 +117,7 @@ class AlertSla extends Model
             'acknowledged_at' => $acknowledgedAt,
             'acknowledge_breached' => $breached,
             'acknowledge_variance_minutes' => $variance,
-            'first_breach_at' => $breached && !$this->first_breach_at ? $acknowledgedAt : $this->first_breach_at,
+            'first_breach_at' => $breached && ! $this->first_breach_at ? $acknowledgedAt : $this->first_breach_at,
         ]);
     }
 
@@ -125,7 +133,7 @@ class AlertSla extends Model
             'responded_at' => $respondedAt,
             'response_breached' => $breached,
             'response_variance_minutes' => $variance,
-            'first_breach_at' => $breached && !$this->first_breach_at ? $respondedAt : $this->first_breach_at,
+            'first_breach_at' => $breached && ! $this->first_breach_at ? $respondedAt : $this->first_breach_at,
         ]);
     }
 
@@ -141,7 +149,7 @@ class AlertSla extends Model
             'resolved_at' => $resolvedAt,
             'resolution_breached' => $breached,
             'resolution_variance_minutes' => $variance,
-            'first_breach_at' => $breached && !$this->first_breach_at ? $resolvedAt : $this->first_breach_at,
+            'first_breach_at' => $breached && ! $this->first_breach_at ? $resolvedAt : $this->first_breach_at,
         ]);
     }
 
@@ -150,7 +158,7 @@ class AlertSla extends Model
         $breaches = [];
         $now = now();
 
-        if (!$this->acknowledged_at && $this->acknowledge_deadline && $now->gt($this->acknowledge_deadline) && !$this->acknowledge_breached) {
+        if (! $this->acknowledged_at && $this->acknowledge_deadline && $now->gt($this->acknowledge_deadline) && ! $this->acknowledge_breached) {
             $this->update([
                 'acknowledge_breached' => true,
                 'first_breach_at' => $this->first_breach_at ?? $now,
@@ -158,7 +166,7 @@ class AlertSla extends Model
             $breaches[] = 'acknowledge';
         }
 
-        if (!$this->responded_at && $this->response_deadline && $now->gt($this->response_deadline) && !$this->response_breached) {
+        if (! $this->responded_at && $this->response_deadline && $now->gt($this->response_deadline) && ! $this->response_breached) {
             $this->update([
                 'response_breached' => true,
                 'first_breach_at' => $this->first_breach_at ?? $now,
@@ -166,7 +174,7 @@ class AlertSla extends Model
             $breaches[] = 'response';
         }
 
-        if (!$this->resolved_at && $this->resolution_deadline && $now->gt($this->resolution_deadline) && !$this->resolution_breached) {
+        if (! $this->resolved_at && $this->resolution_deadline && $now->gt($this->resolution_deadline) && ! $this->resolution_breached) {
             $this->update([
                 'resolution_breached' => true,
                 'first_breach_at' => $this->first_breach_at ?? $now,
@@ -196,9 +204,9 @@ class AlertSla extends Model
 
         // Check if any deadline is within 5 minutes
         if (
-            ($this->acknowledge_deadline && !$this->acknowledged_at && $this->acknowledge_deadline->lte($now->addMinutes(5))) ||
-            ($this->response_deadline && !$this->responded_at && $this->response_deadline->lte($now->addMinutes(5))) ||
-            ($this->resolution_deadline && !$this->resolved_at && $this->resolution_deadline->lte($now->addMinutes(5)))
+            ($this->acknowledge_deadline && ! $this->acknowledged_at && $this->acknowledge_deadline->lte($now->addMinutes(5))) ||
+            ($this->response_deadline && ! $this->responded_at && $this->response_deadline->lte($now->addMinutes(5))) ||
+            ($this->resolution_deadline && ! $this->resolved_at && $this->resolution_deadline->lte($now->addMinutes(5)))
         ) {
             return 'at_risk';
         }
