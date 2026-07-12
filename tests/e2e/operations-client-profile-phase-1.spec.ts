@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-import { loginAsStaff, runLaravelPhp } from './helpers';
+import {
+    collectConsoleErrors,
+    expectNoConsoleErrors,
+    loginAsStaff,
+    runLaravelPhp,
+} from './helpers';
 
 function seedClientProfilePhaseOneFixture() {
     const output = runLaravelPhp(`
@@ -9,14 +14,121 @@ $client = \\App\\Models\\Client::factory()->create([
     'last_name' => 'Profile',
     'status' => 'active',
 ]);
+$recentClient = \\App\\Models\\Client::factory()->create([
+    'first_name' => 'Recent',
+    'last_name' => 'Playwright Client',
+    'status' => 'active',
+]);
 
-echo json_encode(['clientId' => $client->id]);
+echo json_encode([
+    'clientId' => $client->id,
+    'recentClientId' => $recentClient->id,
+]);
 `);
 
-    return JSON.parse(output) as { clientId: number };
+    return JSON.parse(output) as {
+        clientId: number;
+        recentClientId: number;
+    };
 }
 
 test.describe('operations client profile phase 1', () => {
+    test('canonicalizes the legacy care plan tab without breaking Inertia history or dialog state', async ({
+        page,
+    }) => {
+        const { clientId, recentClientId } = seedClientProfilePhaseOneFixture();
+        const consoleErrors = collectConsoleErrors(page);
+        const failedTargetRequests: string[] = [];
+        page.on('response', (response) => {
+            if (
+                response.url().includes(`/operations/clients/${clientId}`) &&
+                response.status() >= 400
+            ) {
+                failedTargetRequests.push(
+                    `${response.status()} ${response.request().method()} ${response.url()}`,
+                );
+            }
+        });
+
+        await loginAsStaff(page);
+        await page.evaluate(
+            ({ id }) => {
+                window.localStorage.setItem(
+                    'recentClients',
+                    JSON.stringify([
+                        {
+                            id,
+                            name: 'Recent Playwright Client',
+                            photo: null,
+                            house: null,
+                        },
+                    ]),
+                );
+            },
+            { id: recentClientId },
+        );
+        const previousUrl = page.url();
+        const historyLength = await page.evaluate(() => window.history.length);
+
+        await page.goto(
+            `/operations/clients/${clientId}?tab=support_plan&dialog=quick_note&record=99&source=legacy`,
+        );
+
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        expect(await page.evaluate(() => window.history.length)).toBe(
+            historyLength + 1,
+        );
+        expect(new URL(page.url()).searchParams.get('dialog')).toBe(
+            'quick_note',
+        );
+        expect(new URL(page.url()).searchParams.get('record')).toBe('99');
+        expect(new URL(page.url()).searchParams.get('source')).toBe('legacy');
+        await expect(page.getByTestId('client-group-plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+        await expect(
+            page.getByTitle('Recent Playwright Client'),
+        ).toHaveAttribute(
+            'href',
+            `/operations/clients/${recentClientId}?tab=care_plans`,
+        );
+
+        await page.goBack();
+        await expect(page).toHaveURL(previousUrl);
+        await page.goForward();
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+
+        await page.reload();
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+
+        expectNoConsoleErrors(consoleErrors);
+        expect(failedTargetRequests).toEqual([]);
+    });
+
     test('submits a quick note from the web profile hero and projects it to the timeline', async ({
         page,
     }) => {

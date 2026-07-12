@@ -1,3 +1,5 @@
+import { router } from '@inertiajs/react';
+
 /**
  * Grouped two-tier navigation registry for the client profile redesign.
  *
@@ -116,8 +118,17 @@ export function updateClientProfileQuery(
             url.searchParams.set(key, value);
         }
     });
-    const method = mode === 'push' ? 'pushState' : 'replaceState';
-    window.history[method]({}, '', url.toString());
+    const visit = {
+        url: `${url.pathname}${url.search}${url.hash}`,
+        preserveScroll: true,
+        preserveState: true,
+    };
+
+    if (mode === 'push') {
+        router.push(visit);
+    } else {
+        router.replace(visit);
+    }
 }
 
 export function resolveVisibleProfileTab(
