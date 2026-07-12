@@ -524,3 +524,11 @@ Expected: the worktree is clean; the three Fleet rollout commits are visible; th
 - The fresh client build was served from this worktree with PHP's local server on `127.0.0.1:8001`; requested ports 8766/8767 refused PHP's bind despite having no listener, so the documented fallback was used.
 - `/fleet-assets` consistently redirects to `/login`. The in-app browser had no reusable signed-in local tab, and no credential was supplied or entered. Consequently the protected Fleet desktop, responsive, dark-mode, interaction, and console checks remain unverified rather than being overstated.
 - `.claude/launch.json` was not modified or staged. Nothing was pushed.
+
+## Recovery checkpoint — 2026-07-12
+
+- Task isolation was rechecked before repository commands: Client Profile, HR, and IT were unloaded; Fleet was the only active Oblivion Findings task.
+- Verified the exact existing worktree `C:\Users\steph\Herd\oblivionfindings\.claude\worktrees\strange-bhaskara-ae2843` on branch `claude/frosty-leavitt-f99798` at `c705d567239fffa7a2da326b32d379ac3f7ef477` (`feat(fleet): finish hero rollout consistency pass`). The worktree was clean before this ledger-only update.
+- Per the user's recovery instruction, no Chrome session, local preview, browser route, interaction, theme, viewport, console check, automated test, static check, or build was run in this checkpoint. Task 4 Steps 2 and 3 therefore remain unverified; no Fleet URL was visited and no new browser evidence is claimed.
+- No source code or preview configuration was changed. The only change from the verified checkpoint is this uncommitted ledger entry.
+- Port `8001` was checked after the deferred browser pass and was not listening. No temporary preview process required shutdown.
