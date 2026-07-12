@@ -1080,3 +1080,79 @@ This work is intentionally paused at a safe boundary following the Fleet task's 
 ### Next safe step
 
 Resume with an independent specification review of `911f0648`, then a code-quality review and fresh focused authorization test run with exclusive access to the shared test database. Only after Phase B2 is approved should Task 2 schema work begin. Continue to exclude mobile testing.
+
+---
+
+## Crash-containment checkpoint — 2026-07-13 (Task 3 boundary)
+
+This audit is intentionally paused at a safe committed boundary following a second Fleet crash-containment request. The active Task 3 specification reviewer was interrupted before it returned a verdict. No further implementation, fix, test, browser journey, audit section, merge, push, deployment, reset, discard, or archive action was started during containment.
+
+### Exact branch state
+
+- Worktree: `C:\Users\steph\.config\superpowers\worktrees\oblivionfindings\codex-control-room-incident-hs-unification`
+- Branch: `codex/control-room-incident-hs-unification`
+- Product HEAD before this checkpoint commit: `b6748d2f4ebd28ef13fb3d4fec6942ee70a0326a`
+- Planning baseline: `0dff98b7`
+- The product worktree was clean before this checkpoint was added.
+
+### Exact scope reached
+
+- Task 1 is complete and independently specification- and quality-approved: Control Room and H&S site visibility, nested-record authorization, task hierarchy and reorder safety, and non-disclosing site-scoped messaging.
+- Task 2 is complete and independently specification- and quality-approved: six journey/handover/SLA/recommendation migrations, corresponding model and factory contracts, legacy-default proof, and full down/up migration proof.
+- Task 3 implementation exists at `b6748d2f`: one incident journey service/DTO, direct alert–incident–H&S links, transaction/lock/conflict handling, critical-severity provenance, and focused service tests.
+- Task 3 is **not approved or complete**. Its independent specification review was interrupted. Root pre-review also identified two likely blockers that remain unproved and unfixed: a retry may regress a reviewed/closed incident to `submitted`, and a retry may overwrite H&S-canonical WorkSafe state with stale incident values.
+- Tasks 4–16 have not started. In particular, there is no observer/sensor/medication bridge rewiring, lifecycle transition layer, explicit H&S or shift acceptance flow, dashboard modernization, shared Control Room/H&S visual system, reconciliation command, five desktop E2E journeys, client/SSR build proof, or final R1–R20 re-audit.
+- Mobile remains explicitly excluded from this audit and test scope.
+
+### Honest verification boundary
+
+- Task 1 final focused suites and independent reviews are recorded in its completion ledger above.
+- Task 2 final schema suite: 14 tests, 130 assertions; source-link, terminal-overdue, and migration down/up checks also passed as recorded above.
+- Task 3 implementer evidence: 13 focused journey tests with 157 assertions, plus 18 H&S-backbone regression tests with 25 assertions; PHP lint, Pint, and diff checks were reported green.
+- Task 3 has no independent specification verdict, no independent code-quality verdict, and no root-owned post-review rerun. Its implementer evidence must not be treated as release approval.
+- No dashboard/browser E2E, live/demo-server audit, client build, SSR build, or final feature-completeness audit has been run for the unfinished product state.
+
+### Files changed since the previous checkpoint
+
+The previous checkpoint contains the exact file list through `911f0648`. From `911f0648` through product HEAD `b6748d2f`, these committed files changed:
+
+- Modified: `app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php`
+- Modified: `app/Models/ClientIncident.php`
+- Modified: `app/Models/ControlRoom/AlertSla.php`
+- Modified: `app/Models/ControlRoom/AlertTask.php`
+- Modified: `app/Models/ControlRoom/Shift.php`
+- Modified: `app/Models/ControlRoomAlert.php`
+- Modified: `app/Models/HsEvent.php`
+- Added: `app/Models/HsRecommendationDisposition.php`
+- Modified: `app/Services/HealthSafety/HsEventService.php`
+- Added: `app/Services/Incidents/IncidentJourney.php`
+- Added: `app/Services/Incidents/IncidentJourneyService.php`
+- Modified: `database/factories/ClientIncidentFactory.php`
+- Modified: `database/factories/HsEventFactory.php`
+- Added: `database/factories/HsRecommendationDispositionFactory.php`
+- Added: `database/migrations/2026_07_12_000100_add_incident_journey_links.php`
+- Added: `database/migrations/2026_07_12_000200_add_hs_handover_acceptance.php`
+- Added: `database/migrations/2026_07_12_000300_add_alert_task_transfer.php`
+- Added: `database/migrations/2026_07_12_000350_add_alert_sla_cycle_history.php`
+- Added: `database/migrations/2026_07_12_000400_add_control_room_shift_handover_acceptance.php`
+- Added: `database/migrations/2026_07_12_000500_create_hs_recommendation_dispositions.php`
+- Modified: `docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md`
+- Modified: `tests/Feature/ControlRoom/ControlRoomMessagingAuthorizationTest.php`
+- Modified: `tests/Feature/ControlRoom/ControlRoomTaskControllerTest.php`
+- Modified: `tests/Feature/HealthSafety/HsEventRegisterTest.php`
+- Added: `tests/Feature/Incidents/IncidentJourneySchemaTest.php`
+- Added: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
+
+The cumulative baseline-to-product-HEAD diff is 42 files: 6,888 insertions and 216 deletions. The checkpoint document itself is the only containment-time file change.
+
+### Browser and process containment
+
+- The in-app browser tab list was empty; no tab was opened, navigated, or closed during containment.
+- No task-owned `php`, `node`, or `cmd` preview process was running for this worktree, so no process was stopped.
+- No PHP test runner was active.
+- Common local preview ports `8000`, `8001`, `8768`, `5173`, and `4173` had no listener.
+- The Task 3 specification-review subagent was interrupted. No implementation or review subagent remains intentionally active for this audit.
+
+### Next safe step
+
+Resume Task 3 with a fresh independent specification review of `b6748d2f`, explicitly test the lifecycle-retry and H&S-canonical WorkSafe concerns, return any findings to the Task 3 implementer under TDD, then obtain a fresh quality review and root-owned focused rerun. Do not begin Task 4 until Task 3 is approved. Continue with desktop-only scope.
