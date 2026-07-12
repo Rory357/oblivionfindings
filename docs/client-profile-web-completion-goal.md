@@ -406,6 +406,14 @@
 
 ## Deployment and external boundary
 
-- No deployment is authorized. The live website is evidence of the pre-change state only.
-- Local implementation and verification must be completed before a separately authorized deployment can make post-change live proof possible.
+- The original no-deployment boundary was later superseded for the combined Client Profile / HR production-readiness release. Application SHA `46acdd312e432c93cf09e8264d6d2dcb35f13637` was pushed to `main`, deployed to the clean production checkout, rebuilt, optimized, and accepted live.
+- Post-deployment desktop Chrome at `1440x900` proved `support_plan` canonicalizes to `care_plans`, Care & Support Plan renders under Plans & goals, visible recent-client links use the canonical tab, legacy dialog query keys survive, and the console-error list is empty. The targeted Chromium alias test remains green for Back/Forward history behavior.
+- This closes the production-readiness browser/deployment boundary for the combined release; it does not relabel the broader historical completion matrix where later-batch Client Profile lifecycle/detail work remains explicitly Partial.
 - No mobile work is included or claimed.
+
+### Release checkpoint F — production proof complete, 13 July 2026
+
+- Production application revision: `46acdd312e432c93cf09e8264d6d2dcb35f13637`; clean `main`, zero pending migrations, fresh client manifest, optimized caches and running Redis queue worker.
+- Live actor/surface: Demo Admin on `https://oblivionfindings.com/operations/clients/9040` at desktop `1440x900`.
+- Result: canonical Care & Support Plan navigation and alias/query compatibility rendered correctly with no Chrome console errors and no `>=400` Nginx responses from the acceptance session.
+- Integration evidence and the paired HR production matrix are carried in `docs/client-hr-live-gap-closeout.md`.

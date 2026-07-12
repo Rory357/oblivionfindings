@@ -1,6 +1,6 @@
 # Client Profile and HR Live Gap Closeout
 
-**Status:** Active
+**Status:** Verified complete
 **Started:** 2026-07-12 (Pacific/Auckland)
 **Branch:** `codex/client-hr-live-gap-closeout`
 **Worktree:** `C:\Users\steph\Herd\oblivionfindings-client-hr-live-gap-closeout`
@@ -152,10 +152,9 @@
 - Feature commit(s): `19892c89`, `e2958ca0`, `e75047ab`, `abd84351`, `50b27bf9`, `42b7c743`, `3f9885c1`, `20222781`, and review-clearance ledger `8a1190ee`.
 - Merge commit: `ee87852ef1139d55f8343027977eef817752e618` (`Merge Client Profile and HR live gap closeout`).
 - Local `main`: `ee87852ef1139d55f8343027977eef817752e618` before this release-candidate ledger commit; clean and 11 commits ahead of `origin/main`.
-- `origin/main`: pending
-- `git ls-remote`: pending
-- Deployed SHA: pending
-- Server cleanliness, migrations, manifest, queue, login and logs: pending
+- `origin/main` and `git ls-remote`: matched application release SHA `46acdd312e432c93cf09e8264d6d2dcb35f13637` before the final ledger-only closeout.
+- Deployed application SHA: `46acdd312e432c93cf09e8264d6d2dcb35f13637`.
+- Server state: clean `main`, zero pending migrations, regenerated Wayfinder and client manifest, optimized Laravel caches, restarted Redis queue worker, and healthy authenticated/live HTTP acceptance.
 
 ### Merged-revision release candidate — 2026-07-12
 
@@ -177,10 +176,22 @@
 - Live UI discovery: `/hr/people/48/edit` rendered `start_date` blank even though the profile had `2025-11-03`, so native form validation prevented the normal Save Changes path from issuing an update request. Root cause was direct model serialization turning all four edit-date props into ISO timestamps that native `type=date` inputs reject.
 - TDD evidence: the new Inertia boundary regression failed **1 test / 12 assertions** because `profile.start_date` was `2025-11-03T00:00:00.000000Z`; the minimal controller payload fix serializes `start_date`, `end_date`, `probation_end_date`, and `visa_expires_at` as date-only strings, and the focused rerun passed **1 test / 18 assertions**.
 - Post-fix focused gate: the complete `HrTeamConfigurationTest` passed **6 tests / 54 assertions** in **182.37s**; PHP syntax, scoped Pint, and `git diff --check` passed.
-- Remaining: commit/push/redeploy the date-input fix, rerun the normal team-edit acceptance, complete the marker-scoped HR lifecycle matrix and cleanup, observe the next normal Control Room interval, and close the durable ledgers.
+- Date-input release: committed and pushed as `46acdd312e432c93cf09e8264d6d2dcb35f13637`; production was rebuilt and optimized on that exact clean SHA. The final manifest timestamp was `2026-07-12 15:52:35 UTC`, the Redis worker was running, and zero migrations were pending.
+- Team acceptance: Demo Admin changed `/hr/people/48/edit` from `Operations` with a whitespace/case variant of `Community Support`; the UI saved and reloaded the canonical `Community Support` value. The same normal UI then restored `Operations`, which was confirmed after reload. The Start Date rendered as `2025-11-03` after the date-boundary fix. Console errors were empty.
+
+### Final live production acceptance — 2026-07-13
+
+- Client Profile, Demo Admin, desktop `1440x900`: `/operations/clients/9040?tab=support_plan` canonicalized to `?tab=care_plans`; the correct Plans & goals / Care & Support Plan surface rendered, legacy dialog query keys survived canonicalization, visible profile links used the canonical tab, and Chrome console errors were empty. The already-green Playwright alias test remains the Back/Forward proof because direct Chrome `goto` uses replace semantics.
+- HR marker: `CODEX-LIVE-HR-GAPS-20260713T0400-LIVE`. Demo Admin exercised the canonical production UI for audit expansion/System fallback; team Calendar create, archive, restore and retained attendee/reminder/attachment evidence; salary-band historical placement, deactivate and reactivate; exit-interview recording, automatic completion, reopen and cancel/resume; offer expiry with required reason, invalid old portal token, safe resend/token rotation; scorecard-quorum override with required audited reason; generic-chain visibility plus native leave add/edit/down/up/deactivate/reactivate/remove; locked payroll, manager desktop detail, `390x844` mobile card, and worker self-service payslip detail/download controls.
+- HR regression controls: Training Catalog search, Feedback Pending, Supervision search, the real 30-second Timekeeping refresh with `?tab=overview` and selected Overview preserved, Shifts Open/Calendar, and the optional shift licence-class/endorsement controls were all rechecked in production Chrome. No shift was saved for the licence-control proof.
+- Chrome evidence: every grouped acceptance row reported an empty console-error list. Nginx access logs for the Chrome source during the 16:00 UTC acceptance hour contained **0** responses with status `>=400`.
+- Server invariants before cleanup: Calendar event `1` was active with attendee/reminder/attachment counts `1/1/1`; salary band `9` was active; offboarding checklist `1` was cancelled after completion/reopen proof with one exit interview; offer `2` had a rotated non-null token and cleared expiry attribution; candidate `8` was `reference_check` with the override audit present; leave routes `1/2` were active at levels `1/2` with `36h/48h`; payroll run `3` was locked and payslip `1` had net pay `$1,814.00`; mail transport resolved to non-delivering `log`.
+- Cleanup: the canonical exact-marker helper removed the synthetic graph and private attachment. A strict audit found two create/delete audit rows for an already-deleted synthetic leave route; exactly those two fixture rows were removed, restoring the pre-fixture audit count. The helper now captures this deleted-route audit shape before deleting fixture users, with a regression that passed in both configured Chromium projects (**2/2 in 34.4s**). The run's unrelated global setup warning remains the pre-existing duplicate `EMP0003` seeder issue; it did not fail the targeted cleanup tests.
+- Final production baseline restored: users `57`, HR profiles `26`, audit logs `11,314`, Calendar events/attendees/reminders/attachments `0/0/0/0`, salary bands `8`, offboarding checklists/tasks/exit interviews `0/0/0`, candidates/applications/offers `6/5/1`, generic approval chains/steps `2/2`, payroll runs/payslips `1/0`; all exact marker counts were `0` and `hr/calendar/1/CODEX-LIVE-HR-GAPS-20260713T0400-LIVE.txt` was absent.
+- Scheduled interval: `AutoEscalateControlRoomQueues` remained registered at `*/10`. From final application deployment at 15:53 UTC through 16:49 UTC, multiple normal intervals elapsed with **0** production error/critical/alert/emergency rows and **0** matches for the prior `automationService`, relation, or `shift.user` failure signatures.
 
 ## Final acceptance status
 
-- Client browser row: Partial — exact post-deployment Chrome evidence not yet captured.
-- HR L1: Partial — exact fixture-backed post-deployment Chrome evidence not yet captured.
-- Control Room scheduled interval: Partial — deployed interval not yet observed.
+- Client browser row: Verified complete for this release — post-deployment desktop Chrome acceptance captured on the canonical Client Profile surface with empty console and failed-request evidence.
+- HR L1: Verified complete — the exact fixture-backed production Chrome matrix, server invariants, strict marker cleanup, and cleanup regression are recorded above.
+- Control Room scheduled interval: Verified complete — the deployed `*/10` job was observed across multiple normal intervals with no matching production failure.

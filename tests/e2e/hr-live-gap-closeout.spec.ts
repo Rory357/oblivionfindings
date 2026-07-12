@@ -110,6 +110,17 @@ $payslipIds = \\Illuminate\\Support\\Facades\\DB::table('hr_payslips')
     ->whereIn('employee_profile_id', $profileIds)->pluck('id');
 $leaveChainIds = \\Illuminate\\Support\\Facades\\DB::table('hr_leave_approval_chains')
     ->whereIn('user_id', $userIds)->pluck('id');
+$deletedLeaveChainAuditIds = collect();
+if ($userIds->isNotEmpty()) {
+    $deletedLeaveChainAuditIds = \\Illuminate\\Support\\Facades\\DB::table('audit_logs')
+        ->where('auditable_type', \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::class)
+        ->where(function ($query) use ($userIds) {
+            foreach ($userIds as $userId) {
+                $query->orWhere('meta', 'like', '%"user_id": "'.$userId.'"%')
+                    ->orWhere('meta', 'like', '%"user_id": '.$userId.'%');
+            }
+        })->pluck('id');
+}
 \\Illuminate\\Support\\Facades\\DB::table('hr_offboarding_tasks')->whereIn('offboarding_checklist_id', $checklistIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_exit_interviews')->whereIn('employee_profile_id', $profileIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_offboarding_checklists')->whereIn('id', $checklistIds)->delete();
@@ -169,7 +180,7 @@ $auditableIds = [
 ];
 
 \\Illuminate\\Support\\Facades\\DB::table('audit_logs')
-    ->where(function ($query) use ($marker, $auditableIds) {
+    ->where(function ($query) use ($marker, $auditableIds, $deletedLeaveChainAuditIds) {
         $query->where(function ($markerQuery) use ($marker) {
             $markerQuery->where(function ($runQuery) use ($marker) {
                 $runQuery->where('action', 'codex.live_hr_gaps')
@@ -186,6 +197,9 @@ $auditableIds = [
             $query->orWhere(function ($q) use ($type, $ids) {
                 $q->where('auditable_type', $type)->whereIn('auditable_id', $ids);
             });
+        }
+        if ($deletedLeaveChainAuditIds->isNotEmpty()) {
+            $query->orWhereIn('id', $deletedLeaveChainAuditIds);
         }
     })->delete();
 `);
@@ -526,6 +540,47 @@ echo \\App\\Models\\AuditLog::query()
         expect(probeAuditCount).toBe(0);
         expect(sentinelAuditCount).toBe(1);
         cleanupFixtures(sentinelMarker);
+
+        const deletedRouteId = Number(
+            runLaravelPhp(`
+$route = \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()->create([
+    'tenant_id' => 1,
+    'user_id' => ${fixture.payrollUserId},
+    'approver_user_id' => ${fixture.adminId},
+    'approval_level' => 99,
+    'escalation_after_hours' => 12,
+    'is_active' => true,
+    'created_by' => ${fixture.adminId},
+    'updated_by' => ${fixture.adminId},
+]);
+$id = $route->id;
+$route->delete();
+echo $id;
+`).trim(),
+        );
+        expect(
+            Number(
+                runLaravelPhp(`
+echo \\App\\Models\\AuditLog::query()
+    ->where('auditable_type', \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::class)
+    ->where('auditable_id', ${deletedRouteId})
+    ->count();
+`).trim(),
+            ),
+        ).toBeGreaterThan(0);
+
+        cleanupFixtures();
+        expect(
+            Number(
+                runLaravelPhp(`
+echo \\App\\Models\\AuditLog::query()
+    ->where('auditable_type', \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::class)
+    ->where('auditable_id', ${deletedRouteId})
+    ->count();
+`).trim(),
+            ),
+        ).toBe(0);
+        fixture = seedFixtures();
     });
 
     test('proves marker-scoped HR lifecycle surfaces and controls', async ({
