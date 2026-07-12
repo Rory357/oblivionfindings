@@ -167,7 +167,7 @@ git commit -m "fix(control-room): enforce incident journey visibility"
 - Modify: `database/factories/HsEventFactory.php`
 - Test: `tests/Feature/Incidents/IncidentJourneySchemaTest.php`
 
-- [ ] **Step 1: Write a failing schema and relationship test**
+- [x] **Step 1: Write a failing schema and relationship test**
 
 ```php
 it('stores direct journey links acceptance transfers and recommendation dispositions', function () {
@@ -180,13 +180,13 @@ it('stores direct journey links acceptance transfers and recommendation disposit
 });
 ```
 
-- [ ] **Step 2: Run the test and verify missing-column failures**
+- [x] **Step 2: Run the test and verify missing-column failures**
 
 Run: `php artisan test tests/Feature/Incidents/IncidentJourneySchemaTest.php`
 
 Expected: FAIL on the first missing column/table.
 
-- [ ] **Step 3: Implement migrations with reversible indexes and foreign keys**
+- [x] **Step 3: Implement migrations with reversible indexes and foreign keys**
 
 Use these exact contracts:
 
@@ -205,22 +205,30 @@ Recommendation dispositions use a unique `(hs_investigation_id, recommendation_i
 
 SLA cycle fields use `cycle_number` (default 1), `cycle_started_at`, JSON `cycle_history`, and nullable `ended_as`. Reopening snapshots the complete prior clock/breach outcome into `cycle_history` before starting the next cycle; dismissal stores `ended_as=dismissed` so it cannot be counted as successful compliance.
 
-- [ ] **Step 4: Add fillable, casts, constants, and relationships**
+- [x] **Step 4: Add fillable, casts, constants, and relationships**
 
 H&S handover constants are `not_ready`, `awaiting_acceptance`, `accepted`, and `not_required`. Alert-task terminal statuses include `completed`, `cancelled`, and `transferred`. Shift handover states are `none`, `prepared`, and `accepted`.
 
-- [ ] **Step 5: Verify migrate, rollback, and re-migrate on the test database**
+- [x] **Step 5: Verify migrate, rollback, and re-migrate on the test database**
 
 Run the six migrations in order with `--database=mysql` under the test environment used by Pest, roll them back by path in reverse order, then re-run the schema test.
 
 Expected: every migration applies and reverses cleanly; the schema test passes after re-migration.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add database/migrations app/Models database/factories tests/Feature/Incidents/IncidentJourneySchemaTest.php
 git commit -m "feat(incidents): add explicit journey and handover schema"
 ```
+
+**Task 2 completion evidence — 2026-07-13**
+
+- Schema/model implementation: `6304a3e7`; provenance, terminal-scope, timeline-site, and constraint-quality correction: `264cbca9`.
+- TDD evidence: initial missing-schema RED 1 failed / 1 assertion; model-contract RED 10 failed / 2 passed / 35 assertions; quality RED 2 failed / 12 passed / 117 assertions plus transferred-overdue RED 1 failed.
+- Final focused proof: `IncidentJourneySchemaTest` 14 tests / 130 assertions; real H&S source-link 1 test / 16 assertions; transferred-task overdue scope 1 test / 1 assertion.
+- Migration proof on the MySQL test database: all six applied `000100 → 000500`, rolled back `000500 → 000100`, and reapplied `000100 → 000500`. Legacy incident/event/SLA/shift rows survived; defaults remained H&S `not_required`, SLA cycle `1`, shift `none` with version `1`.
+- Independent specification review: compliant. Independent code-quality re-review: approved. PHP lint, Pint, and `git diff --check` passed; no controller, service, route, UI, lifecycle, or mobile work was included.
 
 ---
 
