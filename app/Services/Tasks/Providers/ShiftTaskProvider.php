@@ -45,7 +45,8 @@ class ShiftTaskProvider implements HasModelClass, TaskProvider
             ->whereHas('shift', function ($q) use ($user) {
                 // Today/future plus the recent past week — ancient shift tasks
                 // are noise, not actionable work.
-                $q->where('starts_at', '>=', now()->subDays(7))
+                $q->where('organization_id', $user->organization_id)
+                    ->where('starts_at', '>=', now()->subDays(7))
                     ->where('status', '!=', 'cancelled');
 
                 // Schedulers (shifts.manageAny) see every shift's tasks; other

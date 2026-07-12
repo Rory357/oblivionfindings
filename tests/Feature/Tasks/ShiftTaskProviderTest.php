@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\ShiftTask;
@@ -33,9 +34,27 @@ test('shift tasks expose the rostered staff assignee through the canonical shift
         'sort_order' => 1,
     ]);
 
+    $foreignWorker = User::factory()->create(['organization_id' => 2]);
+    $foreignShift = Shift::factory()->create([
+        'organization_id' => 2,
+        'client_id' => Client::factory()->create(['organization_id' => 2])->id,
+        'user_id' => $foreignWorker->id,
+        'created_by' => $foreignWorker->id,
+        'starts_at' => now()->addDay(),
+        'ends_at' => now()->addDay()->addHours(4),
+        'status' => 'scheduled',
+    ]);
+    ShiftTask::query()->create([
+        'shift_id' => $foreignShift->id,
+        'label' => 'Foreign tenant task',
+        'is_completed' => false,
+        'sort_order' => 1,
+    ]);
+
     $tasks = app(ShiftTaskProvider::class)->tasks($admin);
 
     expect($tasks)->toHaveCount(1)
+        ->and(collect($tasks)->pluck('title'))->not->toContain('Foreign tenant task')
         ->and($tasks[0]->assignee)->toBe([
             'id' => $worker->id,
             'name' => $worker->name,

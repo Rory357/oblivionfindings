@@ -78,6 +78,8 @@ $marker = ${JSON.stringify(targetMarker)};
 
 $eventIds = \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()
     ->where('title', $marker.' Team event')->pluck('id');
+$attachmentIds = \\App\\Domain\\Hr\\Models\\HrCalendarEventAttachment::query()
+    ->whereIn('event_id', $eventIds)->pluck('id');
 $attachmentPaths = \\App\\Domain\\Hr\\Models\\HrCalendarEventAttachment::query()
     ->whereIn('event_id', $eventIds)->get(['disk', 'path']);
 foreach ($attachmentPaths as $attachment) {
@@ -148,6 +150,7 @@ $payrollRunIds = \\Illuminate\\Support\\Facades\\DB::table('hr_payroll_runs')
 
 $auditableIds = [
     \\App\\Domain\\Hr\\Models\\HrCalendarEvent::class => $eventIds,
+    \\App\\Domain\\Hr\\Models\\HrCalendarEventAttachment::class => $attachmentIds,
     \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::class => $profileIds,
     \\App\\Domain\\Hr\\Models\\HrOffboardingChecklist::class => $checklistIds,
     \\App\\Domain\\Hr\\Models\\HrOffboardingTask::class => $taskIds,
@@ -168,7 +171,13 @@ $auditableIds = [
 \\Illuminate\\Support\\Facades\\DB::table('audit_logs')
     ->where(function ($query) use ($marker, $auditableIds) {
         $query->where(function ($markerQuery) use ($marker) {
-            $markerQuery->where('meta', 'like', '%'.$marker.'%');
+            $markerQuery->where(function ($runQuery) use ($marker) {
+                $runQuery->where('action', 'codex.live_hr_gaps')
+                    ->where('meta', 'like', '%'.$marker.'%');
+            })->orWhere(function ($scopeQuery) use ($marker) {
+                $scopeQuery->where('action', 'codex.cleanup_scope')
+                    ->where('meta->marker', $marker);
+            });
         });
         foreach ($auditableIds as $type => $ids) {
             if ($ids->isEmpty()) {

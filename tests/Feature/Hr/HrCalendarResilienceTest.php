@@ -166,6 +166,17 @@ test('an active team member can see a team event while other and inactive profil
         'audience_ref' => 'Clinical Support',
     ]);
 
+    $this->actingAs($this->hr)
+        ->post('/hr/calendar/events', [
+            'title' => 'Operations team hui',
+            'event_type' => 'team',
+            'starts_at' => now()->addWeek()->toDateTimeString(),
+            'ends_at' => now()->addWeek()->addHour()->toDateTimeString(),
+            'audience_type' => 'team',
+            'audience_team' => 'Operations',
+        ])
+        ->assertRedirect();
+
     $from = now()->startOfMonth()->toDateString();
     $to = now()->endOfMonth()->addMonth()->toDateString();
     $url = "/hr/calendar/feed?from={$from}&to={$to}&layers=event";
@@ -173,9 +184,14 @@ test('an active team member can see a team event while other and inactive profil
     $memberEvents = collect($this->actingAs($member)->getJson($url)->assertOk()->json('events'));
     $otherEvents = collect($this->actingAs($other)->getJson($url)->assertOk()->json('events'));
     $inactiveEvents = collect($this->actingAs($inactive)->getJson($url)->assertOk()->json('events'));
+    $filteredManagerEvents = collect($this->actingAs($this->hr)->getJson(
+        $url.'&team='.rawurlencode(' CLINICAL   SUPPORT '),
+    )->assertOk()->json('events'));
 
     expect($memberEvents->pluck('title'))->toContain('Clinical team hui')
         ->and($memberEvents->firstWhere('title', 'Clinical team hui')['extendedProps']['audienceRef'])->toBe('Clinical Support')
         ->and($otherEvents->pluck('title'))->not->toContain('Clinical team hui')
-        ->and($inactiveEvents->pluck('title'))->not->toContain('Clinical team hui');
+        ->and($inactiveEvents->pluck('title'))->not->toContain('Clinical team hui')
+        ->and($filteredManagerEvents->pluck('title'))->toContain('Clinical team hui')
+        ->and($filteredManagerEvents->pluck('title'))->not->toContain('Operations team hui');
 });
