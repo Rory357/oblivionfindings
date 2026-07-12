@@ -73,8 +73,11 @@ type Props = {
         wof_due: number;
         wof_expired: number;
         rego_due: number;
+        rego_expired: number;
         cof_due: number;
+        cof_expired: number;
         insurance_expiring: number | null;
+        insurance_expired: number | null;
         open_alerts: number;
         critical_alerts: number;
     };
@@ -178,8 +181,11 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, hero, comp
                             wofDue={compliance.wof_due}
                             wofExpired={compliance.wof_expired}
                             regoDue={compliance.rego_due}
+                            regoExpired={compliance.rego_expired}
                             cofDue={compliance.cof_due}
+                            cofExpired={compliance.cof_expired}
                             insuranceExpiring={compliance.insurance_expiring}
+                            insuranceExpired={compliance.insurance_expired}
                             openAlerts={compliance.open_alerts}
                             criticalAlerts={compliance.critical_alerts}
                             hrefs={{

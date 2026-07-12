@@ -135,17 +135,36 @@ class VehicleController extends Controller
             ->where('wof_expires_at', '<', now())
             ->count();
         $regoDue = Asset::query()->where(fn ($q) => $q->vehicles())->registrationExpiring(30)->count();
+        $regoExpired = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('registration_expires_at')
+            ->where('registration_expires_at', '<', now())
+            ->count();
         $cofDue = Asset::query()
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<=', now()->addDays(30))
             ->where('cof_expires_at', '>=', now())
             ->count();
-        $insuranceExpiring = Schema::hasColumn('assets', 'insurance_expires_at')
+        $cofExpired = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('cof_expires_at')
+            ->where('cof_expires_at', '<', now())
+            ->count();
+        $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
+        $insuranceExpiring = $hasInsuranceExpiry
             ? Asset::query()
                 ->where(fn ($q) => $q->vehicles())
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<=', now()->addDays(30))
+                ->where('insurance_expires_at', '>=', now())
+                ->count()
+            : null;
+        $insuranceExpired = $hasInsuranceExpiry
+            ? Asset::query()
+                ->where(fn ($q) => $q->vehicles())
+                ->whereNotNull('insurance_expires_at')
+                ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
         $openAlerts = ControlRoomAlert::query()->whereNotIn('status', ['closed', 'resolved'])->count();
@@ -165,8 +184,11 @@ class VehicleController extends Controller
                 'wof_due' => $wofDue,
                 'wof_expired' => $wofExpired,
                 'rego_due' => $regoDue,
+                'rego_expired' => $regoExpired,
                 'cof_due' => $cofDue,
+                'cof_expired' => $cofExpired,
                 'insurance_expiring' => $insuranceExpiring,
+                'insurance_expired' => $insuranceExpired,
                 'open_alerts' => $openAlerts,
                 'critical_alerts' => $criticalAlerts,
             ],

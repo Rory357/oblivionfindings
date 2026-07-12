@@ -1,6 +1,7 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
 import {
+    FleetHeroAction,
     fmt,
     HeroClusterTile,
     HeroMedallion,
@@ -9,7 +10,6 @@ import {
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Select,
@@ -172,10 +172,6 @@ export default function FleetReports({
             ? (fuel_stats.total_cost ?? 0) / trip_stats.total_distance_km
             : null;
 
-    const handleExport = (type: string) => {
-        window.location.href = `/fleet-assets/reports/export?period=${period}&type=${type}`;
-    };
-
     // Compute fleet utilization % (ratio of vehicles with trips to total)
     const totalVehicles = utilization.length;
     const activeVehicles = utilization.filter((v) => (v.trips ?? 0) > 0).length;
@@ -234,24 +230,20 @@ export default function FleetReports({
                                     <SelectItem value="1y">Last year</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                onClick={() => handleExport('trips')}
+                            <FleetHeroAction
+                                href={`/fleet-assets/reports/export?period=${period}&type=trips`}
+                                icon={Download}
+                                external
                             >
-                                <Download className="mr-2 h-4 w-4" />
                                 Trips CSV
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                onClick={() => handleExport('fuel')}
+                            </FleetHeroAction>
+                            <FleetHeroAction
+                                href={`/fleet-assets/reports/export?period=${period}&type=fuel`}
+                                icon={Download}
+                                external
                             >
-                                <Download className="mr-2 h-4 w-4" />
                                 Fuel CSV
-                            </Button>
+                            </FleetHeroAction>
                         </div>
                     }
                 >

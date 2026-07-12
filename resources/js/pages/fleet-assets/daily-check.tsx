@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import {
+    FleetComplianceBadges,
     fmt,
     HeroClusterTile,
     HeroMedallion,
@@ -41,11 +42,28 @@ type Props = {
         checked: number;
         unchecked: number;
     };
+    compliance: {
+        wof_due: number;
+        wof_expired: number;
+        rego_due: number;
+        rego_expired: number;
+        cof_due: number;
+        cof_expired: number;
+        insurance_expiring: number | null;
+        insurance_expired: number | null;
+        open_alerts: number;
+        critical_alerts: number;
+    };
 };
 
-export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary }: Props) {
+export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary, compliance: rawCompliance }: Props) {
     const vehicles = rawVehicles ?? [];
     const summary = rawSummary ?? { total: 0, checked: 0, unchecked: 0 };
+    const compliance = rawCompliance ?? {
+        wof_due: 0, wof_expired: 0, rego_due: 0, rego_expired: 0,
+        cof_due: 0, cof_expired: 0, insurance_expiring: null,
+        insurance_expired: null, open_alerts: 0, critical_alerts: 0,
+    };
 
     const [activeCheck, setActiveCheck] = useState<number | null>(null);
     const [notes, setNotes] = useState<Record<number, string>>({});
@@ -78,7 +96,29 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
         >
             <Head title="Daily Vehicle Checks" />
             <PageShell>
-                <HeroShell>
+                <HeroShell
+                    footer={
+                        <FleetComplianceBadges
+                            wofDue={compliance.wof_due}
+                            wofExpired={compliance.wof_expired}
+                            regoDue={compliance.rego_due}
+                            regoExpired={compliance.rego_expired}
+                            cofDue={compliance.cof_due}
+                            cofExpired={compliance.cof_expired}
+                            insuranceExpiring={compliance.insurance_expiring}
+                            insuranceExpired={compliance.insurance_expired}
+                            openAlerts={compliance.open_alerts}
+                            criticalAlerts={compliance.critical_alerts}
+                            hrefs={{
+                                wof: '/fleet-assets/compliance',
+                                rego: '/fleet-assets/compliance',
+                                cof: '/fleet-assets/compliance',
+                                insurance: '/fleet-assets/compliance',
+                                alerts: '/fleet-assets/alerts',
+                            }}
+                        />
+                    }
+                >
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={ClipboardCheck} />
                         <div className="min-w-0">

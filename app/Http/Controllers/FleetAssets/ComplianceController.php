@@ -143,6 +143,13 @@ class ComplianceController extends Controller
                 'expired_rego' => $expiredRego,
                 'expiring_30' => $expiring30,
                 'expiring_60' => $expiring60,
+                // null (column absent) hides the strip metric entirely.
+                'insurance_expiring' => $hasInsuranceColumn
+                    ? $vehicles->filter(function ($v) use ($now) {
+                        $date = $v->insurance_expires_at;
+                        return $date && $now->diffInDays($date, false) <= 30;
+                    })->count()
+                    : null,
             ],
             'filters' => $request->only(['status', 'search']),
         ]);

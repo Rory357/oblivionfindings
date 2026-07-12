@@ -364,7 +364,7 @@ export default function MaintenanceDashboard({
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster title="Work orders" icon={Wrench}>
+                        <HeroCluster title="Work orders" icon={Wrench} columns={3}>
                             <HeroClusterTile
                                 href="/fleet-assets/maintenance/work-orders?status=open"
                                 label="Open"

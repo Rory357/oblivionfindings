@@ -22,7 +22,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Bell,
+    Wrench,
     Calendar,
     CheckCircle,
     Clock,
@@ -62,6 +62,8 @@ type Props = {
         expired_rego: number;
         expiring_30: number;
         expiring_60: number;
+        /** `null` when the schema has no insurance column — hides the metric. */
+        insurance_expiring: number | null;
     };
     filters: {
         status?: string;
@@ -121,10 +123,6 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
         applyFilters({ search });
     };
 
-    const handleSendReminder = (vehicleName: string) => {
-        alert(`Reminder sent for ${vehicleName}. (Placeholder - no actual notification sent)`);
-    };
-
     // Compute compliance percentage
     const totalVehicles = summary.total ?? 0;
     const problemVehicles = (summary.expired_wof ?? 0) + (summary.expired_rego ?? 0) + (summary.expiring_30 ?? 0);
@@ -148,6 +146,13 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                             <HeroSummaryMetric tone={summary.expiring_60 > 0 ? 'warning' : 'success'}>
                                 {summary.expiring_60} renewal{summary.expiring_60 === 1 ? '' : 's'} in 31–60 days
                             </HeroSummaryMetric>
+                            {summary.insurance_expiring !== null && (
+                                <HeroSummaryMetric tone={summary.insurance_expiring > 0 ? 'warning' : 'success'}>
+                                    {summary.insurance_expiring === 0
+                                        ? 'Insurance current'
+                                        : `${summary.insurance_expiring} insurance polic${summary.insurance_expiring === 1 ? 'y' : 'ies'} expiring 30d`}
+                                </HeroSummaryMetric>
+                            )}
                             <HeroSummaryMetric tone="neutral">{summary.total} vehicles tracked</HeroSummaryMetric>
                         </HeroSummaryStrip>
                     }
@@ -321,13 +326,13 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleSendReminder(vehicle.name);
-                                                        }}
+                                                        asChild
+                                                        onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        <Bell className="mr-1 h-3 w-3" />
-                                                        Remind
+                                                        <Link href={`/fleet-assets/maintenance/work-orders?new=1&asset_id=${vehicle.id}`}>
+                                                            <Wrench className="mr-1 h-3 w-3" />
+                                                            Work order
+                                                        </Link>
                                                     </Button>
                                                 </td>
                                             </tr>

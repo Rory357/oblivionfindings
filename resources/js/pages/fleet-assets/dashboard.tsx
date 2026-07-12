@@ -2,13 +2,18 @@ import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import {
+    FleetAttentionStrip,
+    FleetComplianceBadges,
     FleetHeroAction,
     fmt,
     HeroCluster,
     HeroClusterTile,
     HeroMedallion,
+    HeroSegmented,
     HeroShell,
     HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,24 +27,25 @@ import {
     Bookmark,
     Calendar,
     Car,
-    Clock,
     CheckCircle2,
+    ClipboardCheck,
     ClipboardList,
     FileBarChart,
     Fuel,
     MapPin,
     Radio,
     Receipt,
+    RefreshCw,
     Route,
     Settings,
     ShieldAlert,
-    ShieldCheck,
     Smartphone,
     UserSearch,
+    Users,
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { formatCurrency, formatRelativeTime, formatDistance, severityVariant } from '@/lib/fleet-utils';
+import { formatCurrency, formatRelativeTime, severityVariant } from '@/lib/fleet-utils';
 
 
 /* ------------------------------------------------------------------ */
@@ -82,15 +88,32 @@ type Props = {
         recent_bookings_count: number;
         checked_out_count: number;
         overdue_count: number;
+        /** Overdue returns within the active scope lens — feeds the Bookings tile caption. */
+        overdue_count_scoped: number;
         outings_past_return: number;
+        /** Outings past return within the active scope lens — feeds the Outings tile caption. */
+        outings_past_return_scoped: number;
         upcoming_maintenance_count: number;
         trips_today: number;
         vehicles_in_maintenance: number;
         wof_due_30: number;
+        wof_expired: number;
         rego_due_30: number;
+        rego_expired: number;
+        cof_due: number;
+        cof_expired: number;
+        /** `null` when the schema has no insurance column — hides the chip. */
+        insurance_expiring: number | null;
+        insurance_expired: number | null;
+        transports_today: number;
+        open_wandering_alerts: number;
         tracked_residents?: number;
         active_outings?: number;
     };
+    /** Cluster scope lens — `mine` filters cluster counts to the user's site server-side. */
+    scope: 'all' | 'mine';
+    /** False when the user has no resolvable site — the scope lens is hidden. */
+    has_site: boolean;
     houses: Array<{
         id: number;
         name: string;
@@ -295,41 +318,21 @@ function DonutLegend({ segments }: { segments: DonutSegment[] }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Quick Action Tile                                                  */
+/*  Explore link-row                                                   */
 /* ------------------------------------------------------------------ */
 
-function QuickActionTile({
-    icon: Icon,
-    label,
-    href,
-    count,
-    color,
-}: {
-    icon: React.ElementType;
-    label: string;
-    href: string;
-    count?: number;
-    color?: string;
-}) {
-    return (
-        <Link href={href} className="group flex flex-col items-center gap-1.5 rounded-lg border border-border bg-card p-3 transition-all duration-200 hover:bg-accent hover:shadow-lg hover:-translate-y-0.5">
-            <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg"
-                style={{ backgroundColor: color ? `${color}18` : 'hsl(var(--muted))' }}
-            >
-                <Icon className="h-4.5 w-4.5" style={{ color: color ?? 'hsl(var(--muted-foreground))' }} />
-            </div>
-            <span className="text-[11px] font-medium leading-tight text-muted-foreground group-hover:text-foreground text-center">
-                {label}
-            </span>
-            {count !== undefined && count > 0 && (
-                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                    {count}
-                </Badge>
-            )}
-        </Link>
-    );
-}
+/** The eight navigation-jobs. Action-jobs (book, fuel, incident, work order,
+ *  daily check) live only in the hero footer — never duplicated here. */
+const EXPLORE_LINKS: Array<{ label: string; href: string; icon: React.ElementType }> = [
+    { label: 'Vehicles', href: '/fleet-assets/vehicles', icon: Car },
+    { label: 'Assets', href: '/fleet-assets/assets', icon: ClipboardList },
+    { label: 'Devices', href: '/fleet-assets/devices', icon: Smartphone },
+    { label: 'Reports', href: '/fleet-assets/reports', icon: FileBarChart },
+    { label: 'Map', href: '/fleet-assets/map', icon: MapPin },
+    { label: 'Residents', href: '/fleet-assets/resident-tracking', icon: UserSearch },
+    { label: 'Outings', href: '/fleet-assets/outings', icon: Route },
+    { label: 'Mileage', href: '/fleet-assets/mileage', icon: Receipt },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Main Dashboard Component                                           */
@@ -348,15 +351,24 @@ export default function FleetAssetsDashboard({
     after_hours_trips,
     my_site_vehicles,
     today_outings,
+    scope,
+    has_site,
 }: Props) {
     const stats = rawStats ?? {
         total_vehicles: 0, online_count: 0, offline_count: 0,
         total_assets: 0, active_alerts: 0, critical_alerts: 0,
         fuel_cost_mtd: 0, distance_mtd: 0,
         total_devices: 0, online_devices: 0,
-        recent_bookings_count: 0, upcoming_maintenance_count: 0,
+        recent_bookings_count: 0, checked_out_count: 0,
+        overdue_count: 0, overdue_count_scoped: 0,
+        outings_past_return: 0, outings_past_return_scoped: 0,
+        upcoming_maintenance_count: 0,
         trips_today: 0,
-        vehicles_in_maintenance: 0, wof_due_30: 0, rego_due_30: 0,
+        vehicles_in_maintenance: 0, wof_due_30: 0, wof_expired: 0,
+        rego_due_30: 0, rego_expired: 0, cof_due: 0, cof_expired: 0,
+        insurance_expiring: null, insurance_expired: null,
+        transports_today: 0, open_wandering_alerts: 0,
+        tracked_residents: 0, active_outings: 0,
     };
 
     const vsb = vehicle_status_breakdown ?? {};
@@ -366,24 +378,36 @@ export default function FleetAssetsDashboard({
     // Map tab filter
     const [mapFilter, setMapFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
-    // Live-sync timestamp for the hero status pill.
+    // Live-sync timestamp + in-flight spinner for the hero status pill.
     const [lastUpdated, setLastUpdated] = useState<Date>(() => new Date());
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // 30-second auto-refresh
+    // 30-second auto-refresh (all hero stats travel inside `stats`; the current
+    // URL query — including ?scope=mine — is preserved by router.reload).
     useEffect(() => {
         const interval = window.setInterval(() => {
             if (document.hidden) return;
+            setIsRefreshing(true);
             router.reload({
                 only: [
                     'vehicles', 'stats', 'recent_signals',
                     'vehicle_status_breakdown', 'asset_status_breakdown',
                     'maintenance_stats', 'recent_alerts',
                 ],
-                onFinish: () => setLastUpdated(new Date()),
+                onFinish: () => {
+                    setIsRefreshing(false);
+                    setLastUpdated(new Date());
+                },
             });
         }, 30000);
         return () => window.clearInterval(interval);
     }, []);
+
+    // Scope lens — server-side cluster filter, same pattern as the maintenance
+    // dashboard's period control.
+    const handleScopeChange = (key: string) => {
+        router.get('/fleet-assets', key === 'mine' ? { scope: 'mine' } : {}, { preserveState: true });
+    };
 
     // Filtered vehicles for map
     const filteredVehicles = useMemo(() => {
@@ -427,9 +451,6 @@ export default function FleetAssetsDashboard({
         }
         return { lat: -36.8485, lng: 174.7633 };
     }, [vehicles]);
-
-    // On-time rate (derived: completed trips / total trips today, fallback 0)
-    const onTimeRate = (stats.trips_today ?? 0) > 0 ? 100 : 0;
 
     /* ---- Donut segment data ---- */
 
@@ -475,6 +496,9 @@ export default function FleetAssetsDashboard({
                             <FleetHeroAction href="/fleet-assets/bookings?new=1" icon={Bookmark} emphasis>
                                 Book vehicle
                             </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/daily-check" icon={ClipboardCheck}>
+                                Daily check
+                            </FleetHeroAction>
                             <FleetHeroAction href="/fleet-assets/fuel" icon={Fuel}>
                                 Log fuel
                             </FleetHeroAction>
@@ -499,14 +523,41 @@ export default function FleetAssetsDashboard({
                         <div className="min-w-0 flex-1">
                             <HeroStatusPill>
                                 Fleet command · updated{' '}
-                                {lastUpdated.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                                <span aria-live="polite">
+                                    {lastUpdated.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {isRefreshing && (
+                                    <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+                                )}
                             </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-[28px]">Fleet & Assets</h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
                                 Real-time fleet tracking, asset management, and operational insights.
                             </p>
                         </div>
+                        {has_site && (
+                            <div className="flex items-center gap-2 self-start">
+                                <HeroSegmented
+                                    variant="segmented"
+                                    label="Scope"
+                                    ariaLabel="Cluster scope"
+                                    value={scope ?? 'all'}
+                                    onChange={handleScopeChange}
+                                    items={[
+                                        { key: 'all', label: 'All sites' },
+                                        { key: 'mine', label: 'My site' },
+                                    ]}
+                                />
+                            </div>
+                        )}
                     </div>
+
+                    {/* Org-wide escalations — never filtered by the scope lens. */}
+                    <FleetAttentionStrip
+                        overdueReturns={stats.overdue_count ?? 0}
+                        outingsPastReturn={stats.outings_past_return ?? 0}
+                        criticalAlerts={stats.critical_alerts ?? 0}
+                    />
 
                     <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr]">
                         <HeroCluster title="Fleet status" icon={Car}>
@@ -536,11 +587,11 @@ export default function FleetAssetsDashboard({
                                 label="Offline"
                                 value={fmt(stats.offline_count)}
                                 caption="no recent signal"
-                                tone="neutral"
+                                tone={(stats.offline_count ?? 0) > 0 ? 'warning' : 'success'}
                             />
                         </HeroCluster>
 
-                        <HeroCluster title="Today" icon={Calendar}>
+                        <HeroCluster title="Today" icon={Calendar} columns={3}>
                             <HeroClusterTile
                                 href="/fleet-assets/trips"
                                 label="Trips today"
@@ -552,87 +603,88 @@ export default function FleetAssetsDashboard({
                                 href="/fleet-assets/bookings"
                                 label="Bookings"
                                 value={fmt(stats.recent_bookings_count)}
-                                caption="pending + approved"
-                                tone="neutral"
+                                caption={
+                                    (stats.overdue_count_scoped ?? 0) > 0
+                                        ? `${stats.overdue_count_scoped} overdue return${stats.overdue_count_scoped === 1 ? '' : 's'}`
+                                        : 'pending + approved'
+                                }
+                                tone={(stats.overdue_count_scoped ?? 0) > 0 ? 'warning' : 'neutral'}
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/outings"
                                 label="Outings"
                                 value={fmt(stats.active_outings)}
-                                caption="planned or underway"
+                                caption={
+                                    (stats.outings_past_return_scoped ?? 0) > 0
+                                        ? `${stats.outings_past_return_scoped} past return`
+                                        : 'planned or underway'
+                                }
+                                tone={(stats.outings_past_return_scoped ?? 0) > 0 ? 'critical' : 'neutral'}
+                            />
+                        </HeroCluster>
+
+                        <HeroCluster title="Resident movement" icon={Users} columns={3}>
+                            <HeroClusterTile
+                                href="/fleet-assets/transports"
+                                label="Transports"
+                                value={fmt(stats.transports_today)}
+                                caption="resident journeys today"
                                 tone="neutral"
                             />
-                        </HeroCluster>
-
-                        <HeroCluster title="Compliance" icon={ShieldCheck}>
                             <HeroClusterTile
-                                href="/fleet-assets/compliance"
-                                label="WOF due 30d"
-                                value={fmt(stats.wof_due_30)}
-                                caption="book inspections"
-                                tone={stats.wof_due_30 > 0 ? 'warning' : 'success'}
+                                href="/fleet-assets/resident-tracking"
+                                label="Tracked"
+                                value={fmt(stats.tracked_residents)}
+                                caption="residents with devices"
+                                tone="neutral"
                             />
                             <HeroClusterTile
-                                href="/fleet-assets/compliance"
-                                label="Rego due 30d"
-                                value={fmt(stats.rego_due_30)}
-                                caption="renew registration"
-                                tone={stats.rego_due_30 > 0 ? 'warning' : 'success'}
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/alerts"
-                                label="Alerts"
-                                value={fmt(stats.active_alerts)}
-                                caption={
-                                    (stats.critical_alerts ?? 0) > 0
-                                        ? `${stats.critical_alerts} critical`
-                                        : 'unresolved'
-                                }
-                                tone={
-                                    (stats.critical_alerts ?? 0) > 0
-                                        ? 'critical'
-                                        : stats.active_alerts > 0
-                                          ? 'warning'
-                                          : 'success'
-                                }
+                                href="/fleet-assets/resident-tracking?tab=wandering"
+                                label="Wandering"
+                                value={fmt(stats.open_wandering_alerts)}
+                                caption={(stats.open_wandering_alerts ?? 0) > 0 ? 'respond now' : 'none active'}
+                                tone={(stats.open_wandering_alerts ?? 0) > 0 ? 'critical' : 'success'}
                             />
                         </HeroCluster>
                     </div>
+
+                    {/* Org-wide compliance horizon — successor of the old Compliance cluster;
+                        identical composition to /fleet-assets/vehicles so the heroes read as siblings. */}
+                    <FleetComplianceBadges
+                        wofDue={stats.wof_due_30 ?? 0}
+                        wofExpired={stats.wof_expired ?? 0}
+                        regoDue={stats.rego_due_30 ?? 0}
+                        regoExpired={stats.rego_expired ?? 0}
+                        cofDue={stats.cof_due ?? 0}
+                        cofExpired={stats.cof_expired ?? 0}
+                        insuranceExpiring={stats.insurance_expiring ?? null}
+                        insuranceExpired={stats.insurance_expired ?? null}
+                        openAlerts={stats.active_alerts ?? 0}
+                        criticalAlerts={stats.critical_alerts ?? 0}
+                        hrefs={{
+                            wof: '/fleet-assets/compliance',
+                            rego: '/fleet-assets/compliance',
+                            cof: '/fleet-assets/compliance',
+                            insurance: '/fleet-assets/compliance',
+                            alerts: '/fleet-assets/alerts',
+                        }}
+                    />
+
+                    <HeroSummaryStrip label="This month">
+                        <HeroSummaryMetric tone="neutral">
+                            {formatCurrency(stats.fuel_cost_mtd ?? 0)} fuel
+                        </HeroSummaryMetric>
+                        <HeroSummaryMetric tone="neutral">{fmt(stats.distance_mtd, ' km')} travelled</HeroSummaryMetric>
+                        <HeroSummaryMetric
+                            tone={(stats.total_devices ?? 0) - (stats.online_devices ?? 0) > 0 ? 'warning' : 'success'}
+                        >
+                            {fmt(stats.online_devices)} of {fmt(stats.total_devices)} devices online
+                        </HeroSummaryMetric>
+                        <HeroSummaryMetric tone="neutral">
+                            {fmt(stats.upcoming_maintenance_count)} services due
+                        </HeroSummaryMetric>
+                    </HeroSummaryStrip>
                 </HeroShell>
-
-                {/* ============================================================ */}
-                {/*  ALERT BANNER                                                 */}
-                {/* ============================================================ */}
-                {((stats.overdue_count ?? 0) > 0 || (stats.critical_alerts ?? 0) > 0 || (stats.outings_past_return ?? 0) > 0) && (
-                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 px-4 py-3">
-                        <div className="flex items-start gap-3">
-                            <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical shrink-0 mt-0.5" />
-                            <div className="flex-1 space-y-1">
-                                <div className="text-sm font-semibold text-status-critical dark:text-status-critical">Attention Required</div>
-                                <div className="flex flex-wrap gap-2">
-                                    {(stats.overdue_count ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/bookings" className="inline-flex items-center gap-1.5 rounded-full bg-status-critical-bg dark:bg-status-critical-bg px-3 py-1 text-xs font-medium text-status-critical dark:text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical transition-colors">
-                                            <Car className="h-3 w-3" />
-                                            {stats.overdue_count} overdue vehicle return{stats.overdue_count !== 1 ? 's' : ''}
-                                        </Link>
-                                    )}
-                                    {(stats.critical_alerts ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/alerts" className="inline-flex items-center gap-1.5 rounded-full bg-status-critical-bg dark:bg-status-critical-bg px-3 py-1 text-xs font-medium text-status-critical dark:text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical transition-colors">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            {stats.critical_alerts} critical alert{stats.critical_alerts !== 1 ? 's' : ''}
-                                        </Link>
-                                    )}
-                                    {(stats.outings_past_return ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/outings" className="inline-flex items-center gap-1.5 rounded-full bg-status-warning-bg dark:bg-status-warning-bg px-3 py-1 text-xs font-medium text-status-warning dark:text-status-warning hover:bg-status-warning-bg dark:hover:bg-status-warning transition-colors">
-                                            <Clock className="h-3 w-3" />
-                                            {stats.outings_past_return} outing{stats.outings_past_return !== 1 ? 's' : ''} past return time
-                                        </Link>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* ============================================================ */}
                 {/*  ROW 1 - KPI Cards                                           */}
@@ -701,28 +753,23 @@ export default function FleetAssetsDashboard({
 
                     {/* RIGHT COLUMN - Stacked tiles */}
                     <div className="space-y-4">
-                        {/* Quick Actions - compact 4x2 grid */}
-                        <Card>
-                            <CardHeader className="pb-1 pt-3 px-4">
-                                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="px-4 pb-3">
-                                <div className="grid grid-cols-4 gap-1.5">
-                                    <QuickActionTile icon={Wrench} label="Maintenance" href="/fleet-assets/maintenance/work-orders" count={stats.upcoming_maintenance_count ?? 0} color="#f59e0b" />
-                                    <QuickActionTile icon={Bookmark} label="Bookings" href="/fleet-assets/bookings" count={stats.recent_bookings_count ?? 0} color="#3b82f6" />
-                                    <QuickActionTile icon={AlertTriangle} label="Alerts" href="/fleet-assets/alerts" count={stats.active_alerts ?? 0} color="#ef4444" />
-                                    <QuickActionTile icon={Smartphone} label="Devices" href="/fleet-assets/devices" color="#8b5cf6" />
-                                    <QuickActionTile icon={FileBarChart} label="Reports" href="/fleet-assets/reports" color="#06b6d4" />
-                                    <QuickActionTile icon={Car} label="Vehicles" href="/fleet-assets/vehicles" color="#7c3aed" />
-                                    <QuickActionTile icon={ClipboardList} label="Assets" href="/fleet-assets/assets" color="#f97316" />
-                                    <QuickActionTile icon={MapPin} label="Map" href="/fleet-assets/map" color="#6366f1" />
-                                    <QuickActionTile icon={UserSearch} label="Residents" href="/fleet-assets/resident-tracking" count={stats.tracked_residents ?? 0} color="#7c3aed" />
-                                    <QuickActionTile icon={MapPin} label="Outings" href="/fleet-assets/outings" color="#06b6d4" />
-                                    <QuickActionTile icon={ShieldAlert} label="Wandering" href="/fleet-assets/resident-tracking?tab=wandering" color="#ef4444" />
-                                    <QuickActionTile icon={Receipt} label="Mileage" href="/fleet-assets/mileage" color="#f59e0b" />
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {/* Explore — the navigation-jobs; action-jobs live in the hero footer only. */}
+                        {/* eslint-disable-next-line no-restricted-syntax -- slim single-row link strip, not a Card surface */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                Explore
+                            </span>
+                            {EXPLORE_LINKS.map((link) => (
+                                <Link
+                                    key={link.label}
+                                    href={link.href}
+                                    className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-primary"
+                                >
+                                    <link.icon className="h-3.5 w-3.5" />
+                                    {link.label}
+                                </Link>
+                            ))}
+                        </div>
 
                         {/* Donut charts - 3 side by side */}
                         <div className="grid grid-cols-3 gap-3">

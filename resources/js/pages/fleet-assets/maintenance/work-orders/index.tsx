@@ -28,6 +28,12 @@ import {
     type WizardAsset,
     type WizardChecklistRun,
 } from '@/pages/fleet-assets/maintenance/work-orders/create-wizard';
+import {
+    mergeWorkOrderFilters,
+    type WorkOrderFilters,
+    workOrderStatusFilterUpdate,
+    workOrderStatusFilterValue,
+} from '@/pages/fleet-assets/maintenance/work-orders/work-order-filters';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ChevronDown,
@@ -60,7 +66,7 @@ type Props = {
         links: Array<{ url: string | null; label: string; active: boolean }>;
         meta: { current_page: number; last_page: number; total: number };
     };
-    filters: { status?: string; priority?: string; asset_id?: string };
+    filters: WorkOrderFilters;
     users?: Array<{ id: number; name: string }>;
     stats?: {
         open: number;
@@ -212,10 +218,13 @@ export default function WorkOrdersIndex({
         );
     };
 
-    const applyFilters = (newFilters: Partial<typeof safeFilters>) => {
+    const applyFilters = (newFilters: Partial<WorkOrderFilters>) => {
         router.get(
             '/fleet-assets/maintenance/work-orders',
-            { ...safeFilters, ...newFilters, page: 1 },
+            {
+                ...mergeWorkOrderFilters(safeFilters, newFilters),
+                page: 1,
+            },
             { preserveState: true },
         );
     };
@@ -290,6 +299,7 @@ export default function WorkOrdersIndex({
                                 tone={heroStats.open > 0 ? 'warning' : 'success'}
                             />
                             <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?overdue=1"
                                 label="Overdue"
                                 value={fmt(heroStats.overdue)}
                                 caption="past due date"
@@ -348,9 +358,9 @@ export default function WorkOrdersIndex({
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Select
-                        value={safeFilters.status || 'all'}
-                        onValueChange={(v) =>
-                            applyFilters({ status: v === 'all' ? '' : v })
+                        value={workOrderStatusFilterValue(safeFilters)}
+                        onValueChange={(value) =>
+                            applyFilters(workOrderStatusFilterUpdate(value))
                         }
                     >
                         <SelectTrigger className="w-36">
@@ -358,6 +368,7 @@ export default function WorkOrdersIndex({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All statuses</SelectItem>
+                            <SelectItem value="overdue">Overdue</SelectItem>
                             <SelectItem value="open">Open</SelectItem>
                             <SelectItem value="in_progress">
                                 In Progress

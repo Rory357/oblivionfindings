@@ -4,12 +4,15 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\ControlRoomAlert;
+use App\Models\FleetOuting;
 use App\Models\FleetVehicleBooking;
 use App\Notifications\Fleet\FleetBookingApprovedNotification;
 use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class VehicleBookingController extends Controller
@@ -93,6 +96,19 @@ class VehicleBookingController extends Controller
             )
             ->first();
 
+        // Attention-strip escalations (org-wide, same definitions as the
+        // fleet dashboard hero).
+        $outingsPastReturn = Schema::hasTable('fleet_outings')
+            ? FleetOuting::query()
+                ->where('status', 'active')
+                ->where('planned_return', '<', $now)
+                ->count()
+            : 0;
+        $criticalAlerts = ControlRoomAlert::query()
+            ->whereNotIn('status', ['closed', 'resolved'])
+            ->where('severity', 'critical')
+            ->count();
+
         $data = [
             'bookings' => [
                 'data' => $bookings->getCollection()->map($mapBooking)->values(),
@@ -108,6 +124,8 @@ class VehicleBookingController extends Controller
                 'approved_upcoming' => (int) ($heroRow->approved_upcoming ?? 0),
                 'checked_out' => (int) ($heroRow->checked_out ?? 0),
                 'overdue' => (int) ($heroRow->overdue ?? 0),
+                'outings_past_return' => $outingsPastReturn,
+                'critical_alerts' => $criticalAlerts,
             ],
             'filters' => $request->only(['status', 'asset_id', 'date_from', 'date_to', 'view', 'week_start', 'overdue']),
             // Book-vehicle wizard props. Options are heavy (vehicles + sites +
