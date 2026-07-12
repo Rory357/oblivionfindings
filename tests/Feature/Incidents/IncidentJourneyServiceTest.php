@@ -330,6 +330,46 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('hs_events', 1);
     }
 
+    public function test_signal_backed_non_sensor_alert_remains_an_interactive_control_room_incident(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'source' => 'medication',
+            'alert_type' => 'medication.missed_dose',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => ['medication_id' => 314],
+        ]);
+        Signal::create([
+            'alert_id' => $alert->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'signal_type_code' => 'medication_missed_dose',
+            'severity_hint' => 'high',
+            'occurred_at' => now()->subMinutes(5),
+            'payload' => ['medication_id' => 314],
+            'status' => 'processed',
+        ]);
+
+        $journey = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site),
+            $actor,
+        );
+        $incident = $journey->incident->fresh();
+
+        $this->assertSame('control_room', $incident->source);
+        $this->assertTrue($incident->interactive);
+        $this->assertSame('control_room_alert', $incident->metadata['journey']['source']);
+        $this->assertSame('medication', $incident->metadata['journey']['original_alert_source']);
+        $this->assertSame('medication', $alert->fresh()->source);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
     public function test_draft_ensure_is_rejected_without_any_journey_writes(): void
     {
         $incident = $this->incidentWithoutEvents([
@@ -459,6 +499,76 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->assertSame(0, ClientIncident::query()->whereNull('control_room_alert_id')->count());
         $this->assertSame(0, HsEvent::query()->whereNull('control_room_alert_id')->count());
+    }
+
+    public function test_reused_alert_context_keeps_existing_nested_operational_provenance_and_fills_missing_journey_defaults(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => [
+                'incident_id' => 999999,
+                'description' => 'Medication workflow description must remain.',
+                'reason' => 'Medication escalation reason must remain.',
+                'provenance' => [
+                    'source' => 'medication_workflow',
+                    'trace' => [
+                        'correlation_id' => 'med-314',
+                        'steps' => ['missed-dose', 'operator-review'],
+                    ],
+                ],
+                'operational' => [
+                    'channels' => ['dashboard', 'email'],
+                    'tasks' => [
+                        ['id' => 71, 'status' => 'in_progress'],
+                    ],
+                ],
+            ],
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+            'type' => 'medication_error',
+            'description' => 'Canonical incident description.',
+            'control_room_alert_id' => $alert->id,
+        ]);
+
+        app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+        app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Replacement operator reason',
+        );
+
+        $context = $alert->fresh()->context;
+        $this->assertSame($incident->id, $context['incident_id']);
+        $this->assertSame('medication_error', $context['type']);
+        $this->assertSame('medication_error', $context['incident_type']);
+        $this->assertSame('Medication workflow description must remain.', $context['description']);
+        $this->assertSame('Medication escalation reason must remain.', $context['reason']);
+        $this->assertSame('medication_workflow', $context['provenance']['source']);
+        $this->assertSame(IncidentJourneyService::class, $context['provenance']['service']);
+        $this->assertEquals(
+            [
+                'correlation_id' => 'med-314',
+                'steps' => ['missed-dose', 'operator-review'],
+            ],
+            $context['provenance']['trace'],
+        );
+        $this->assertEquals(
+            [
+                'channels' => ['dashboard', 'email'],
+                'tasks' => [
+                    ['id' => 71, 'status' => 'in_progress'],
+                ],
+            ],
+            $context['operational'],
+        );
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
     }
 
     public function test_legacy_idempotency_hs_events_are_reused_and_accepted_handover_is_never_downgraded(): void
@@ -613,6 +723,17 @@ class IncidentJourneyServiceTest extends TestCase
             'control_room_alert_id' => $directAlert->id,
             'hs_event_id' => $directEvent->id,
         ]);
+        $legacyCategory = HsEvent::CATEGORY_NEAR_MISS;
+        $directEvent->updateQuietly([
+            'source_type' => ClientIncident::class,
+            'source_id' => $incident->id,
+            'event_category' => $legacyCategory,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                $incident->id,
+                $legacyCategory,
+            ),
+        ]);
         $legacyAlert = ControlRoomAlert::factory()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
@@ -643,6 +764,70 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('hs_events', 1);
     }
 
+    public function test_direct_hs_event_owned_by_another_source_is_not_reparented_without_a_competing_event(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $shift = Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'user_id' => $actor->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => [
+                'incident_id' => 999999,
+                'keep' => ['workflow' => 'medication'],
+            ],
+        ]);
+        $directEvent = HsEvent::factory()->create([
+            'source_type' => Shift::class,
+            'source_id' => $shift->id,
+            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                Shift::class,
+                $shift->id,
+                HsEvent::CATEGORY_INCIDENT,
+            ),
+            'control_room_alert_id' => $alert->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+            'control_room_alert_id' => $alert->id,
+            'hs_event_id' => $directEvent->id,
+            'metadata' => ['keep' => 'incident-metadata'],
+        ]);
+        $incidentBefore = $incident->only(['control_room_alert_id', 'hs_event_id', 'metadata']);
+        $alertBefore = $alert->only(['status', 'source', 'notes', 'context']);
+        $directBefore = $directEvent->only([
+            'source_type',
+            'source_id',
+            'event_category',
+            'idempotency_key',
+            'control_room_alert_id',
+            'handover_status',
+        ]);
+
+        $exception = null;
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+        } catch (\DomainException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertNotNull($exception);
+        $this->assertStringContainsString('conflict', strtolower($exception->getMessage()));
+        $this->assertSame($incidentBefore, $incident->fresh()->only(array_keys($incidentBefore)));
+        $this->assertEquals($alertBefore, $alert->fresh()->only(array_keys($alertBefore)));
+        $this->assertSame($directBefore, $directEvent->fresh()->only(array_keys($directBefore)));
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
     public function test_direct_hs_tuple_conflict_throws_before_any_partial_journey_write(): void
     {
         $actor = User::factory()->create();
@@ -662,6 +847,17 @@ class IncidentJourneyServiceTest extends TestCase
             'control_room_alert_id' => $alert->id,
             'hs_event_id' => $directEvent->id,
             'metadata' => ['keep' => 'incident-metadata'],
+        ]);
+        $legacyCategory = HsEvent::CATEGORY_NEAR_MISS;
+        $directEvent->updateQuietly([
+            'source_type' => ClientIncident::class,
+            'source_id' => $incident->id,
+            'event_category' => $legacyCategory,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                $incident->id,
+                $legacyCategory,
+            ),
         ]);
         $canonicalEvent = HsEvent::factory()->forClientIncident($incident)->create([
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,

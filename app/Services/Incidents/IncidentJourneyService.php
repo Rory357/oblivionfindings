@@ -325,7 +325,15 @@ class IncidentJourneyService
 
     private function incidentSourceForAlert(ControlRoomAlert $alert): string
     {
-        return $alert->signals()->exists() ? 'sensor' : 'control_room';
+        $trustedSensorSource = in_array(
+            (string) $alert->source,
+            ['sensor', 'personal_tracker'],
+            true,
+        );
+
+        return $trustedSensorSource && $alert->signals()->exists()
+            ? 'sensor'
+            : 'control_room';
     }
 
     private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
@@ -527,7 +535,7 @@ class IncidentJourneyService
         );
 
         if ($alert !== null) {
-            $context = array_replace((array) $alert->context, $alertContext, [
+            $context = array_replace_recursive($alertContext, (array) $alert->context, [
                 'incident_id' => $incident->id,
             ]);
             $alert->forceFill(['context' => $context])->saveQuietly();
@@ -658,6 +666,14 @@ class IncidentJourneyService
         }
 
         $tuple = $this->canonicalHsTuple($incident);
+        if ($hsEvent->source_type !== $tuple['source_type']
+            || (int) $hsEvent->source_id !== $tuple['source_id']
+        ) {
+            throw new \DomainException(
+                'Incident journey conflict: the direct H&S event belongs to a different source.',
+            );
+        }
+
         $conflict = HsEvent::query()
             ->where('id', '!=', $hsEvent->id)
             ->where(function ($query) use ($tuple): void {
