@@ -15,6 +15,7 @@ use App\Models\HsRecommendationDisposition;
 use App\Models\Site;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -161,20 +162,35 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_incident_uses_direct_journey_relationships_before_the_idempotency_fallback(): void
     {
         $this->assertJourneySchemaAvailable();
+        $this->assertModelFieldsAreFillable(new ClientIncident, ['site_id', 'hs_event_id']);
         $this->assertTrue(method_exists(ClientIncident::class, 'site'));
         $this->assertTrue(method_exists(ClientIncident::class, 'hsEvent'));
         $this->assertTrue(method_exists(HsEvent::class, 'clientIncident'));
 
         $site = Site::factory()->create();
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $reporter = User::factory()->create();
+        $occurredAt = now()->subMinutes(15)->startOfSecond();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
+            'client_id' => $client->id,
             'site_id' => $site->id,
-            'type' => 'injury',
+            'reported_by' => $reporter->id,
+            'type' => 'near_miss',
+            'severity' => 'medium',
+            'status' => 'submitted',
+            'title' => 'Near miss with no injury',
+            'description' => 'A trip hazard was removed before anyone was injured.',
+            'occurred_at' => $occurredAt,
         ]));
         $event = HsEvent::factory()->forClientIncident($incident)->create();
 
-        DB::table('client_incidents')->where('id', $incident->id)->update(['hs_event_id' => $event->id]);
+        $incident->fill(['hs_event_id' => $event->id]);
+        $this->assertSame($event->id, $incident->hs_event_id);
+        $incident->saveQuietly();
         $incident->refresh();
 
+        $this->assertSame($site->id, $incident->site_id);
+        $this->assertSame($event->id, $incident->hs_event_id);
         $this->assertTrue($incident->site->is($site));
         $this->assertTrue($incident->hsEvent->is($event));
         $this->assertTrue($event->source->is($incident));
@@ -184,7 +200,8 @@ class IncidentJourneySchemaTest extends TestCase
         $this->assertTrue($event->site->is($site));
         $this->assertTrue($incident->linkedHsEvent()?->is($event));
 
-        DB::table('client_incidents')->where('id', $incident->id)->update(['hs_event_id' => null]);
+        $incident->fill(['hs_event_id' => null]);
+        $incident->saveQuietly();
         $incident->refresh();
 
         $this->assertTrue($incident->linkedHsEvent()?->is($event));
@@ -260,20 +277,44 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_hs_handover_acceptance_fields_are_cast_and_user_links_null_on_delete(): void
     {
         $this->assertJourneySchemaAvailable();
+        $this->assertModelFieldsAreFillable(new HsEvent, [
+            'handover_status',
+            'owner_user_id',
+            'accepted_by_user_id',
+            'accepted_at',
+            'acceptance_notes',
+        ]);
         $this->assertTrue(method_exists(HsEvent::class, 'owner'));
         $this->assertTrue(method_exists(HsEvent::class, 'acceptedBy'));
 
         $owner = User::factory()->create();
         $acceptor = User::factory()->create();
-        $event = HsEvent::factory()->create([
-            'handover_status' => 'accepted',
+        $acceptedAt = now()->subMinutes(5)->startOfSecond();
+        $sourceId = 900_001;
+        $category = HsEvent::CATEGORY_INCIDENT;
+        $event = HsEvent::query()->create([
+            'reference_number' => HsEvent::generateReferenceNumber(),
+            'source_type' => HsEvent::class,
+            'source_id' => $sourceId,
+            'event_category' => $category,
+            'severity' => HsEvent::SEVERITY_LOW,
+            'status' => HsEvent::STATUS_OPEN,
+            'occurred_at' => now()->subHour(),
+            'reported_at' => now(),
+            'idempotency_key' => HsEvent::buildIdempotencyKey(HsEvent::class, $sourceId, $category),
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
             'owner_user_id' => $owner->id,
             'accepted_by_user_id' => $acceptor->id,
-            'accepted_at' => now(),
+            'accepted_at' => $acceptedAt,
             'acceptance_notes' => 'Accepted with a clear owner.',
         ])->fresh();
 
+        $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $event->handover_status);
+        $this->assertSame($owner->id, $event->owner_user_id);
+        $this->assertSame($acceptor->id, $event->accepted_by_user_id);
         $this->assertInstanceOf(CarbonInterface::class, $event->accepted_at);
+        $this->assertTrue($event->accepted_at->equalTo($acceptedAt));
+        $this->assertSame('Accepted with a clear owner.', $event->acceptance_notes);
         $this->assertTrue($event->owner->is($owner));
         $this->assertTrue($event->acceptedBy->is($acceptor));
 
@@ -288,6 +329,11 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_alert_task_transfer_fields_are_cast_and_relationships_null_on_delete(): void
     {
         $this->assertJourneySchemaAvailable();
+        $this->assertModelFieldsAreFillable(new AlertTask, [
+            'transferred_to_hs_corrective_action_id',
+            'transferred_at',
+            'transferred_by_user_id',
+        ]);
         $this->assertTrue(method_exists(AlertTask::class, 'transferredCorrectiveAction'));
         $this->assertTrue(method_exists(AlertTask::class, 'transferredBy'));
 
@@ -303,6 +349,8 @@ class IncidentJourneySchemaTest extends TestCase
             'transferred_by_user_id' => $actor->id,
         ])->fresh();
 
+        $this->assertSame($action->id, $task->transferred_to_hs_corrective_action_id);
+        $this->assertSame($actor->id, $task->transferred_by_user_id);
         $this->assertInstanceOf(CarbonInterface::class, $task->transferred_at);
         $this->assertTrue($task->transferredCorrectiveAction->is($action));
         $this->assertTrue($task->transferredBy->is($actor));
@@ -318,6 +366,12 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_alert_sla_cycle_history_fields_are_fillable_and_cast(): void
     {
         $this->assertJourneySchemaAvailable();
+        $this->assertModelFieldsAreFillable(new AlertSla, [
+            'cycle_number',
+            'cycle_started_at',
+            'cycle_history',
+            'ended_as',
+        ]);
 
         $alert = ControlRoomAlert::factory()->create();
         $sla = AlertSla::create([
@@ -340,6 +394,13 @@ class IncidentJourneySchemaTest extends TestCase
     public function test_control_room_shift_handover_fields_are_fillable_cast_and_keep_the_existing_incoming_lead(): void
     {
         $this->assertJourneySchemaAvailable();
+        $this->assertModelFieldsAreFillable(new ControlRoomShift, [
+            'handover_status',
+            'handover_snapshot',
+            'handover_version',
+            'handover_prepared_at',
+            'handover_accepted_at',
+        ]);
 
         $incomingLead = User::factory()->create();
         $shift = ControlRoomShift::create([
@@ -364,6 +425,15 @@ class IncidentJourneySchemaTest extends TestCase
     {
         $this->assertJourneySchemaAvailable();
         $this->assertTrue(class_exists(HsRecommendationDisposition::class));
+        $this->assertModelFieldsAreFillable(new HsRecommendationDisposition, [
+            'hs_investigation_id',
+            'recommendation_index',
+            'disposition',
+            'reason',
+            'hs_corrective_action_id',
+            'decided_by_user_id',
+            'decided_at',
+        ]);
         $this->assertTrue(method_exists(HsRecommendationDisposition::class, 'investigation'));
         $this->assertTrue(method_exists(HsRecommendationDisposition::class, 'correctiveAction'));
         $this->assertTrue(method_exists(HsRecommendationDisposition::class, 'decidedBy'));
@@ -384,6 +454,10 @@ class IncidentJourneySchemaTest extends TestCase
         ])->fresh();
 
         $this->assertSame(1, $disposition->recommendation_index);
+        $this->assertSame(HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION, $disposition->disposition);
+        $this->assertSame('A corrective action is required.', $disposition->reason);
+        $this->assertSame($action->id, $disposition->hs_corrective_action_id);
+        $this->assertSame($decider->id, $disposition->decided_by_user_id);
         $this->assertInstanceOf(CarbonInterface::class, $disposition->decided_at);
         $this->assertTrue($disposition->investigation->is($investigation));
         $this->assertTrue($disposition->correctiveAction->is($action));
@@ -453,29 +527,71 @@ class IncidentJourneySchemaTest extends TestCase
         $this->assertNull($syntheticEvent->source);
 
         $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $owner = User::factory()->create();
         $acceptor = User::factory()->create();
+        $occurredAt = now()->subMinutes(20)->startOfSecond();
         $sourceIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()
             ->atSite($site)
-            ->create());
+            ->create([
+                'client_id' => $client->id,
+                'type' => 'near_miss',
+                'occurred_at' => $occurredAt,
+            ]));
         $event = HsEvent::factory()->forClientIncident($sourceIncident)
             ->awaitingHandoverAcceptance($owner)
             ->create();
-        DB::table('client_incidents')->where('id', $sourceIncident->id)->update(['hs_event_id' => $event->id]);
+        $sourceIncident->fill(['hs_event_id' => $event->id]);
+        $sourceIncident->saveQuietly();
         $sourceIncident->refresh();
-        $accepted = HsEvent::factory()->handoverAccepted($owner, $acceptor)->create();
+        $accepted = HsEvent::factory()->handoverAccepted($owner, $acceptor)->create([
+            'acceptance_notes' => 'Accepted after reviewing the near-miss handover.',
+        ]);
         $factoryDisposition = HsRecommendationDisposition::factory()->create();
 
         $this->assertSame(ClientIncident::class, $event->source_type);
         $this->assertSame($sourceIncident->id, $event->source_id);
+        $this->assertSame(HsEvent::CATEGORY_NEAR_MISS, $event->event_category);
+        $this->assertSame($site->id, $event->site_id);
+        $this->assertSame($client->id, $event->client_id);
+        $this->assertTrue($event->occurred_at->equalTo($occurredAt));
+        $this->assertSame(
+            HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                $sourceIncident->id,
+                HsEvent::CATEGORY_NEAR_MISS
+            ),
+            $event->idempotency_key
+        );
         $this->assertTrue($event->source->is($sourceIncident));
         $this->assertTrue($event->clientIncident->is($sourceIncident));
-        $this->assertSame('awaiting_acceptance', $event->handover_status);
+        $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $event->handover_status);
+        $this->assertSame($owner->id, $event->owner_user_id);
+        $this->assertNull($event->accepted_by_user_id);
+        $this->assertNull($event->accepted_at);
+        $this->assertNull($event->acceptance_notes);
         $this->assertSame($site->id, $sourceIncident->site_id);
         $this->assertSame($event->id, $sourceIncident->hs_event_id);
-        $this->assertSame('accepted', $accepted->handover_status);
+        $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $accepted->handover_status);
+        $this->assertSame($owner->id, $accepted->owner_user_id);
         $this->assertSame($acceptor->id, $accepted->accepted_by_user_id);
-        $this->assertNotNull($factoryDisposition->id);
+        $this->assertInstanceOf(CarbonInterface::class, $accepted->accepted_at);
+        $this->assertSame('Accepted after reviewing the near-miss handover.', $accepted->acceptance_notes);
+        $this->assertTrue($accepted->owner->is($owner));
+        $this->assertTrue($accepted->acceptedBy->is($acceptor));
+        $this->assertSame(0, $factoryDisposition->recommendation_index);
+        $this->assertSame(
+            HsRecommendationDisposition::DISPOSITION_ACCEPTED_RISK,
+            $factoryDisposition->disposition
+        );
+        $this->assertNotEmpty($factoryDisposition->reason);
+        $this->assertInstanceOf(CarbonInterface::class, $factoryDisposition->decided_at);
+        $this->assertNotNull($factoryDisposition->investigation);
+        $this->assertTrue($factoryDisposition->investigation->is(
+            HsInvestigation::query()->findOrFail($factoryDisposition->hs_investigation_id)
+        ));
+        $this->assertNull($factoryDisposition->correctiveAction);
+        $this->assertNull($factoryDisposition->decidedBy);
     }
 
     private function assertJourneySchemaAvailable(): void
@@ -495,6 +611,24 @@ class IncidentJourneySchemaTest extends TestCase
             $this->assertTrue(
                 defined($class.'::'.$constant),
                 "{$class}::{$constant} is missing."
+            );
+        }
+    }
+
+    /**
+     * @param  list<string>  $fields
+     */
+    private function assertModelFieldsAreFillable(Model $model, array $fields): void
+    {
+        foreach ($fields as $field) {
+            $this->assertTrue(
+                $model->isFillable($field),
+                sprintf('%s::isFillable() rejected %s.', $model::class, $field)
+            );
+            $this->assertContains(
+                $field,
+                $model->getFillable(),
+                sprintf('%s::$fillable is missing %s.', $model::class, $field)
             );
         }
     }
