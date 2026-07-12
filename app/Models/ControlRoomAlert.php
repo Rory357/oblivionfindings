@@ -3,9 +3,22 @@
 namespace App\Models;
 
 use App\Enums\AlertSeverity;
+use App\Models\ControlRoom\AlertDiscussion;
+use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\AlertWatcher;
+use App\Models\ControlRoom\Communication;
+use App\Models\ControlRoom\Device;
+use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\OperatorNote;
+use App\Models\ControlRoom\PlaybookRun;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\TimeEntry;
+use App\Models\ControlRoom\TriageQueue;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ControlRoomAlert extends Model
 {
@@ -16,13 +29,19 @@ class ControlRoomAlert extends Model
 
     // --- Lifecycle statuses ---
     public const STATUS_OPEN = 'open';
+
     public const STATUS_ACK = 'ack';
+
     public const STATUS_TRIAGING = 'triaging';
+
     public const STATUS_RESOLVED = 'resolved';
+
     public const STATUS_CLOSED = 'closed';
+
     // Sensor triage outcomes (Gap B): an operator confirms a detection into an
     // incident, or dismisses it as a false positive (sensor-tuning signal).
     public const STATUS_CONFIRMED = 'confirmed';
+
     public const STATUS_DISMISSED = 'dismissed';
 
     public const VALID_STATUSES = [
@@ -112,6 +131,22 @@ class ControlRoomAlert extends Model
         return $this->belongsTo(Site::class);
     }
 
+    /**
+     * The canonical incident linked through the incident's direct alert FK.
+     */
+    public function clientIncident(): HasOne
+    {
+        return $this->hasOne(ClientIncident::class, 'control_room_alert_id');
+    }
+
+    /**
+     * The canonical H&S event linked through its direct alert FK.
+     */
+    public function hsEvent(): HasOne
+    {
+        return $this->hasOne(HsEvent::class, 'control_room_alert_id');
+    }
+
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
@@ -128,42 +163,42 @@ class ControlRoomAlert extends Model
      */
     public function device(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\ControlRoom\Device::class, 'device_id');
+        return $this->belongsTo(Device::class, 'device_id');
     }
 
     public function queue(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\ControlRoom\TriageQueue::class, 'queue_id');
+        return $this->belongsTo(TriageQueue::class, 'queue_id');
     }
 
     public function playbookRun(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\ControlRoom\PlaybookRun::class, 'playbook_run_id');
+        return $this->belongsTo(PlaybookRun::class, 'playbook_run_id');
     }
 
     public function signals()
     {
-        return $this->hasMany(\App\Models\ControlRoom\Signal::class, 'alert_id');
+        return $this->hasMany(Signal::class, 'alert_id');
     }
 
     public function sla()
     {
-        return $this->hasOne(\App\Models\ControlRoom\AlertSla::class, 'alert_id');
+        return $this->hasOne(AlertSla::class, 'alert_id');
     }
 
     public function evidencePacks()
     {
-        return $this->hasMany(\App\Models\ControlRoom\EvidencePack::class, 'alert_id');
+        return $this->hasMany(EvidencePack::class, 'alert_id');
     }
 
     public function communications()
     {
-        return $this->hasMany(\App\Models\ControlRoom\Communication::class, 'alert_id');
+        return $this->hasMany(Communication::class, 'alert_id');
     }
 
     public function operatorNotes()
     {
-        return $this->hasMany(\App\Models\ControlRoom\OperatorNote::class, 'alert_id');
+        return $this->hasMany(OperatorNote::class, 'alert_id');
     }
 
     public function assignedTo(): BelongsTo
@@ -208,22 +243,22 @@ class ControlRoomAlert extends Model
 
     public function tasks()
     {
-        return $this->hasMany(\App\Models\ControlRoom\AlertTask::class, 'alert_id');
+        return $this->hasMany(AlertTask::class, 'alert_id');
     }
 
     public function discussions()
     {
-        return $this->hasMany(\App\Models\ControlRoom\AlertDiscussion::class, 'alert_id');
+        return $this->hasMany(AlertDiscussion::class, 'alert_id');
     }
 
     public function watchers()
     {
-        return $this->hasMany(\App\Models\ControlRoom\AlertWatcher::class, 'alert_id');
+        return $this->hasMany(AlertWatcher::class, 'alert_id');
     }
 
     public function timeEntries()
     {
-        return $this->hasMany(\App\Models\ControlRoom\TimeEntry::class, 'alert_id');
+        return $this->hasMany(TimeEntry::class, 'alert_id');
     }
 
     /**
@@ -294,7 +329,7 @@ class ControlRoomAlert extends Model
             $alert->triggered_at ??= now();
 
             // Ensure status is valid
-            if (!in_array($alert->status, self::VALID_STATUSES, true)) {
+            if (! in_array($alert->status, self::VALID_STATUSES, true)) {
                 $alert->status = self::STATUS_OPEN;
             }
 
@@ -323,7 +358,7 @@ class ControlRoomAlert extends Model
      */
     public function canTransitionTo(string $newStatus): bool
     {
-        if (!in_array($newStatus, self::VALID_STATUSES, true)) {
+        if (! in_array($newStatus, self::VALID_STATUSES, true)) {
             return false;
         }
 
@@ -346,6 +381,6 @@ class ControlRoomAlert extends Model
      */
     public function isActionable(): bool
     {
-        return !$this->isTerminal();
+        return ! $this->isTerminal();
     }
 }

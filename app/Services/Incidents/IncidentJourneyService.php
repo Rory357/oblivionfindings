@@ -1,0 +1,681 @@
+<?php
+
+namespace App\Services\Incidents;
+
+use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
+use App\Models\User;
+use App\Services\HealthSafety\HsEventService;
+use App\Services\References\ReferenceNumberGenerator;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+
+class IncidentJourneyService
+{
+    private const TRANSACTION_ATTEMPTS = 3;
+
+    /** @var list<string> */
+    private const INCIDENT_INPUT_FIELDS = [
+        'client_id',
+        'site_id',
+        'shift_id',
+        'respite_stay_id',
+        'service_context_id',
+        'template_id',
+        'type',
+        'severity',
+        'occurred_at',
+        'title',
+        'description',
+        'metadata',
+        'requires_followup',
+        'immediate_action_taken',
+        'witnesses',
+        'location',
+        'immediate_action',
+        'follow_up_required',
+        'portal_visible',
+        'potential_severity',
+        'potential_consequence',
+        'is_notifiable',
+        'worksafe_notification_status',
+        'worksafe_notified_at',
+        'worksafe_reference',
+        'site_preserved',
+        'site_preservation_released_at',
+        'site_preservation_released_by',
+        'injured_person_name',
+        'injured_person_role',
+        'injured_person_age',
+        'injury_body_part',
+        'injury_nature',
+        'injury_classification',
+        'medical_treatment_type',
+    ];
+
+    public function __construct(
+        private readonly HsEventService $hsEventService,
+        private readonly ReferenceNumberGenerator $references,
+    ) {}
+
+    /**
+     * Submit the canonical incident represented by an existing operational alert.
+     *
+     * The alert is the lock anchor, so concurrent retries cannot create two
+     * incidents for the same operational record.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    public function submitFromAlert(ControlRoomAlert $alert, array $input, User $actor): IncidentJourney
+    {
+        return DB::transaction(function () use ($alert, $input, $actor): IncidentJourney {
+            $lockedAlert = ControlRoomAlert::query()
+                ->whereKey($alert->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $incident = $this->lockedIncidentForAlert($lockedAlert);
+            $attributes = $this->incidentAttributes($lockedAlert, $incident, $input, $actor);
+
+            if ($incident === null) {
+                $incident = ClientIncident::withoutEvents(
+                    fn () => ClientIncident::query()->create($attributes),
+                );
+            } else {
+                $incident->forceFill($attributes)->saveQuietly();
+                $incident->refresh();
+            }
+
+            $hsEvent = $this->lockedOrCreatedHsEvent($incident, $actor);
+
+            $this->assertJourneyLinksDoNotConflict($incident, $lockedAlert, $hsEvent);
+            $this->linkJourney($incident, $lockedAlert, $hsEvent, $actor, [
+                'incident_id' => $incident->id,
+            ]);
+
+            return $this->freshJourney($incident, $lockedAlert, $hsEvent);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Ensure a submitted incident has its canonical H&S event and, when high or
+     * critical-equivalent, its one incident-backed alert.
+     */
+    public function ensureForSubmittedIncident(ClientIncident $incident, ?User $actor = null): IncidentJourney
+    {
+        return DB::transaction(function () use ($incident, $actor): IncidentJourney {
+            $lockedIncident = $this->lockIncident($incident);
+            $this->assertSubmitted($lockedIncident);
+
+            $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
+            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent);
+            $alertReason = $alert === null
+                ? 'Automatic high-severity incident escalation'
+                : data_get($alert->context, 'reason');
+
+            if ($alert === null && $this->requiresAutomaticAlert($lockedIncident)) {
+                $alertActor = $this->actorRequiredForAlert($lockedIncident, $actor);
+                $alert = $this->createIncidentAlert(
+                    $lockedIncident,
+                    $alertActor,
+                    $alertReason,
+                );
+            }
+
+            $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
+            $this->linkJourney(
+                $lockedIncident,
+                $alert,
+                $hsEvent,
+                $actor,
+                $alert === null ? [] : $this->incidentAlertContext($lockedIncident, $alertReason),
+            );
+
+            return $this->freshJourney($lockedIncident, $alert, $hsEvent);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Explicitly escalate a submitted incident into the Control Room regardless
+     * of severity. Exact incident linkage is the idempotency boundary; the legacy
+     * fuzzy 30-minute bridge is deliberately not used.
+     */
+    public function ensureAlertForIncident(
+        ClientIncident $incident,
+        User $actor,
+        ?string $reason = null,
+    ): IncidentJourney {
+        return DB::transaction(function () use ($incident, $actor, $reason): IncidentJourney {
+            $lockedIncident = $this->lockIncident($incident);
+            $this->assertSubmitted($lockedIncident);
+
+            $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
+            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent)
+                ?? $this->createIncidentAlert($lockedIncident, $actor, $reason);
+
+            $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
+            $this->linkJourney(
+                $lockedIncident,
+                $alert,
+                $hsEvent,
+                $actor,
+                $this->incidentAlertContext($lockedIncident, $reason),
+            );
+
+            return $this->freshJourney($lockedIncident, $alert, $hsEvent);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Resolve the journey without taking locks or repairing legacy gaps.
+     */
+    public function journeyForIncident(ClientIncident $incident): IncidentJourney
+    {
+        $incident = ClientIncident::query()->findOrFail($incident->getKey());
+        $hsEvent = $this->readHsEventForIncident($incident);
+        $alert = $this->readAlertForIncident($incident, $hsEvent);
+
+        return new IncidentJourney($incident, $alert, $hsEvent);
+    }
+
+    private function lockIncident(ClientIncident $incident): ClientIncident
+    {
+        return ClientIncident::query()
+            ->whereKey($incident->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function assertSubmitted(ClientIncident $incident): void
+    {
+        if ($incident->status === 'draft' || ! $incident->isSubmitted()) {
+            throw new \DomainException('The incident must be submitted before its H&S journey can be ensured.');
+        }
+    }
+
+    private function lockedIncidentForAlert(ControlRoomAlert $alert): ?ClientIncident
+    {
+        $direct = ClientIncident::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->lockForUpdate()
+            ->get();
+
+        if ($direct->count() > 1) {
+            throw new \DomainException('Incident journey conflict: the alert is directly linked to multiple incidents.');
+        }
+
+        if ($direct->isNotEmpty()) {
+            return $direct->first();
+        }
+
+        $legacyIncidentId = data_get($alert->context, 'incident_id');
+        if (! is_numeric($legacyIncidentId)) {
+            return null;
+        }
+
+        $legacy = ClientIncident::query()
+            ->whereKey((int) $legacyIncidentId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($legacy === null) {
+            return null;
+        }
+
+        if ($legacy->control_room_alert_id !== null
+            && (int) $legacy->control_room_alert_id !== (int) $alert->id
+        ) {
+            throw new \DomainException('Incident journey conflict: the legacy incident already has a different direct alert.');
+        }
+
+        return $legacy;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function incidentAttributes(
+        ControlRoomAlert $alert,
+        ?ClientIncident $incident,
+        array $input,
+        User $actor,
+    ): array {
+        $safe = Arr::only($input, self::INCIDENT_INPUT_FIELDS);
+        $clientId = $safe['client_id']
+            ?? $incident?->client_id
+            ?? $alert->client_id
+            ?? data_get($alert->context, 'client_id');
+
+        if (! is_numeric($clientId)) {
+            throw new \DomainException('A valid client is required to submit an incident from this alert.');
+        }
+
+        $client = Client::query()->find((int) $clientId);
+        if ($client === null) {
+            throw new \DomainException('A valid client is required to submit an incident from this alert.');
+        }
+
+        $siteId = $safe['site_id']
+            ?? $incident?->site_id
+            ?? $alert->site_id
+            ?? $client->site_id;
+        $type = trim((string) ($safe['type'] ?? $incident?->type ?? $this->typeFromAlert($alert)));
+        $type = $type === '' ? 'other' : $type;
+        $requestedSeverity = $alert->severity === HsEvent::SEVERITY_CRITICAL
+            ? HsEvent::SEVERITY_CRITICAL
+            : ($safe['severity'] ?? $incident?->severity ?? $alert->severity ?? HsEvent::SEVERITY_LOW);
+        $normalisedSeverity = HsEventService::normaliseSeverity((string) $requestedSeverity);
+
+        $inputMetadata = is_array($safe['metadata'] ?? null) ? $safe['metadata'] : [];
+        $existingMetadata = is_array($incident?->metadata) ? $incident->metadata : [];
+        $metadata = array_replace($inputMetadata, $existingMetadata);
+        $existingJourney = is_array($metadata['journey'] ?? null) ? $metadata['journey'] : [];
+        $metadata['journey'] = array_replace($existingJourney, [
+            'source' => 'control_room_alert',
+            'control_room_alert_id' => $alert->id,
+            'original_alert_severity' => $alert->severity,
+            'submitted_by_user_id' => $actor->id,
+        ]);
+
+        unset($safe['metadata']);
+
+        return array_replace($safe, [
+            'reference_number' => $incident?->reference_number
+                ?? $this->references->next(ClientIncident::REFERENCE_PREFIX),
+            'client_id' => (int) $clientId,
+            'site_id' => is_numeric($siteId) ? (int) $siteId : null,
+            'type' => $type,
+            'severity' => $normalisedSeverity === HsEvent::SEVERITY_CRITICAL
+                ? HsEvent::SEVERITY_HIGH
+                : $normalisedSeverity,
+            'title' => $safe['title']
+                ?? $incident?->title
+                ?? data_get($alert->context, 'title')
+                ?? ucfirst(str_replace(['.', '_'], ' ', $type)).' incident',
+            'description' => array_key_exists('description', $safe)
+                ? $safe['description']
+                : ($incident?->description ?? data_get($alert->context, 'description') ?? $alert->notes),
+            'occurred_at' => $safe['occurred_at'] ?? $incident?->occurred_at ?? $alert->triggered_at,
+            'metadata' => $metadata,
+            'source' => 'control_room',
+            'status' => 'submitted',
+            'submitted_at' => $incident?->submitted_at ?? now(),
+            'reported_by' => $actor->id,
+            'control_room_alert_id' => $alert->id,
+        ]);
+    }
+
+    private function typeFromAlert(ControlRoomAlert $alert): string
+    {
+        $type = (string) $alert->alert_type;
+
+        return str_starts_with($type, 'incident.')
+            ? substr($type, strlen('incident.'))
+            : $type;
+    }
+
+    private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
+    {
+        $hsEvent = null;
+
+        if ($incident->hs_event_id !== null) {
+            $hsEvent = HsEvent::query()
+                ->whereKey($incident->hs_event_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($hsEvent === null) {
+                throw new \DomainException('Incident journey conflict: the direct H&S event no longer exists.');
+            }
+        }
+
+        if ($hsEvent === null) {
+            $hsEvent = HsEvent::query()
+                ->where('idempotency_key', $this->hsIdempotencyKey($incident))
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if ($hsEvent === null) {
+            $hsEvent = $this->hsEventService->recordEvent([
+                'source' => $incident,
+                'event_category' => $this->hsCategory($incident),
+                'severity' => $this->hsSeverity($incident),
+                'occurred_at' => $incident->occurred_at,
+                'reported_at' => $incident->submitted_at ?? $incident->created_at,
+                'site_id' => $this->incidentSiteId($incident),
+                'client_id' => $incident->client_id,
+                'staff_id' => $incident->reported_by,
+                'shift_id' => $incident->shift_id,
+                'worksafe_notifiable' => (bool) $incident->is_notifiable,
+                'created_by' => $actor?->id ?? $incident->reported_by,
+                'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+                'owner_user_id' => $actor?->id ?? $incident->reported_by,
+            ]);
+
+            if ($hsEvent === null) {
+                throw new \RuntimeException('The H&S event could not be recorded; the incident journey was rolled back.');
+            }
+
+            $hsEvent = HsEvent::query()
+                ->whereKey($hsEvent->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+        }
+
+        $otherIncident = ClientIncident::query()
+            ->where('hs_event_id', $hsEvent->id)
+            ->where('id', '!=', $incident->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($otherIncident !== null) {
+            throw new \DomainException('Incident journey conflict: the H&S event is directly linked to a different incident.');
+        }
+
+        return $hsEvent;
+    }
+
+    private function lockedAlertForIncident(ClientIncident $incident, HsEvent $hsEvent): ?ControlRoomAlert
+    {
+        if ($incident->control_room_alert_id !== null) {
+            return ControlRoomAlert::query()
+                ->whereKey($incident->control_room_alert_id)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if ($hsEvent->control_room_alert_id !== null) {
+            return ControlRoomAlert::query()
+                ->whereKey($hsEvent->control_room_alert_id)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $legacyAlerts = ControlRoomAlert::query()
+            ->where('context->incident_id', $incident->id)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($legacyAlerts->count() > 1) {
+            throw new \DomainException('Incident journey conflict: multiple legacy alerts claim the same incident.');
+        }
+
+        return $legacyAlerts->first();
+    }
+
+    private function createIncidentAlert(ClientIncident $incident, User $actor, ?string $reason): ControlRoomAlert
+    {
+        return ControlRoomAlert::query()->create([
+            'source' => 'incident',
+            'alert_type' => 'incident.'.$incident->type,
+            'severity' => $this->alertSeverity($incident),
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'site_id' => $this->incidentSiteId($incident),
+            'client_id' => $incident->client_id,
+            'triggered_at' => $incident->occurred_at ?? $incident->submitted_at ?? now(),
+            'created_by_user_id' => $actor->id,
+            'context' => $this->incidentAlertContext($incident, $reason),
+        ]);
+    }
+
+    private function actorRequiredForAlert(ClientIncident $incident, ?User $actor): User
+    {
+        if ($actor !== null) {
+            return $actor;
+        }
+
+        if ($incident->reported_by !== null) {
+            $reporter = User::query()->find($incident->reported_by);
+            if ($reporter !== null) {
+                return $reporter;
+            }
+        }
+
+        throw new \DomainException('An actor is required to create the Control Room alert for this incident.');
+    }
+
+    private function assertJourneyLinksDoNotConflict(
+        ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        HsEvent $hsEvent,
+    ): void {
+        if ($incident->hs_event_id !== null && (int) $incident->hs_event_id !== (int) $hsEvent->id) {
+            throw new \DomainException('Incident journey conflict: the incident has a different direct H&S event.');
+        }
+
+        if ($alert !== null
+            && $incident->control_room_alert_id !== null
+            && (int) $incident->control_room_alert_id !== (int) $alert->id
+        ) {
+            throw new \DomainException('Incident journey conflict: the incident has a different direct alert.');
+        }
+
+        if ($alert !== null
+            && $hsEvent->control_room_alert_id !== null
+            && (int) $hsEvent->control_room_alert_id !== (int) $alert->id
+        ) {
+            throw new \DomainException('Incident journey conflict: the H&S event has a different direct alert.');
+        }
+
+        if ($alert === null && $hsEvent->control_room_alert_id !== null) {
+            throw new \DomainException('Incident journey conflict: the H&S event has an alert that could not be resolved.');
+        }
+
+        if ($alert !== null) {
+            $otherIncident = ClientIncident::query()
+                ->where('control_room_alert_id', $alert->id)
+                ->where('id', '!=', $incident->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($otherIncident !== null) {
+                throw new \DomainException('Incident journey conflict: the alert is directly linked to a different incident.');
+            }
+
+            $otherHsEvent = HsEvent::query()
+                ->where('control_room_alert_id', $alert->id)
+                ->where('id', '!=', $hsEvent->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($otherHsEvent !== null) {
+                throw new \DomainException('Incident journey conflict: the alert is directly linked to a different H&S event.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $alertContext
+     */
+    private function linkJourney(
+        ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        HsEvent $hsEvent,
+        ?User $actor,
+        array $alertContext,
+    ): void {
+        $incidentLinks = ['hs_event_id' => $hsEvent->id];
+        if ($alert !== null) {
+            $incidentLinks['control_room_alert_id'] = $alert->id;
+        }
+        $incident->forceFill($incidentLinks)->saveQuietly();
+
+        $this->synchroniseHsEvent($hsEvent, $incident, $alert, $actor);
+
+        if ($alert !== null) {
+            $context = array_replace((array) $alert->context, $alertContext, [
+                'incident_id' => $incident->id,
+            ]);
+            $alert->forceFill(['context' => $context])->saveQuietly();
+        }
+    }
+
+    private function synchroniseHsEvent(
+        HsEvent $hsEvent,
+        ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        ?User $actor,
+    ): void {
+        $severity = $this->higherSeverity($hsEvent->severity, $this->hsSeverity($incident));
+        $notifiable = (bool) $incident->is_notifiable;
+        $worksafeStatus = $notifiable
+            ? ($incident->worksafe_notification_status ?: HsEvent::WORKSAFE_PENDING)
+            : null;
+        $handoverStatus = $hsEvent->handover_status === HsEvent::HANDOVER_ACCEPTED
+            ? HsEvent::HANDOVER_ACCEPTED
+            : HsEvent::HANDOVER_AWAITING_ACCEPTANCE;
+
+        $hsEvent->forceFill([
+            'severity' => $severity,
+            'site_id' => $this->incidentSiteId($incident),
+            'client_id' => $incident->client_id,
+            'staff_id' => $incident->reported_by,
+            'shift_id' => $incident->shift_id,
+            'worksafe_notifiable' => $notifiable,
+            'worksafe_status' => $worksafeStatus,
+            'worksafe_reference' => $incident->worksafe_reference,
+            'worksafe_notified_at' => $incident->worksafe_notified_at,
+            'worksafe_site_preserved' => (bool) $incident->site_preserved,
+            'investigation_required' => (bool) $hsEvent->investigation_required
+                || $notifiable
+                || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true),
+            'control_room_alert_id' => $alert?->id ?? $hsEvent->control_room_alert_id,
+            'handover_status' => $handoverStatus,
+            'owner_user_id' => $hsEvent->owner_user_id ?? $actor?->id ?? $incident->reported_by,
+        ])->saveQuietly();
+    }
+
+    /** @return array<string, mixed> */
+    private function incidentAlertContext(ClientIncident $incident, ?string $reason): array
+    {
+        return [
+            'incident_id' => $incident->id,
+            'type' => $incident->type,
+            'incident_type' => $incident->type,
+            'description' => $incident->description,
+            'reason' => $reason,
+            'provenance' => [
+                'source' => 'incident_journey',
+                'service' => self::class,
+            ],
+        ];
+    }
+
+    private function requiresAutomaticAlert(ClientIncident $incident): bool
+    {
+        return in_array(
+            $this->alertSeverity($incident),
+            [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL],
+            true,
+        );
+    }
+
+    private function hsCategory(ClientIncident $incident): string
+    {
+        return $incident->type === 'near_miss'
+            ? HsEvent::CATEGORY_NEAR_MISS
+            : HsEvent::CATEGORY_INCIDENT;
+    }
+
+    private function hsIdempotencyKey(ClientIncident $incident): string
+    {
+        return HsEvent::buildIdempotencyKey(
+            ClientIncident::class,
+            $incident->id,
+            $this->hsCategory($incident),
+        );
+    }
+
+    private function hsSeverity(ClientIncident $incident): string
+    {
+        $originalAlertSeverity = data_get($incident->metadata, 'journey.original_alert_severity');
+        if ($originalAlertSeverity === HsEvent::SEVERITY_CRITICAL) {
+            return HsEvent::SEVERITY_CRITICAL;
+        }
+
+        return HsEventService::normaliseSeverity((string) $incident->severity);
+    }
+
+    private function alertSeverity(ClientIncident $incident): string
+    {
+        return $this->hsSeverity($incident);
+    }
+
+    private function higherSeverity(?string $current, string $target): string
+    {
+        $rank = [
+            HsEvent::SEVERITY_LOW => 0,
+            HsEvent::SEVERITY_MEDIUM => 1,
+            HsEvent::SEVERITY_HIGH => 2,
+            HsEvent::SEVERITY_CRITICAL => 3,
+        ];
+
+        $current = HsEventService::normaliseSeverity((string) $current);
+
+        return ($rank[$current] ?? 0) >= ($rank[$target] ?? 0) ? $current : $target;
+    }
+
+    private function incidentSiteId(ClientIncident $incident): ?int
+    {
+        if ($incident->site_id !== null) {
+            return (int) $incident->site_id;
+        }
+
+        $clientSiteId = Client::query()->whereKey($incident->client_id)->value('site_id');
+
+        return $clientSiteId === null ? null : (int) $clientSiteId;
+    }
+
+    private function readHsEventForIncident(ClientIncident $incident): ?HsEvent
+    {
+        if ($incident->hs_event_id !== null) {
+            $direct = HsEvent::query()->find($incident->hs_event_id);
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        return HsEvent::query()
+            ->where('idempotency_key', $this->hsIdempotencyKey($incident))
+            ->first();
+    }
+
+    private function readAlertForIncident(ClientIncident $incident, ?HsEvent $hsEvent): ?ControlRoomAlert
+    {
+        if ($incident->control_room_alert_id !== null) {
+            $direct = ControlRoomAlert::query()->find($incident->control_room_alert_id);
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        if ($hsEvent?->control_room_alert_id !== null) {
+            $direct = ControlRoomAlert::query()->find($hsEvent->control_room_alert_id);
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        return ControlRoomAlert::query()
+            ->where('context->incident_id', $incident->id)
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function freshJourney(
+        ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        HsEvent $hsEvent,
+    ): IncidentJourney {
+        return new IncidentJourney(
+            $incident->fresh(),
+            $alert?->fresh(),
+            $hsEvent->fresh(),
+        );
+    }
+}

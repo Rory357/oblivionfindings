@@ -25,7 +25,7 @@ class HsEventService
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Public API                                                         */
+    /*  Public API */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -48,6 +48,9 @@ class HsEventService
      *     worksafe_notifiable?: bool,
      *     organization_id?: int|null,
      *     created_by?: int|null,
+     *     control_room_alert_id?: int|null,
+     *     handover_status?: string,
+     *     owner_user_id?: int|null,
      * } $data
      */
     public function recordEvent(array $data): ?HsEvent
@@ -88,6 +91,9 @@ class HsEventService
                 'worksafe_notifiable' => $data['worksafe_notifiable'] ?? false,
                 'worksafe_status' => ($data['worksafe_notifiable'] ?? false) ? HsEvent::WORKSAFE_PENDING : null,
                 'investigation_required' => $this->requiresInvestigation($severity, $data['worksafe_notifiable'] ?? false),
+                'control_room_alert_id' => $data['control_room_alert_id'] ?? null,
+                'handover_status' => $data['handover_status'] ?? HsEvent::HANDOVER_NOT_REQUIRED,
+                'owner_user_id' => $data['owner_user_id'] ?? null,
                 'idempotency_key' => $idempotencyKey,
                 'created_by' => $data['created_by'] ?? auth()->id(),
             ]);
@@ -95,7 +101,7 @@ class HsEventService
             Log::info('HsEventService: event created', [
                 'hs_event_id' => $hsEvent->id,
                 'reference' => $hsEvent->reference_number,
-                'source' => class_basename($source) . ':' . $source->getKey(),
+                'source' => class_basename($source).':'.$source->getKey(),
                 'category' => $category,
                 'severity' => $severity,
             ]);
@@ -108,7 +114,7 @@ class HsEventService
             }
 
             Log::error('HsEventService: failed to create event', [
-                'source' => class_basename($source) . ':' . $source->getKey(),
+                'source' => class_basename($source).':'.$source->getKey(),
                 'category' => $category,
                 'error' => $e->getMessage(),
             ]);
@@ -164,7 +170,7 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Governance — gated closure (E-Gap 1)                                */
+    /*  Governance — gated closure (E-Gap 1) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -238,7 +244,7 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Governance — WorkSafe NZ notification (E-Gap 2)                     */
+    /*  Governance — WorkSafe NZ notification (E-Gap 2) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -306,7 +312,7 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Severity normalisation                                             */
+    /*  Severity normalisation */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -332,7 +338,7 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     private function requiresInvestigation(string $normalisedSeverity, bool $worksafeNotifiable): bool
