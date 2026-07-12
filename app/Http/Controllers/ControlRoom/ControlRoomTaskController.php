@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ControlRoomTaskController extends Controller
 {
@@ -112,13 +113,14 @@ class ControlRoomTaskController extends Controller
         $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
-            'title' => ['nullable', 'string', 'max:200'],
-            'description' => ['nullable', 'string'],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'priority' => ['nullable', 'in:critical,high,medium,low'],
-            'due_at' => ['nullable', 'date'],
-            'estimated_minutes' => ['nullable', 'integer'],
+            'title' => ['sometimes', 'required', 'string', 'max:200'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'assigned_to_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'priority' => ['sometimes', 'required', 'in:critical,high,medium,low'],
+            'due_at' => ['sometimes', 'nullable', 'date'],
+            'estimated_minutes' => ['sometimes', 'nullable', 'integer'],
             'parent_task_id' => [
+                'sometimes',
                 'nullable',
                 'integer',
                 Rule::exists('control_room_alert_tasks', 'id')
@@ -130,7 +132,14 @@ class ControlRoomTaskController extends Controller
             $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
         }
 
-        $task->update(array_filter($data, fn ($v) => $v !== null));
+        if (array_key_exists('parent_task_id', $data)) {
+            $this->assertTaskParentDoesNotCreateCycle(
+                $task,
+                $data['parent_task_id'] === null ? null : (int) $data['parent_task_id'],
+            );
+        }
+
+        $task->update($data);
 
         AuditLogger::log('controlRoom.task.updated', $task->alert, [
             'task_id' => $task->id,
@@ -207,7 +216,12 @@ class ControlRoomTaskController extends Controller
 
         $data = $request->validate([
             'task_ids' => ['required', 'array'],
-            'task_ids.*' => ['integer'],
+            'task_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('control_room_alert_tasks', 'id')
+                    ->where(fn ($query) => $query->where('alert_id', $alert->id)),
+            ],
         ]);
 
         foreach ($data['task_ids'] as $index => $taskId) {
@@ -222,6 +236,31 @@ class ControlRoomTaskController extends Controller
         ]);
 
         return back()->with('success', 'Tasks reordered.');
+    }
+
+    private function assertTaskParentDoesNotCreateCycle(AlertTask $task, ?int $parentTaskId): void
+    {
+        if ($parentTaskId === null) {
+            return;
+        }
+
+        $parentIdsByTask = AlertTask::query()
+            ->where('alert_id', $task->alert_id)
+            ->pluck('parent_task_id', 'id');
+        $visitedTaskIds = [];
+        $currentTaskId = $parentTaskId;
+
+        while ($currentTaskId !== null) {
+            if ($currentTaskId === $task->id || isset($visitedTaskIds[$currentTaskId])) {
+                throw ValidationException::withMessages([
+                    'parent_task_id' => 'A task cannot be parented beneath itself or one of its descendants.',
+                ]);
+            }
+
+            $visitedTaskIds[$currentTaskId] = true;
+            $nextTaskId = $parentIdsByTask->get($currentTaskId);
+            $currentTaskId = $nextTaskId === null ? null : (int) $nextTaskId;
+        }
     }
 
     private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void

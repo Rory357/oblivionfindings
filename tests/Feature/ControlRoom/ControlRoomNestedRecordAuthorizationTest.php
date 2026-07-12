@@ -153,6 +153,76 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
         ];
     }
 
+    public function test_multi_site_operator_can_use_visible_recipients_and_mixed_hidden_recipients_are_rejected_atomically(): void
+    {
+        $thirdSite = Site::factory()->create(['type' => 'house']);
+        $operatorProfile = HrEmployeeProfile::query()
+            ->where('user_id', $this->operator->id)
+            ->firstOrFail();
+        $operatorProfile->update(['secondary_site_ids' => [$this->hiddenSite->id]]);
+        $this->operator->unsetRelation('hrEmployeeProfile');
+
+        $visibleStaff = $this->siteBoundUser($this->visibleSite, [], 'support_worker');
+        $secondarySiteStaff = $this->siteBoundUser($this->hiddenSite, [], 'coordinator');
+        $inaccessibleStaff = $this->siteBoundUser($thirdSite, [], 'coordinator');
+
+        $this->actingAs($this->operator)
+            ->post("/control-room/alerts/{$this->visibleAlert->id}/tasks", [
+                'title' => 'Secondary-site assignee',
+                'priority' => 'medium',
+                'assigned_to_user_id' => $secondarySiteStaff->id,
+            ])
+            ->assertRedirect();
+        $this->assertDatabaseHas('control_room_alert_tasks', [
+            'alert_id' => $this->visibleAlert->id,
+            'assigned_to_user_id' => $secondarySiteStaff->id,
+        ]);
+
+        $this->actingAs($this->operator)
+            ->postJson("/control-room/alerts/{$this->visibleAlert->id}/watchers", [
+                'user_id' => $secondarySiteStaff->id,
+            ])
+            ->assertCreated();
+
+        $this->actingAs($this->operator)
+            ->postJson("/control-room/alerts/{$this->visibleAlert->id}/discussions", [
+                'content' => 'Both accessible sites can be mentioned.',
+                'mentions' => [$visibleStaff->id, $secondarySiteStaff->id],
+            ])
+            ->assertCreated();
+
+        $taskCount = AlertTask::query()->where('alert_id', $this->visibleAlert->id)->count();
+        $watcherCount = AlertWatcher::query()->where('alert_id', $this->visibleAlert->id)->count();
+        $discussionCount = AlertDiscussion::query()->where('alert_id', $this->visibleAlert->id)->count();
+        $watchersAggregate = $this->visibleAlert->fresh()->watchers_count;
+        $auditCount = DB::table('audit_logs')->count();
+
+        $this->actingAs($this->operator)
+            ->postJson("/control-room/alerts/{$this->visibleAlert->id}/tasks", [
+                'title' => 'Inaccessible assignee',
+                'priority' => 'medium',
+                'assigned_to_user_id' => $inaccessibleStaff->id,
+            ])
+            ->assertForbidden();
+        $this->actingAs($this->operator)
+            ->postJson("/control-room/alerts/{$this->visibleAlert->id}/watchers", [
+                'user_id' => $inaccessibleStaff->id,
+            ])
+            ->assertForbidden();
+        $this->actingAs($this->operator)
+            ->postJson("/control-room/alerts/{$this->visibleAlert->id}/discussions", [
+                'content' => 'Mixed recipient list must be atomic.',
+                'mentions' => [$secondarySiteStaff->id, $inaccessibleStaff->id],
+            ])
+            ->assertForbidden();
+
+        $this->assertSame($taskCount, AlertTask::query()->where('alert_id', $this->visibleAlert->id)->count());
+        $this->assertSame($watcherCount, AlertWatcher::query()->where('alert_id', $this->visibleAlert->id)->count());
+        $this->assertSame($discussionCount, AlertDiscussion::query()->where('alert_id', $this->visibleAlert->id)->count());
+        $this->assertSame($watchersAggregate, $this->visibleAlert->fresh()->watchers_count);
+        $this->assertSame($auditCount, DB::table('audit_logs')->count());
+    }
+
     public function test_global_reports_actor_retains_parent_and_child_record_access(): void
     {
         $globalOperator = $this->roleUser('coordinator', [
