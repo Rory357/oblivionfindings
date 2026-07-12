@@ -132,6 +132,159 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
         $this->assertStringNotContainsString('Hidden Support Worker', $encodedProps);
     }
 
+    public function test_alert_thread_summary_uses_the_deterministic_latest_row_for_content_time_counts_and_ordering(): void
+    {
+        $latestAt = now()->addHour()->startOfSecond();
+        $olderAt = $latestAt->copy()->subHour();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->visibleSite->id,
+            'alert_type' => 'Deterministic Alert Thread',
+        ]);
+        $comparisonAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->visibleSite->id,
+            'alert_type' => 'Tie Ordering Alert Thread',
+        ]);
+
+        $this->communication([
+            'alert_id' => $alert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'content' => 'Alert first equal-time message',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => $alert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'direction' => 'outbound',
+            'content' => 'Alert deterministic latest message',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => $comparisonAlert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'direction' => 'outbound',
+            'content' => 'Alert comparison thread',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => $alert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'content' => 'Alert higher ID but older message',
+            'sent_at' => $olderAt,
+            'delivered_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->operator)
+            ->get('/control-room/messaging')
+            ->assertOk();
+        $threads = collect($response->viewData('page')['props']['threads']);
+        $thread = $threads->firstWhere('id', "alert-{$alert->id}");
+
+        $this->assertSame('Alert deterministic latest message', $thread['last_message']);
+        $this->assertSame($latestAt->format('Y-m-d H:i:s'), $thread['last_message_at']);
+        $this->assertSame(3, $thread['message_count']);
+        $this->assertSame(1, $thread['unread_count']);
+        $this->assertSame(
+            ["alert-{$comparisonAlert->id}", "alert-{$alert->id}"],
+            $threads->pluck('id')
+                ->filter(fn (string $id) => in_array($id, ["alert-{$alert->id}", "alert-{$comparisonAlert->id}"], true))
+                ->values()
+                ->all(),
+        );
+    }
+
+    public function test_direct_thread_summary_uses_the_deterministic_latest_row_for_content_time_counts_and_ordering(): void
+    {
+        $latestAt = now()->addHour()->startOfSecond();
+        $olderAt = $latestAt->copy()->subHour();
+        $target = $this->siteBoundUser($this->visibleSite, [], 'support_worker', 'Deterministic Direct Target');
+        $comparisonTarget = $this->siteBoundUser($this->visibleSite, [], 'support_worker', 'Tie Ordering Direct Target');
+
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $target->id,
+            'content' => 'Direct first equal-time message',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $target->id,
+            'direction' => 'outbound',
+            'content' => 'Direct deterministic latest message',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $comparisonTarget->id,
+            'direction' => 'outbound',
+            'content' => 'Direct comparison thread',
+            'sent_at' => $latestAt,
+        ]);
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $target->id,
+            'content' => 'Direct higher ID but older message',
+            'sent_at' => $olderAt,
+            'delivered_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->operator)
+            ->get('/control-room/messaging')
+            ->assertOk();
+        $threads = collect($response->viewData('page')['props']['threads']);
+        $thread = $threads->firstWhere('id', "user-{$target->id}");
+
+        $this->assertSame('Direct deterministic latest message', $thread['last_message']);
+        $this->assertSame($latestAt->format('Y-m-d H:i:s'), $thread['last_message_at']);
+        $this->assertSame(3, $thread['message_count']);
+        $this->assertSame(1, $thread['unread_count']);
+        $this->assertSame(
+            ["user-{$comparisonTarget->id}", "user-{$target->id}"],
+            $threads->pluck('id')
+                ->filter(fn (string $id) => in_array($id, ["user-{$target->id}", "user-{$comparisonTarget->id}"], true))
+                ->values()
+                ->all(),
+        );
+    }
+
+    public function test_site_bound_index_excludes_client_and_next_of_kin_direct_threads(): void
+    {
+        [$client, $nextOfKin] = $this->portalTargetsWithDirectMessages();
+
+        $response = $this->actingAs($this->operator)
+            ->get('/control-room/messaging')
+            ->assertOk();
+        $props = $response->viewData('page')['props'];
+        $threadIds = collect($props['threads'])->pluck('id')->all();
+        $staffIds = collect($props['staff'])->pluck('id')->all();
+
+        $this->assertNotContains("user-{$client->id}", $threadIds);
+        $this->assertNotContains("user-{$nextOfKin->id}", $threadIds);
+        $this->assertNotContains($client->id, $staffIds);
+        $this->assertNotContains($nextOfKin->id, $staffIds);
+    }
+
+    public function test_global_reports_index_excludes_client_and_next_of_kin_direct_threads(): void
+    {
+        [$client, $nextOfKin] = $this->portalTargetsWithDirectMessages();
+        $globalOperator = $this->roleUser(
+            'coordinator',
+            ['controlRoom.viewAny', 'controlRoom.alerts.manage', 'reports.viewAny'],
+            'Global Portal Thread Reviewer',
+        );
+
+        $response = $this->actingAs($globalOperator)
+            ->get('/control-room/messaging')
+            ->assertOk();
+        $props = $response->viewData('page')['props'];
+        $threadIds = collect($props['threads'])->pluck('id')->all();
+        $staffIds = collect($props['staff'])->pluck('id')->all();
+
+        $this->assertNotContains("user-{$client->id}", $threadIds);
+        $this->assertNotContains("user-{$nextOfKin->id}", $threadIds);
+        $this->assertNotContains($client->id, $staffIds);
+        $this->assertNotContains($nextOfKin->id, $staffIds);
+    }
+
     public function test_alert_thread_hidden_and_missing_ids_are_both_not_found(): void
     {
         $missingAlertId = (int) ControlRoomAlert::query()->max('id') + 1000;
@@ -405,6 +558,28 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
             'initiated_by_user_id' => $this->operator->id,
             'sent_at' => now(),
         ], $attributes));
+    }
+
+    /**
+     * @return array{0: User, 1: User}
+     */
+    private function portalTargetsWithDirectMessages(): array
+    {
+        $client = $this->siteBoundUser($this->visibleSite, [], 'client', 'Legacy Client Target');
+        $nextOfKin = $this->siteBoundUser($this->visibleSite, [], 'next_of_kin', 'Legacy Next of Kin Target');
+
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $client->id,
+            'content' => 'Client portal direct message',
+        ]);
+        $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $nextOfKin->id,
+            'content' => 'Next of kin portal direct message',
+        ]);
+
+        return [$client, $nextOfKin];
     }
 
     private function siteBoundUser(

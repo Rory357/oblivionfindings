@@ -29,35 +29,39 @@ class ControlRoomMessagingController extends Controller
         $siteAccess = $this->siteAccess();
         $bypassPermissions = $this->alertBypassPermissions();
 
-        // Build alert-linked threads: group by alert_id where alert_id is not null
-        $alertThreads = Communication::query()
+        $rankedAlertCommunications = Communication::query()
             ->whereNotNull('alert_id')
             ->whereHas('alert', fn (Builder $alertQuery) => $siteAccess->applyAlertScope(
                 $alertQuery,
                 $user,
                 $bypassPermissions,
             ))
-            ->select(
-                'alert_id',
-                DB::raw('MAX(id) as last_message_id'),
-                DB::raw('MAX(sent_at) as last_message_at'),
-                DB::raw("SUM(CASE WHEN direction = 'inbound' AND delivered_at IS NULL THEN 1 ELSE 0 END) as unread_count"),
-                DB::raw('COUNT(*) as message_count'),
-            )
-            ->groupBy('alert_id')
-            ->orderByDesc('last_message_at')
+            ->select([
+                'control_room_communications.id',
+                'control_room_communications.alert_id',
+                'control_room_communications.content',
+                'control_room_communications.sent_at',
+            ])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY alert_id ORDER BY sent_at DESC, id DESC) as thread_rank')
+            ->selectRaw('COUNT(*) OVER (PARTITION BY alert_id) as message_count')
+            ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND delivered_at IS NULL THEN 1 ELSE 0 END) OVER (PARTITION BY alert_id) as unread_count");
+
+        $alertThreads = DB::query()
+            ->fromSub($rankedAlertCommunications->toBase(), 'ranked_alert_communications')
+            ->where('thread_rank', 1)
+            ->orderByDesc('sent_at')
+            ->orderByDesc('id')
             ->get();
 
-        $alertLastMessages = Communication::query()
-            ->with('alert:id,alert_type')
-            ->whereIn('id', $alertThreads->pluck('last_message_id'))
+        $alertsById = ControlRoomAlert::query()
+            ->select('id', 'alert_type')
+            ->whereIn('id', $alertThreads->pluck('alert_id'))
             ->get()
             ->keyBy('id');
 
         $alertThreadData = [];
         foreach ($alertThreads as $thread) {
-            $lastMessage = $alertLastMessages->get($thread->last_message_id);
-            $alert = $lastMessage?->alert;
+            $alert = $alertsById->get($thread->alert_id);
 
             $alertThreadData[] = [
                 'id' => 'alert-'.$thread->alert_id,
@@ -65,43 +69,48 @@ class ControlRoomMessagingController extends Controller
                 'alert_id' => $thread->alert_id,
                 'user_id' => null,
                 'title' => $alert ? ucfirst(str_replace('_', ' ', $alert->alert_type)).' #'.$alert->id : 'Alert #'.$thread->alert_id,
-                'last_message' => $lastMessage ? substr($lastMessage->content, 0, 80) : '',
-                'last_message_at' => $thread->last_message_at,
+                'last_message' => substr((string) $thread->content, 0, 80),
+                'last_message_at' => $thread->sent_at,
                 'unread_count' => (int) $thread->unread_count,
                 'message_count' => (int) $thread->message_count,
+                '_latest_message_id' => (int) $thread->id,
             ];
         }
 
-        // Build direct message threads: group by target_user_id where alert_id is null
-        $directThreads = Communication::query()
+        $rankedDirectCommunications = Communication::query()
             ->whereNull('alert_id')
             ->whereNotNull('target_user_id')
-            ->whereHas('targetUser', fn (Builder $targetUserQuery) => $siteAccess->applyStaffScope(
-                $targetUserQuery,
-                $user,
-                $bypassPermissions,
-            ))
-            ->select(
-                'target_user_id',
-                DB::raw('MAX(id) as last_message_id'),
-                DB::raw('MAX(sent_at) as last_message_at'),
-                DB::raw("SUM(CASE WHEN direction = 'inbound' AND delivered_at IS NULL THEN 1 ELSE 0 END) as unread_count"),
-                DB::raw('COUNT(*) as message_count'),
-            )
-            ->groupBy('target_user_id')
-            ->orderByDesc('last_message_at')
+            ->whereHas('targetUser', function (Builder $targetUserQuery) use ($siteAccess, $user, $bypassPermissions): void {
+                $targetUserQuery->staff();
+                $siteAccess->applyStaffScope($targetUserQuery, $user, $bypassPermissions);
+            })
+            ->select([
+                'control_room_communications.id',
+                'control_room_communications.target_user_id',
+                'control_room_communications.content',
+                'control_room_communications.sent_at',
+            ])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY target_user_id ORDER BY sent_at DESC, id DESC) as thread_rank')
+            ->selectRaw('COUNT(*) OVER (PARTITION BY target_user_id) as message_count')
+            ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND delivered_at IS NULL THEN 1 ELSE 0 END) OVER (PARTITION BY target_user_id) as unread_count");
+
+        $directThreads = DB::query()
+            ->fromSub($rankedDirectCommunications->toBase(), 'ranked_direct_communications')
+            ->where('thread_rank', 1)
+            ->orderByDesc('sent_at')
+            ->orderByDesc('id')
             ->get();
 
-        $directLastMessages = Communication::query()
-            ->with('targetUser:id,name')
-            ->whereIn('id', $directThreads->pluck('last_message_id'))
+        $targetUsersById = User::query()
+            ->staff()
+            ->select('id', 'name')
+            ->whereIn('id', $directThreads->pluck('target_user_id'))
             ->get()
             ->keyBy('id');
 
         $directThreadData = [];
         foreach ($directThreads as $thread) {
-            $lastMessage = $directLastMessages->get($thread->last_message_id);
-            $targetUser = $lastMessage?->targetUser;
+            $targetUser = $targetUsersById->get($thread->target_user_id);
 
             $directThreadData[] = [
                 'id' => 'user-'.$thread->target_user_id,
@@ -109,16 +118,27 @@ class ControlRoomMessagingController extends Controller
                 'alert_id' => null,
                 'user_id' => $thread->target_user_id,
                 'title' => $targetUser?->name ?? 'Unknown User',
-                'last_message' => $lastMessage ? substr($lastMessage->content, 0, 80) : '',
-                'last_message_at' => $thread->last_message_at,
+                'last_message' => substr((string) $thread->content, 0, 80),
+                'last_message_at' => $thread->sent_at,
                 'unread_count' => (int) $thread->unread_count,
                 'message_count' => (int) $thread->message_count,
+                '_latest_message_id' => (int) $thread->id,
             ];
         }
 
-        // Merge and sort by last message time
         $threads = collect(array_merge($alertThreadData, $directThreadData))
-            ->sortByDesc('last_message_at')
+            ->sort(function (array $left, array $right): int {
+                $timeOrder = strcmp((string) $right['last_message_at'], (string) $left['last_message_at']);
+
+                return $timeOrder !== 0
+                    ? $timeOrder
+                    : $right['_latest_message_id'] <=> $left['_latest_message_id'];
+            })
+            ->map(function (array $thread): array {
+                unset($thread['_latest_message_id']);
+
+                return $thread;
+            })
             ->values()
             ->all();
 
