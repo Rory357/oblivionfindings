@@ -77,18 +77,20 @@ class IncidentJourneyService
                 ->firstOrFail();
 
             $incident = $this->lockedIncidentForAlert($lockedAlert);
-            $attributes = $this->incidentAttributes($lockedAlert, $incident, $input, $actor);
 
             if ($incident === null) {
+                $attributes = $this->incidentAttributes($lockedAlert, null, $input, $actor);
                 $incident = ClientIncident::withoutEvents(
                     fn () => ClientIncident::query()->create($attributes),
                 );
-            } else {
+            } elseif ($incident->status === 'draft') {
+                $attributes = $this->incidentAttributes($lockedAlert, $incident, $input, $actor);
                 $incident->forceFill($attributes)->saveQuietly();
                 $incident->refresh();
             }
 
             $hsEvent = $this->lockedOrCreatedHsEvent($incident, $actor);
+            $this->assertHsTupleCanBeCanonicalised($incident, $hsEvent);
 
             $this->assertJourneyLinksDoNotConflict($incident, $lockedAlert, $hsEvent);
             $this->linkJourney($incident, $lockedAlert, $hsEvent, $actor, [
@@ -110,6 +112,7 @@ class IncidentJourneyService
             $this->assertSubmitted($lockedIncident);
 
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
+            $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
             $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent);
             $alertReason = $alert === null
                 ? 'Automatic high-severity incident escalation'
@@ -152,6 +155,7 @@ class IncidentJourneyService
             $this->assertSubmitted($lockedIncident);
 
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
+            $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
             $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent)
                 ?? $this->createIncidentAlert($lockedIncident, $actor, $reason);
 
@@ -268,14 +272,16 @@ class IncidentJourneyService
             ? HsEvent::SEVERITY_CRITICAL
             : ($safe['severity'] ?? $incident?->severity ?? $alert->severity ?? HsEvent::SEVERITY_LOW);
         $normalisedSeverity = HsEventService::normaliseSeverity((string) $requestedSeverity);
+        $incidentSource = $this->incidentSourceForAlert($alert);
 
         $inputMetadata = is_array($safe['metadata'] ?? null) ? $safe['metadata'] : [];
         $existingMetadata = is_array($incident?->metadata) ? $incident->metadata : [];
         $metadata = array_replace($inputMetadata, $existingMetadata);
         $existingJourney = is_array($metadata['journey'] ?? null) ? $metadata['journey'] : [];
         $metadata['journey'] = array_replace($existingJourney, [
-            'source' => 'control_room_alert',
+            'source' => $incidentSource === 'sensor' ? 'sensor_signal' : 'control_room_alert',
             'control_room_alert_id' => $alert->id,
+            'original_alert_source' => $existingJourney['original_alert_source'] ?? $alert->source,
             'original_alert_severity' => $alert->severity,
             'submitted_by_user_id' => $actor->id,
         ]);
@@ -300,7 +306,7 @@ class IncidentJourneyService
                 : ($incident?->description ?? data_get($alert->context, 'description') ?? $alert->notes),
             'occurred_at' => $safe['occurred_at'] ?? $incident?->occurred_at ?? $alert->triggered_at,
             'metadata' => $metadata,
-            'source' => 'control_room',
+            'source' => $incidentSource,
             'status' => 'submitted',
             'submitted_at' => $incident?->submitted_at ?? now(),
             'reported_by' => $actor->id,
@@ -315,6 +321,11 @@ class IncidentJourneyService
         return str_starts_with($type, 'incident.')
             ? substr($type, strlen('incident.'))
             : $type;
+    }
+
+    private function incidentSourceForAlert(ControlRoomAlert $alert): string
+    {
+        return $alert->signals()->exists() ? 'sensor' : 'control_room';
     }
 
     private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
@@ -499,13 +510,21 @@ class IncidentJourneyService
         ?User $actor,
         array $alertContext,
     ): void {
+        $mayAdoptIncidentWorksafe = $incident->hs_event_id === null
+            || ! $this->hsTupleIsCanonical($incident, $hsEvent);
         $incidentLinks = ['hs_event_id' => $hsEvent->id];
         if ($alert !== null) {
             $incidentLinks['control_room_alert_id'] = $alert->id;
         }
         $incident->forceFill($incidentLinks)->saveQuietly();
 
-        $this->synchroniseHsEvent($hsEvent, $incident, $alert, $actor);
+        $this->synchroniseHsEvent(
+            $hsEvent,
+            $incident,
+            $alert,
+            $actor,
+            $mayAdoptIncidentWorksafe,
+        );
 
         if ($alert !== null) {
             $context = array_replace((array) $alert->context, $alertContext, [
@@ -520,34 +539,91 @@ class IncidentJourneyService
         ClientIncident $incident,
         ?ControlRoomAlert $alert,
         ?User $actor,
+        bool $mayAdoptIncidentWorksafe,
     ): void {
         $severity = $this->higherSeverity($hsEvent->severity, $this->hsSeverity($incident));
-        $notifiable = (bool) $incident->is_notifiable;
-        $worksafeStatus = $notifiable
-            ? ($incident->worksafe_notification_status ?: HsEvent::WORKSAFE_PENDING)
-            : null;
+        $worksafe = $this->canonicalWorksafeValues(
+            $hsEvent,
+            $incident,
+            $mayAdoptIncidentWorksafe,
+        );
         $handoverStatus = $hsEvent->handover_status === HsEvent::HANDOVER_ACCEPTED
             ? HsEvent::HANDOVER_ACCEPTED
             : HsEvent::HANDOVER_AWAITING_ACCEPTANCE;
+        $hsTuple = $this->canonicalHsTuple($incident);
 
         $hsEvent->forceFill([
+            ...$hsTuple,
             'severity' => $severity,
             'site_id' => $this->incidentSiteId($incident),
             'client_id' => $incident->client_id,
             'staff_id' => $incident->reported_by,
             'shift_id' => $incident->shift_id,
-            'worksafe_notifiable' => $notifiable,
-            'worksafe_status' => $worksafeStatus,
-            'worksafe_reference' => $incident->worksafe_reference,
-            'worksafe_notified_at' => $incident->worksafe_notified_at,
-            'worksafe_site_preserved' => (bool) $incident->site_preserved,
+            ...$worksafe,
             'investigation_required' => (bool) $hsEvent->investigation_required
-                || $notifiable
+                || $worksafe['worksafe_notifiable']
                 || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true),
             'control_room_alert_id' => $alert?->id ?? $hsEvent->control_room_alert_id,
             'handover_status' => $handoverStatus,
             'owner_user_id' => $hsEvent->owner_user_id ?? $actor?->id ?? $incident->reported_by,
         ])->saveQuietly();
+    }
+
+    /**
+     * H&S becomes authoritative once the direct incident link is canonical.
+     * Before that first link/adoption, legacy incident values may only fill gaps
+     * or promote progress; they never demote or overwrite H&S state.
+     *
+     * @return array<string, mixed>
+     */
+    private function canonicalWorksafeValues(
+        HsEvent $hsEvent,
+        ClientIncident $incident,
+        bool $mayAdoptIncidentWorksafe,
+    ): array {
+        if (! $mayAdoptIncidentWorksafe) {
+            return [
+                'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
+                'worksafe_status' => $hsEvent->worksafe_status,
+                'worksafe_reference' => $hsEvent->worksafe_reference,
+                'worksafe_notified_at' => $hsEvent->worksafe_notified_at,
+                'worksafe_method' => $hsEvent->worksafe_method,
+                'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at,
+                'worksafe_site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
+            ];
+        }
+
+        $notifiable = (bool) $hsEvent->worksafe_notifiable || (bool) $incident->is_notifiable;
+        $incidentStatus = $incident->is_notifiable
+            ? ($incident->worksafe_notification_status ?: HsEvent::WORKSAFE_PENDING)
+            : null;
+
+        return [
+            'worksafe_notifiable' => $notifiable,
+            'worksafe_status' => $notifiable
+                ? $this->higherWorksafeStatus($hsEvent->worksafe_status, $incidentStatus)
+                : $hsEvent->worksafe_status,
+            'worksafe_reference' => $hsEvent->worksafe_reference ?: $incident->worksafe_reference,
+            'worksafe_notified_at' => $hsEvent->worksafe_notified_at ?? $incident->worksafe_notified_at,
+            'worksafe_method' => $hsEvent->worksafe_method,
+            'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at,
+            'worksafe_site_preserved' => (bool) $hsEvent->worksafe_site_preserved
+                || (bool) $incident->site_preserved,
+        ];
+    }
+
+    private function higherWorksafeStatus(?string $current, ?string $candidate): ?string
+    {
+        $rank = [
+            null => 0,
+            HsEvent::WORKSAFE_PENDING => 1,
+            HsEvent::WORKSAFE_NOTIFIED => 2,
+            HsEvent::WORKSAFE_ACKNOWLEDGED => 3,
+        ];
+
+        return ($rank[$current] ?? 0) >= ($rank[$candidate] ?? 0)
+            ? $current
+            : $candidate;
     }
 
     /** @return array<string, mixed> */
@@ -573,6 +649,54 @@ class IncidentJourneyService
             [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL],
             true,
         );
+    }
+
+    private function assertHsTupleCanBeCanonicalised(ClientIncident $incident, HsEvent $hsEvent): void
+    {
+        if ($this->hsTupleIsCanonical($incident, $hsEvent)) {
+            return;
+        }
+
+        $tuple = $this->canonicalHsTuple($incident);
+        $conflict = HsEvent::query()
+            ->where('id', '!=', $hsEvent->id)
+            ->where(function ($query) use ($tuple): void {
+                $query->where('idempotency_key', $tuple['idempotency_key'])
+                    ->orWhere(function ($sourceQuery) use ($tuple): void {
+                        $sourceQuery
+                            ->where('source_type', $tuple['source_type'])
+                            ->where('source_id', $tuple['source_id']);
+                    });
+            })
+            ->lockForUpdate()
+            ->first();
+
+        if ($conflict !== null) {
+            throw new \DomainException(
+                'Incident journey conflict: another H&S event already owns the canonical incident tuple.',
+            );
+        }
+    }
+
+    /** @return array{source_type: class-string<ClientIncident>, source_id: int, event_category: string, idempotency_key: string} */
+    private function canonicalHsTuple(ClientIncident $incident): array
+    {
+        return [
+            'source_type' => ClientIncident::class,
+            'source_id' => (int) $incident->id,
+            'event_category' => $this->hsCategory($incident),
+            'idempotency_key' => $this->hsIdempotencyKey($incident),
+        ];
+    }
+
+    private function hsTupleIsCanonical(ClientIncident $incident, HsEvent $hsEvent): bool
+    {
+        $tuple = $this->canonicalHsTuple($incident);
+
+        return $hsEvent->source_type === $tuple['source_type']
+            && (int) $hsEvent->source_id === $tuple['source_id']
+            && $hsEvent->event_category === $tuple['event_category']
+            && $hsEvent->idempotency_key === $tuple['idempotency_key'];
     }
 
     private function hsCategory(ClientIncident $incident): string

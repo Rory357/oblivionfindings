@@ -7,6 +7,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Shift;
@@ -16,6 +17,7 @@ use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -170,6 +172,162 @@ class IncidentJourneyServiceTest extends TestCase
         );
         $this->assertSame('metadata', $journey->incident->fresh()->metadata['original']);
         $this->assertSame('context', $journey->alert->fresh()->context['original']);
+    }
+
+    public function test_reviewed_and_closed_incident_retries_are_link_only_and_preserve_the_record(): void
+    {
+        foreach (['reviewed', 'closed'] as $status) {
+            $actor = User::factory()->create();
+            $reporter = User::factory()->create();
+            $reviewer = User::factory()->create();
+            $closer = User::factory()->create();
+            $site = Site::factory()->create();
+            $client = Client::factory()->create(['site_id' => $site->id]);
+            $submittedAt = now()->subDays(3);
+            $reviewedAt = now()->subDays(2);
+            $closedAt = $status === 'closed' ? now()->subDay() : null;
+            $occurredAt = now()->subDays(4);
+            $incident = $this->incidentWithoutEvents([
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'reported_by' => $reporter->id,
+                'type' => 'medication_error',
+                'source' => 'sensor',
+                'severity' => 'medium',
+                'status' => $status,
+                'submitted_at' => $submittedAt,
+                'occurred_at' => $occurredAt,
+                'title' => 'Canonical existing title',
+                'description' => 'Canonical existing facts.',
+                'immediate_action_taken' => 'Canonical immediate controls.',
+                'witnesses' => 'Canonical witness.',
+                'reviewed_by' => $reviewer->id,
+                'reviewed_at' => $reviewedAt,
+                'review_notes' => 'Canonical review notes.',
+                'closed_by' => $closer->id,
+                'closed_at' => $closedAt,
+                'closed_outcome' => $status === 'closed' ? 'Controls verified' : null,
+                'closed_notes' => $status === 'closed' ? 'Canonical closure notes.' : null,
+                'metadata' => [
+                    'journey' => [
+                        'source' => 'sensor_detection',
+                        'original_alert_source' => 'personal_tracker',
+                    ],
+                    'canonical' => 'keep',
+                ],
+            ]);
+            $alert = ControlRoomAlert::factory()->triaging()->create([
+                'source' => 'manual',
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'context' => ['incident_id' => $incident->id, 'keep' => $status],
+                'notes' => 'Operational notes stay unchanged.',
+            ]);
+            $preservedFields = [
+                'status',
+                'source',
+                'reported_by',
+                'submitted_at',
+                'reviewed_by',
+                'reviewed_at',
+                'review_notes',
+                'closed_by',
+                'closed_at',
+                'closed_outcome',
+                'closed_notes',
+                'type',
+                'severity',
+                'occurred_at',
+                'title',
+                'description',
+                'immediate_action_taken',
+                'witnesses',
+            ];
+            $incident = $incident->fresh();
+            $before = Arr::only($incident->getAttributes(), $preservedFields);
+            $metadataBefore = $incident->metadata;
+
+            $journey = app(IncidentJourneyService::class)->submitFromAlert(
+                $alert,
+                $this->incidentInput($client, $site, [
+                    'type' => 'fall',
+                    'severity' => 'high',
+                    'title' => 'Retry must not replace title',
+                    'description' => 'Retry must not replace facts.',
+                    'immediate_action_taken' => 'Retry must not replace controls.',
+                    'witnesses' => 'Retry must not replace witnesses.',
+                    'occurred_at' => now(),
+                    'metadata' => ['canonical' => 'replace-attempt'],
+                    'source' => 'control_room',
+                ]),
+                $actor,
+            );
+
+            $this->assertEquals(
+                $before,
+                Arr::only($journey->incident->fresh()->getAttributes(), $preservedFields),
+                "{$status} incident was mutated by retry",
+            );
+            $this->assertSame($metadataBefore, $journey->incident->fresh()->metadata);
+            $this->assertSame($alert->id, $journey->incident->control_room_alert_id);
+            $this->assertSame($journey->hsEvent->id, $journey->incident->hs_event_id);
+            $this->assertSame($incident->id, $alert->fresh()->context['incident_id']);
+            $this->assertSame($status, $alert->fresh()->context['keep']);
+        }
+
+        $this->assertDatabaseCount('client_incidents', 2);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+        $this->assertDatabaseCount('hs_events', 2);
+    }
+
+    public function test_sensor_signal_provenance_is_derived_from_the_alert_and_stable_on_retry(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'source' => 'personal_tracker',
+            'alert_type' => 'sensor.fall_detected',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => ['device_event' => 'fall'],
+        ]);
+        Signal::create([
+            'alert_id' => $alert->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'signal_type_code' => 'fall_detected',
+            'severity_hint' => 'high',
+            'occurred_at' => now()->subMinutes(5),
+            'payload' => ['confidence' => 0.96],
+            'status' => 'processed',
+        ]);
+
+        $first = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, ['source' => 'manual']),
+            $actor,
+        );
+        $second = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert->fresh(),
+            $this->incidentInput($client, $site, ['source' => 'control_room']),
+            $actor,
+        );
+
+        $this->assertTrue($second->incident->is($first->incident));
+        $this->assertSame('personal_tracker', $alert->fresh()->source);
+        $this->assertSame('sensor', $first->incident->fresh()->source);
+        $this->assertSame('sensor', $second->incident->fresh()->source);
+        $this->assertSame(
+            'personal_tracker',
+            $second->incident->fresh()->metadata['journey']['original_alert_source'],
+        );
+        $this->assertSame($alert->id, $second->incident->control_room_alert_id);
+        $this->assertSame($second->hsEvent->id, $second->incident->hs_event_id);
+        $this->assertSame($alert->id, $second->hsEvent->control_room_alert_id);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
     }
 
     public function test_draft_ensure_is_rejected_without_any_journey_writes(): void
@@ -374,7 +532,69 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('hs_events', 2);
     }
 
-    public function test_direct_links_beat_conflicting_legacy_context_and_idempotency_candidates(): void
+    public function test_linked_acknowledged_hs_event_is_authoritative_over_stale_incident_worksafe_fields(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => ['keep' => 'alert-context'],
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'control_room_alert_id' => $alert->id,
+            'is_notifiable' => false,
+            'worksafe_notification_status' => HsEvent::WORKSAFE_PENDING,
+            'worksafe_reference' => 'WS-STALE-INCIDENT',
+            'worksafe_notified_at' => now()->subDays(5),
+            'site_preserved' => false,
+        ]);
+        $notifiedAt = now()->subDays(2);
+        $acknowledgedAt = now()->subDay();
+        $hsEvent = HsEvent::factory()->forClientIncident($incident)->create([
+            'control_room_alert_id' => $alert->id,
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_reference' => 'WS-CANONICAL-42',
+            'worksafe_notified_at' => $notifiedAt,
+            'worksafe_method' => 'online',
+            'worksafe_acknowledged_at' => $acknowledgedAt,
+            'worksafe_site_preserved' => true,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $hsEvent->id]);
+        $worksafeFields = [
+            'worksafe_notifiable',
+            'worksafe_status',
+            'worksafe_reference',
+            'worksafe_notified_at',
+            'worksafe_method',
+            'worksafe_acknowledged_at',
+            'worksafe_site_preserved',
+        ];
+        $before = Arr::only($hsEvent->fresh()->getAttributes(), $worksafeFields);
+
+        $journey = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'is_notifiable' => false,
+                'worksafe_notification_status' => null,
+                'worksafe_reference' => null,
+                'worksafe_notified_at' => null,
+                'site_preserved' => false,
+            ]),
+            $actor,
+        );
+
+        $this->assertTrue($journey->hsEvent->is($hsEvent));
+        $this->assertSame($before, Arr::only($hsEvent->fresh()->getAttributes(), $worksafeFields));
+        $this->assertSame($incident->id, $alert->fresh()->context['incident_id']);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    public function test_direct_links_beat_legacy_context_and_repair_a_safe_hs_tuple(): void
     {
         $actor = User::factory()->create();
         $site = Site::factory()->create();
@@ -398,9 +618,6 @@ class IncidentJourneyServiceTest extends TestCase
             'site_id' => $site->id,
             'context' => ['incident_id' => $incident->id, 'legacy' => true],
         ]);
-        $legacyEvent = HsEvent::factory()->forClientIncident($incident)->create([
-            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
-        ]);
 
         $readJourney = app(IncidentJourneyService::class)->journeyForIncident($incident);
         $this->assertTrue($readJourney->alert->is($directAlert));
@@ -413,11 +630,71 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($incident->id, $directAlert->fresh()->context['incident_id']);
         $this->assertSame('direct-context', $directAlert->fresh()->context['keep']);
         $this->assertEquals(['incident_id' => $incident->id, 'legacy' => true], $legacyAlert->fresh()->context);
-        $this->assertSame(HsEvent::HANDOVER_NOT_REQUIRED, $legacyEvent->fresh()->handover_status);
-        $this->assertNull($legacyEvent->fresh()->control_room_alert_id);
+        $this->assertSame(ClientIncident::class, $directEvent->fresh()->source_type);
+        $this->assertSame($incident->id, $directEvent->fresh()->source_id);
+        $this->assertSame(HsEvent::CATEGORY_INCIDENT, $directEvent->fresh()->event_category);
+        $this->assertSame(
+            HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, HsEvent::CATEGORY_INCIDENT),
+            $directEvent->fresh()->idempotency_key,
+        );
         $this->assertTrue($directAlert->fresh()->clientIncident->is($incident));
         $this->assertTrue($directAlert->fresh()->hsEvent->is($directEvent));
         $this->assertDatabaseCount('control_room_alerts', 2);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
+    public function test_direct_hs_tuple_conflict_throws_before_any_partial_journey_write(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => ['keep' => 'alert-context'],
+        ]);
+        $directEvent = HsEvent::factory()->create([
+            'control_room_alert_id' => $alert->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+            'control_room_alert_id' => $alert->id,
+            'hs_event_id' => $directEvent->id,
+            'metadata' => ['keep' => 'incident-metadata'],
+        ]);
+        $canonicalEvent = HsEvent::factory()->forClientIncident($incident)->create([
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $incidentBefore = $incident->only(['control_room_alert_id', 'hs_event_id', 'metadata']);
+        $alertBefore = $alert->only(['status', 'source', 'notes', 'context']);
+        $directBefore = $directEvent->only([
+            'source_type',
+            'source_id',
+            'event_category',
+            'idempotency_key',
+            'control_room_alert_id',
+            'handover_status',
+        ]);
+
+        $exception = null;
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+        } catch (\DomainException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertNotNull($exception);
+        $this->assertStringContainsString('conflict', strtolower($exception->getMessage()));
+        $this->assertSame($incidentBefore, $incident->fresh()->only(array_keys($incidentBefore)));
+        $this->assertSame($alertBefore, $alert->fresh()->only(array_keys($alertBefore)));
+        $this->assertSame($directBefore, $directEvent->fresh()->only(array_keys($directBefore)));
+        $this->assertSame(
+            HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, HsEvent::CATEGORY_INCIDENT),
+            $canonicalEvent->fresh()->idempotency_key,
+        );
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 2);
     }
 
