@@ -148,14 +148,26 @@
 
 ## Integration and deployment
 
-- Latest upstream reconciliation: pending
-- Feature commit(s): pending
-- Merge commit: pending
-- Local `main`: pending
+- Latest upstream reconciliation: fetched `origin/main` at `0dff98b787525c67a004830e233f37530c87166b`; merge-tree inspection found no conflicts and preserved the five intervening Fleet commits.
+- Feature commit(s): `19892c89`, `e2958ca0`, `e75047ab`, `abd84351`, `50b27bf9`, `42b7c743`, `3f9885c1`, `20222781`, and review-clearance ledger `8a1190ee`.
+- Merge commit: `ee87852ef1139d55f8343027977eef817752e618` (`Merge Client Profile and HR live gap closeout`).
+- Local `main`: `ee87852ef1139d55f8343027977eef817752e618` before this release-candidate ledger commit; clean and 11 commits ahead of `origin/main`.
 - `origin/main`: pending
 - `git ls-remote`: pending
 - Deployed SHA: pending
 - Server cleanliness, migrations, manifest, queue, login and logs: pending
+
+### Merged-revision release candidate — 2026-07-12
+
+- Wayfinder regenerated cleanly: `883` routes and `561` actions with no tracked diff. The first TypeScript invocation raced route generation and reported missing generated modules; the post-generation rerun passed.
+- PHP behavior bundle: `HrTeamConfigurationTest`, `HrDemoSeederTest`, `HrCalendarResilienceTest`, `AutoEscalateControlRoomQueuesTest`, and `ShiftTaskProviderTest` passed **18 tests / 136 assertions** in **229.79s**.
+- Client navigation Vitest passed **14/14** in **73.56s**. Changed TypeScript/TSX ESLint passed with zero warnings. PHP syntax passed for all 14 changed PHP files.
+- Production builds passed: client **4,944 modules** in **4m23s** and SSR **1,596 modules** in **1m30s**. TypeScript and `git diff --check` passed.
+- Starting-revision-only format classification remains unchanged: three legacy PHP files retain the documented whole-file Pint findings and four legacy HR UI files retain the documented whole-file Prettier findings; no new formatter failure was introduced.
+- Merged Client alias proof: targeted Chromium desktop **1/1** in **30.4s** with exact synthetic Client rows absent after teardown.
+- Merged HR proof: `tests/e2e/hr-live-gap-closeout.spec.ts` passed **3/3** in **4.0m** on a serial Chromium desktop worker. Exact marker `CODEX-LIVE-HR-GAPS-20260712071119` covered cleanup isolation, the canonical lifecycle matrix, and the five active regression controls including the real timed Timekeeping refresh and `390x844` payroll-card branch.
+- Merged HR cleanup proof: exact marker counts are events `0`, profiles `0`, users `0`, candidates `0`, approval chains `0`, salary bands `0`, payroll runs `0`, audits `0`; `hr/calendar/1/CODEX-LIVE-HR-GAPS-20260712071119.txt` is absent from private storage.
+- Independent review clearance remains current: no Critical or Important findings after the cross-tenant Shift task and Calendar team-filter regressions were fixed and rerun.
 
 ## Final acceptance status
 
