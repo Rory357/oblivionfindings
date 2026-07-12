@@ -152,23 +152,18 @@ class ControlRoomMessagingController extends Controller
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
         $validated = $request->validate([
-            'alert_id' => ['nullable', 'integer', 'required_without:user_id', Rule::prohibitedIf($request->filled('user_id')), 'exists:control_room_alerts,id'],
-            'user_id' => ['nullable', 'integer', 'required_without:alert_id', Rule::prohibitedIf($request->filled('alert_id')), 'exists:users,id'],
+            'alert_id' => ['nullable', 'integer', 'required_without:user_id', Rule::prohibitedIf($request->filled('user_id'))],
+            'user_id' => ['nullable', 'integer', 'required_without:alert_id', Rule::prohibitedIf($request->filled('alert_id'))],
         ]);
 
         $query = Communication::query()
             ->with(['targetUser:id,name', 'initiatedBy:id,name']);
 
         if (filled($validated['alert_id'] ?? null)) {
-            $alert = ControlRoomAlert::query()->findOrFail((int) $validated['alert_id']);
-            $this->assertCanAccessAlert($user, $alert);
+            $alert = $this->resolveAccessibleAlert($user, (int) $validated['alert_id']);
             $query->where('alert_id', $alert->id);
         } else {
-            $targetUser = $this->assertCanAccessStaff(
-                $user,
-                (int) $validated['user_id'],
-                'You are not authorized to access messages for that staff member.',
-            );
+            $targetUser = $this->resolveAccessibleStaff($user, (int) $validated['user_id']);
             $query->whereNull('alert_id')
                 ->where('target_user_id', $targetUser->id);
         }
@@ -202,25 +197,25 @@ class ControlRoomMessagingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
-        $validated = $request->validate([
-            'content' => ['required', 'string', 'max:2000'],
-            'alert_id' => ['nullable', 'integer', 'exists:control_room_alerts,id'],
-            'target_user_id' => ['required', 'integer', 'exists:users,id'],
+        $alertIdentifier = $request->validate([
+            'alert_id' => ['nullable', 'integer'],
         ]);
 
-        if (filled($validated['alert_id'] ?? null)) {
-            $alert = ControlRoomAlert::query()->findOrFail((int) $validated['alert_id']);
-            $this->assertCanAccessAlert($user, $alert);
-        }
+        $alert = filled($alertIdentifier['alert_id'] ?? null)
+            ? $this->resolveAccessibleAlert($user, (int) $alertIdentifier['alert_id'])
+            : null;
 
-        $targetUser = $this->assertCanAccessStaff(
-            $user,
-            (int) $validated['target_user_id'],
-            'You are not authorized to message that staff member.',
-        );
+        $targetIdentifier = $request->validate([
+            'target_user_id' => ['required', 'integer'],
+        ]);
+        $targetUser = $this->resolveAccessibleStaff($user, (int) $targetIdentifier['target_user_id']);
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:2000'],
+        ]);
 
         $communication = Communication::create([
-            'alert_id' => $validated['alert_id'] ?? null,
+            'alert_id' => $alert?->id,
             'channel' => 'in_app',
             'direction' => 'outbound',
             'purpose' => 'update',
@@ -232,8 +227,8 @@ class ControlRoomMessagingController extends Controller
         ]);
 
         AuditLogger::log('controlRoom.messaging.sent', $communication, [
-            'target_user_id' => $validated['target_user_id'],
-            'alert_id' => $validated['alert_id'] ?? null,
+            'target_user_id' => $targetUser->id,
+            'alert_id' => $alert?->id,
         ]);
 
         return response()->json([
@@ -257,17 +252,7 @@ class ControlRoomMessagingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
-        if ($communication->alert_id) {
-            $communication->loadMissing('alert');
-            abort_unless($communication->alert, 403);
-            $this->assertCanAccessAlert($user, $communication->alert);
-        } else {
-            $this->assertCanAccessStaff(
-                $user,
-                (int) $communication->target_user_id,
-                'You are not authorized to access messages for that staff member.',
-            );
-        }
+        $communication = $this->resolveAccessibleCommunication($user, $communication);
 
         if (! $communication->delivered_at) {
             $communication->update([
@@ -276,5 +261,49 @@ class ControlRoomMessagingController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    private function resolveAccessibleAlert(User $user, int $alertId): ControlRoomAlert
+    {
+        $query = ControlRoomAlert::query()->whereKey($alertId);
+        $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
+
+        return $query->firstOrFail();
+    }
+
+    private function resolveAccessibleStaff(User $user, int $staffUserId): User
+    {
+        return $this->accessibleStaffQuery($user)
+            ->whereKey($staffUserId)
+            ->firstOrFail();
+    }
+
+    private function resolveAccessibleCommunication(User $user, Communication $communication): Communication
+    {
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
+
+        return Communication::query()
+            ->whereKey($communication->id)
+            ->where(function (Builder $query) use ($user, $siteAccess, $bypassPermissions): void {
+                $query->where(function (Builder $alertCommunicationQuery) use ($user, $siteAccess, $bypassPermissions): void {
+                    $alertCommunicationQuery
+                        ->whereNotNull('alert_id')
+                        ->whereHas('alert', fn (Builder $alertQuery) => $siteAccess->applyAlertScope(
+                            $alertQuery,
+                            $user,
+                            $bypassPermissions,
+                        ));
+                })->orWhere(function (Builder $directCommunicationQuery) use ($user, $siteAccess, $bypassPermissions): void {
+                    $directCommunicationQuery
+                        ->whereNull('alert_id')
+                        ->whereNotNull('target_user_id')
+                        ->whereHas('targetUser', function (Builder $targetUserQuery) use ($user, $siteAccess, $bypassPermissions): void {
+                            $targetUserQuery->staff();
+                            $siteAccess->applyStaffScope($targetUserQuery, $user, $bypassPermissions);
+                        });
+                });
+            })
+            ->firstOrFail();
     }
 }

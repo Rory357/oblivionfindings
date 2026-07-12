@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ControlRoomMessagingAuthorizationTest extends TestCase
@@ -131,20 +132,36 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
         $this->assertStringNotContainsString('Hidden Support Worker', $encodedProps);
     }
 
-    public function test_other_site_alert_thread_is_denied_before_messages_are_returned(): void
+    public function test_alert_thread_hidden_and_missing_ids_are_both_not_found(): void
     {
-        $this->actingAs($this->operator)
-            ->getJson("/control-room/messaging/thread?alert_id={$this->hiddenAlert->id}")
-            ->assertForbidden()
+        $missingAlertId = (int) ControlRoomAlert::query()->max('id') + 1000;
+
+        $hiddenResponse = $this->actingAs($this->operator)
+            ->getJson("/control-room/messaging/thread?alert_id={$this->hiddenAlert->id}");
+        $missingResponse = $this->actingAs($this->operator)
+            ->getJson("/control-room/messaging/thread?alert_id={$missingAlertId}");
+
+        $hiddenResponse
+            ->assertNotFound()
             ->assertJsonMissing(['content' => 'Hidden alert message']);
+        $missingResponse->assertNotFound();
+        $this->assertSame($hiddenResponse->status(), $missingResponse->status());
     }
 
-    public function test_other_site_direct_user_thread_is_denied(): void
+    public function test_direct_thread_hidden_and_missing_user_ids_are_both_not_found(): void
     {
-        $this->actingAs($this->operator)
-            ->getJson("/control-room/messaging/thread?user_id={$this->hiddenStaff->id}")
-            ->assertForbidden()
+        $missingUserId = (int) User::query()->max('id') + 1000;
+
+        $hiddenResponse = $this->actingAs($this->operator)
+            ->getJson("/control-room/messaging/thread?user_id={$this->hiddenStaff->id}");
+        $missingResponse = $this->actingAs($this->operator)
+            ->getJson("/control-room/messaging/thread?user_id={$missingUserId}");
+
+        $hiddenResponse
+            ->assertNotFound()
             ->assertJsonMissing(['content' => 'Hidden direct message']);
+        $missingResponse->assertNotFound();
+        $this->assertSame($hiddenResponse->status(), $missingResponse->status());
     }
 
     public function test_send_rejects_other_site_alerts_and_inaccessible_target_users_without_writes(): void
@@ -152,38 +169,156 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
         $communicationCount = Communication::query()->count();
         $auditCount = DB::table('audit_logs')->count();
 
-        $this->actingAs($this->operator)
+        $hiddenAlertResponse = $this->actingAs($this->operator)
             ->postJson('/control-room/messaging/send', [
                 'content' => 'Must not reach a hidden alert',
                 'alert_id' => $this->hiddenAlert->id,
                 'target_user_id' => $this->visibleStaff->id,
-            ])
-            ->assertForbidden();
+            ]);
 
-        $this->actingAs($this->operator)
+        $hiddenTargetResponse = $this->actingAs($this->operator)
             ->postJson('/control-room/messaging/send', [
                 'content' => 'Must not reach hidden staff',
                 'alert_id' => $this->visibleAlert->id,
                 'target_user_id' => $this->hiddenStaff->id,
+            ]);
+
+        $this->assertSame($communicationCount, Communication::query()->count());
+        $this->assertSame($auditCount, DB::table('audit_logs')->count());
+        $hiddenAlertResponse->assertNotFound();
+        $hiddenTargetResponse->assertNotFound();
+    }
+
+    public function test_hidden_and_missing_alerts_resolve_before_invalid_send_content_is_validated(): void
+    {
+        $missingAlertId = (int) ControlRoomAlert::query()->max('id') + 1000;
+        $communicationCount = Communication::query()->count();
+        $auditCount = DB::table('audit_logs')->count();
+
+        $hiddenResponse = $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $this->hiddenAlert->id,
+                'target_user_id' => $this->visibleStaff->id,
+            ]);
+        $missingResponse = $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $missingAlertId,
+                'target_user_id' => $this->visibleStaff->id,
+            ]);
+
+        $this->assertSame($communicationCount, Communication::query()->count());
+        $this->assertSame($auditCount, DB::table('audit_logs')->count());
+        $hiddenResponse->assertNotFound()->assertJsonMissingValidationErrors('content');
+        $missingResponse->assertNotFound()->assertJsonMissingValidationErrors('content');
+        $this->assertSame($hiddenResponse->status(), $missingResponse->status());
+    }
+
+    public function test_hidden_and_missing_targets_resolve_before_invalid_send_content_is_validated(): void
+    {
+        $missingUserId = (int) User::query()->max('id') + 1000;
+        $communicationCount = Communication::query()->count();
+        $auditCount = DB::table('audit_logs')->count();
+
+        $hiddenResponse = $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $this->visibleAlert->id,
+                'target_user_id' => $this->hiddenStaff->id,
+            ]);
+        $missingResponse = $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $this->visibleAlert->id,
+                'target_user_id' => $missingUserId,
+            ]);
+
+        $this->assertSame($communicationCount, Communication::query()->count());
+        $this->assertSame($auditCount, DB::table('audit_logs')->count());
+        $hiddenResponse->assertNotFound()->assertJsonMissingValidationErrors('content');
+        $missingResponse->assertNotFound()->assertJsonMissingValidationErrors('content');
+        $this->assertSame($hiddenResponse->status(), $missingResponse->status());
+    }
+
+    public function test_hidden_alert_resolves_before_missing_target_and_invalid_content_are_validated(): void
+    {
+        $communicationCount = Communication::query()->count();
+        $auditCount = DB::table('audit_logs')->count();
+
+        $response = $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $this->hiddenAlert->id,
+            ]);
+
+        $this->assertSame($communicationCount, Communication::query()->count());
+        $this->assertSame($auditCount, DB::table('audit_logs')->count());
+        $response
+            ->assertNotFound()
+            ->assertJsonMissingValidationErrors(['target_user_id', 'content']);
+    }
+
+    public function test_accessible_send_still_validates_content_without_writes(): void
+    {
+        $communicationCount = Communication::query()->count();
+        $auditCount = DB::table('audit_logs')->count();
+
+        $this->actingAs($this->operator)
+            ->postJson('/control-room/messaging/send', [
+                'content' => '',
+                'alert_id' => $this->visibleAlert->id,
+                'target_user_id' => $this->visibleStaff->id,
             ])
-            ->assertForbidden();
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('content');
 
         $this->assertSame($communicationCount, Communication::query()->count());
         $this->assertSame($auditCount, DB::table('audit_logs')->count());
     }
 
-    public function test_mark_read_rejects_other_site_alert_and_direct_messages_without_mutation(): void
+    public function test_mark_read_hidden_or_orphaned_records_match_missing_communication_without_mutation(): void
     {
-        $this->actingAs($this->operator)
-            ->postJson("/control-room/messaging/{$this->hiddenAlertMessage->id}/read")
-            ->assertForbidden();
+        $orphanedAlertMessage = $this->communication([
+            'alert_id' => $this->visibleAlert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'content' => 'Orphaned alert message',
+        ]);
+        $orphanedTargetMessage = $this->communication([
+            'alert_id' => null,
+            'target_user_id' => $this->visibleStaff->id,
+            'content' => 'Orphaned target message',
+        ]);
+        $missingAlertId = (int) ControlRoomAlert::query()->max('id') + 1000;
+        $missingUserId = (int) User::query()->max('id') + 1000;
+        Schema::withoutForeignKeyConstraints(function () use ($orphanedAlertMessage, $orphanedTargetMessage, $missingAlertId, $missingUserId): void {
+            DB::table('control_room_communications')
+                ->where('id', $orphanedAlertMessage->id)
+                ->update(['alert_id' => $missingAlertId]);
+            DB::table('control_room_communications')
+                ->where('id', $orphanedTargetMessage->id)
+                ->update(['target_user_id' => $missingUserId]);
+        });
+        $orphanedAlertMessage->refresh();
+        $orphanedTargetMessage->refresh();
+        $missingCommunicationId = (int) Communication::query()->max('id') + 1000;
 
-        $this->actingAs($this->operator)
-            ->postJson("/control-room/messaging/{$this->hiddenDirectMessage->id}/read")
-            ->assertForbidden();
+        $responses = [
+            $this->actingAs($this->operator)->postJson("/control-room/messaging/{$this->hiddenAlertMessage->id}/read"),
+            $this->actingAs($this->operator)->postJson("/control-room/messaging/{$this->hiddenDirectMessage->id}/read"),
+            $this->actingAs($this->operator)->postJson("/control-room/messaging/{$orphanedAlertMessage->id}/read"),
+            $this->actingAs($this->operator)->postJson("/control-room/messaging/{$orphanedTargetMessage->id}/read"),
+            $this->actingAs($this->operator)->postJson("/control-room/messaging/{$missingCommunicationId}/read"),
+        ];
+
+        foreach ($responses as $response) {
+            $response->assertNotFound();
+        }
 
         $this->assertNull($this->hiddenAlertMessage->fresh()->delivered_at);
         $this->assertNull($this->hiddenDirectMessage->fresh()->delivered_at);
+        $this->assertNull($orphanedAlertMessage->fresh()->delivered_at);
+        $this->assertNull($orphanedTargetMessage->fresh()->delivered_at);
     }
 
     public function test_global_reports_actor_retains_all_messaging_access(): void
@@ -212,6 +347,11 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
             ->getJson("/control-room/messaging/thread?alert_id={$this->hiddenAlert->id}")
             ->assertOk()
             ->assertJsonPath('messages.0.content', 'Hidden alert message');
+
+        $this->actingAs($globalOperator)
+            ->getJson("/control-room/messaging/thread?user_id={$this->hiddenStaff->id}")
+            ->assertOk()
+            ->assertJsonPath('messages.0.content', 'Hidden direct message');
 
         $this->actingAs($globalOperator)
             ->postJson('/control-room/messaging/send', [
