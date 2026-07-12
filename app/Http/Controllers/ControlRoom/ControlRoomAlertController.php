@@ -3,20 +3,23 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
-use App\Models\AuditLog;
+use App\Models\Client;
+use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
-use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ControlRoomAlertController extends Controller
@@ -132,7 +135,7 @@ class ControlRoomAlertController extends Controller
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
             'snoozed_until' => optional($alert->snoozed_until)->toISOString(),
-            'notes' => $alert->notes ? \Illuminate\Support\Str::limit($alert->notes, 120) : null,
+            'notes' => $alert->notes ? Str::limit($alert->notes, 120) : null,
             // Operator context — what this alert is about (from normalized_data)
             'summary' => $this->extractAlertSummary($alert),
             // Playbook progress — shows operator what action state this is in
@@ -177,7 +180,10 @@ class ControlRoomAlertController extends Controller
 
         // Triage queue summary — compact overview for operators
         $queues = TriageQueue::active()
-            ->withCount(['alerts as active_alert_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])])
+            ->withCount(['alerts as active_alert_count' => function ($query) use ($user) {
+                $query->whereNotIn('status', ['resolved', 'closed']);
+                $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
+            }])
             ->orderBy('tier')
             ->get(['id', 'name', 'tier', 'code'])
             ->map(fn ($q) => [
@@ -187,6 +193,18 @@ class ControlRoomAlertController extends Controller
                 'active_alerts' => $q->active_alert_count,
             ]);
 
+        $clientsQuery = Client::query()->orderBy('first_name');
+        $this->siteAccess()->applyClientScope($clientsQuery, $user, $this->alertBypassPermissions());
+        $clients = $clientsQuery->get(['id', 'first_name', 'last_name'])
+            ->map(fn (Client $client) => [
+                'id' => $client->id,
+                'name' => trim($client->first_name.' '.$client->last_name),
+            ]);
+
+        $sitesQuery = Site::query()->orderBy('name');
+        $this->siteAccess()->applySiteScope($sitesQuery, $user, $this->alertBypassPermissions());
+        $sites = $sitesQuery->get(['id', 'name']);
+
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
             'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),
@@ -194,10 +212,8 @@ class ControlRoomAlertController extends Controller
             'queues' => $queues,
             'staff' => $staff,
             // For the New-alert wizard (manual alert creation).
-            'clients' => \App\Models\Client::orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
-            'sites' => \App\Models\Site::orderBy('name')->get(['id', 'name']),
+            'clients' => $clients,
+            'sites' => $sites,
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
@@ -234,18 +250,18 @@ class ControlRoomAlertController extends Controller
         // 1. Signal/bridge normalised title
         $title = $ctx['title'] ?? null;
         if ($title && is_string($title) && trim($title) !== '') {
-            return \Illuminate\Support\Str::limit(trim($title), 100);
+            return Str::limit(trim($title), 100);
         }
 
         // 2. Description (may contain more detail)
         $desc = $ctx['description'] ?? null;
         if ($desc && is_string($desc) && trim($desc) !== '') {
-            return \Illuminate\Support\Str::limit(trim($desc), 100);
+            return Str::limit(trim($desc), 100);
         }
 
         // 3. Notes on the alert
         if ($alert->notes && trim($alert->notes) !== '') {
-            return \Illuminate\Support\Str::limit(trim($alert->notes), 100);
+            return Str::limit(trim($alert->notes), 100);
         }
 
         // 4. Humanised alert_type as last resort (always available)
@@ -954,6 +970,36 @@ class ControlRoomAlertController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
+        $client = null;
+
+        if (! empty($data['client_id'])) {
+            $clientQuery = Client::query();
+            $siteAccess->applyClientScope($clientQuery, $user, $bypassPermissions);
+            $client = $clientQuery->find($data['client_id']);
+            abort_unless($client, 403, 'You are not authorized to access that client.');
+
+            $clientSiteId = $client->site_id ? (int) $client->site_id : null;
+            $requestedSiteId = ! empty($data['site_id']) ? (int) $data['site_id'] : null;
+
+            if ($clientSiteId && $requestedSiteId && $clientSiteId !== $requestedSiteId) {
+                throw ValidationException::withMessages([
+                    'site_id' => 'The selected site does not match the selected client.',
+                ]);
+            }
+
+            if (! $requestedSiteId && $clientSiteId) {
+                $data['site_id'] = $clientSiteId;
+            }
+        }
+
+        if (! empty($data['site_id'])) {
+            $siteAccess->assertCanAccessSiteId($user, (int) $data['site_id'], $bypassPermissions);
+        } elseif (! $siteAccess->canBypass($user, $bypassPermissions)) {
+            abort(403, 'A site is required when creating an alert.');
+        }
+
         $data['status'] = 'open';
         $data['triggered_at'] = now();
         $data['created_by_user_id'] = $user->id;
@@ -963,7 +1009,7 @@ class ControlRoomAlertController extends Controller
         $alert = ControlRoomAlert::create($data);
 
         if ($queue) {
-            \App\Models\ControlRoom\AlertQueue::create([
+            AlertQueue::create([
                 'alert_id' => $alert->id,
                 'queue_id' => $queue->id,
                 'entered_at' => now(),

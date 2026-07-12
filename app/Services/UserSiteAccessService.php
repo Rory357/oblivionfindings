@@ -3,13 +3,16 @@
 namespace App\Services;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetShiftHandover;
+use App\Models\HsEvent;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 class UserSiteAccessService
 {
@@ -103,6 +106,50 @@ class UserSiteAccessService
             $siteId ? (int) $siteId : null,
             $bypassPermissions,
             $message,
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanAccessClientIncident(
+        ?User $user,
+        ClientIncident $incident,
+        array $bypassPermissions = [],
+    ): void {
+        if ($this->canBypass($user, $bypassPermissions)) {
+            return;
+        }
+
+        $incident->loadMissing([
+            'client:id,site_id',
+            'shift.client:id,site_id',
+        ]);
+
+        $siteId = $incident->getAttribute('site_id')
+            ?: $incident->client?->site_id
+            ?: $incident->shift?->site_id
+            ?: $incident->shift?->client?->site_id;
+
+        $this->assertCanAccessSiteId(
+            $user,
+            $siteId ? (int) $siteId : null,
+            $bypassPermissions,
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanAccessHsEvent(
+        ?User $user,
+        HsEvent $event,
+        array $bypassPermissions = [],
+    ): void {
+        $this->assertCanAccessSiteId(
+            $user,
+            $event->site_id ? (int) $event->site_id : null,
+            $bypassPermissions,
         );
     }
 
@@ -253,6 +300,47 @@ class UserSiteAccessService
      * @param  array<int, string>  $bypassPermissions
      */
     public function applyClientScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
+    {
+        if ($this->canBypass($user, $bypassPermissions)) {
+            return $query;
+        }
+
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('site_id', $siteIds);
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyClientIncidentScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
+    {
+        if ($this->canBypass($user, $bypassPermissions)) {
+            return $query;
+        }
+
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if (Schema::hasColumn($query->getModel()->getTable(), 'site_id')) {
+            return $query->whereIn('site_id', $siteIds);
+        }
+
+        return $query->where(function (Builder $nested) use ($siteIds) {
+            $nested->whereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds))
+                ->orWhereHas('shift', fn (Builder $shiftQuery) => $this->applyShiftScopeForSiteIds($shiftQuery, $siteIds));
+        });
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyHsEventScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
     {
         if ($this->canBypass($user, $bypassPermissions)) {
             return $query;

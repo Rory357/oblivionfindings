@@ -20,14 +20,19 @@ use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class HsEventController extends Controller
 {
-    public function __construct(private readonly HsEventService $events) {}
+    public function __construct(
+        private readonly HsEventService $events,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * H&S Events register — the governance convergence view.
@@ -35,7 +40,7 @@ class HsEventController extends Controller
      * Hero counts, tab counts, standardised rows (source + governance flags) and,
      * on ?event=, the detail payload for the over-the-list modal.
      */
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $tab = (string) $request->input('tab', 'all');
 
@@ -99,7 +104,7 @@ class HsEventController extends Controller
             'occurred_at' => $e->occurred_at?->toIso8601String(),
             'reported_at' => $e->reported_at?->toIso8601String(),
             'site_name' => $e->site?->name,
-            'client_name' => $e->client ? trim($e->client->first_name . ' ' . $e->client->last_name) : null,
+            'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : null,
             'staff_name' => $e->staff?->name,
             'worksafe_notifiable' => (bool) $e->worksafe_notifiable,
             'worksafe_status' => $e->worksafe_status,
@@ -160,7 +165,7 @@ class HsEventController extends Controller
         // ── Detail-over-list (?event=) ──
         $detail = null;
         if ($request->filled('event')) {
-            $target = HsEvent::find($request->integer('event'));
+            $target = $this->scopedBase($request)->find($request->integer('event'));
             $detail = $target ? $this->buildEventDetail($target) : null;
         }
 
@@ -191,7 +196,18 @@ class HsEventController extends Controller
     /** Scope = the hero/tab "period + site" lens (never the tab or list refinements). */
     private function applyScope(Builder $query, Request $request): void
     {
+        $this->siteAccess->applyHsEventScope(
+            $query,
+            $request->user(),
+            $this->hsEventBypassPermissions(),
+        );
+
         if ($request->filled('site_id')) {
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                (int) $request->input('site_id'),
+                $this->hsEventBypassPermissions(),
+            );
             $query->where('site_id', (int) $request->input('site_id'));
         }
         if ($request->filled('from')) {
@@ -247,8 +263,10 @@ class HsEventController extends Controller
      * governance modal (HsEventDialog) on a thin shell as the over-the-list
      * modal opened from the register.
      */
-    public function show(HsEvent $hsEvent): \Inertia\Response
+    public function show(Request $request, HsEvent $hsEvent): Response
     {
+        $this->assertCanAccessEvent($request, $hsEvent);
+
         return Inertia::render('health-safety/events/show', [
             'detail' => $this->buildEventDetail($hsEvent),
         ]);
@@ -261,6 +279,8 @@ class HsEventController extends Controller
      */
     public function close(Request $request, HsEvent $hsEvent)
     {
+        $this->assertCanAccessEvent($request, $hsEvent);
+
         $data = $request->validate([
             'closure_summary' => ['required', 'string', 'max:2000'],
             'override_reason' => ['nullable', 'string', 'max:2000'],
@@ -286,6 +306,8 @@ class HsEventController extends Controller
      */
     public function worksafeNotify(Request $request, HsEvent $hsEvent)
     {
+        $this->assertCanAccessEvent($request, $hsEvent);
+
         $data = $request->validate([
             'notified_at' => ['required', 'date'],
             'method' => ['required', 'string', 'max:50'],
@@ -313,6 +335,8 @@ class HsEventController extends Controller
      */
     public function worksafeAcknowledge(Request $request, HsEvent $hsEvent)
     {
+        $this->assertCanAccessEvent($request, $hsEvent);
+
         $data = $request->validate([
             'acknowledged_at' => ['required', 'date'],
         ]);
@@ -435,6 +459,19 @@ class HsEventController extends Controller
         $canManage = (bool) (auth()->user()?->canDo('hazards.manage') ?? false);
         $currentUserId = auth()->id();
 
+        $assignableStaff = [];
+        if ($canManage) {
+            $staffQuery = User::query()->staff()->whereNotNull('approved_at')->orderBy('name')->limit(200);
+            $this->siteAccess->applyStaffScope(
+                $staffQuery,
+                auth()->user(),
+                $this->hsEventBypassPermissions(),
+            );
+            $assignableStaff = $staffQuery->get(['id', 'name'])
+                ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
+                ->all();
+        }
+
         $correctiveActions = $hsEvent->correctiveActions()
             ->with(['assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name'])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
@@ -498,7 +535,7 @@ class HsEventController extends Controller
             'reported_at' => $hsEvent->reported_at?->toIso8601String(),
             'description' => null,
             'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
-            'client' => $hsEvent->client ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name . ' ' . $hsEvent->client->last_name)] : null,
+            'client' => $hsEvent->client ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
             'staff' => $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
             'asset' => $hsEvent->asset ? ['id' => $hsEvent->asset->id, 'name' => $hsEvent->asset->name] : null,
             'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
@@ -528,10 +565,7 @@ class HsEventController extends Controller
                 'actions_ok' => ! $hsEvent->hasOpenCorrectiveActions(),
                 'blockers' => $this->events->closeBlockers($hsEvent),
             ],
-            'assignable_staff' => $canManage
-                ? User::query()->staff()->whereNotNull('approved_at')->orderBy('name')->limit(200)->get(['id', 'name'])
-                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->all()
-                : [],
+            'assignable_staff' => $assignableStaff,
             'can' => ['manage' => $canManage],
         ];
     }
@@ -539,7 +573,7 @@ class HsEventController extends Controller
     /**
      * Corrective actions listing — all actions across all events.
      */
-    public function correctiveActions(Request $request): \Inertia\Response
+    public function correctiveActions(Request $request): Response
     {
         $tab = (string) $request->input('tab', $this->legacyActionTab($request));
 
@@ -650,7 +684,13 @@ class HsEventController extends Controller
 
         $detail = null;
         if ($request->filled('event')) {
-            $target = HsEvent::find($request->integer('event'));
+            $targetQuery = HsEvent::query();
+            $this->siteAccess->applyHsEventScope(
+                $targetQuery,
+                $request->user(),
+                $this->hsEventBypassPermissions(),
+            );
+            $target = $targetQuery->find($request->integer('event'));
             $detail = $target ? $this->buildEventDetail($target) : null;
         }
 
@@ -709,7 +749,20 @@ class HsEventController extends Controller
 
     private function applyActionScope(Builder $query, Request $request): void
     {
+        $query->whereHas('hsEvent', function (Builder $eventQuery) use ($request) {
+            $this->siteAccess->applyHsEventScope(
+                $eventQuery,
+                $request->user(),
+                $this->hsEventBypassPermissions(),
+            );
+        });
+
         if ($request->filled('site_id')) {
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                (int) $request->input('site_id'),
+                $this->hsEventBypassPermissions(),
+            );
             $siteId = (int) $request->input('site_id');
             $query->whereHas('hsEvent', fn (Builder $q) => $q->where('site_id', $siteId));
         }
@@ -742,10 +795,35 @@ class HsEventController extends Controller
         };
     }
 
+    private function assertCanAccessEvent(Request $request, HsEvent $event): void
+    {
+        $this->siteAccess->assertCanAccessHsEvent(
+            $request->user(),
+            $event,
+            $this->hsEventBypassPermissions(),
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function hsEventBypassPermissions(): array
+    {
+        $permissions = ['reports.viewAny'];
+        $user = auth()->user();
+
+        if ($user?->hasRole('health_safety_officer')
+            && $this->siteAccess->accessibleSiteIds($user, $permissions) === []) {
+            $permissions[] = 'hazards.manage';
+        }
+
+        return $permissions;
+    }
+
     /**
      * Risk assessments listing.
      */
-    public function riskAssessments(Request $request): \Inertia\Response
+    public function riskAssessments(Request $request): Response
     {
         $query = HsRiskAssessment::query()
             ->with(['assessedBy:id,name'])

@@ -5,19 +5,22 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
-use App\Models\ControlRoomAlert;
+use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
+use App\Models\ControlRoomAlert;
 use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class ControlRoomIncidentController extends Controller
@@ -34,12 +37,21 @@ class ControlRoomIncidentController extends Controller
             'source_type', 'severity', 'status', 'client_id', 'site_id',
             'date_from', 'date_to', 'search',
         ]);
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
 
-        $dateFrom = !empty($filters['date_from'])
+        if (! empty($filters['site_id'])) {
+            $siteAccess->assertCanAccessSiteId($user, (int) $filters['site_id'], $bypassPermissions);
+        }
+        if (! empty($filters['client_id'])) {
+            $siteAccess->assertCanAccessClientId($user, (int) $filters['client_id'], $bypassPermissions);
+        }
+
+        $dateFrom = ! empty($filters['date_from'])
             ? Carbon::parse($filters['date_from'])->startOfDay()
             : now()->subDays(30)->startOfDay();
 
-        $dateTo = !empty($filters['date_to'])
+        $dateTo = ! empty($filters['date_to'])
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
@@ -51,33 +63,34 @@ class ControlRoomIncidentController extends Controller
                 ->with(['client.site', 'reporter:id,name'])
                 ->where('status', '!=', 'draft')
                 ->whereBetween('occurred_at', [$dateFrom, $dateTo]);
+            $siteAccess->applyClientIncidentScope($ciQuery, $user, $bypassPermissions);
 
-            if (!empty($filters['severity'])) {
+            if (! empty($filters['severity'])) {
                 $ciQuery->where('severity', $filters['severity']);
             }
-            if (!empty($filters['status'])) {
+            if (! empty($filters['status'])) {
                 $ciQuery->where('status', $filters['status']);
             }
-            if (!empty($filters['client_id'])) {
+            if (! empty($filters['client_id'])) {
                 $ciQuery->where('client_id', $filters['client_id']);
             }
-            if (!empty($filters['site_id'])) {
+            if (! empty($filters['site_id'])) {
                 $ciQuery->whereHas('client', fn ($q) => $q->where('site_id', $filters['site_id']));
             }
-            if (!empty($filters['search'])) {
+            if (! empty($filters['search'])) {
                 $search = $filters['search'];
                 $ciQuery->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             }
 
             $ciQuery->get()->each(function (ClientIncident $ci) use ($incidents) {
                 $incidents->push([
-                    'id' => 'ci_' . $ci->id,
+                    'id' => 'ci_'.$ci->id,
                     'source_type' => 'client_incident',
                     'source_id' => $ci->id,
-                    'title' => $ci->title ?: ('Incident: ' . ucfirst($ci->type ?? 'General')),
+                    'title' => $ci->title ?: ('Incident: '.ucfirst($ci->type ?? 'General')),
                     'description' => $ci->description,
                     'severity' => $ci->severity ?? 'medium',
                     'status' => $ci->status,
@@ -98,33 +111,34 @@ class ControlRoomIncidentController extends Controller
             $meQuery = MedicationError::query()
                 ->with(['client.site', 'reportedBy:id,name', 'medication'])
                 ->whereBetween('reported_at', [$dateFrom, $dateTo]);
+            $this->applyMedicationErrorScope($meQuery, $user);
 
-            if (!empty($filters['severity'])) {
+            if (! empty($filters['severity'])) {
                 $meQuery->where('severity', $filters['severity']);
             }
-            if (!empty($filters['status'])) {
+            if (! empty($filters['status'])) {
                 $meQuery->where('status', $filters['status']);
             }
-            if (!empty($filters['client_id'])) {
+            if (! empty($filters['client_id'])) {
                 $meQuery->where('client_id', $filters['client_id']);
             }
-            if (!empty($filters['site_id'])) {
+            if (! empty($filters['site_id'])) {
                 $meQuery->whereHas('client', fn ($q) => $q->where('site_id', $filters['site_id']));
             }
-            if (!empty($filters['search'])) {
+            if (! empty($filters['search'])) {
                 $search = $filters['search'];
                 $meQuery->where(function ($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
-                      ->orWhere('error_type', 'like', "%{$search}%");
+                        ->orWhere('error_type', 'like', "%{$search}%");
                 });
             }
 
             $meQuery->get()->each(function (MedicationError $me) use ($incidents) {
                 $incidents->push([
-                    'id' => 'me_' . $me->id,
+                    'id' => 'me_'.$me->id,
                     'source_type' => 'medication_error',
                     'source_id' => $me->id,
-                    'title' => 'Medication Error: ' . ucfirst(str_replace('_', ' ', $me->error_type ?? 'Unknown')),
+                    'title' => 'Medication Error: '.ucfirst(str_replace('_', ' ', $me->error_type ?? 'Unknown')),
                     'description' => $me->description,
                     'severity' => $me->severity ?? 'medium',
                     'status' => $me->status,
@@ -145,31 +159,32 @@ class ControlRoomIncidentController extends Controller
             $sgQuery = SafeguardingConcern::query()
                 ->with(['reportedBy:id,name', 'site:id,name'])
                 ->whereBetween('occurred_at', [$dateFrom, $dateTo]);
+            $this->applySafeguardingScope($sgQuery, $user);
 
-            if (!empty($filters['severity'])) {
+            if (! empty($filters['severity'])) {
                 $sgQuery->where('severity', $filters['severity']);
             }
-            if (!empty($filters['status'])) {
+            if (! empty($filters['status'])) {
                 $sgQuery->where('status', $filters['status']);
             }
-            if (!empty($filters['site_id'])) {
+            if (! empty($filters['site_id'])) {
                 $sgQuery->where('site_id', $filters['site_id']);
             }
-            if (!empty($filters['search'])) {
+            if (! empty($filters['search'])) {
                 $search = $filters['search'];
                 $sgQuery->where(function ($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
-                      ->orWhere('concern_type', 'like', "%{$search}%")
-                      ->orWhere('subject_name', 'like', "%{$search}%");
+                        ->orWhere('concern_type', 'like', "%{$search}%")
+                        ->orWhere('subject_name', 'like', "%{$search}%");
                 });
             }
 
             $sgQuery->get()->each(function (SafeguardingConcern $sg) use ($incidents) {
                 $incidents->push([
-                    'id' => 'sg_' . $sg->id,
+                    'id' => 'sg_'.$sg->id,
                     'source_type' => 'safeguarding',
                     'source_id' => $sg->id,
-                    'title' => 'Safeguarding: ' . ucfirst(str_replace('_', ' ', $sg->concern_type ?? 'Concern')),
+                    'title' => 'Safeguarding: '.ucfirst(str_replace('_', ' ', $sg->concern_type ?? 'Concern')),
                     'description' => $sg->description,
                     'severity' => $sg->severity ?? 'high',
                     'status' => $sg->status,
@@ -218,8 +233,17 @@ class ControlRoomIncidentController extends Controller
         ];
 
         // ── Supporting data ───────────────────────────────────
-        $sites = Site::orderBy('name')->get(['id', 'name']);
-        $clients = Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])->map(fn($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)]);
+        $sitesQuery = Site::query()->orderBy('name');
+        $siteAccess->applySiteScope($sitesQuery, $user, $bypassPermissions);
+        $sites = $sitesQuery->get(['id', 'name']);
+
+        $clientsQuery = Client::query()->orderBy('first_name');
+        $siteAccess->applyClientScope($clientsQuery, $user, $bypassPermissions);
+        $clients = $clientsQuery->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($client) => [
+                'id' => $client->id,
+                'name' => trim($client->first_name.' '.$client->last_name),
+            ]);
 
         return Inertia::render('control-room/incidents', [
             'incidents' => $paginated,
@@ -252,6 +276,8 @@ class ControlRoomIncidentController extends Controller
             'severity' => ['required', 'string', 'in:low,medium,high,critical'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
 
         // Resolve the source record for context
         $context = [
@@ -265,8 +291,12 @@ class ControlRoomIncidentController extends Controller
 
         switch ($data['source_type']) {
             case 'client_incident':
-                $source = ClientIncident::with('client.site')->findOrFail($data['source_id']);
-                $context['title'] = $source->title ?: ('Incident: ' . ucfirst($source->type ?? 'General'));
+                $sourceQuery = ClientIncident::query()->with('client.site');
+                $siteAccess->applyClientIncidentScope($sourceQuery, $user, $bypassPermissions);
+                $source = $sourceQuery->find($data['source_id']);
+                abort_unless($source, 403, 'You are not authorized to access that incident source.');
+                $siteAccess->assertCanAccessClientIncident($user, $source, $bypassPermissions);
+                $context['title'] = $source->title ?: ('Incident: '.ucfirst($source->type ?? 'General'));
                 $context['description'] = $source->description;
                 $alertType = 'client_incident';
                 $siteId = $source->client?->site_id;
@@ -274,8 +304,11 @@ class ControlRoomIncidentController extends Controller
                 break;
 
             case 'medication_error':
-                $source = MedicationError::with('client.site')->findOrFail($data['source_id']);
-                $context['title'] = 'Medication Error: ' . ucfirst(str_replace('_', ' ', $source->error_type ?? 'Unknown'));
+                $sourceQuery = MedicationError::query()->with('client.site');
+                $this->applyMedicationErrorScope($sourceQuery, $user);
+                $source = $sourceQuery->find($data['source_id']);
+                abort_unless($source, 403, 'You are not authorized to access that incident source.');
+                $context['title'] = 'Medication Error: '.ucfirst(str_replace('_', ' ', $source->error_type ?? 'Unknown'));
                 $context['description'] = $source->description;
                 $alertType = 'medication_error';
                 $siteId = $source->client?->site_id;
@@ -283,8 +316,11 @@ class ControlRoomIncidentController extends Controller
                 break;
 
             case 'safeguarding':
-                $source = SafeguardingConcern::with('site')->findOrFail($data['source_id']);
-                $context['title'] = 'Safeguarding: ' . ucfirst(str_replace('_', ' ', $source->concern_type ?? 'Concern'));
+                $sourceQuery = SafeguardingConcern::query()->with('site');
+                $this->applySafeguardingScope($sourceQuery, $user);
+                $source = $sourceQuery->find($data['source_id']);
+                abort_unless($source, 403, 'You are not authorized to access that incident source.');
+                $context['title'] = 'Safeguarding: '.ucfirst(str_replace('_', ' ', $source->concern_type ?? 'Concern'));
                 $context['description'] = $source->description;
                 $alertType = 'safeguarding_concern';
                 $siteId = $source->site_id;
@@ -301,7 +337,7 @@ class ControlRoomIncidentController extends Controller
             'site_id' => $siteId,
             'client_id' => $clientId,
             'context' => $context,
-            'notes' => $data['notes'],
+            'notes' => $data['notes'] ?? null,
         ];
 
         $queue = TriageQueue::findForAlert($alertData['severity'], $alertData['source'], $alertData['alert_type']);
@@ -310,14 +346,14 @@ class ControlRoomIncidentController extends Controller
         $alert = ControlRoomAlert::create($alertData);
 
         if ($queue) {
-            \App\Models\ControlRoom\AlertQueue::create([
+            AlertQueue::create([
                 'alert_id' => $alert->id,
                 'queue_id' => $queue->id,
                 'entered_at' => now(),
             ]);
         }
 
-        if (!$alert->sla) {
+        if (! $alert->sla) {
             $slaDefinition = SlaDefinition::findForAlert($alert->alert_type, $alert->severity, $alert->source);
             if ($slaDefinition) {
                 AlertSla::createFromDefinition($alert, $slaDefinition);
@@ -355,7 +391,19 @@ class ControlRoomIncidentController extends Controller
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $client = Client::with('site')->findOrFail($data['client_id']);
+        $clientQuery = Client::query()->with('site');
+        $this->siteAccess()->applyClientScope(
+            $clientQuery,
+            $user,
+            $this->alertBypassPermissions(),
+        );
+        $client = $clientQuery->find($data['client_id']);
+        abort_unless($client, 403, 'You are not authorized to access that client.');
+        $this->siteAccess()->assertCanAccessClientId(
+            $user,
+            $client->id,
+            $this->alertBypassPermissions(),
+        );
 
         // ClientIncident severity is low|medium|high; an alert may also be critical.
         $incidentSeverity = $data['severity'] === 'critical' ? 'high' : $data['severity'];
@@ -371,12 +419,12 @@ class ControlRoomIncidentController extends Controller
                 'submitted_at' => now(),
                 'occurred_at' => now(),
                 'description' => $data['note'] ?? null,
-                'title' => $data['type'] . ' incident',
+                'title' => $data['type'].' incident',
             ]);
 
             $alertData = [
                 'source' => 'control_room',
-                'alert_type' => 'incident.' . $incident->type,
+                'alert_type' => 'incident.'.$incident->type,
                 'severity' => $data['severity'],
                 'status' => 'open',
                 'triggered_at' => now(),
@@ -399,7 +447,7 @@ class ControlRoomIncidentController extends Controller
             $alert = ControlRoomAlert::create($alertData);
 
             if ($queue) {
-                \App\Models\ControlRoom\AlertQueue::create([
+                AlertQueue::create([
                     'alert_id' => $alert->id,
                     'queue_id' => $queue->id,
                     'entered_at' => now(),
@@ -431,5 +479,65 @@ class ControlRoomIncidentController extends Controller
             ->with('success', "Incident INC-{$result['incident']->id} flagged and alert raised.")
             ->with('flagged_incident_id', $result['incident']->id)
             ->with('flagged_alert_id', $result['alert']->id);
+    }
+
+    protected function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
+    }
+
+    protected function applyMedicationErrorScope(Builder $query, User $user): Builder
+    {
+        if ($this->siteAccess()->canBypass($user, $this->alertBypassPermissions())) {
+            return $query;
+        }
+
+        return $query->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess()->applyClientScope(
+            $clientQuery,
+            $user,
+            $this->alertBypassPermissions(),
+        ));
+    }
+
+    protected function applySafeguardingScope(Builder $query, User $user): Builder
+    {
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
+
+        if (! $siteAccess->canBypass($user, $bypassPermissions)) {
+            $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
+
+            if ($siteIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('site_id', $siteIds);
+            }
+        }
+
+        if (! $user->can('viewAny', SafeguardingConcern::class)) {
+            $query->where(function (Builder $visibility) use ($user) {
+                $visibility->where('assigned_to_user_id', $user->id)
+                    ->orWhere('reported_by_user_id', $user->id);
+            });
+        }
+
+        if (! $user->can('viewSensitive', SafeguardingConcern::class)) {
+            $query->where(function (Builder $sensitivity) use ($user) {
+                $sensitivity->where('is_sensitive', false)
+                    ->orWhereNull('is_sensitive')
+                    ->orWhere('assigned_to_user_id', $user->id)
+                    ->orWhere('reported_by_user_id', $user->id);
+            });
+        }
+
+        return $query;
     }
 }
