@@ -114,7 +114,7 @@
 ## Code-review remediation checkpoint — 2026-07-12
 
 - Start SHA: `42b7c7438eac8e6b991d4209e8b5d5dc649256da`.
-- Review disposition: all five Important findings from the first independent review were addressed. The first follow-up then found a new Critical cross-tenant Shift task disclosure and an Important no-op Calendar team filter; both now have red/green regressions and minimal fixes. A final independent follow-up remains required before merge.
+- Review disposition: all five Important findings from the first independent review were addressed. The first follow-up then found a new Critical cross-tenant Shift task disclosure and an Important no-op Calendar team filter; both now have red/green regressions and minimal fixes. The second follow-up found no remaining Critical or Important issues and marked the branch ready to merge subject to merged-revision gates.
 - Calendar canonical-team fix: store/update validation now resolves an active same-tenant team through `HrEmployeeProfile::normalizeTeam`, stores the canonical active-profile spelling, and compares viewer/audience teams case-insensitively after whitespace normalization. The regression creates, updates, and reads a team event using case and repeated-spacing variants.
 - Exact cleanup fix: the HR E2E helper accepts one exact marker and uses exact names, IDs, employee numbers, notes, emails, and paths. A probe/sentinel test proves cleanup removes only the requested marker, including marker-bearing audit rows. Client fixtures now use event-suppressed `forceDelete()` and assert exact IDs are absent even with trashed rows included.
 - Browser-proof expansion: the Calendar event is created through the team-audience wizard; scorecard-quorum override is submitted with a required reason and audited; generic approval-chain presence plus native leave add/edit/down/up/deactivate/reactivate/remove are exercised; manager/worker payslip view/download and the existing `390x844` card branch are exercised; Training Catalog, Feedback Pending, Supervision search, the real 30-second Timekeeping partial refresh, Shifts Open, and Calendar view are active controls rather than render-only checks.
@@ -129,8 +129,9 @@
 - Static evidence after all review edits: PHP syntax green for all five affected PHP files; scoped Pint green; Prettier green for both affected E2E specs; ESLint zero-warning green; TypeScript green; `git diff --check` green.
 - First review-remediation commit: `3f9885c1402af3f3f04fd767eb6f9f0bf7ab9658`.
 - Follow-up-review TDD: the new bundle failed **2 / 11 tests** in **246.23s** — the manager’s Clinical Support filter still contained `Operations team hui`, and the tenant-1 scheduler received two tasks including `Foreign tenant task`. After adding normalized team-audience filtering and `shifts.organization_id = viewer.organization_id`, the same bundle passed **11 tests / 45 assertions** in **221.27s**.
-- Follow-up-review commit: pending.
-- Remaining: checkpoint commit, independent follow-up review, upstream reconciliation, merged-revision gates, push, deployment, scheduled-interval observation, and one final real Chrome session.
+- Follow-up-review commit: `202227818d1b9718dba7ac040bda4792240da47a`.
+- Independent clearance: no current Critical or Important findings; Shift tenant isolation, normalized team filtering, and exact attachment/audit cleanup were each confirmed with file/line evidence.
+- Remaining: upstream reconciliation, merged-revision gates, push, deployment, scheduled-interval observation, and one final real Chrome session.
 
 ## Release gates
 
