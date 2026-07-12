@@ -82,7 +82,7 @@ it('does not return another sites incidents clients sites or hs events', functio
             ->where('sites', fn ($rows) => collect($rows)->doesntContain('id', $otherSite->id)));
 
     $this->actingAs($user)->get("/health-safety/events?event={$otherEvent->id}")
-        ->assertForbidden();
+        ->assertNotFound();
 });
 ```
 
@@ -102,6 +102,8 @@ public function assertCanAccessHsEvent(?User $user, HsEvent $event, array $bypas
 ```
 
 Use `ClientIncident.site_id` when populated and the incident's client/shift site only as a compatibility fallback. H&S uses `hs_events.site_id`.
+
+H&S record IDs use non-disclosing scoped resolution: inaccessible and nonexistent IDs both return 404 for overlays, direct reads, and record mutations. Explicit attempts to select an inaccessible `site_id` filter return 403. Organisation-wide H&S access requires the explicit `healthSafety.viewAllSites` permission; absence of a site assignment never grants access by itself.
 
 - [ ] **Step 4: Scope reads, pickers, queue counts, and nested parent records**
 
@@ -125,7 +127,7 @@ it('rejects creating alerts or incidents for an inaccessible client or source', 
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php tests/Feature/HealthSafety/HsEventSiteIsolationTest.php tests/Unit/Services/UserSiteAccessServiceTest.php`
 
-Expected: PASS with all cross-site IDs absent and every out-of-scope write returning 403.
+Expected: PASS with all cross-site IDs absent; Control Room out-of-scope writes and forbidden site filters return 403, while inaccessible H&S record IDs return the same 404 as nonexistent IDs.
 
 - [ ] **Step 7: Commit**
 
