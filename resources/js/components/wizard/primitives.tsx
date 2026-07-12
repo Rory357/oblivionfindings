@@ -201,7 +201,7 @@ export function Segmented<T extends string>({
 }: {
     value: T;
     onChange: (v: T) => void;
-    options: { value: T; label: string; icon?: IconType }[];
+    options: { value: T; label: string; icon?: IconType; disabled?: boolean }[];
 }) {
     return (
         <div className="inline-flex flex-wrap gap-1 rounded-lg bg-muted p-1">
@@ -214,11 +214,13 @@ export function Segmented<T extends string>({
                         type="button"
                         onClick={() => onChange(o.value)}
                         aria-pressed={active}
+                        disabled={o.disabled}
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors',
                             active
                                 ? 'bg-card text-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground',
+                            o.disabled && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
                         )}
                     >
                         {Icon ? <Icon className="h-3.5 w-3.5" /> : null}

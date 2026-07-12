@@ -67,6 +67,10 @@ class CalendarController extends Controller
             ->distinct()
             ->orderBy('team')
             ->pluck('team')
+            ->map(fn (string $team) => HrEmployeeProfile::normalizeTeam($team))
+            ->filter()
+            ->unique(fn (string $team) => mb_strtolower($team))
+            ->sort(fn (string $left, string $right) => strnatcasecmp($left, $right))
             ->values();
 
         $icalToken = HrICalToken::query()

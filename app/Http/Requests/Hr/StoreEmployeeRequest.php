@@ -2,11 +2,22 @@
 
 namespace App\Http\Requests\Hr;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreEmployeeRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('team')) {
+            $team = $this->input('team');
+            if (is_string($team) || $team === null) {
+                $this->merge(['team' => HrEmployeeProfile::normalizeTeam($team)]);
+            }
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->canDo('hr.employees.manage') ?? false;
@@ -26,6 +37,7 @@ class StoreEmployeeRequest extends FormRequest
             'position_title'  => ['nullable', 'string', 'max:255'],
             'employment_type' => ['nullable', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'department'      => ['nullable', 'string', 'max:255'],
+            'team'            => ['nullable', 'string', 'max:255'],
             'primary_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'manager_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'start_date'      => ['nullable', 'date'],

@@ -487,6 +487,8 @@ class EmployeeProfileController extends Controller
     {
         $actor = $request->user();
         $data = $request->validated();
+        $tenantId = $this->resolveHrTenantIdForUser($actor);
+        $data['team'] = HrEmployeeProfile::canonicalTeamForTenant($data['team'] ?? null, $tenantId);
         $roleName = $data['role'] ?? 'support_worker';
 
         $positionTitle = $data['position_title'] ?? null;
@@ -519,6 +521,7 @@ class EmployeeProfileController extends Controller
                     'position_role' => $roleName,
                     'employment_type' => $data['employment_type'] ?? 'full_time',
                     'department' => $data['department'] ?? null,
+                    'team' => $data['team'],
                     'primary_site_id' => $data['primary_site_id'] ?? null,
                     'manager_user_id' => $data['manager_user_id'] ?? null,
                     'start_date' => $data['start_date'] ?? now()->toDateString(),
@@ -529,7 +532,7 @@ class EmployeeProfileController extends Controller
                     'emergency_contacts' => $data['emergency_contacts'] ?? null,
                 ],
                 actorId: $actor->id,
-                tenantId: $this->resolveHrTenantIdForUser($actor),
+                tenantId: $tenantId,
                 startOnboarding: $request->boolean('start_onboarding', true),
                 sendInvite: $request->boolean('send_invite', false),
                 source: 'manual',
@@ -1083,6 +1086,7 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
 
         $profile->load('user:id,name,email');
 
@@ -1119,8 +1123,13 @@ class EmployeeProfileController extends Controller
     public function update(UpdateEmployeeProfileRequest $request, HrEmployeeProfile $profile)
     {
         $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $validated = $request->validated();
+        if (array_key_exists('team', $validated)) {
+            $validated['team'] = HrEmployeeProfile::canonicalTeamForTenant($validated['team'], $tenantId);
+        }
         $validated['updated_by'] = $user->id;
         $profile->update($validated);
 

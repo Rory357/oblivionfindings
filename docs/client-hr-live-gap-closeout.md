@@ -46,22 +46,26 @@
 - Full-file classification: **1 passed / 2 failed**. The new alias case passed. Both pre-existing note-capture cases could not find the permission-gated quick-note action after canonical global setup failed on the existing duplicate `EMP0003` unique key in `SystemUsersSeeder`; the same two failures reproduced with reseeding skipped. This is a local fixture/seeder blocker, not an alias regression.
 - Smoke marker and record IDs: exact local synthetic clients `5-38`, alternating `Playwright Profile` and `Recent Playwright Client`.
 - Cleanup: deleted exactly client IDs `5-38` from the local testing database through model deletion; verified `remaining=0` for that ID set.
-- Commit SHA: pending
-- Remaining: post-deployment Chrome acceptance and exact slice commit SHA recording.
+- Commit SHA: `e2958ca0a1ef64bb7c4729ffe506e5f14b71a43d`
+- Remaining: post-deployment Chrome acceptance.
 
 ### Slice 2 — HR team ownership and Calendar configuration
 
-- Start SHA: pending
+- Start SHA: `e2958ca0a1ef64bb7c4729ffe506e5f14b71a43d`
 - End SHA: pending
-- Ownership decision: pending source audit before edits
-- Files changed: pending
-- Red proof: pending
-- Green tests and exact counts: pending
+- Ownership decision: `HrEmployeeProfile.team` is the single employee-membership fact and the current Calendar contract. `HrPosition.team` remains an independent position-template attribute and is not dual-written. Calendar, manager create/edit, and demo assignments all use the profile field; no schema, route, taxonomy, or parallel configuration surface was added.
+- Files changed: `HrEmployeeProfile`, the two employee requests, `EmployeeProfileController`, `CalendarController`, `HrDemoSeeder`, manager create/edit UI, shared segmented-control disabled support, Calendar wizard empty state, focused feature tests, demo-seeder test, and this ledger.
+- Red proof: the first genuine focused test asserted that create input `clinical support` must resolve to the tenant's existing `Clinical Support`; it failed because the newly created profile team was `NULL`.
+- Normalisation and safety: leading/trailing and repeated whitespace collapse; blank becomes `NULL`; existing tenant spelling/case is reused; 255-character maximum is enforced; foreign-tenant edit/update returns 404; Calendar options include only active same-tenant profiles and deduplicate case/spacing variants.
+- Manager UI: Add Employee and Edit Employee expose the canonical profile team. Edit copy explains Calendar use and clearing. Calendar disables `A team` when none exist and links to `/hr/people` instead of exposing a dead selector.
+- Demo ownership: `HrDemoSeeder` now targets only the three exact `hrdemo.worker{1..3}@example.test` profiles and assigns `Community Support`, `Community Support`, and `Operations` idempotently; it no longer selects arbitrary active profiles for its demo workflow data.
+- Green tests and exact counts: `HrTeamConfigurationTest`, `HrDemoSeederTest`, and `HrCalendarResilienceTest` passed **16 tests / 118 assertions**. PHP syntax passed for all 8 changed PHP/test files. Pint passed before the legacy-formatting churn was reverted. TypeScript passed. ESLint passed with zero warnings. `git diff --check` passed.
+- Formatting classification: all four touched legacy TSX files fail whole-file Prettier on the starting revision; formatting them would create hundreds of unrelated lines, so that sweep was explicitly reverted and only scoped lines remain. The changed PHP requests/seeder likewise predate current whole-file Pint formatting; the broad mechanical sweep was reverted for minimal churn.
 - Browser URLs: pending
 - Smoke marker and record IDs: pending
-- Cleanup: pending
+- Cleanup: no Slice 2 local transient records remain; feature tests use isolated per-process databases that are dropped at shutdown. Durable known demo assignments are intentionally idempotent.
 - Commit SHA: pending
-- Remaining: all acceptance rows.
+- Remaining: exact commit SHA and post-deployment browser lifecycle acceptance.
 
 ### Slice 3 — Fixture-gated HR browser matrix
 

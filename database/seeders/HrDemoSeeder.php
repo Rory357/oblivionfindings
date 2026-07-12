@@ -379,17 +379,14 @@ class HrDemoSeeder extends Seeder
      */
     private function profiles(int $tenantId, User $admin, User $manager): Collection
     {
-        $profiles = HrEmployeeProfile::query()
-            ->with('user')
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->whereNotNull('user_id')
-            ->orderBy('id')
-            ->get()
-            ->filter(fn (HrEmployeeProfile $profile) => $profile->user !== null)
-            ->values();
+        $teams = [
+            1 => 'Community Support',
+            2 => 'Community Support',
+            3 => 'Operations',
+        ];
+        $profiles = collect();
 
-        for ($index = $profiles->count() + 1; $index <= 3; $index++) {
+        foreach (range(1, 3) as $index) {
             $user = $this->demoUser("hrdemo.worker{$index}@example.test", "HR Demo Worker {$index}", 'support_worker');
 
             $profile = HrEmployeeProfile::updateOrCreate(
@@ -409,6 +406,7 @@ class HrDemoSeeder extends Seeder
                     'start_date' => '2025-11-03',
                     'is_active' => true,
                     'manager_user_id' => $manager->id,
+                    'team' => $teams[$index],
                     'created_by' => $admin->id,
                     'updated_by' => $admin->id,
                 ],
@@ -418,7 +416,7 @@ class HrDemoSeeder extends Seeder
             $profiles->push($profile);
         }
 
-        return $profiles->take(3)->values();
+        return $profiles->values();
     }
 
     private function seedLeaveRequests(int $tenantId, User $admin, User $manager, Collection $profiles): void

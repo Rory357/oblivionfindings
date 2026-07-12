@@ -3,7 +3,7 @@
  * native buttons + inputs, and the per-category accent tints use color-mix() on
  * semantic CSS tokens (var(--category-*), var(--status-*)) via inline style —
  * that IS the design-token system, not a raw Tailwind colour class. */
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     AlarmClock,
     Archive,
@@ -771,7 +771,7 @@ export function EventWizardDialog({
                                         { value: 'org', label: 'Everyone' },
                                         { value: 'site', label: 'This site' },
                                         { value: 'department', label: 'This department' },
-                                        { value: 'team', label: 'A team' },
+                                        { value: 'team', label: 'A team', disabled: teams.length === 0 },
                                         { value: 'people', label: 'Specific people' },
                                     ]}
                                 />
@@ -854,6 +854,16 @@ export function EventWizardDialog({
                                             ]}
                                         />
                                     </Field>
+                                </div>
+                            ) : null}
+
+                            {teams.length === 0 ? (
+                                <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                                    No teams are configured for active employees. Assign a team from the{' '}
+                                    <Link href="/hr/people" className="font-semibold text-primary underline-offset-4 hover:underline">
+                                        People workspace
+                                    </Link>{' '}
+                                    before creating a team event.
                                 </div>
                             ) : null}
 
