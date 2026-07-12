@@ -4,15 +4,16 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\AlertWatcher;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
 class ControlRoomWatcherController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
     use RespondsToInertiaOrJson;
 
     /**
@@ -152,35 +153,10 @@ class ControlRoomWatcherController extends Controller
 
     private function assertCanUseWatcher(User $user, int $watcherUserId): void
     {
-        $query = User::staff()->whereKey($watcherUserId);
-        app(UserSiteAccessService::class)->applyStaffScope(
-            $query,
+        $this->assertCanAccessStaff(
             $user,
-            $this->alertBypassPermissions(),
-        );
-
-        abort_unless(
-            $query->exists(),
-            403,
+            $watcherUserId,
             'You are not authorized to add that staff member as a watcher.',
         );
-    }
-
-    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
-    {
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
-        );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function alertBypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 }

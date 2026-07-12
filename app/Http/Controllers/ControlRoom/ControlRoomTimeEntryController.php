@@ -4,17 +4,17 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\TimeEntry;
 use App\Models\ControlRoomAlert;
-use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ControlRoomTimeEntryController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
     use RespondsToInertiaOrJson;
 
     /**
@@ -251,23 +251,5 @@ class ControlRoomTimeEntryController extends Controller
 
         ControlRoomAlert::where('id', $alertId)
             ->update(['time_spent_minutes' => (int) $total]);
-    }
-
-    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
-    {
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
-        );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function alertBypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 }

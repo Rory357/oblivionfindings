@@ -4,16 +4,17 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\AlertDiscussion;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ControlRoomDiscussionController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
     use RespondsToInertiaOrJson;
 
     /**
@@ -199,35 +200,13 @@ class ControlRoomDiscussionController extends Controller
             return;
         }
 
-        $query = User::staff()->whereIn('id', $uniqueUserIds);
-        app(UserSiteAccessService::class)->applyStaffScope(
-            $query,
-            $user,
-            $this->alertBypassPermissions(),
-        );
+        $query = $this->accessibleStaffQuery($user)
+            ->whereIn('id', $uniqueUserIds);
 
         abort_if(
             $query->count() !== count($uniqueUserIds),
             403,
             'You are not authorized to mention one or more staff members for this alert.',
         );
-    }
-
-    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
-    {
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
-        );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function alertBypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 }

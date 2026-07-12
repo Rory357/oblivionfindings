@@ -3,17 +3,19 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ControlRoomTaskController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
+
     /**
      * List tasks for an alert with assignee name and subtask count.
      */
@@ -263,31 +265,13 @@ class ControlRoomTaskController extends Controller
         }
     }
 
-    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
-    {
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
-        );
-    }
-
     private function assertCanAssignAlertToUser(User $user, int $assigneeUserId): void
     {
-        app(UserSiteAccessService::class)->assertCanAssignControlRoomAlertToUser(
+        $this->siteAccess()->assertCanAssignControlRoomAlertToUser(
             $user,
             $assigneeUserId,
             $this->alertBypassPermissions(),
             'You are not authorized to assign alerts to that staff member.',
         );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function alertBypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 }

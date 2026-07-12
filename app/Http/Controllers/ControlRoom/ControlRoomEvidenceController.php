@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoomAlert;
-use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\File;
@@ -16,6 +15,8 @@ use ZipArchive;
 
 class ControlRoomEvidenceController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
+
     /**
      * List evidence packs for an alert with their items.
      */
@@ -377,23 +378,5 @@ class ControlRoomEvidenceController extends Controller
         ]);
 
         return back()->with('success', 'CCTV bookmark added.');
-    }
-
-    private function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
-    {
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
-        );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function alertBypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 }
