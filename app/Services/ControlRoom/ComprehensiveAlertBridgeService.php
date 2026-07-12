@@ -15,6 +15,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
 use App\Services\AuditLogger;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Support\Facades\Log;
 
 class ComprehensiveAlertBridgeService
@@ -85,31 +86,38 @@ class ComprehensiveAlertBridgeService
     // ─── Client Incidents ───────────────────────────────────────
 
     /**
-     * Bridge a client incident into the Control Room.
-     * Only incidents with severity 'high' or 'critical' are bridged.
+     * Compatibility entry point for the canonical incident journey.
+     * Every submitted incident receives H&S governance; only journey rules decide
+     * whether an operational alert is required.
      */
     public function bridgeClientIncident(ClientIncident $incident): ?ControlRoomAlert
     {
-        if (! in_array($incident->severity, ['high', 'critical'], true)) {
+        if ($incident->status === 'draft') {
             return null;
         }
 
-        return $this->createBridgedAlert([
-            'source' => 'incident',
-            'alert_type' => "incident.{$incident->type}",
-            'severity' => $incident->severity,
-            'client_id' => $incident->client_id,
-            'site_id' => $incident->client?->site_id,
-            'context' => [
-                'incident_id' => $incident->id,
-                'incident_type' => $incident->type,
-                'shift_id' => $incident->shift_id,
-                'site_id' => $incident->client?->site_id,
-                'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                'description' => $incident->description,
-                'reported_by' => $incident->reported_by,
-            ],
+        $journey = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($incident, $incident->reporter);
+        $alert = $journey->alert;
+
+        if ($alert === null) {
+            return null;
+        }
+
+        $context = array_replace_recursive([
+            'incident_id' => $incident->id,
+            'incident_type' => $incident->type,
+            'shift_id' => $incident->shift_id,
+            'site_id' => $incident->site_id ?? $incident->client?->site_id,
+            'occurred_at' => $incident->occurred_at?->toIso8601String(),
+            'description' => $incident->description,
+            'reported_by' => $incident->reported_by,
+        ], (array) $alert->context, [
+            'incident_id' => $incident->id,
         ]);
+        $alert->updateQuietly(['context' => $context]);
+
+        return $alert->fresh();
     }
 
     // ─── Safeguarding Concerns ──────────────────────────────────

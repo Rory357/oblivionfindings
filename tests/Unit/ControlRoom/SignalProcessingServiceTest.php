@@ -3,14 +3,15 @@
 namespace Tests\Unit\ControlRoom;
 
 use App\Models\ControlRoom\Device;
+use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
-use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoomAlert;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class SignalProcessingServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $notificationService = $this->mock(ControlRoomNotificationService::class);
         $notificationService->shouldReceive('notifyAlert')->andReturnNull();
@@ -226,6 +227,126 @@ class SignalProcessingServiceTest extends TestCase
         // Depending on implementation, may create default alert or skip
         $signal->refresh();
         $this->assertContains($signal->status, ['processed', 'skipped']);
+    }
+
+    public function test_incident_tagged_signals_correlate_only_to_the_exact_incident(): void
+    {
+        $source = SignalSource::create([
+            'name' => 'Incident Signals',
+            'slug' => 'incident-signals',
+            'category' => 'medication',
+            'vendor' => 'internal',
+            'status' => 'active',
+        ]);
+        $signalType = SignalType::create([
+            'code' => 'medication.incident',
+            'name' => 'Medication Incident',
+            'category' => 'medication',
+            'default_severity' => 'high',
+        ]);
+        SignalRule::create([
+            'name' => 'Incident signal exact correlation',
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'conditions' => [],
+            'alert_type' => 'Medication incident',
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+            'priority' => 1,
+        ]);
+
+        $first = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'incident-501-first',
+            'normalized_data' => ['incident_id' => 501],
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+        $second = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'incident-502-first',
+            'normalized_data' => ['incident_id' => 502],
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+        $retry = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'incident-501-retry',
+            'normalized_data' => ['incident_id' => 501],
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        $firstAlert = $this->service->process($first);
+        $secondAlert = $this->service->process($second);
+        $retryAlert = $this->service->process($retry);
+
+        $this->assertNotSame($firstAlert?->id, $secondAlert?->id);
+        $this->assertSame($firstAlert?->id, $retryAlert?->id);
+        $this->assertSame(2, ControlRoomAlert::query()->count());
+    }
+
+    public function test_generic_signals_still_use_fuzzy_deduplication(): void
+    {
+        $source = SignalSource::create([
+            'name' => 'Generic Signals',
+            'slug' => 'generic-signals',
+            'category' => 'operations',
+            'vendor' => 'internal',
+            'status' => 'active',
+        ]);
+        $signalType = SignalType::create([
+            'code' => 'operations.generic',
+            'name' => 'Generic Operations Signal',
+            'category' => 'operations',
+            'default_severity' => 'medium',
+        ]);
+        SignalRule::create([
+            'name' => 'Generic fuzzy correlation',
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'conditions' => [],
+            'alert_type' => 'Generic operations',
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+            'priority' => 1,
+        ]);
+
+        $first = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'generic-first',
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+        $second = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'generic-second',
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        $firstAlert = $this->service->process($first);
+        $secondAlert = $this->service->process($second);
+
+        $this->assertSame($firstAlert?->id, $secondAlert?->id);
+        $this->assertSame(1, ControlRoomAlert::query()->count());
     }
 
     // ──────────────────────────────────────

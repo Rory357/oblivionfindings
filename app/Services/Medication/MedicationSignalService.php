@@ -3,9 +3,11 @@
 namespace App\Services\Medication;
 
 use App\Enums\AlertSeverity;
-use App\Models\ControlRoomAlert;
+use App\Models\ClientIncident;
+use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
-use App\Models\ControlRoom\SignalType;
+use App\Models\ControlRoomAlert;
+use App\Models\MedicationError;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Carbon;
@@ -27,17 +29,29 @@ class MedicationSignalService
 {
     // --- Signal type codes ---
     public const TYPE_OVERDUE = 'medication_overdue';
+
     public const TYPE_MISSED_DOSE = 'medication_missed_dose';
+
     public const TYPE_LATE_DOSE = 'medication_late_dose';
+
     public const TYPE_PRN_OVER_LIMIT = 'medication_prn_over_limit';
+
     public const TYPE_CONTROLLED_DISCREPANCY = 'medication_controlled_discrepancy';
+
     public const TYPE_REFUSED_DOSE = 'medication_refused_dose';
+
     public const TYPE_REFUSAL_ESCALATION = 'medication_refusal_escalation';
+
     public const TYPE_UNSAFE_CORRECTION = 'medication_unsafe_correction';
+
     public const TYPE_CONTROLLED_LOSS = 'medication_controlled_loss';
+
     public const TYPE_TRANSIT_EXCEPTION = 'medication_transit_exception';
+
     public const TYPE_EXPIRED = 'medication_expired';
+
     public const TYPE_STOCK_OUT = 'medication_stock_out';
+
     public const TYPE_ERROR = 'medication_error';
 
     // --- Canonical severity mapping ---
@@ -67,11 +81,11 @@ class MedicationSignalService
     /**
      * Emit a medication signal into the Control Room pipeline.
      *
-     * @param string $signalType One of the TYPE_* constants
-     * @param int $clientId Client affected
-     * @param string $severity Canonical severity (low/medium/high/critical)
-     * @param string $message Operator-facing summary
-     * @param array $context Additional medication context for traceability
+     * @param  string  $signalType  One of the TYPE_* constants
+     * @param  int  $clientId  Client affected
+     * @param  string  $severity  Canonical severity (low/medium/high/critical)
+     * @param  string  $message  Operator-facing summary
+     * @param  array  $context  Additional medication context for traceability
      */
     public function emit(
         string $signalType,
@@ -108,7 +122,16 @@ class MedicationSignalService
 
         try {
             $signal = $this->signalProcessor->ingest($signalData);
-            $alert = $this->signalProcessor->process($signal);
+            $incident = $this->trustedIncident($signal, $context);
+            $alert = $incident === null ? null : $this->exactIncidentAlert($incident);
+
+            if ($alert === null) {
+                $alert = $this->signalProcessor->process($signal);
+            }
+
+            if ($alert !== null && $incident !== null) {
+                $this->attachSignalToIncidentAlert($signal, $alert, $incident);
+            }
 
             if ($alert) {
                 Log::info('MedicationSignalService: alert created', [
@@ -138,9 +161,9 @@ class MedicationSignalService
      * Near-miss, minor, and moderate errors are tracked in the MedicationError
      * record and investigation workflow but do NOT enter Control Room.
      *
-     * @param \App\Models\MedicationError $error The medication error record
+     * @param  MedicationError  $error  The medication error record
      */
-    public function emitError(\App\Models\MedicationError $error): void
+    public function emitError(MedicationError $error): void
     {
         // Only major/critical medication errors are operational alerts
         if (! in_array($error->severity, ['major', 'critical'], true)) {
@@ -159,9 +182,10 @@ class MedicationSignalService
             self::TYPE_ERROR,
             $error->client_id,
             $severityMap[$error->severity],
-            'Medication error: ' . str_replace('_', ' ', $error->error_type)
-                . ($medication ? " — {$medication->name}" : ''),
+            'Medication error: '.str_replace('_', ' ', $error->error_type)
+                .($medication ? " — {$medication->name}" : ''),
             [
+                'incident_id' => $error->client_incident_id,
                 'medication_error_id' => $error->id,
                 'client_medication_id' => $error->client_medication_id,
                 'medication_name' => $medication?->name,
@@ -192,7 +216,7 @@ class MedicationSignalService
         $occurredAt = isset($context['occurred_at'])
             ? Carbon::parse($context['occurred_at'])
             : now();
-        $window = $occurredAt->format('Y-m-d H:') . (intdiv((int) $occurredAt->format('i'), 30) * 30);
+        $window = $occurredAt->format('Y-m-d H:').(intdiv((int) $occurredAt->format('i'), 30) * 30);
         $medicationId = $context['client_medication_id'] ?? null;
         [$entityType, $entityId] = $this->relatedEntityIdentity($context);
 
@@ -212,6 +236,7 @@ class MedicationSignalService
     protected function relatedEntityIdentity(array $context): array
     {
         foreach ([
+            'incident_id' => 'client_incident',
             'medication_error_id' => 'medication_error',
             'loss_report_id' => 'loss_report',
             'transport_log_id' => 'transport_log',
@@ -227,6 +252,67 @@ class MedicationSignalService
         }
 
         return [null, null];
+    }
+
+    private function trustedIncident(Signal $signal, array $context): ?ClientIncident
+    {
+        $incidentId = $context['incident_id'] ?? null;
+        if (! is_numeric($incidentId)) {
+            return null;
+        }
+
+        $incident = ClientIncident::query()->find((int) $incidentId);
+        if ($incident === null || (int) $incident->client_id !== (int) $signal->client_id) {
+            Log::warning('MedicationSignalService: rejected untrusted incident correlation', [
+                'signal_id' => $signal->id,
+                'incident_id' => $incidentId,
+                'signal_client_id' => $signal->client_id,
+                'incident_client_id' => $incident?->client_id,
+            ]);
+
+            return null;
+        }
+
+        return $incident;
+    }
+
+    private function exactIncidentAlert(ClientIncident $incident): ?ControlRoomAlert
+    {
+        if ($incident->control_room_alert_id !== null) {
+            $direct = ControlRoomAlert::query()->find($incident->control_room_alert_id);
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        return ControlRoomAlert::query()
+            ->where('context->incident_id', $incident->id)
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function attachSignalToIncidentAlert(
+        Signal $signal,
+        ControlRoomAlert $alert,
+        ClientIncident $incident,
+    ): void {
+        $context = $alert->context ?? [];
+        $normalizedData = array_replace_recursive(
+            (array) ($context['normalized_data'] ?? []),
+            (array) ($signal->normalized_data ?? []),
+            ['incident_id' => $incident->id],
+        );
+
+        $alert->updateQuietly([
+            'context' => array_replace($context, [
+                'incident_id' => $incident->id,
+                'signal_id' => $signal->id,
+                'signal_type_code' => $signal->signal_type_code,
+                'signal_payload' => $signal->payload,
+                'normalized_data' => $normalizedData,
+            ]),
+        ]);
+        $signal->markProcessed($alert, 'Attached to exact incident journey alert');
     }
 
     /**
@@ -268,7 +354,7 @@ class MedicationSignalService
         $query = ControlRoomAlert::query()
             ->with('sla')
             ->unresolved()
-            ->where('source', 'medication')
+            ->whereIn('source', ['medication', 'incident'])
             ->whereRaw(
                 "JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?",
                 [$signalType]

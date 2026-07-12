@@ -12,15 +12,22 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
+use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class MedicationIncidentIntegrationService
 {
     public function __construct(
         protected ?MedicationSignalService $signalService = null,
+        protected ?IncidentJourneyService $journeyService = null,
     ) {
         $this->signalService ??= app(MedicationSignalService::class);
+        $this->journeyService ??= app(IncidentJourneyService::class);
     }
 
     /**
@@ -34,11 +41,11 @@ class MedicationIncidentIntegrationService
         $client = $administration->client;
 
         // Check if we should auto-create
-        if (!$this->shouldAutoCreateIncident('missed_dose', $medication)) {
+        if (! $this->shouldAutoCreateIncident('missed_dose', $medication)) {
             return null;
         }
 
-        $incident = new ClientIncident();
+        $incident = new ClientIncident;
         $incident->client_id = $client->id;
         $incident->title = "Missed medication: {$medication->name}";
         $incident->description = $this->buildMissedDoseDescription($administration, $medication);
@@ -58,7 +65,7 @@ class MedicationIncidentIntegrationService
             $client->id,
             'missed_dose',
             'warning',
-            "Missed dose: {$medication->name} scheduled for " . ($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
+            "Missed dose: {$medication->name} scheduled for ".($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
             $medication->id
         );
 
@@ -68,8 +75,9 @@ class MedicationIncidentIntegrationService
             MedicationSignalService::TYPE_MISSED_DOSE,
             $client->id,
             $severity,
-            "Missed dose: {$medication->name} scheduled for " . ($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
+            "Missed dose: {$medication->name} scheduled for ".($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
             [
+                'incident_id' => $incident->id,
                 'client_medication_id' => $medication->id,
                 'administration_id' => $administration->id,
                 'medication_name' => $medication->name,
@@ -91,21 +99,21 @@ class MedicationIncidentIntegrationService
         ClientMedication $medication,
         int $attemptedBy
     ): ?ClientIncident {
-        if (!$this->shouldAutoCreateIncident('prn_over_limit', $medication)) {
+        if (! $this->shouldAutoCreateIncident('prn_over_limit', $medication)) {
             return null;
         }
 
         $count24h = $medication->prnCountLast24Hours;
         $maxPerDay = (int) filter_var($medication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
 
-        $incident = new ClientIncident();
+        $incident = new ClientIncident;
         $incident->client_id = $client->id;
         $incident->title = "PRN limit exceeded: {$medication->name}";
-        $incident->description = "Attempted to administer PRN medication {$medication->name} when limit already reached.\n\n" .
-            "Maximum per 24h: {$maxPerDay}\n" .
-            "Given in last 24h: {$count24h}\n" .
-            "Attempted by: User ID {$attemptedBy}\n\n" .
-            "System blocked administration.";
+        $incident->description = "Attempted to administer PRN medication {$medication->name} when limit already reached.\n\n".
+            "Maximum per 24h: {$maxPerDay}\n".
+            "Given in last 24h: {$count24h}\n".
+            "Attempted by: User ID {$attemptedBy}\n\n".
+            'System blocked administration.';
         $incident->category = 'medication';
         $incident->severity = 'high';
         $incident->status = 'draft';
@@ -131,6 +139,7 @@ class MedicationIncidentIntegrationService
             'critical',
             "PRN limit exceeded: {$medication->name} ({$count24h}/{$maxPerDay})",
             [
+                'incident_id' => $incident->id,
                 'client_medication_id' => $medication->id,
                 'medication_name' => $medication->name,
                 'prn_count_24h' => $count24h,
@@ -152,49 +161,69 @@ class MedicationIncidentIntegrationService
         ClientControlledDrugDiscrepancy $discrepancy,
         ?int $createdBy = null
     ): ?ClientIncident {
-        $medication = $discrepancy->medication;
-        $client = $discrepancy->client;
+        return DB::transaction(function () use ($discrepancy, $createdBy): ClientIncident {
+            $lockedDiscrepancy = ClientControlledDrugDiscrepancy::query()
+                ->with(['medication', 'client'])
+                ->whereKey($discrepancy->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $medication = $lockedDiscrepancy->medication;
+            $client = $lockedDiscrepancy->client;
+            $incident = $lockedDiscrepancy->incident_id === null
+                ? null
+                : ClientIncident::query()
+                    ->whereKey($lockedDiscrepancy->incident_id)
+                    ->lockForUpdate()
+                    ->first();
 
-        $incident = new ClientIncident();
-        $incident->client_id = $client->id;
-        $incident->title = "Controlled drug discrepancy: {$medication->name}";
-        $incident->description = $this->buildDiscrepancyDescription($discrepancy, $medication);
-        $incident->category = 'controlled_drug';
-        $incident->severity = 'critical';
-        $incident->status = 'submitted';
-        $incident->submitted_at = now();
-        $incident->occurred_at = $discrepancy->reported_at ?? now();
-        $incident->reported_by = $createdBy ?? $discrepancy->reported_by;
-        $this->assignIncidentServiceContext($incident, $discrepancy->service_context_id);
-        $incident->save();
+            if ($incident === null) {
+                $incident = new ClientIncident;
+                $incident->client_id = $client->id;
+                $incident->title = "Controlled drug discrepancy: {$medication->name}";
+                $incident->description = $this->buildDiscrepancyDescription($lockedDiscrepancy, $medication);
+                $incident->category = 'controlled_drug';
+                $incident->severity = 'critical';
+                $incident->status = 'submitted';
+                $incident->submitted_at = now();
+                $incident->occurred_at = $lockedDiscrepancy->reported_at ?? now();
+                $incident->reported_by = $createdBy ?? $lockedDiscrepancy->reported_by;
+                $this->assignIncidentServiceContext($incident, $lockedDiscrepancy->service_context_id);
+                $incident->save();
 
-        $this->linkToMedication($incident, $medication);
+                $this->linkToMedication($incident, $medication);
+                $lockedDiscrepancy->updateQuietly(['incident_id' => $incident->id]);
+            }
 
-        // Dashboard alert (UI compat)
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
-            'controlled_discrepancy',
-            'critical',
-            "Controlled drug discrepancy: {$medication->name} (diff: {$discrepancy->difference})",
-            $medication->id
-        );
+            $actorId = $createdBy ?? $lockedDiscrepancy->reported_by;
+            $actor = $actorId === null ? null : User::query()->find($actorId);
+            $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
-        // Operational signal → Control Room
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
-            $client->id,
-            'critical',
-            "Controlled drug discrepancy: {$medication->name} (diff: {$discrepancy->difference})",
-            [
-                'client_medication_id' => $medication->id,
-                'medication_name' => $medication->name,
-                'discrepancy_id' => $discrepancy->id,
-                'difference' => $discrepancy->difference,
-                'site_id' => $client->site_id,
-            ],
-        );
+            MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'controlled_discrepancy',
+                'critical',
+                "Controlled drug discrepancy: {$medication->name} (diff: {$lockedDiscrepancy->difference})",
+                $medication->id
+            );
 
-        return $incident;
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
+                $client->id,
+                'critical',
+                "Controlled drug discrepancy: {$medication->name} (diff: {$lockedDiscrepancy->difference})",
+                [
+                    'incident_id' => $incident->id,
+                    'client_medication_id' => $medication->id,
+                    'medication_name' => $medication->name,
+                    'discrepancy_id' => $lockedDiscrepancy->id,
+                    'difference' => $lockedDiscrepancy->difference,
+                    'site_id' => $client->site_id,
+                    'occurred_at' => $lockedDiscrepancy->reported_at?->toIso8601String(),
+                ],
+            );
+
+            return $incident->fresh();
+        });
     }
 
     /**
@@ -208,7 +237,7 @@ class MedicationIncidentIntegrationService
     ): ?ClientIncident {
         // Only flag if significant time has passed
         $hoursSince = $original->created_at?->diffInHours(now()) ?? 0;
-        
+
         if ($hoursSince < 4) {
             return null; // Don't auto-create for quick corrections
         }
@@ -216,7 +245,7 @@ class MedicationIncidentIntegrationService
         $medication = $original->medication;
         $client = $original->client;
 
-        $incident = new ClientIncident();
+        $incident = new ClientIncident;
         $incident->client_id = $client->id;
         $incident->title = "Medication correction after {$hoursSince}h: {$medication->name}";
         $incident->description = $this->buildCorrectionDescription($original, $correctionData, $hoursSince);
@@ -244,6 +273,7 @@ class MedicationIncidentIntegrationService
             $hoursSince > 24 ? 'high' : 'medium',
             "Medication correction after {$hoursSince}h: {$medication->name}",
             [
+                'incident_id' => $incident->id,
                 'client_medication_id' => $medication->id,
                 'administration_id' => $original->id,
                 'correction_id' => $correction?->id,
@@ -276,13 +306,13 @@ class MedicationIncidentIntegrationService
 
         $hoursLate = round($lateMinutes / 60, 1);
 
-        $incident = new ClientIncident();
+        $incident = new ClientIncident;
         $incident->client_id = $client->id;
         $incident->title = "Late medication: {$medication->name} ({$hoursLate}h late)";
-        $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n" .
-            "Scheduled: " . ($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown') . "\n" .
-            "Given: " . ($administration->administered_at?->format('d/m/Y H:i') ?? 'Unknown') . "\n" .
-            "Reason: " . ($administration->reason ?? 'Not provided');
+        $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n".
+            'Scheduled: '.($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
+            'Given: '.($administration->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n".
+            'Reason: '.($administration->reason ?? 'Not provided');
         $incident->category = 'medication';
         $incident->severity = $hoursLate > 4 ? 'high' : 'medium';
         $incident->status = 'draft';
@@ -309,6 +339,7 @@ class MedicationIncidentIntegrationService
             $severity,
             "Late dose: {$medication->name} ({$hoursLate}h late)",
             [
+                'incident_id' => $incident->id,
                 'client_medication_id' => $medication->id,
                 'administration_id' => $administration->id,
                 'medication_name' => $medication->name,
@@ -331,22 +362,22 @@ class MedicationIncidentIntegrationService
         ClientMedicationAdministration $administration
     ): ?ClientIncident {
         $medication = $administration->medication;
-        
+
         // Only create incident for high-risk or controlled medications
-        if (!$medication->high_risk && !$medication->controlled_drug) {
+        if (! $medication->high_risk && ! $medication->controlled_drug) {
             return null;
         }
 
         $client = $administration->client;
 
-        $incident = new ClientIncident();
+        $incident = new ClientIncident;
         $incident->client_id = $client->id;
         $incident->title = "Refused medication: {$medication->name}";
-        $incident->description = "Client refused {$medication->name}.\n\n" .
-            "Classification: " . ($medication->high_risk ? 'High Risk' : '') .
-            ($medication->controlled_drug ? ' Controlled Drug' : '') . "\n" .
-            "Reason given: " . ($administration->reason ?? 'Not provided') . "\n" .
-            "Follow-up may be required.";
+        $incident->description = "Client refused {$medication->name}.\n\n".
+            'Classification: '.($medication->high_risk ? 'High Risk' : '').
+            ($medication->controlled_drug ? ' Controlled Drug' : '')."\n".
+            'Reason given: '.($administration->reason ?? 'Not provided')."\n".
+            'Follow-up may be required.';
         $incident->category = 'medication';
         $incident->severity = $medication->controlled_drug ? 'high' : 'medium';
         $incident->status = 'draft';
@@ -371,6 +402,7 @@ class MedicationIncidentIntegrationService
             $medication->controlled_drug ? 'high' : 'medium',
             "Refused dose: {$medication->name}",
             [
+                'incident_id' => $incident->id,
                 'client_medication_id' => $medication->id,
                 'administration_id' => $administration->id,
                 'medication_name' => $medication->name,
@@ -388,134 +420,173 @@ class MedicationIncidentIntegrationService
         MedicationRefusalFollowup $followup,
         int $recentRefusalCount
     ): ?ClientIncident {
-        $followup->loadMissing([
-            'client',
-            'administration.medication',
-        ]);
+        return DB::transaction(function () use ($followup, $recentRefusalCount): ?ClientIncident {
+            $lockedFollowup = MedicationRefusalFollowup::query()
+                ->with(['client', 'administration.medication'])
+                ->lockForUpdate()
+                ->find($followup->id);
 
-        $client = $followup->client;
-        $administration = $followup->administration;
-        $medication = $administration?->medication;
-        $medicationName = $medication?->name ?? 'Medication';
+            $client = $lockedFollowup?->client;
+            $administration = $lockedFollowup?->administration;
+            $medication = $administration?->medication;
+            $medicationName = $medication?->name ?? 'Medication';
 
-        if (! $client) {
-            return null;
-        }
+            if (! $lockedFollowup || ! $client) {
+                return null;
+            }
 
-        $incident = new ClientIncident();
-        $incident->client_id = $client->id;
-        $incident->title = "Repeated medication refusal: {$medicationName}";
-        $incident->description = $this->buildRefusalEscalationDescription(
-            $followup,
-            $medicationName,
-            $recentRefusalCount
-        );
-        $incident->category = 'medication';
-        $incident->severity = ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium';
-        $incident->status = 'submitted';
-        $incident->submitted_at = now();
-        $incident->occurred_at = $followup->created_at ?? now();
-        $incident->reported_by = $followup->created_by;
-        $this->assignIncidentServiceContext(
-            $incident,
-            $administration?->service_context_id ?? $client->service_context_id
-        );
-        $incident->save();
+            $incident = ClientIncident::query()
+                ->where('client_id', $client->id)
+                ->where('metadata->medication_refusal_followup_id', $lockedFollowup->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($medication) {
-            $this->linkToMedication($incident, $medication);
-        }
+            if (! $incident) {
+                $incident = new ClientIncident;
+                $incident->client_id = $client->id;
+                $incident->title = "Repeated medication refusal: {$medicationName}";
+                $incident->description = $this->buildRefusalEscalationDescription(
+                    $lockedFollowup,
+                    $medicationName,
+                    $recentRefusalCount
+                );
+                $incident->category = 'medication';
+                $incident->severity = ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium';
+                $incident->status = 'submitted';
+                $incident->submitted_at = now();
+                $incident->occurred_at = $lockedFollowup->created_at ?? now();
+                $incident->reported_by = $lockedFollowup->created_by;
+                $incident->metadata = [
+                    'medication_refusal_followup_id' => $lockedFollowup->id,
+                ];
+                $this->assignIncidentServiceContext(
+                    $incident,
+                    $administration?->service_context_id ?? $client->service_context_id
+                );
+                $incident->save();
 
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
-            'refusal_escalation',
-            'critical',
-            "{$medicationName}: repeated refusals require follow-up",
-            $medication?->id
-        );
+                if ($medication) {
+                    $this->linkToMedication($incident, $medication);
+                }
+            }
 
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_REFUSAL_ESCALATION,
-            $client->id,
-            ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium',
-            "{$medicationName}: repeated refusals require follow-up",
-            [
-                'client_medication_id' => $medication?->id,
-                'administration_id' => $administration?->id,
-                'followup_id' => $followup->id,
-                'medication_name' => $medicationName,
-                'recent_refusal_count' => $recentRefusalCount,
-                'gp_notification_required' => (bool) $followup->gp_notification_required,
-                'follow_up_due_at' => $followup->follow_up_due_at?->toIso8601String(),
-                'controlled_drug' => $medication?->controlled_drug ?? false,
-                'high_risk' => $medication?->high_risk ?? false,
-                'site_id' => $client->site_id,
-            ],
-        );
+            $actor = $incident->reported_by === null
+                ? null
+                : User::query()->find($incident->reported_by);
+            $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
-        return $incident;
+            MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'refusal_escalation',
+                'critical',
+                "{$medicationName}: repeated refusals require follow-up",
+                $medication?->id
+            );
+
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_REFUSAL_ESCALATION,
+                $client->id,
+                ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium',
+                "{$medicationName}: repeated refusals require follow-up",
+                [
+                    'incident_id' => $incident->id,
+                    'client_medication_id' => $medication?->id,
+                    'administration_id' => $administration?->id,
+                    'followup_id' => $lockedFollowup->id,
+                    'medication_name' => $medicationName,
+                    'recent_refusal_count' => $recentRefusalCount,
+                    'gp_notification_required' => (bool) $lockedFollowup->gp_notification_required,
+                    'follow_up_due_at' => $lockedFollowup->follow_up_due_at?->toIso8601String(),
+                    'controlled_drug' => $medication?->controlled_drug ?? false,
+                    'high_risk' => $medication?->high_risk ?? false,
+                    'site_id' => $client->site_id,
+                    'occurred_at' => $lockedFollowup->created_at?->toIso8601String(),
+                ],
+            );
+
+            return $incident->fresh();
+        });
     }
 
     public function handleControlledLossReport(
         ControlledDrugLossReport $report,
         ?int $createdBy = null
     ): ?ClientIncident {
-        $report->loadMissing([
-            'client',
-            'medication',
-        ]);
+        return DB::transaction(function () use ($report, $createdBy): ?ClientIncident {
+            $lockedReport = ControlledDrugLossReport::query()
+                ->with(['client', 'medication'])
+                ->lockForUpdate()
+                ->find($report->id);
 
-        $client = $report->client;
-        if (! $client) {
-            return null;
-        }
+            $client = $lockedReport?->client;
+            if (! $lockedReport || ! $client) {
+                return null;
+            }
 
-        $medication = $report->medication;
-        $medicationName = $report->medication_name ?: $medication?->name ?: 'Controlled medication';
+            $medication = $lockedReport->medication;
+            $medicationName = $lockedReport->medication_name ?: $medication?->name ?: 'Controlled medication';
+            $incident = $lockedReport->incident_id === null
+                ? null
+                : ClientIncident::query()
+                    ->whereKey($lockedReport->incident_id)
+                    ->lockForUpdate()
+                    ->first();
 
-        $incident = new ClientIncident();
-        $incident->client_id = $client->id;
-        $incident->title = "Controlled drug loss: {$medicationName}";
-        $incident->description = $this->buildControlledLossDescription($report, $medicationName);
-        $incident->category = 'controlled_drug';
-        $incident->severity = 'critical';
-        $incident->status = 'submitted';
-        $incident->submitted_at = now();
-        $incident->occurred_at = $report->discovered_at ?? now();
-        $incident->reported_by = $createdBy ?? $report->discovered_by;
-        $this->assignIncidentServiceContext($incident, $client->service_context_id);
-        $incident->save();
+            if (! $incident) {
+                $incident = new ClientIncident;
+                $incident->client_id = $client->id;
+                $incident->title = "Controlled drug loss: {$medicationName}";
+                $incident->description = $this->buildControlledLossDescription($lockedReport, $medicationName);
+                $incident->category = 'controlled_drug';
+                $incident->severity = 'critical';
+                $incident->status = 'submitted';
+                $incident->submitted_at = now();
+                $incident->occurred_at = $lockedReport->discovered_at ?? now();
+                $incident->reported_by = $createdBy ?? $lockedReport->discovered_by;
+                $this->assignIncidentServiceContext($incident, $client->service_context_id);
+                $incident->save();
 
-        if ($medication) {
-            $this->linkToMedication($incident, $medication);
-        }
+                if ($medication) {
+                    $this->linkToMedication($incident, $medication);
+                }
 
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
-            'controlled_loss',
-            'critical',
-            "Controlled drug loss reported: {$medicationName}",
-            $medication?->id
-        );
+                $lockedReport->updateQuietly(['incident_id' => $incident->id]);
+            }
 
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_CONTROLLED_LOSS,
-            $client->id,
-            'critical',
-            "Controlled drug loss reported: {$medicationName}",
-            [
-                'client_medication_id' => $medication?->id,
-                'loss_report_id' => $report->id,
-                'medication_name' => $medicationName,
-                'quantity_lost' => (string) $report->quantity_lost,
-                'unit' => $report->unit,
-                'reported_to_police' => (bool) $report->reported_to_police,
-                'reported_to_pharmacy' => (bool) $report->reported_to_pharmacy,
-                'site_id' => $client->site_id,
-            ],
-        );
+            $actor = $incident->reported_by === null
+                ? null
+                : User::query()->find($incident->reported_by);
+            $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
-        return $incident;
+            MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'controlled_loss',
+                'critical',
+                "Controlled drug loss reported: {$medicationName}",
+                $medication?->id
+            );
+
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_CONTROLLED_LOSS,
+                $client->id,
+                'critical',
+                "Controlled drug loss reported: {$medicationName}",
+                [
+                    'incident_id' => $incident->id,
+                    'client_medication_id' => $medication?->id,
+                    'loss_report_id' => $lockedReport->id,
+                    'medication_name' => $medicationName,
+                    'quantity_lost' => (string) $lockedReport->quantity_lost,
+                    'unit' => $lockedReport->unit,
+                    'reported_to_police' => (bool) $lockedReport->reported_to_police,
+                    'reported_to_pharmacy' => (bool) $lockedReport->reported_to_pharmacy,
+                    'site_id' => $client->site_id,
+                    'occurred_at' => $lockedReport->discovered_at?->toIso8601String(),
+                ],
+            );
+
+            return $incident->fresh();
+        });
     }
 
     public function handleTransitException(FleetMedicationTransitLog $log): void
@@ -723,21 +794,21 @@ class MedicationIncidentIntegrationService
     ): string {
         $description = "Scheduled medication was not administered.\n\n";
         $description .= "Medication: {$medication->name}\n";
-        $description .= "Dosage: " . ($medication->formatted_dose ?? 'N/A') . "\n";
-        $description .= "Scheduled time: " . ($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown') . "\n";
-        $description .= "Classification: ";
-        
+        $description .= 'Dosage: '.($medication->formatted_dose ?? 'N/A')."\n";
+        $description .= 'Scheduled time: '.($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n";
+        $description .= 'Classification: ';
+
         if ($medication->controlled_drug) {
-            $description .= "Controlled Drug ";
+            $description .= 'Controlled Drug ';
         }
         if ($medication->high_risk) {
-            $description .= "High Risk ";
+            $description .= 'High Risk ';
         }
-        if (!$medication->controlled_drug && !$medication->high_risk) {
-            $description .= "Standard";
+        if (! $medication->controlled_drug && ! $medication->high_risk) {
+            $description .= 'Standard';
         }
-        
-        $description .= "\n\nReason: " . ($administration->reason ?? 'Not recorded') . "\n";
+
+        $description .= "\n\nReason: ".($administration->reason ?? 'Not recorded')."\n";
         $description .= "\nFollow-up actions required per medication policy.";
 
         return $description;
@@ -755,9 +826,9 @@ class MedicationIncidentIntegrationService
         $description .= "Expected quantity: {$discrepancy->on_hand_before}\n";
         $description .= "Actual quantity: {$discrepancy->on_hand_after}\n";
         $description .= "Difference: {$discrepancy->difference}\n";
-        $description .= "\nReason given: " . ($discrepancy->reason ?? 'Not provided') . "\n";
+        $description .= "\nReason given: ".($discrepancy->reason ?? 'Not provided')."\n";
         $description .= "\n⚠️ CRITICAL: Immediate review required.\n";
-        $description .= "Further controlled drug transactions for this medication are blocked until resolved.";
+        $description .= 'Further controlled drug transactions for this medication are blocked until resolved.';
 
         return $description;
     }
@@ -773,19 +844,19 @@ class MedicationIncidentIntegrationService
         $description = "Medication administration was corrected after {$hoursSince} hours.\n\n";
         $description .= "Original record:\n";
         $description .= "- Status: {$original->status}\n";
-        $description .= "- Dose: " . ($original->dose_given ?? 'N/A') . "\n";
-        $description .= "- Time: " . ($original->administered_at?->format('d/m/Y H:i') ?? 'Unknown') . "\n\n";
-        
+        $description .= '- Dose: '.($original->dose_given ?? 'N/A')."\n";
+        $description .= '- Time: '.($original->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n\n";
+
         $description .= "Correction:\n";
-        $description .= "- Status: " . ($correctionData['status'] ?? 'Unknown') . "\n";
-        $description .= "- Dose: " . ($correctionData['dose_given'] ?? 'N/A') . "\n";
-        $description .= "- Time: " . (isset($correctionData['administered_at']) 
-            ? (new \Carbon\Carbon($correctionData['administered_at']))->format('d/m/Y H:i')
-            : 'Unknown') . "\n";
-        $description .= "- Reason: " . ($correctionData['correction_reason'] ?? 'Not provided') . "\n\n";
-        
+        $description .= '- Status: '.($correctionData['status'] ?? 'Unknown')."\n";
+        $description .= '- Dose: '.($correctionData['dose_given'] ?? 'N/A')."\n";
+        $description .= '- Time: '.(isset($correctionData['administered_at'])
+            ? (new Carbon($correctionData['administered_at']))->format('d/m/Y H:i')
+            : 'Unknown')."\n";
+        $description .= '- Reason: '.($correctionData['correction_reason'] ?? 'Not provided')."\n\n";
+
         if ($hoursSince > 24) {
-            $description .= "⚠️ Significant delay in correction - review required.";
+            $description .= '⚠️ Significant delay in correction - review required.';
         }
 
         return $description;
@@ -800,10 +871,10 @@ class MedicationIncidentIntegrationService
         $description .= "Medication: {$medicationName}\n";
         $description .= "Recent refusals/withheld doses in 7 days: {$recentRefusalCount}\n";
         $description .= "Reason category: {$followup->reason_category}\n";
-        $description .= "Detailed reason: " . ($followup->detailed_reason ?: 'Not provided') . "\n";
+        $description .= 'Detailed reason: '.($followup->detailed_reason ?: 'Not provided')."\n";
         $description .= "Capacity at time: {$followup->client_capacity_at_time}\n";
-        $description .= "GP notification required: " . ($followup->gp_notification_required ? 'Yes' : 'No') . "\n";
-        $description .= "Follow-up due: " . ($followup->follow_up_due_at?->format('d/m/Y H:i') ?? 'Not set');
+        $description .= 'GP notification required: '.($followup->gp_notification_required ? 'Yes' : 'No')."\n";
+        $description .= 'Follow-up due: '.($followup->follow_up_due_at?->format('d/m/Y H:i') ?? 'Not set');
 
         return $description;
     }
@@ -814,10 +885,10 @@ class MedicationIncidentIntegrationService
     ): string {
         $description = "Controlled drug loss report submitted.\n\n";
         $description .= "Medication: {$medicationName}\n";
-        $description .= "Quantity lost: {$report->quantity_lost}" . ($report->unit ? " {$report->unit}" : '') . "\n";
+        $description .= "Quantity lost: {$report->quantity_lost}".($report->unit ? " {$report->unit}" : '')."\n";
         $description .= "Circumstances: {$report->circumstances}\n";
-        $description .= "Reported to police: " . ($report->reported_to_police ? 'Yes' : 'No') . "\n";
-        $description .= "Reported to pharmacy: " . ($report->reported_to_pharmacy ? 'Yes' : 'No');
+        $description .= 'Reported to police: '.($report->reported_to_police ? 'Yes' : 'No')."\n";
+        $description .= 'Reported to pharmacy: '.($report->reported_to_pharmacy ? 'Yes' : 'No');
 
         return $description;
     }
@@ -899,7 +970,7 @@ class MedicationIncidentIntegrationService
         ?string $category = null,
         ?string $severity = null,
         int $limit = 50
-    ): \Illuminate\Database\Eloquent\Collection {
+    ): Collection {
         $query = ClientIncident::query()
             ->orderByDesc('created_at');
 

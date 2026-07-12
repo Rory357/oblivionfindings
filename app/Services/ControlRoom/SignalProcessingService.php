@@ -4,8 +4,8 @@ namespace App\Services\ControlRoom;
 
 use App\Enums\AlertSeverity;
 use App\Models\ClientMedicationAdministration;
-use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertQueue;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Playbook;
@@ -18,10 +18,15 @@ use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetOuting;
+use App\Models\FleetResidentTransport;
+use App\Models\FleetSignal;
+use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleStateSnapshot;
 use App\Models\ShiftSignal;
 use App\Services\AuditLogger;
-use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ShiftSignalService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -31,8 +36,7 @@ class SignalProcessingService
     public function __construct(
         protected ControlRoomNotificationService $notifications,
         protected ?ShiftSignalService $shiftSignals = null,
-    )
-    {
+    ) {
         $this->shiftSignals ??= app(ShiftSignalService::class);
     }
 
@@ -67,11 +71,12 @@ class SignalProcessingService
         $existing = Signal::where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
             Log::debug('Signal deduplicated', ['idempotency_key' => $data['idempotency_key']]);
+
             return $existing;
         }
 
         // Resolve signal type
-        if (!empty($data['signal_type_code']) && $data['signal_type_code'] !== 'unknown') {
+        if (! empty($data['signal_type_code']) && $data['signal_type_code'] !== 'unknown') {
             $signalType = SignalType::findByCode($data['signal_type_code']);
             if ($signalType) {
                 $data['signal_type_id'] = $signalType->id;
@@ -80,7 +85,7 @@ class SignalProcessingService
         }
 
         // Record signal source activity
-        if (!empty($data['signal_source_id'])) {
+        if (! empty($data['signal_source_id'])) {
             $source = SignalSource::find($data['signal_source_id']);
             $source?->recordSignal();
         }
@@ -93,7 +98,7 @@ class SignalProcessingService
             $signal = Signal::create(array_merge($data, [
                 'status' => 'pending',
             ]));
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             // Handle race condition: another process created the signal between check and create
             if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
                 $signal = Signal::where('idempotency_key', $data['idempotency_key'])->firstOrFail();
@@ -127,6 +132,7 @@ class SignalProcessingService
             // Check if in maintenance window
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
+
                 return null;
             }
 
@@ -147,6 +153,7 @@ class SignalProcessingService
                 if ($existingAlert) {
                     $signal->markCorrelated($existingAlert);
                     $this->addSignalToAlert($signal, $existingAlert);
+
                     return $existingAlert;
                 }
             }
@@ -323,6 +330,23 @@ class SignalProcessingService
 
         $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
 
+        if (! empty($normalizedData['incident_id'])) {
+            $incidentId = (int) $normalizedData['incident_id'];
+
+            return $query
+                ->where(function ($query) use ($incidentId) {
+                    $query->whereRaw(
+                        "JSON_UNQUOTE(JSON_EXTRACT(context, '$.incident_id')) = ?",
+                        [(string) $incidentId]
+                    )->orWhereRaw(
+                        "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.incident_id')) = ?",
+                        [(string) $incidentId]
+                    );
+                })
+                ->latest('triggered_at')
+                ->first();
+        }
+
         if (! empty($normalizedData['shift_id'])) {
             $query->whereRaw(
                 "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.shift_id')) = ?",
@@ -445,7 +469,7 @@ class SignalProcessingService
     /**
      * Ingest a signal from a fleet signal, enriching with operational context.
      */
-    public function ingestFromFleetSignal(\App\Models\FleetSignal $fleetSignal): Signal
+    public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
         // Eager-load relationships for context enrichment
         $fleetSignal->loadMissing([
@@ -463,16 +487,16 @@ class SignalProcessingService
         $fleetContext = $this->buildFleetContext($fleetSignal);
 
         // Map fleet source to control room signal source
-        $fleetSource = \App\Models\ControlRoom\SignalSource::where('slug', 'queclink_fleet')->first();
+        $fleetSource = SignalSource::where('slug', 'queclink_fleet')->first();
 
-        $signalTypeCode = 'fleet_' . str_replace('.', '_', $fleetSignal->signal_type);
+        $signalTypeCode = 'fleet_'.str_replace('.', '_', $fleetSignal->signal_type);
 
         $data = [
             'signal_source_id' => $fleetSource?->id,
             'signal_type_code' => $signalTypeCode,
             'asset_id' => $fleetSignal->asset_id,
             'site_id' => $fleetSignal->asset?->home_site_id,
-            'external_ref' => 'fleet_signal_' . $fleetSignal->id,
+            'external_ref' => 'fleet_signal_'.$fleetSignal->id,
             'severity_hint' => $fleetSignal->severity_hint ?? 'medium',
             'occurred_at' => $fleetSignal->occurred_at,
             'payload' => array_merge($fleetSignal->payload ?? [], [
@@ -599,7 +623,7 @@ class SignalProcessingService
     /**
      * Build enriched fleet context for control room alerts.
      */
-    protected function buildFleetContext(\App\Models\FleetSignal $signal): array
+    protected function buildFleetContext(FleetSignal $signal): array
     {
         $context = [];
 
@@ -642,7 +666,7 @@ class SignalProcessingService
 
         // Linked booking and outing (reduced to IDs, status, and non-PII labels)
         if ($signal->asset_id) {
-            $activeBooking = \App\Models\FleetVehicleBooking::query()
+            $activeBooking = FleetVehicleBooking::query()
                 ->where('asset_id', $signal->asset_id)
                 ->where('status', 'checked_out')
                 ->first();
@@ -654,7 +678,7 @@ class SignalProcessingService
                     'booked_by_user_id' => $activeBooking->user_id,
                 ];
 
-                $outing = \App\Models\FleetOuting::query()
+                $outing = FleetOuting::query()
                     ->where('booking_id', $activeBooking->id)
                     ->where('status', 'active')
                     ->withCount('residents')
@@ -670,7 +694,7 @@ class SignalProcessingService
             }
 
             // Active transport (count + IDs only — names removed)
-            $activeTransport = \App\Models\FleetResidentTransport::query()
+            $activeTransport = FleetResidentTransport::query()
                 ->where('asset_id', $signal->asset_id)
                 ->where('status', 'in_progress')
                 ->first();
@@ -682,11 +706,11 @@ class SignalProcessingService
 
         // Vehicle state (last known position — already consent-gated)
         if ($signal->asset_id) {
-            $state = \App\Models\FleetVehicleStateSnapshot::query()
+            $state = FleetVehicleStateSnapshot::query()
                 ->where('asset_id', $signal->asset_id)
                 ->first();
 
-            if ($state && $state->latitude && !$state->consent_blocked) {
+            if ($state && $state->latitude && ! $state->consent_blocked) {
                 $context['location'] = [
                     'lat' => (float) $state->latitude,
                     'lng' => (float) $state->longitude,
