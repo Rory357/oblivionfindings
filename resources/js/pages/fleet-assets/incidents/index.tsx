@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -602,6 +603,7 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
     }
     return (
         <div className="overflow-x-auto">
+            <FleetResponsiveTable>
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -631,7 +633,7 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                 }}
                                 className="cursor-pointer transition-colors hover:bg-muted/40 focus:bg-muted/50 focus:outline-none"
                             >
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
+                                <td data-fleet-row-time className="px-4 py-3 align-top whitespace-nowrap">
                                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                         <Calendar className="h-3 w-3" />
                                         {i.occurred_at ? formatDateTime(i.occurred_at) : '—'}
@@ -642,7 +644,7 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                         </span>
                                     </div>
                                 </td>
-                                <td className="px-4 py-3 align-top">
+                                <td data-fleet-row-identity className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-2">
                                         <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`} />
                                         <span className="font-medium capitalize">{titleCase(i.incident_type)}</span>
@@ -670,13 +672,13 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                 <td className="px-4 py-3 align-top">
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}>{sev.label}</span>
                                 </td>
-                                <td className="px-4 py-3 align-top">
+                                <td data-fleet-row-status className="px-4 py-3 align-top">
                                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}>
                                         <StatusIcon className="h-3 w-3" />
                                         {stat.label}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 align-top">
+                                <td data-fleet-row-action className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-1.5">
                                         {i.flags.police_report_due ? <PoliceCountdownPill dueAt={i.flags.police_report_due_at} /> : null}
                                         {i.flags.injury ? <FlagChip tone="critical" icon={<AlertTriangle className="h-3 w-3" />} title="Injury / ACC" /> : null}
@@ -696,6 +698,7 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                     })}
                 </tbody>
             </table>
+            </FleetResponsiveTable>
         </div>
     );
 }

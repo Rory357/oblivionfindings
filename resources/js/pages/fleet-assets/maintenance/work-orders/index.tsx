@@ -1,4 +1,5 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -399,6 +400,7 @@ export default function WorkOrdersIndex({
 
                 {/* Table with priority left borders */}
                 <div className="overflow-hidden rounded-lg border">
+                    <FleetResponsiveTable>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -455,7 +457,7 @@ export default function WorkOrdersIndex({
                                                 className="h-3.5 w-3.5 rounded border-border"
                                             />
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-identity className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Wrench className="h-4 w-4 text-muted-foreground" />
                                                 <RefChip
@@ -495,7 +497,7 @@ export default function WorkOrdersIndex({
                                                 {wo.priority}
                                             </Badge>
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-status data-fleet-row-action className="px-4 py-3">
                                             <Badge
                                                 variant={statusVariant(
                                                     wo.status,
@@ -519,7 +521,7 @@ export default function WorkOrdersIndex({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
+                                        <td data-fleet-row-time className="px-4 py-3 text-muted-foreground">
                                             {wo.created_at
                                                 ? formatDate(wo.created_at)
                                                 : '---'}
@@ -543,6 +545,7 @@ export default function WorkOrdersIndex({
                             )}
                         </tbody>
                     </table>
+                    </FleetResponsiveTable>
                 </div>
 
                 {/* Bulk Action Bar */}

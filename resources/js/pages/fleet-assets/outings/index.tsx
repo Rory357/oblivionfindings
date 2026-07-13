@@ -1,4 +1,5 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
@@ -314,6 +315,7 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                     <Card>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
+                                <FleetResponsiveTable>
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
@@ -330,10 +332,10 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                     <tbody>
                                         {safeOutings.map((outing) => (
                                             <tr key={outing.id} className="border-b last:border-0 hover:bg-muted/20">
-                                                <td className="px-4 py-3 text-xs whitespace-nowrap">
+                                                <td data-fleet-row-time className="px-4 py-3 text-xs whitespace-nowrap">
                                                     {formatDate(outing.planned_departure)}
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td data-fleet-row-identity className="px-4 py-3">
                                                     <Link href={`/fleet-assets/outings/${outing.id}`} className="font-medium text-primary hover:underline dark:text-primary">
                                                         {outing.title}
                                                     </Link>
@@ -366,12 +368,12 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                                         </span>
                                                     ) : '---'}
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td data-fleet-row-status className="px-4 py-3">
                                                     <Badge className={`text-[10px] ${STATUS_COLORS[outing.status] ?? STATUS_COLORS.planned}`}>
                                                         {outing.status}
                                                     </Badge>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td data-fleet-row-action className="px-4 py-3">
                                                     <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                                                         <Link href={`/fleet-assets/outings/${outing.id}`}>View</Link>
                                                     </Button>
@@ -380,6 +382,7 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                         ))}
                                     </tbody>
                                 </table>
+                                </FleetResponsiveTable>
                             </div>
 
                             {/* Pagination */}

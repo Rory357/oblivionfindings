@@ -1,4 +1,5 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
@@ -420,6 +421,7 @@ export default function TransportsIndex({
 
                 {/* Table */}
                 <div className="overflow-hidden rounded-lg border">
+                    <FleetResponsiveTable>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -464,7 +466,7 @@ export default function TransportsIndex({
                                             )
                                         }
                                     >
-                                        <td className="px-3 py-2 whitespace-nowrap">
+                                        <td data-fleet-row-time className="px-3 py-2 whitespace-nowrap">
                                             {t.departed_at
                                                 ? formatDate(t.departed_at)
                                                 : '---'}
@@ -491,7 +493,7 @@ export default function TransportsIndex({
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-3 py-2">
+                                        <td data-fleet-row-identity className="px-3 py-2">
                                             <div className="font-medium">
                                                 {t.resident_name}
                                             </div>
@@ -535,7 +537,7 @@ export default function TransportsIndex({
                                                 t.duration_minutes,
                                             )}
                                         </td>
-                                        <td className="px-3 py-2">
+                                        <td data-fleet-row-status data-fleet-row-action className="px-3 py-2">
                                             <Badge
                                                 variant={statusVariant(
                                                     t.status,
@@ -561,6 +563,7 @@ export default function TransportsIndex({
                             )}
                         </tbody>
                     </table>
+                    </FleetResponsiveTable>
                 </div>
 
                 {/* Pagination */}

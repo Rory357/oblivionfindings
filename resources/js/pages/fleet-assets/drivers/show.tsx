@@ -1,4 +1,6 @@
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { FleetHeroAction } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,7 +34,6 @@ import {
     Timer,
     TrendingDown,
     TrendingUp,
-    User,
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -110,15 +111,6 @@ type Props = {
     scorecard?: Scorecard | null;
 };
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (status) {
-        case 'eligible': return 'default';
-        case 'suspended': return 'destructive';
-        case 'expired': return 'destructive';
-        default: return 'secondary';
-    }
-}
-
 function computeDurationMinutes(startedAt: string | null, endedAt: string | null): number | null {
     if (!startedAt || !endedAt) return null;
     const diffMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
@@ -130,13 +122,6 @@ function getLicenceExpiryDays(dateStr: string | null | undefined): number | null
     const diff = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
     return Math.ceil(diff);
 }
-
-const statusBannerColors: Record<string, string> = {
-    eligible: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
-    suspended: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
-    expired: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
-    unknown: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
-};
 
 function scoreColor(score: number): string {
     if (score >= 80) return FLEET_COLORS.primary;
@@ -202,42 +187,38 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
         >
             <Head title={`Driver: ${driver?.name ?? 'Driver'}`} />
             <PageShell>
-                {/* Header Banner */}
-                <div className={cn('rounded-lg border px-5 py-4', statusBannerColors[driverStatus] ?? statusBannerColors.unknown)}>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/80 dark:bg-black/20">
-                                <User className="h-7 w-7" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold">{driver?.name ?? 'Driver'}</h1>
-                                <div className="mt-1 flex items-center gap-2">
-                                    <Badge variant={statusVariant(driverStatus)} className="text-xs">{driverStatus}</Badge>
-                                    {driver?.hr_status && (
-                                        <Badge variant={driver.hr_status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                                            {driver.hr_status}
-                                        </Badge>
-                                    )}
-                                    {driver?.email && (
-                                        <span className="text-xs opacity-70">{driver.email}</span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openTab('scorecard')} className="bg-white/50 dark:bg-black/20">
-                                <Gauge className="mr-2 h-4 w-4" />
+                <FleetCompactHero
+                    pill={`Driver · ${driverStatus.replace(/_/g, ' ')}`}
+                    title={driver?.name ?? 'Driver'}
+                    backHref="/fleet-assets/drivers"
+                    backLabel="Drivers"
+                    stats={
+                        <>
+                            <CompactHeroStat
+                                label="Safety score"
+                                value={String(aggregatedMetrics.score)}
+                                tone={aggregatedMetrics.score >= 80 ? 'success' : aggregatedMetrics.score >= 60 ? 'warning' : 'critical'}
+                            />
+                            {driver.hr_status ? (
+                                <CompactHeroStat
+                                    label="HR status"
+                                    value={driver.hr_status.replace(/_/g, ' ')}
+                                    tone={driver.hr_status === 'active' ? 'success' : 'warning'}
+                                />
+                            ) : null}
+                        </>
+                    }
+                    actions={
+                        <>
+                            <FleetHeroAction icon={Gauge} onClick={() => openTab('scorecard')} emphasis>
                                 Scorecard
-                            </Button>
-                            <Button variant="outline" size="sm" asChild className="bg-white/50 dark:bg-black/20">
-                                <Link href={`/hr/staff/${driver?.id}`}>
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    HR Profile
-                                </Link>
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                            </FleetHeroAction>
+                            <FleetHeroAction icon={ExternalLink} href={`/hr/staff/${driver?.id}`}>
+                                HR profile
+                            </FleetHeroAction>
+                        </>
+                    }
+                />
 
                 {/* License expiry warning banner */}
                 {(isExpired || isExpiringSoon) && (
@@ -435,7 +416,7 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                     </CardHeader>
                     <CardContent>
                         {safeRecentTrips.length > 0 ? (
-                            <div className="overflow-x-auto rounded-md border">
+                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-md border">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
@@ -483,7 +464,7 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-x-auto rounded-md border">
+                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-md border">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">

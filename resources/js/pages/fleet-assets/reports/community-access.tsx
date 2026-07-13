@@ -180,7 +180,7 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                             <CardTitle className="text-base">Resident Community Participation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-x-auto">
+                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">

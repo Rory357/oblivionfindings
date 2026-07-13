@@ -4,6 +4,7 @@ import {
     HorizontalBarChart,
     MiniBarChart,
 } from '@/components/fleet-charts';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -651,6 +652,7 @@ export default function SchedulesIndex({
 
                 {/* Schedule Table */}
                 <div className="overflow-hidden rounded-lg border">
+                    <FleetResponsiveTable>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -694,7 +696,7 @@ export default function SchedulesIndex({
                                                   : ''
                                         }`}
                                     >
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-identity className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                                 <span className="font-medium">
@@ -735,7 +737,7 @@ export default function SchedulesIndex({
                                                   )
                                                 : '---'}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-status data-fleet-row-time className="px-4 py-3">
                                             {schedule.next_due_at ? (
                                                 <div className="flex items-center gap-2">
                                                     <span>
@@ -810,7 +812,7 @@ export default function SchedulesIndex({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right">
+                                        <td data-fleet-row-action className="px-4 py-3 text-right">
                                             {can.manage ? (
                                                 <Button
                                                     variant="ghost"
@@ -845,6 +847,7 @@ export default function SchedulesIndex({
                             })}
                         </tbody>
                     </table>
+                    </FleetResponsiveTable>
                 </div>
 
                 {createScheduleDialog}

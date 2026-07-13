@@ -833,7 +833,7 @@ export default function FleetAssetsDashboard({
                         </CardHeader>
                         <CardContent>
                             {(recent_alerts ?? []).length > 0 ? (
-                                <div className="overflow-x-auto">
+                                <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead>
                                             <tr className="border-b text-left text-muted-foreground">
@@ -969,7 +969,7 @@ export default function FleetAssetsDashboard({
                                     <CardTitle className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4" /> Fleet by Site</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="overflow-x-auto">
+                                    <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                         <table className="w-full text-xs">
                                             <thead>
                                                 <tr className="border-b text-left text-muted-foreground">

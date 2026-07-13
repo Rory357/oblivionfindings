@@ -1,4 +1,5 @@
 import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import {
     FleetHeroAction,
@@ -765,6 +766,7 @@ export default function FuelIndex({
                 <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
                     {/* Fuel Log Table */}
                     <div className="overflow-hidden rounded-lg border">
+                        <FleetResponsiveTable>
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -800,12 +802,12 @@ export default function FuelIndex({
                                             key={log.id}
                                             className="border-b transition-colors hover:bg-muted/30"
                                         >
-                                            <td className="px-4 py-3">
+                                            <td data-fleet-row-time className="px-4 py-3">
                                                 {log.logged_at
                                                     ? formatDate(log.logged_at)
                                                     : '---'}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td data-fleet-row-identity data-fleet-row-action className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <Fuel className="h-4 w-4 text-muted-foreground" />
                                                     <span className="font-medium">
@@ -837,8 +839,8 @@ export default function FuelIndex({
                                                     log.cost_per_litre ?? 0,
                                                 ).toFixed(3)}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {log.user?.name ?? '---'}
+                                            <td data-fleet-row-status className="px-4 py-3">
+                                                Logged by {log.user?.name ?? '---'}
                                             </td>
                                         </tr>
                                     ))
@@ -854,6 +856,7 @@ export default function FuelIndex({
                                 )}
                             </tbody>
                         </table>
+                        </FleetResponsiveTable>
                     </div>
 
                     {/* Efficiency Chart */}

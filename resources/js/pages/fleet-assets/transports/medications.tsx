@@ -1,4 +1,5 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -414,6 +415,7 @@ export default function MedicationTransitIndex({
                             />
                         ) : (
                             <div className="overflow-x-auto">
+                                <FleetResponsiveTable>
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
@@ -446,12 +448,12 @@ export default function MedicationTransitIndex({
                                                 key={log.id}
                                                 className="transition-colors hover:bg-muted/20"
                                             >
-                                                <td className="whitespace-nowrap px-4 py-3 text-xs">
+                                                <td data-fleet-row-time className="whitespace-nowrap px-4 py-3 text-xs">
                                                     {formatDateTime(
                                                         log.packed_at,
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 font-medium">
+                                                <td data-fleet-row-identity className="px-4 py-3 font-medium">
                                                     <div className="space-y-1">
                                                         <div>
                                                             {log.client?.name ?? '---'}
@@ -513,7 +515,7 @@ export default function MedicationTransitIndex({
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td data-fleet-row-status className="px-4 py-3">
                                                     <div className="space-y-1">
                                                         {statusBadge(log.status)}
                                                         {log.administered_at && (
@@ -534,7 +536,7 @@ export default function MedicationTransitIndex({
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right">
+                                                <td data-fleet-row-action className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-1">
                                                         {log.status ===
                                                             'packed' && (
@@ -576,6 +578,7 @@ export default function MedicationTransitIndex({
                                         ))}
                                     </tbody>
                                 </table>
+                                </FleetResponsiveTable>
                             </div>
                         )}
                     </CardContent>

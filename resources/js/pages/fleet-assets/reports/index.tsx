@@ -542,7 +542,7 @@ export default function FleetReports({
                             <CardTitle className="flex items-center gap-2 text-base"><Car className="h-4 w-4" /> Vehicle Utilisation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-x-auto">
+                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
@@ -597,7 +597,7 @@ export default function FleetReports({
                             <CardTitle className="flex items-center gap-2 text-base"><User className="h-4 w-4" /> Staff Driving Risk</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-x-auto">
+                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
@@ -658,7 +658,7 @@ export default function FleetReports({
                             )}
                             <div>
                                 <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Top Residents by Transport Frequency</div>
-                                <div className="overflow-x-auto">
+                                <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead>
                                             <tr className="border-b text-left text-muted-foreground">

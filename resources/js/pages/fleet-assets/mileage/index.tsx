@@ -1,4 +1,5 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart } from '@/components/fleet-charts';
 import {
@@ -366,6 +367,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                     />
                                 ) : (
                                     <div className="overflow-x-auto">
+                                        <FleetResponsiveTable>
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b bg-muted/30">
@@ -382,7 +384,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                             <tbody className="divide-y">
                                                 {safeData.map((trip) => (
                                                     <tr key={trip.id} className="hover:bg-muted/20 transition-colors">
-                                                        <td className="px-4 py-3 whitespace-nowrap text-xs">
+                                                        <td data-fleet-row-time className="px-4 py-3 whitespace-nowrap text-xs">
                                                             {formatDate(trip.date)}
                                                         </td>
                                                         {is_manager && (
@@ -390,7 +392,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                                 <span className="font-medium text-xs">{trip.user?.name ?? '---'}</span>
                                                             </td>
                                                         )}
-                                                        <td className="px-4 py-3">
+                                                        <td data-fleet-row-identity className="px-4 py-3">
                                                             <div className="flex items-center gap-1 text-xs">
                                                                 <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
                                                                 <span className="truncate max-w-[120px]">{trip.start_location}</span>
@@ -410,11 +412,11 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                         <td className="px-4 py-3 text-right tabular-nums text-xs font-medium">
                                                             {formatCurrency(trip.total_amount)}
                                                         </td>
-                                                        <td className="px-4 py-3">
+                                                        <td data-fleet-row-status className="px-4 py-3">
                                                             {statusBadge(trip.status)}
                                                         </td>
                                                         {canApprove && (
-                                                            <td className="px-4 py-3 text-right">
+                                                            <td data-fleet-row-action className="px-4 py-3 text-right">
                                                                 {trip.status === 'pending' && (
                                                                     <div className="flex items-center justify-end gap-1">
                                                                         <Button
@@ -454,6 +456,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                 ))}
                                             </tbody>
                                         </table>
+                                        </FleetResponsiveTable>
                                     </div>
                                 )}
                             </CardContent>

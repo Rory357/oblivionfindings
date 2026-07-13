@@ -147,7 +147,7 @@ export default function MileageReimbursement() {
                             {data.length === 0 ? (
                                 <div className="py-8 text-center text-muted-foreground">No trip data found for the selected period.</div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b text-left text-muted-foreground">

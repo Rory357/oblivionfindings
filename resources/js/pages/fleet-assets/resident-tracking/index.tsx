@@ -2,6 +2,7 @@ import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import ResidentMap from '@/components/resident-tracking/resident-map';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Geofence, Resident } from '@/components/resident-tracking/types';
@@ -349,6 +350,7 @@ function WanderingAlertsTab({
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
+                        <FleetResponsiveTable>
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -373,7 +375,7 @@ function WanderingAlertsTab({
                                 ) : (
                                     alertData.map((alert) => (
                                         <TableRow key={alert.id}>
-                                            <TableCell>
+                                            <TableCell data-fleet-row-identity>
                                                 <div className="flex items-center gap-3">
                                                     <img
                                                         src={
@@ -404,17 +406,17 @@ function WanderingAlertsTab({
                                             <TableCell className="text-sm">
                                                 {alert.geofence_name ?? '---'}
                                             </TableCell>
-                                            <TableCell className="text-sm">
+                                            <TableCell data-fleet-row-time className="text-sm">
                                                 {formatRelativeTime(alert.triggered_at)}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell data-fleet-row-status>
                                                 <Badge
                                                     className={`text-[10px] ${statusColor(alert.status)}`}
                                                 >
                                                     {alert.status?.replace(/_/g, ' ')}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell data-fleet-row-action className="text-right">
                                                 {canManage ? (
                                                     <div className="flex items-center justify-end gap-1">
                                                         {alert.status !== 'acknowledged' &&
@@ -455,6 +457,7 @@ function WanderingAlertsTab({
                                 )}
                             </TableBody>
                         </Table>
+                        </FleetResponsiveTable>
                     </div>
                 </CardContent>
             </Card>
@@ -1203,7 +1206,7 @@ export default function ResidentTrackingIndex({
                                     className="flex-1 overflow-y-auto p-0"
                                     style={{ maxHeight: '460px' }}
                                 >
-                                    <div ref={sidebarRef}>
+                                    <div ref={sidebarRef} data-fleet-mobile-list>
                                         {activeSideTab === 'alerts' ? (
                                             safeAlerts.length === 0 ? (
                                                 <div className="flex flex-col items-center gap-2 py-10 text-center">

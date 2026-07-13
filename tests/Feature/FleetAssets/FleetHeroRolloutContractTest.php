@@ -371,4 +371,18 @@ class FleetHeroRolloutContractTest extends TestCase
             array_slice($rows[1], 1),
         );
     }
+
+    public function test_driver_detail_and_mobile_dashboard_use_the_fleet_hero_family(): void
+    {
+        $driverSource = file_get_contents(resource_path('js/pages/fleet-assets/drivers/show.tsx'));
+        $mobileSource = file_get_contents(resource_path('js/pages/fleet-assets/mobile/dashboard.tsx'));
+
+        $this->assertIsString($driverSource);
+        $this->assertStringContainsString('<FleetCompactHero', $driverSource);
+        $this->assertStringContainsString('data-fleet-narrow-strategy="horizontal-scroll"', $driverSource);
+
+        $this->assertIsString($mobileSource);
+        $this->assertStringContainsString('data-fleet-mobile-hero', $mobileSource);
+        $this->assertStringContainsString('text-primary-foreground', $mobileSource);
+    }
 }

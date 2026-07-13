@@ -227,7 +227,7 @@ export default function CostAllocation({ by_site: rawSite, by_resident: rawResid
                                     <Card>
                                         <CardHeader><CardTitle className="text-base">House Cost Breakdown</CardTitle></CardHeader>
                                         <CardContent>
-                                            <div className="overflow-x-auto">
+                                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                                 <table className="w-full text-sm">
                                                     <thead>
                                                         <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
@@ -295,7 +295,7 @@ export default function CostAllocation({ by_site: rawSite, by_resident: rawResid
                                     <Card>
                                         <CardHeader><CardTitle className="text-base">Resident Transport Costs</CardTitle></CardHeader>
                                         <CardContent>
-                                            <div className="overflow-x-auto">
+                                            <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                                 <table className="w-full text-sm">
                                                     <thead>
                                                         <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">

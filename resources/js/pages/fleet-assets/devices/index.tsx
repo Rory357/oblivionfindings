@@ -548,7 +548,7 @@ export default function DevicesIndex({
                 {activeTab === 'devices' ? (
                     <>
                         {/* Table */}
-                        <div className="overflow-hidden rounded-lg border">
+                        <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -692,7 +692,7 @@ export default function DevicesIndex({
                             </div>
                         </div>
 
-                        <div className="overflow-hidden rounded-lg border">
+                        <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">

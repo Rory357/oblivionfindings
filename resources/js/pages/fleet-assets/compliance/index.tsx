@@ -230,7 +230,7 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
 
                 {/* Compliance Table */}
                 <div className="rounded-lg border">
-                    <div className="overflow-x-auto">
+                    <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">

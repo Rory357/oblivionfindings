@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import {
     FleetHeroAction,
@@ -594,6 +595,7 @@ export default function AlertsIndex({
 
                 {/* Table with severity left borders */}
                 <div className="overflow-hidden rounded-lg border">
+                    <FleetResponsiveTable>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -648,7 +650,7 @@ export default function AlertsIndex({
                                                 />
                                             </td>
                                         )}
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-identity className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <AlertTriangle
                                                     className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-status-critical' : 'text-status-warning'}`}
@@ -670,7 +672,7 @@ export default function AlertsIndex({
                                                 {alert.severity}
                                             </Badge>
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-status className="px-4 py-3">
                                             <Badge
                                                 variant={statusVariant(
                                                     alert.status,
@@ -693,14 +695,14 @@ export default function AlertsIndex({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
+                                        <td data-fleet-row-time className="px-4 py-3 text-muted-foreground">
                                             {alert.triggered_at
                                                 ? formatDateTime(
                                                       alert.triggered_at,
                                                   )
                                                 : '---'}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td data-fleet-row-action className="px-4 py-3">
                                             {canManage ? (
                                                 <div className="flex gap-1">
                                                     {alert.status ===
@@ -762,6 +764,7 @@ export default function AlertsIndex({
                             )}
                         </tbody>
                     </table>
+                    </FleetResponsiveTable>
                 </div>
 
                 <Card>

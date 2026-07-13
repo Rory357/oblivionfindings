@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -305,6 +306,7 @@ export default function KeyManagement({
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
+                                <FleetResponsiveTable>
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
@@ -320,7 +322,7 @@ export default function KeyManagement({
                                         )}
                                         {filteredHolders.map((h) => (
                                             <tr key={h.vehicle_id} className="border-b last:border-0 transition-colors hover:bg-muted/30 transition-colors">
-                                                <td className="py-3 pr-4">
+                                                <td data-fleet-row-identity className="py-3 pr-4">
                                                     <div className="font-medium">{h.vehicle_name}</div>
                                                     {h.asset_tag && <div className="text-xs text-muted-foreground">{h.asset_tag}</div>}
                                                 </td>
@@ -330,12 +332,13 @@ export default function KeyManagement({
                                                         {h.holder_name ?? '-'}
                                                     </div>
                                                 </td>
-                                                <td className="py-3 pr-4 text-muted-foreground">{formatDate(h.since)}</td>
-                                                <td className="py-3 pr-4">{actionBadge(h.status)}</td>
+                                                <td data-fleet-row-time className="py-3 pr-4 text-muted-foreground">{formatDate(h.since)}</td>
+                                                <td data-fleet-row-status data-fleet-row-action className="py-3 pr-4">{actionBadge(h.status)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                                </FleetResponsiveTable>
                             </div>
                         </CardContent>
                     </Card>
@@ -347,6 +350,7 @@ export default function KeyManagement({
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
+                                <FleetResponsiveTable>
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
@@ -362,9 +366,9 @@ export default function KeyManagement({
                                         )}
                                         {filteredLogs.map((l) => (
                                             <tr key={l.id} className="border-b last:border-0">
-                                                <td className="py-3 pr-4 whitespace-nowrap text-xs">{formatDate(l.created_at)}</td>
-                                                <td className="py-3 pr-4">{l.vehicle ?? '-'}</td>
-                                                <td className="py-3 pr-4">
+                                                <td data-fleet-row-time className="py-3 pr-4 whitespace-nowrap text-xs">{formatDate(l.created_at)}</td>
+                                                <td data-fleet-row-identity className="py-3 pr-4">{l.vehicle ?? '-'}</td>
+                                                <td data-fleet-row-status data-fleet-row-action className="py-3 pr-4">
                                                     {actionBadge(l.action)}
                                                     {l.transferred_to && <span className="ml-1 text-xs text-muted-foreground">to {l.transferred_to}</span>}
                                                 </td>
@@ -373,6 +377,7 @@ export default function KeyManagement({
                                         ))}
                                     </tbody>
                                 </table>
+                                </FleetResponsiveTable>
                             </div>
                         </CardContent>
                     </Card>

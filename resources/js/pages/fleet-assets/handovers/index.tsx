@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -961,6 +962,7 @@ export default function HandoverIndex({
 
                 {/* Table with status color coding */}
                 <div className="overflow-hidden rounded-lg border">
+                    <FleetResponsiveTable>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -990,10 +992,10 @@ export default function HandoverIndex({
                                     key={h.id}
                                     className="border-b transition-colors hover:bg-muted/30"
                                 >
-                                    <td className="px-3 py-2 whitespace-nowrap">
+                                    <td data-fleet-row-time className="px-3 py-2 whitespace-nowrap">
                                         {h.handed_over_at ? formatDate(h.handed_over_at) : '---'}
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td data-fleet-row-identity className="px-3 py-2">
                                         <div className="font-medium">{h.asset?.name ?? '---'}</div>
                                         {h.asset?.registration_number && (
                                             <div className="text-xs text-muted-foreground">
@@ -1009,8 +1011,8 @@ export default function HandoverIndex({
                                             {conditionBadge(h.exterior_condition)}
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2">{statusBadge(h.status)}</td>
-                                    <td className="px-3 py-2 text-right">
+                                    <td data-fleet-row-status className="px-3 py-2">{statusBadge(h.status)}</td>
+                                    <td data-fleet-row-action className="px-3 py-2 text-right">
                                         <Button variant="ghost" size="sm" asChild>
                                             <Link href={`/fleet-assets/handovers/${h.id}`}>
                                                 <Eye className="mr-1 h-3.5 w-3.5" />
@@ -1022,6 +1024,7 @@ export default function HandoverIndex({
                             ))}
                         </tbody>
                     </table>
+                    </FleetResponsiveTable>
                 </div>
 
                 {/* Pagination */}

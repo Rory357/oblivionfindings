@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -242,6 +243,7 @@ export default function InspectionsIndex({
                 {/* Inspections Table */}
                 <Card>
                     <CardContent className="p-0">
+                        <FleetResponsiveTable>
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -266,21 +268,21 @@ export default function InspectionsIndex({
                                 )}
                                 {allInspections.map((insp) => (
                                     <TableRow key={insp.id} className="transition-colors hover:bg-muted/30 transition-colors">
-                                        <TableCell className="whitespace-nowrap text-sm">
+                                        <TableCell data-fleet-row-time className="whitespace-nowrap text-sm">
                                             {insp.completed_at ? formatDate(insp.completed_at)
                                                 : insp.created_at ? formatDate(insp.created_at) : '---'}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell data-fleet-row-identity>
                                             {insp.asset ? (
                                                 <Link href={`/fleet-assets/vehicles/${insp.asset.id}`} className="text-primary hover:underline">{insp.asset.name}</Link>
                                             ) : '---'}
                                         </TableCell>
                                         <TableCell>{insp.user?.name ?? '---'}</TableCell>
                                         <TableCell>{typeBadge(insp.type ?? 'inspection')}</TableCell>
-                                        <TableCell>{resultBadge(insp.passed)}</TableCell>
+                                        <TableCell data-fleet-row-status>{resultBadge(insp.passed)}</TableCell>
                                         <TableCell className="capitalize">{insp.overall_condition ?? '---'}</TableCell>
                                         <TableCell>{insp.odometer != null ? `${formatDistance(insp.odometer)}` : '---'}</TableCell>
-                                        <TableCell>
+                                        <TableCell data-fleet-row-action>
                                             <Button variant="ghost" size="icon" asChild>
                                                 <Link href={`/fleet-assets/inspections/${insp.id}`}><Eye className="h-4 w-4" /></Link>
                                             </Button>
@@ -289,6 +291,7 @@ export default function InspectionsIndex({
                                 ))}
                             </TableBody>
                         </Table>
+                        </FleetResponsiveTable>
                     </CardContent>
                 </Card>
 

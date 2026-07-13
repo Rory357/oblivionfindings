@@ -1347,7 +1347,7 @@ export default function AssetShow({
                                 </CardHeader>
                                 <CardContent>
                                     {(assignments ?? []).length > 0 ? (
-                                        <div className="overflow-x-auto">
+                                        <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
                                                     <tr className="border-b text-left">

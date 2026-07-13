@@ -84,17 +84,20 @@ export default function MobileDashboard({
         <>
             <Head title="Mobile Dashboard" />
             <div className="min-h-screen bg-background">
-                {/* Purple gradient header */}
-                <div className="bg-gradient-to-br from-primary to-primary px-4 pb-6 pt-8 text-white">
+                {/* Explicitly compact mobile Fleet hero: no desktop command-centre chrome. */}
+                <div
+                    data-fleet-mobile-hero
+                    className="bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-4 pb-6 pt-8 text-primary-foreground"
+                >
                     <p
-                        className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70"
+                        className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground/75"
                         dusk="fleet-mobile-dashboard-heading"
                     >
                         Mobile Dashboard
                     </p>
-                    <p className="text-sm font-medium text-primary/70">Welcome back,</p>
+                    <p className="text-sm font-medium text-primary-foreground/75">Welcome back,</p>
                     <h1 className="text-2xl font-bold">{auth_user?.name ?? 'Driver'}</h1>
-                    <p className="mt-1 text-xs text-primary/70">Oblivion Findings Fleet</p>
+                    <p className="mt-1 text-xs text-primary-foreground/75">Oblivion Findings Fleet</p>
                 </div>
 
                 <div className="mx-auto max-w-lg space-y-4 px-4 -mt-3">
@@ -138,7 +141,7 @@ export default function MobileDashboard({
                     </Card>
 
                     {/* Quick Actions */}
-                    <div className="space-y-2">
+                    <div data-fleet-mobile-list className="space-y-2">
                         {quickActions.map((action) => {
                             const IconComp = action.icon;
                             return (
