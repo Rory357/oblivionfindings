@@ -9,6 +9,8 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Tasks\Providers\ControlRoomAlertProvider;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,7 +28,7 @@ class ControlRoomDashboardTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -61,11 +63,11 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dashboard_accessible_by_support_worker_with_view_permission(): void
+    public function test_dashboard_blocked_for_support_worker_without_full_operator_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_dashboard_blocked_for_user_without_permission(): void
@@ -440,17 +442,15 @@ class ControlRoomDashboardTest extends TestCase
             );
     }
 
-    public function test_support_worker_gets_limited_permissions(): void
+    public function test_task5_failed_gate_support_worker_keeps_narrow_alert_task_visibility_without_operator_dashboard(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('can.manage', false)
-                ->where('can.assign', false)
-                ->where('can.escalate', false)
-                ->where('can.create', false)
-            );
+            ->assertForbidden();
+
+        $this->assertFalse($this->supportWorker->canDo('controlRoom.viewAny'));
+        $this->assertTrue($this->supportWorker->canDo('controlRoom.alerts.view'));
+        $this->assertTrue(app(ControlRoomAlertProvider::class)->canView($this->supportWorker));
     }
 
     // ──────────────────────────────────────

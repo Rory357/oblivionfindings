@@ -8,17 +8,26 @@ use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
+use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use App\Services\Incidents\IncidentJourney;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
@@ -219,7 +228,13 @@ class IncidentController extends Controller
         $sites = null;
         $clients = null;
         if ($user->canDo('incidents.viewAny')) {
-            $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+            $siteQuery = Site::query()->where('is_active', true);
+            app(UserSiteAccessService::class)->applySiteScope(
+                $siteQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $sites = $siteQuery->orderBy('name')->get(['id', 'name']);
             $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
         }
 
@@ -228,10 +243,22 @@ class IncidentController extends Controller
         $reportClients = null;
         $reportStaff = null;
         if ($user->canDo('incidents.create')) {
-            $reportClients = Client::query()
-                ->when(! $user->canDo('clients.viewAny'), fn ($qq) => $qq->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id)))
+            $reportClientQuery = Client::query();
+
+            app(UserSiteAccessService::class)->applyClientScope(
+                $reportClientQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $this->applyOrganizationScope($reportClientQuery, $user);
+
+            if (! $this->canReportAcrossHealthSafety($user) && ! $user->canDo('clients.viewAny')) {
+                $reportClientQuery->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id));
+            }
+
+            $reportClients = $reportClientQuery
                 ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']);
+                ->get(['id', 'first_name', 'last_name', 'site_id']);
             $reportStaff = $user->canDo('incidents.followups.manage')
                 ? User::staff()->orderBy('name')->get(['id', 'name'])
                 : [];
@@ -267,6 +294,7 @@ class IncidentController extends Controller
             ],
             'can' => [
                 'create' => $user->canDo('incidents.create'),
+                'followupsManage' => $user->canDo('incidents.followups.manage'),
                 'templatesManage' => $user->canDo('incidents.templates.manage'),
             ],
             // Detail-over-list: when ?incident= is present the dialog opens over
@@ -321,7 +349,7 @@ class IncidentController extends Controller
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
-        $medicationError = \App\Models\MedicationError::query()
+        $medicationError = MedicationError::query()
             ->where('client_incident_id', $incident->id)
             ->with('medication:id,name')
             ->first();
@@ -516,21 +544,37 @@ class IncidentController extends Controller
         return redirect()->route('incidents.index', $params);
     }
 
-    public function store(Request $request, NotifiableEventClassifier $classifier)
-    {
-        abort_unless($request->user()?->canDo('incidents.create'), 403);
+    public function store(
+        Request $request,
+        NotifiableEventClassifier $classifier,
+        IncidentJourneyService $journeys,
+    ) {
+        $actor = $request->user();
+        abort_unless($actor?->canDo('incidents.create'), 403);
+        $canManageFollowups = $actor->canDo('incidents.followups.manage');
 
         $data = $request->validate([
+            'intent' => ['required', 'in:draft,submit'],
+            'report_request_uuid' => ['nullable', 'uuid'],
+            'incident_id' => [
+                'nullable',
+                'integer',
+                Rule::prohibitedIf($request->filled('report_request_uuid')),
+            ],
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'template_id' => ['nullable', 'integer', 'exists:incident_templates,id'],
             'type' => ['required', 'string', 'max:120'],
             'severity' => ['required', 'in:low,medium,high'],
+            'reported_severity' => ['nullable', 'in:critical'],
             'occurred_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => ['nullable', 'string'],
             'witnesses' => ['nullable', 'string'],
+            'harm_or_injury' => ['nullable', 'string', 'max:2000'],
+            'consequence' => ['nullable', 'string', 'max:2000'],
 
             // Near-miss fields
             'potential_severity' => ['nullable', 'in:low,medium,high,critical'],
@@ -549,48 +593,78 @@ class IncidentController extends Controller
             'is_notifiable' => ['sometimes', 'boolean'],
             'site_preserved' => ['sometimes', 'boolean'],
             'worksafe_reference' => ['nullable', 'string', 'max:255'],
+            'worksafe_notification_status' => ['nullable', 'in:pending,notified,acknowledged'],
 
-            // Report-wizard extras (one-submit report flow)
+            // Report-wizard extras
             'hazard' => ['nullable', 'string'],
             'followups' => ['nullable', 'array'],
             'followups.*.notes' => ['required_with:followups', 'string'],
-            'followups.*.assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'followups.*.assigned_to_user_id' => $canManageFollowups
+                ? ['nullable', 'integer', 'exists:users,id']
+                : ['prohibited'],
             'followups.*.due_at' => ['nullable', 'date'],
         ]);
 
-        // Server-side notifiable enforcement (NZ HSWA, G2) — escalate-only: a
-        // hospitalisation / ambulance treatment, or a "notifiable" injury classification,
-        // forces the WorkSafe-notifiable flag regardless of the client-side determination.
-        $harmProxy = in_array($data['medical_treatment_type'] ?? null, ['hospital', 'ambulance'], true)
+        $client = Client::query()->findOrFail($data['client_id']);
+        $healthSafetyFallback = $this->canReportAcrossHealthSafety($actor, $client);
+        abort_unless($actor->can('view', $client) || $healthSafetyFallback, 403);
+
+        app(UserSiteAccessService::class)->assertCanAccessClientId(
+            $actor,
+            $client->id,
+            $this->incidentReportSiteBypassPermissions(),
+        );
+
+        [$shift, $siteId] = $this->validatedIncidentContext(
+            $actor,
+            $client,
+            $data,
+        );
+
+        // Server-side notifiable enforcement (NZ HSWA, G2) is escalate-only.
+        $reportedHarm = trim((string) ($data['harm_or_injury'] ?? ''));
+        $normalisedHarm = strtolower(str_replace([' ', '-'], '_', $reportedHarm));
+        $reportedTreatment = match ($normalisedHarm) {
+            'first_aid', 'first_aid_only' => 'first_aid',
+            'medical', 'medical_treatment', 'medical_centre' => 'medical_centre',
+            'hospital', 'hospitalisation', 'death' => 'hospital',
+            default => null,
+        };
+        $medicalTreatmentType = $data['medical_treatment_type'] ?? $reportedTreatment;
+        $injuryClassification = $data['injury_classification'] ?? (
+            in_array($normalisedHarm, ['hospital', 'hospitalisation', 'death'], true)
+                || ($data['reported_severity'] ?? null) === 'critical'
+                ? 'notifiable'
+                : null
+        );
+        $harmProxy = in_array($medicalTreatmentType, ['hospital', 'ambulance'], true)
             ? NotifiableEventClassifier::HARM_HOSPITALISATION
             : null;
-        $severityProxy = ($data['injury_classification'] ?? null) === 'notifiable'
+        $severityProxy = $injuryClassification === 'notifiable'
             ? NotifiableEventClassifier::SEVERITY_CRITICAL
             : null;
         $isNotifiable = $classifier->isNotifiable($harmProxy, $severityProxy)
             || (bool) ($data['is_notifiable'] ?? false);
+        $isSubmit = $data['intent'] === 'submit';
+        $worksafeStatus = $isNotifiable
+            ? ($data['worksafe_notification_status'] ?? HsEvent::WORKSAFE_PENDING)
+            : null;
+        $metadata = $this->incidentReportMetadata($data);
+        $storedSeverity = ($data['reported_severity'] ?? null) === HsEvent::SEVERITY_CRITICAL
+            ? 'high'
+            : $data['severity'];
 
-        $client = Client::query()->findOrFail($data['client_id']);
-        $this->authorize('view', $client);
-
-        // Only persist shift_id when the reporter is the assigned worker on
-        // that shift (or a manager). Stops a worker forging the link.
-        $shiftId = null;
-        if (! empty($data['shift_id'])) {
-            $shift = Shift::query()->find((int) $data['shift_id']);
-            if ($shift && ($shift->user_id === $request->user()?->id || $request->user()?->canDo('incidents.viewAny'))) {
-                $shiftId = $shift->id;
-            }
-        }
-
-        $incident = ClientIncident::create([
+        $attributes = [
+            'report_request_uuid' => $data['report_request_uuid'] ?? null,
             'client_id' => $client->id,
-            'reported_by' => $request->user()?->id,
-            'shift_id' => $shiftId,
+            'site_id' => $siteId,
+            'reported_by' => $actor->id,
+            'shift_id' => $shift?->id,
             'template_id' => $data['template_id'] ?? null,
             'type' => $data['type'],
-            'severity' => $data['severity'],
-            'status' => 'draft',
+            'severity' => $storedSeverity,
+            'status' => $isSubmit ? 'submitted' : 'draft',
+            'submitted_at' => $isSubmit ? now() : null,
             'source' => 'manual',
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
@@ -598,51 +672,140 @@ class IncidentController extends Controller
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
-            'metadata' => $request->filled('hazard') ? ['hazard' => $data['hazard']] : null,
-
-            // Near-miss
+            'metadata' => $metadata,
             'potential_severity' => $data['potential_severity'] ?? null,
-            'potential_consequence' => $data['potential_consequence'] ?? null,
-
-            // Injury details
+            'potential_consequence' => $data['consequence'] ?? $data['potential_consequence'] ?? null,
             'injured_person_name' => $data['injured_person_name'] ?? null,
             'injured_person_role' => $data['injured_person_role'] ?? null,
             'injured_person_age' => $data['injured_person_age'] ?? null,
             'injury_body_part' => $data['injury_body_part'] ?? null,
             'injury_nature' => $data['injury_nature'] ?? null,
-            'injury_classification' => $data['injury_classification'] ?? null,
-            'medical_treatment_type' => $data['medical_treatment_type'] ?? null,
-
-            // WorkSafe
+            'injury_classification' => $injuryClassification,
+            'medical_treatment_type' => $medicalTreatmentType,
             'is_notifiable' => $isNotifiable,
             'site_preserved' => (bool) ($data['site_preserved'] ?? false),
             'worksafe_reference' => $data['worksafe_reference'] ?? null,
-            'worksafe_notification_status' => $isNotifiable ? 'pending' : null,
-        ]);
+            'worksafe_notification_status' => $worksafeStatus,
+            'worksafe_notified_at' => in_array($worksafeStatus, [HsEvent::WORKSAFE_NOTIFIED, HsEvent::WORKSAFE_ACKNOWLEDGED], true)
+                ? now()
+                : null,
+        ];
 
-        // Auto-escalate abuse/neglect incidents to safeguarding
-        if (preg_match('/abuse|neglect/i', $incident->type)) {
-            SafeguardingConcern::create([
-                'subject_type' => Client::class,
-                'subject_id' => $client->id,
-                'subject_name' => $client->first_name.' '.$client->last_name,
-                'concern_type' => 'incident_escalation',
-                'severity' => $incident->severity,
-                'description' => $incident->description,
-                'occurred_at' => $incident->occurred_at,
-                'reported_by_user_id' => $request->user()?->id,
-                'reported_by_name' => $request->user()?->name,
-                'status' => 'open',
-                'requires_external_referral' => true,
-                'related_incident_id' => $incident->id,
-                'created_by' => $request->user()?->id,
-            ]);
-        }
+        [$incident, $journey, $created, $submittedNow] = DB::transaction(
+            function () use ($actor, $attributes, $client, $data, $isSubmit, $journeys, $shift, $siteId): array {
+                $created = false;
+                $submittedNow = false;
+                $journey = null;
 
-        // High severity alert -> managers only (drafts can still be high severity)
-        if ($incident->severity === 'high') {
+                if (! empty($data['report_request_uuid'])) {
+                    $requestUuid = (string) $data['report_request_uuid'];
+                    $incident = ClientIncident::query()
+                        ->where('report_request_uuid', $requestUuid)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $incident) {
+                        $createAttributes = $attributes;
+                        unset($createAttributes['report_request_uuid']);
+                        $incident = ClientIncident::query()->createOrFirst(
+                            ['report_request_uuid' => $requestUuid],
+                            $createAttributes,
+                        );
+                        $created = $incident->wasRecentlyCreated;
+
+                        if (! $created) {
+                            $incident = ClientIncident::query()
+                                ->where('report_request_uuid', $requestUuid)
+                                ->lockForUpdate()
+                                ->firstOrFail();
+                        }
+                    }
+
+                    if (! $created) {
+                        $this->assertCanReuseIncidentReport($actor, $incident, $client);
+                        $this->assertIncidentIdentity($incident, $client, $shift, $siteId);
+                    }
+                } elseif (! empty($data['incident_id'])) {
+                    $incident = ClientIncident::query()
+                        ->whereKey((int) $data['incident_id'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $incident) {
+                        throw ValidationException::withMessages([
+                            'incident_id' => 'The saved incident is not available.',
+                        ]);
+                    }
+
+                    $this->assertCanReuseIncidentReport($actor, $incident, $client);
+                    $this->assertIncidentIdentity($incident, $client, $shift, $siteId);
+                } else {
+                    $incident = ClientIncident::query()->create($attributes);
+                    $created = true;
+                }
+
+                if (! $created) {
+                    if ($incident->status === 'submitted' && $isSubmit) {
+                        $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
+
+                        return [$journey->incident, $journey, false, false];
+                    }
+
+                    if ($incident->status !== 'draft') {
+                        throw ValidationException::withMessages([
+                            (! empty($data['report_request_uuid']) ? 'report_request_uuid' : 'incident_id') => 'Only a saved draft can be reused for this action.',
+                        ]);
+                    }
+
+                    $incident->fill($attributes);
+                    $incident->save();
+                    $submittedNow = $isSubmit;
+                } else {
+                    $submittedNow = $isSubmit;
+                }
+
+                if ($created && preg_match('/abuse|neglect/i', $incident->type)) {
+                    SafeguardingConcern::query()->create([
+                        'subject_type' => Client::class,
+                        'subject_id' => $client->id,
+                        'subject_name' => $client->first_name.' '.$client->last_name,
+                        'concern_type' => 'incident_escalation',
+                        'severity' => $incident->severity,
+                        'description' => $incident->description,
+                        'occurred_at' => $incident->occurred_at,
+                        'reported_by_user_id' => $actor->id,
+                        'reported_by_name' => $actor->name,
+                        'status' => 'open',
+                        'requires_external_referral' => true,
+                        'related_incident_id' => $incident->id,
+                        'created_by' => $actor->id,
+                    ]);
+                }
+
+                if ($created) {
+                    foreach ($data['followups'] ?? [] as $followup) {
+                        $incident->followups()->create([
+                            'notes' => $followup['notes'],
+                            'assigned_to_user_id' => $followup['assigned_to_user_id'] ?? null,
+                            'due_at' => $followup['due_at'] ?? null,
+                            'created_by' => $actor->id,
+                        ]);
+                    }
+                }
+
+                if ($isSubmit) {
+                    $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
+                    $incident = $journey->incident;
+                }
+
+                return [$incident->fresh(), $journey, $created, $submittedNow];
+            },
+            3,
+        );
+
+        if ($created && ! $isSubmit && $incident->severity === 'high') {
             app(NotificationService::class)->notifyCrud(
-                $request->user(),
+                $actor,
                 'created',
                 'incident',
                 $incident,
@@ -654,35 +817,262 @@ class IncidentController extends Controller
                     'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
                     'url' => url("/incidents/{$incident->id}"),
                     'include_assigned_workers' => false,
-                ]
+                ],
             );
         }
 
-        // Report-wizard follow-ups: created alongside the incident in one submit.
-        foreach ($data['followups'] ?? [] as $fu) {
-            $incident->followups()->create([
-                'notes' => $fu['notes'],
-                'assigned_to_user_id' => $fu['assigned_to_user_id'] ?? null,
-                'due_at' => $fu['due_at'] ?? null,
-                'created_by' => $request->user()?->id,
+        if ($submittedNow) {
+            $this->notifyIncidentSubmitted($request, $incident);
+        }
+
+        $result = $this->incidentReportResult($incident, $journey);
+        $message = $isSubmit ? 'Incident submitted.' : 'Draft saved.';
+
+        if ($request->boolean('stay')) {
+            return back()->with('success', $message)->with('incident_report_result', $result);
+        }
+
+        if ($request->boolean('continue_wizard') && ! $isSubmit) {
+            return redirect()
+                ->route('incidents.create', ['incident' => $incident->id])
+                ->with('success', 'Draft saved. Add any extra detail below.')
+                ->with('incident_report_result', $result);
+        }
+
+        return redirect()
+            ->route('incidents.show', $incident)
+            ->with('success', $message)
+            ->with('incident_report_result', $result);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{0: Shift|null, 1: int|null}
+     */
+    private function validatedIncidentContext(
+        User $actor,
+        Client $client,
+        array $data,
+    ): array {
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->incidentReportSiteBypassPermissions();
+        $clientSiteId = $client->site_id ? (int) $client->site_id : null;
+        $suppliedSiteId = isset($data['site_id']) ? (int) $data['site_id'] : null;
+
+        if ($suppliedSiteId) {
+            $siteAccess->assertCanAccessSiteId($actor, $suppliedSiteId, $bypassPermissions);
+        }
+
+        $shift = isset($data['shift_id'])
+            ? Shift::query()->with('client:id,site_id,organization_id')->find((int) $data['shift_id'])
+            : null;
+
+        if (isset($data['shift_id']) && ! $shift) {
+            throw ValidationException::withMessages([
+                'shift_id' => 'The selected shift is not available for this incident.',
             ]);
         }
 
-        // In-place wizard (the modal-first Report flow / H&S command-centre): stay
-        // on the referring page so its props refresh and the success pane can show.
-        if ($request->boolean('stay')) {
-            return back()
-                ->with('success', 'Incident recorded.')
-                ->with('created_incident_id', $incident->id);
+        if ($shift) {
+            $siteAccess->assertCanAccessShift($actor, $shift, $bypassPermissions);
+
+            if (
+                (int) $shift->client_id !== (int) $client->id
+                || (int) $shift->user_id !== (int) $actor->id
+            ) {
+                throw ValidationException::withMessages([
+                    'shift_id' => 'The selected shift is not available for this incident.',
+                ]);
+            }
         }
 
-        if ($request->boolean('continue_wizard')) {
-            return redirect()
-                ->route('incidents.create', ['incident' => $incident->id])
-                ->with('success', 'Incident saved. Add any extra detail below.');
+        $shiftSiteId = $shift ? $siteAccess->shiftSiteId($shift) : null;
+        if ($shift && $clientSiteId !== null && $shiftSiteId !== null && $clientSiteId !== $shiftSiteId) {
+            throw ValidationException::withMessages([
+                'shift_id' => 'The selected shift is not available for this incident.',
+            ]);
         }
 
-        return redirect()->route('incidents.show', $incident)->with('success', 'Incident draft created.');
+        $resolvedSiteId = $shift ? $shiftSiteId : $clientSiteId;
+        if ($suppliedSiteId !== null && $suppliedSiteId !== $resolvedSiteId) {
+            throw ValidationException::withMessages([
+                'site_id' => 'The selected site does not match this incident.',
+            ]);
+        }
+
+        $siteAccess->assertCanAccessSiteId($actor, $resolvedSiteId, $bypassPermissions);
+
+        return [$shift, $resolvedSiteId];
+    }
+
+    private function assertIncidentIdentity(
+        ClientIncident $incident,
+        Client $client,
+        ?Shift $shift,
+        ?int $siteId,
+    ): void {
+        if ((int) $incident->client_id !== (int) $client->id) {
+            throw ValidationException::withMessages([
+                'client_id' => 'The saved incident belongs to a different client.',
+            ]);
+        }
+
+        if (($incident->shift_id ? (int) $incident->shift_id : null) !== ($shift?->id ? (int) $shift->id : null)) {
+            throw ValidationException::withMessages([
+                'shift_id' => 'The saved incident belongs to a different shift.',
+            ]);
+        }
+
+        if (($incident->site_id ? (int) $incident->site_id : null) !== $siteId) {
+            throw ValidationException::withMessages([
+                'site_id' => 'The saved incident belongs to a different site.',
+            ]);
+        }
+    }
+
+    private function assertCanReuseIncidentReport(
+        User $actor,
+        ClientIncident $incident,
+        Client $client,
+    ): void {
+        abort_unless(
+            (int) $incident->reported_by === (int) $actor->id
+            && ($actor->can('view', $incident) || $this->canReportAcrossHealthSafety($actor, $client)),
+            403,
+        );
+    }
+
+    /** @param array<string, mixed> $data */
+    private function incidentReportMetadata(array $data): ?array
+    {
+        $metadata = [];
+
+        if (filled($data['hazard'] ?? null)) {
+            $metadata['hazard'] = $data['hazard'];
+        }
+
+        if (filled($data['harm_or_injury'] ?? null)) {
+            $metadata['reported_harm_or_injury'] = trim((string) $data['harm_or_injury']);
+        }
+
+        if (($data['reported_severity'] ?? null) === HsEvent::SEVERITY_CRITICAL) {
+            $metadata['journey']['original_alert_severity'] = HsEvent::SEVERITY_CRITICAL;
+        }
+
+        return $metadata === [] ? null : $metadata;
+    }
+
+    /** @return array<string, string> */
+    private function incidentReportResult(
+        ClientIncident $incident,
+        ?IncidentJourney $journey,
+    ): array {
+        $result = [
+            'result' => $incident->status === 'draft' ? 'draft' : 'submitted',
+            'incident_reference' => (string) $incident->reference_number,
+            'incident_url' => route('incidents.show', $incident),
+        ];
+
+        if (! $journey?->hsEvent) {
+            return $result;
+        }
+
+        $result['hs_reference'] = (string) $journey->hsEvent->reference_number;
+        $result['handover_state'] = match ($journey->hsEvent->handover_status) {
+            HsEvent::HANDOVER_AWAITING_ACCEPTANCE => 'awaiting_hs_acceptance',
+            HsEvent::HANDOVER_ACCEPTED => 'accepted_by_hs',
+            default => (string) $journey->hsEvent->handover_status,
+        };
+
+        if ($journey->alert?->reference_number) {
+            $result['alert_reference'] = (string) $journey->alert->reference_number;
+        }
+
+        return $result;
+    }
+
+    private function notifyIncidentSubmitted(Request $request, ClientIncident $incident): void
+    {
+        $incident->loadMissing(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'submitted',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.submitted',
+                'severity' => $incident->severity,
+                'title' => 'Incident submitted for review',
+                'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
+                'url' => url("/incidents/{$incident->id}"),
+                'include_entity_user' => false,
+            ],
+        );
+
+        if ($incident->severity !== 'high') {
+            return;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'submitted',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.high_severity_alert',
+                'severity' => $incident->severity,
+                'title' => 'High severity incident submitted',
+                'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
+                'url' => url("/incidents/{$incident->id}"),
+                'include_assigned_workers' => false,
+                'include_entity_user' => false,
+                'include_managers' => false,
+            ],
+        );
+    }
+
+    private function canReportAcrossHealthSafety(User $user, ?Client $client = null): bool
+    {
+        $canReport = $user->canDo('incidents.create')
+            && $user->canDo('healthSafety.viewAllSites');
+
+        return $canReport && (! $client || $this->sharesOrganization($user, $client));
+    }
+
+    private function sharesOrganization(User $user, Client $client): bool
+    {
+        if ($user->organization_id === null || $client->organization_id === null) {
+            return true;
+        }
+
+        return (int) $user->organization_id === (int) $client->organization_id;
+    }
+
+    private function applyOrganizationScope(Builder $query, User $user): void
+    {
+        if ($user->organization_id === null) {
+            return;
+        }
+
+        $query->where(fn (Builder $organizationQuery) => $organizationQuery
+            ->whereNull('organization_id')
+            ->orWhere('organization_id', $user->organization_id));
+    }
+
+    /** @return array<int, string> */
+    private function healthSafetySiteBypassPermissions(): array
+    {
+        return ['healthSafety.viewAllSites'];
+    }
+
+    /** @return array<int, string> */
+    private function incidentReportSiteBypassPermissions(): array
+    {
+        return ['healthSafety.viewAllSites', 'reports.viewAny'];
     }
 
     /**
@@ -806,57 +1196,83 @@ class IncidentController extends Controller
         return back()->with('success', 'Attachment sharing updated.');
     }
 
-    public function submit(Request $request, ClientIncident $incident)
-    {
-        $this->authorize('submit', $incident);
+    public function submit(
+        Request $request,
+        ClientIncident $incident,
+        IncidentJourneyService $journeys,
+    ) {
+        $actor = $request->user();
+        abort_unless($actor, 403);
 
-        $incident->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
-        $incident->load(['client:id,first_name,last_name']);
-        $client = $incident->client;
-
-        app(NotificationService::class)->notifyCrud(
-            $request->user(),
-            'submitted',
-            'incident',
-            $incident,
-            $client,
-            [
-                'event_key' => 'incidents.submitted',
-                'severity' => $incident->severity,
-                'title' => 'Incident submitted for review',
-                'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
-                'url' => url("/incidents/{$incident->id}"),
-                // Submission is for managers to action; avoid pinging the submitter again.
-                'include_entity_user' => false,
-            ]
-        );
-
-        // High severity: extra managers-only alert on submission.
-        if ($incident->severity === 'high') {
-            app(NotificationService::class)->notifyCrud(
-                $request->user(),
-                'submitted',
-                'incident',
-                $incident,
-                $client,
-                [
-                    'event_key' => 'incidents.high_severity_alert',
-                    'severity' => $incident->severity,
-                    'title' => 'High severity incident submitted',
-                    'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
-                    'url' => url("/incidents/{$incident->id}"),
-                    'include_assigned_workers' => false,
-                    'include_entity_user' => false,
-                    'include_managers' => false,
-                ]
+        if ($incident->status === 'submitted') {
+            abort_unless(
+                $actor->canDo('incidents.submit')
+                && (int) $incident->reported_by === (int) $actor->id
+                && $actor->can('view', $incident),
+                403,
             );
+        } else {
+            $this->authorize('submit', $incident);
         }
 
-        return back()->with('success', 'Incident submitted.');
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
+        $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
+
+        [$incident, $journey, $submittedNow] = DB::transaction(
+            function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions): array {
+                $locked = ClientIncident::query()
+                    ->whereKey($incident->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                abort_unless(
+                    $actor->canDo('incidents.submit')
+                    && (int) $locked->reported_by === (int) $actor->id
+                    && $actor->can('view', $locked),
+                    403,
+                );
+
+                $siteAccess->assertCanAccessClientIncident($actor, $locked, $siteBypassPermissions);
+
+                if ($locked->status === 'submitted') {
+                    $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
+
+                    return [$journey->incident, $journey, false];
+                }
+
+                abort_unless(
+                    $locked->status === 'draft'
+                    && empty($locked->submitted_at)
+                    && ! $locked->isShiftLinked(),
+                    403,
+                );
+
+                $locked->loadMissing(['client:id,site_id', 'shift.client:id,site_id']);
+                $siteId = $locked->shift
+                    ? app(UserSiteAccessService::class)->shiftSiteId($locked->shift)
+                    : ($locked->client?->site_id ? (int) $locked->client->site_id : null);
+
+                $locked->fill([
+                    'site_id' => $locked->site_id ?: $siteId,
+                    'status' => 'submitted',
+                    'submitted_at' => now(),
+                ])->save();
+
+                $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
+
+                return [$journey->incident, $journey, true];
+            },
+            3,
+        );
+
+        if ($submittedNow) {
+            $this->notifyIncidentSubmitted($request, $incident);
+        }
+
+        return back()
+            ->with('success', 'Incident submitted.')
+            ->with('incident_report_result', $this->incidentReportResult($incident, $journey));
     }
 
     public function review(Request $request, ClientIncident $incident)
@@ -1064,7 +1480,7 @@ class IncidentController extends Controller
         return HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
-            ->whereHas('investigations', fn ($q) => $q->where('status', \App\Models\HsInvestigation::STATUS_COMPLETED))
+            ->whereHas('investigations', fn ($q) => $q->where('status', HsInvestigation::STATUS_COMPLETED))
             ->exists();
     }
 

@@ -34,15 +34,69 @@ type Workflow = {
 };
 
 const WORKFLOWS: Workflow[] = [
-    { key: 'incident', label: 'Report incident / near-miss', desc: 'Events register · WorkSafe check', icon: ShieldAlert, inPlace: true },
-    { key: 'hazard', label: 'Log hazard + risk assessment', desc: 'L×C matrix · hierarchy of control', icon: AlertOctagon, inPlace: true },
-    { key: 'first_aid', label: 'Record first-aid treatment', desc: 'First-aid register', icon: HeartPulse, inPlace: true },
-    { key: 'restraint', label: 'Log restraint event', desc: 'Least-restrictive · debrief', icon: Clipboard, inPlace: true },
-    { key: 'drill', label: 'Record emergency drill', desc: 'Fire / evacuation / lockdown', icon: Siren, inPlace: true },
-    { key: 'rtw', label: 'Injury → return-to-work', desc: 'ACC claim · RTW plan', icon: Activity, inPlace: true },
-    { key: 'substance', label: 'Add hazardous substance', desc: 'SDS · Hazardous Substances Regs 2017', icon: FlaskConical, inPlace: true },
-    { key: 'lone', label: 'Lone-worker check-in', desc: 'Check-in / escalate to on-call', icon: PersonStanding, inPlace: true },
-    { key: 'participation', label: 'Worker participation / committee', desc: 'HSR · committee minutes', icon: Users, inPlace: true },
+    {
+        key: 'incident',
+        label: 'Report incident',
+        desc: 'Events register · WorkSafe check',
+        icon: ShieldAlert,
+        inPlace: true,
+    },
+    {
+        key: 'hazard',
+        label: 'Log hazard + risk assessment',
+        desc: 'L×C matrix · hierarchy of control',
+        icon: AlertOctagon,
+        inPlace: true,
+    },
+    {
+        key: 'first_aid',
+        label: 'Record first-aid treatment',
+        desc: 'First-aid register',
+        icon: HeartPulse,
+        inPlace: true,
+    },
+    {
+        key: 'restraint',
+        label: 'Log restraint event',
+        desc: 'Least-restrictive · debrief',
+        icon: Clipboard,
+        inPlace: true,
+    },
+    {
+        key: 'drill',
+        label: 'Record emergency drill',
+        desc: 'Fire / evacuation / lockdown',
+        icon: Siren,
+        inPlace: true,
+    },
+    {
+        key: 'rtw',
+        label: 'Injury → return-to-work',
+        desc: 'ACC claim · RTW plan',
+        icon: Activity,
+        inPlace: true,
+    },
+    {
+        key: 'substance',
+        label: 'Add hazardous substance',
+        desc: 'SDS · Hazardous Substances Regs 2017',
+        icon: FlaskConical,
+        inPlace: true,
+    },
+    {
+        key: 'lone',
+        label: 'Lone-worker check-in',
+        desc: 'Check-in / escalate to on-call',
+        icon: PersonStanding,
+        inPlace: true,
+    },
+    {
+        key: 'participation',
+        label: 'Worker participation / committee',
+        desc: 'HSR · committee minutes',
+        icon: Users,
+        inPlace: true,
+    },
 ];
 
 export function ReportLauncher({
@@ -58,9 +112,12 @@ export function ReportLauncher({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Report a health &amp; safety event</DialogTitle>
+                    <DialogTitle>
+                        Report a health &amp; safety event
+                    </DialogTitle>
                     <DialogDescription>
-                        Choose a workflow — everything is recorded against the relevant NZ register.
+                        Choose a workflow — everything is recorded against the
+                        relevant NZ register.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -82,8 +139,12 @@ export function ReportLauncher({
                             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <w.icon className="h-4 w-4" />
                             </span>
-                            <span className="text-sm font-semibold text-foreground">{w.label}</span>
-                            <span className="text-[11px] text-muted-foreground">{w.desc}</span>
+                            <span className="text-sm font-semibold text-foreground">
+                                {w.label}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                                {w.desc}
+                            </span>
                         </button>
                     ))}
                 </div>

@@ -2,29 +2,36 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Domain\Governance\Models\NotifiableIncident;
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
 use App\Models\HsCommittee;
 use App\Models\HsRepresentative;
-use App\Models\LoneWorkerAlert;
-use App\Models\AppSetting;
+use App\Models\PpeAllocation;
+use App\Models\PpeInventory;
 use App\Models\SafeguardingConcern;
+use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
-use App\Domain\Governance\Models\NotifiableIncident;
+use App\Services\HealthSafety\DrillComplianceService;
 use App\Services\HealthSafety\HsAnalyticsService;
 use App\Services\HealthSafety\HsDashboardService;
 use App\Services\HealthSafety\HsKpiService;
 use App\Services\HealthSafety\RestraintKpiService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HealthSafetyDashboardController extends Controller
 {
@@ -33,11 +40,13 @@ class HealthSafetyDashboardController extends Controller
         private readonly HsAnalyticsService $analyticsService,
         private readonly HsKpiService $kpiService,
         private readonly RestraintKpiService $restraintKpiService,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
+
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
      */
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $now = Carbon::now();
         $thirtyDaysAgo = $now->copy()->subDays(30);
@@ -82,7 +91,7 @@ class HealthSafetyDashboardController extends Controller
 
         // Drill compliance — single source of truth (reconciles with the drills
         // register hero, analytics site league + site-profile Drills badge).
-        $drillCompliancePct = app(\App\Services\HealthSafety\DrillComplianceService::class)->compliancePct();
+        $drillCompliancePct = app(DrillComplianceService::class)->compliancePct();
 
         // Lone worker active alerts — canonical ControlRoomAlert is the operational source of truth
         $activeAlerts = ControlRoomAlert::where('source', 'lone_worker')
@@ -111,15 +120,15 @@ class HealthSafetyDashboardController extends Controller
             'staff_compliance_pct' => (int) round($this->kpiService->trainingAuditCompliancePct() ?? 0),
             'days_since_lti' => $this->kpiService->daysSinceLostTimeInjury($siteId),
             // PPE compliance (cross-module B2) — site-scoped when a site filter is active.
-            'ppe_inspections_overdue' => \App\Models\PpeInventory::query()
+            'ppe_inspections_overdue' => PpeInventory::query()
                 ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
                 ->whereNotIn('status', ['condemned', 'disposed'])
                 ->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<', $now->toDateString())->count(),
-            'ppe_expiring' => \App\Models\PpeInventory::query()
+            'ppe_expiring' => PpeInventory::query()
                 ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
                 ->whereNotIn('status', ['condemned', 'disposed'])
                 ->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', $now->copy()->addDays(60)->toDateString())->count(),
-            'ppe_unacknowledged' => \App\Models\PpeAllocation::query()
+            'ppe_unacknowledged' => PpeAllocation::query()
                 ->whereNull('returned_at')->where('acknowledged', false)
                 ->when($siteId, fn ($q) => $q->whereHas('ppeInventory', fn ($iq) => $iq->where('site_id', $siteId)))
                 ->count(),
@@ -128,10 +137,10 @@ class HealthSafetyDashboardController extends Controller
         // -- Incident Trends (12 months) --
         $twelveMonthsAgo = $now->copy()->subMonths(12)->startOfMonth();
         $incidentTrends = ClientIncident::select(
-                DB::raw("DATE_FORMAT(occurred_at, '%Y-%m') as month"),
-                'type',
-                DB::raw('COUNT(*) as count')
-            )
+            DB::raw("DATE_FORMAT(occurred_at, '%Y-%m') as month"),
+            'type',
+            DB::raw('COUNT(*) as count')
+        )
             ->where('occurred_at', '>=', $twelveMonthsAgo)
             ->groupBy('month', 'type')
             ->orderBy('month')
@@ -144,6 +153,7 @@ class HealthSafetyDashboardController extends Controller
                     $types[$item->type] = $item->count;
                     $total += $item->count;
                 }
+
                 return [
                     'month' => $month,
                     'count' => $total,
@@ -154,6 +164,17 @@ class HealthSafetyDashboardController extends Controller
 
         // ── H&S Backbone summary (PR5 addition — additive) ──
         $backboneSummary = $this->dashboardService->getDashboardSummary($thirtyDaysAgo);
+        $user = $request->user();
+        $hsSiteBypass = ['healthSafety.viewAllSites'];
+        $siteQuery = Site::query()->orderBy('name');
+        $this->siteAccess->applySiteScope($siteQuery, $user, $hsSiteBypass);
+        $clientQuery = Client::query()->orderBy('first_name');
+        $this->siteAccess->applyClientScope($clientQuery, $user, $hsSiteBypass);
+        if ($user?->organization_id !== null) {
+            $clientQuery->where(fn ($organizationQuery) => $organizationQuery
+                ->whereNull('organization_id')
+                ->orWhere('organization_id', $user->organization_id));
+        }
 
         return Inertia::render('health-safety/dashboard', [
             'kpis' => $kpis,
@@ -168,12 +189,11 @@ class HealthSafetyDashboardController extends Controller
                 'lens' => $lens,
             ],
             'lens' => $lens,
-            'sites' => Site::orderBy('name')->get(['id', 'name']),
+            'sites' => $siteQuery->get(['id', 'name']),
             // Org/brand name comes from Settings → Branding (AppSetting `branding.name`), the
             // same source the rest of the app reads — set it there, not on the organizations row.
             'org_name' => rescue(fn () => AppSetting::query()->where('key', 'branding.name')->value('value') ?? config('app.name'), null, false),
-            'clients' => Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])
-                ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
+            'clients' => $clientQuery->get(['id', 'first_name', 'last_name', 'site_id']),
             'staff' => User::query()
                 ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
                 ->orderBy('name')
@@ -235,12 +255,12 @@ class HealthSafetyDashboardController extends Controller
             // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
             'procedures' => rescue(function () {
                 $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
-                $covered = \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                $covered = SafeWorkProcedure::query()->where('status', 'approved')
                     ->whereIn('category', $highRisk)->distinct()->pluck('category')->all();
 
                 return [
-                    'approved' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')->count(),
-                    'review_due' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                    'approved' => SafeWorkProcedure::query()->where('status', 'approved')->count(),
+                    'review_due' => SafeWorkProcedure::query()->where('status', 'approved')
                         ->whereNotNull('review_date')->where('review_date', '<=', now()->addDays(30))->count(),
                     'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
                 ];
@@ -269,7 +289,7 @@ class HealthSafetyDashboardController extends Controller
      * HsAnalyticsService. NZ-only metrics (LTIFR/TRIFR, WorkSafe notifiable,
      * Nga Paerewa). See docs/HEALTH_SAFETY_ANALYTICS_BACKEND_AUDIT.md.
      */
-    public function analytics(Request $request): \Inertia\Response
+    public function analytics(Request $request): Response
     {
         $period = (string) $request->input('period', 'ytd'); // 30d|q|6m|ytd|custom
         [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));
@@ -313,7 +333,7 @@ class HealthSafetyDashboardController extends Controller
      * CSV export of the active analytics view (read-only register records).
      * Honours the same period / site_id / drill filters as the page.
      */
-    public function analyticsExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function analyticsExport(Request $request): StreamedResponse
     {
         $period = (string) $request->input('period', 'ytd');
         [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));
@@ -339,7 +359,7 @@ class HealthSafetyDashboardController extends Controller
      * JSON records for the read-only drill-in detail modal. Same scoping as
      * the page + the clicked breakdown's drill filter. Capped for display.
      */
-    public function analyticsRecords(Request $request): \Illuminate\Http\JsonResponse
+    public function analyticsRecords(Request $request): JsonResponse
     {
         $period = (string) $request->input('period', 'ytd');
         [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));

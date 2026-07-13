@@ -12,7 +12,7 @@ use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
-class ControlRoomAlertProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     /**
      * Same bypass list ControlRoomAlertController uses for its site scoping.
@@ -120,7 +120,8 @@ class ControlRoomAlertProvider implements TaskProvider, HasModelClass, Assignabl
 
     public function canView(User $user): bool
     {
-        return $user->canDo('controlRoom.viewAny');
+        return $user->canDo('controlRoom.viewAny')
+            || $user->canDo('controlRoom.alerts.view');
     }
 
     public function tasks(User $user, array $filters = []): array

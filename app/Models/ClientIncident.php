@@ -23,6 +23,7 @@ class ClientIncident extends Model implements EmitsToTimeline
 
     protected $fillable = [
         'reference_number',
+        'report_request_uuid',
         'client_id',
         'site_id',
         'hs_event_id',

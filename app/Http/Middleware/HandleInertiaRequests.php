@@ -292,6 +292,10 @@ class HandleInertiaRequests extends Middleware
                 // The incident report wizard reads this so its success pane can
                 // open the newly-created incident over the register.
                 'created_incident_id' => session('created_incident_id'),
+                // Canonical incident reporting returns official references and
+                // the truthful H&S handover state; it never derives a reference
+                // from a raw database id.
+                'incident_report_result' => session('incident_report_result'),
                 // The New-alert wizard reads this so its success pane can open
                 // the freshly-raised alert's workspace.
                 'created_alert_id' => session('created_alert_id'),

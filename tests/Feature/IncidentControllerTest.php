@@ -2,17 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
 use App\Models\Role;
+use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsInvestigationService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
+use App\Services\Tasks\Providers\ControlRoomAlertProvider;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class IncidentControllerTest extends TestCase
@@ -20,15 +32,20 @@ class IncidentControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $staff;
+
     protected User $coordinator;
+
+    protected Site $site;
+
     protected Client $client;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -51,20 +68,45 @@ class IncidentControllerTest extends TestCase
         ]);
         $this->staff->roles()->attach(Role::where('name', 'support_worker')->first());
 
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->client->supportWorkers()->attach($this->staff->id);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->staff->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
     }
 
     // ──────────────────────────────────────────────────────────────
     //  Helper: create a mock for NotificationService
     // ──────────────────────────────────────────────────────────────
 
-    protected function mockNotificationService(): \Mockery\MockInterface
+    protected function mockNotificationService(): MockInterface
     {
         $mock = \Mockery::mock(NotificationService::class)->shouldIgnoreMissing();
         $this->app->instance(NotificationService::class, $mock);
 
         return $mock;
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    protected function reportPayload(array $overrides = []): array
+    {
+        return array_replace([
+            'intent' => 'draft',
+            'report_request_uuid' => (string) Str::uuid(),
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'type' => 'fall',
+            'severity' => 'low',
+            'occurred_at' => now()->format('Y-m-d H:i:s'),
+            'description' => 'Client slipped beside the dining table.',
+        ], $overrides);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -113,6 +155,205 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($userNoPerms)
             ->get('/incidents')
             ->assertForbidden();
+    }
+
+    public function test_incident_reporting_role_permissions_are_narrow_and_explicit(): void
+    {
+        $healthSafety = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
+        $healthSafetyIncidentKeys = $healthSafety->permissions()
+            ->where('key', 'like', 'incidents.%')
+            ->pluck('key')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame(['incidents.create'], $healthSafetyIncidentKeys);
+
+        $coordinator = Role::query()->where('name', 'coordinator')->firstOrFail();
+        $this->assertTrue($coordinator->permissions()->where('key', 'controlRoom.alerts.create')->exists());
+
+        $supportWorker = Role::query()->where('name', 'support_worker')->firstOrFail();
+        $this->assertFalse($supportWorker->permissions()->where('key', 'controlRoom.viewAny')->exists());
+        $this->assertTrue($supportWorker->permissions()->where('key', 'controlRoom.alerts.view')->exists());
+        $this->assertTrue($supportWorker->permissions()->where('key', 'incidents.viewAssigned')->exists());
+        $this->assertTrue($supportWorker->permissions()->where('key', 'incidents.create')->exists());
+        $this->assertTrue($supportWorker->permissions()->where('key', 'incidents.submit')->exists());
+        $this->assertTrue(app(ControlRoomAlertProvider::class)->canView($this->staff));
+    }
+
+    public function test_health_safety_officer_can_use_the_visible_canonical_incident_action(): void
+    {
+        $this->mockNotificationService();
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => $this->client->organization_id,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+
+        $this->actingAs($officer)
+            ->post('/incidents', $this->reportPayload())
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('client_incidents', [
+            'client_id' => $this->client->id,
+            'reported_by' => $officer->id,
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_task5_integration_health_safety_incident_action_does_not_disclose_or_accept_a_foreign_organization_client(): void
+    {
+        $this->client->update(['organization_id' => 1]);
+        $foreignClient = Client::factory()->create([
+            'organization_id' => 2,
+            'site_id' => $this->site->id,
+        ]);
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+
+        $this->actingAs($officer)
+            ->get(route('health-safety.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('clients', 1)
+                ->where('clients.0.id', $this->client->id));
+
+        $this->actingAs($officer)
+            ->post('/incidents', $this->reportPayload(['client_id' => $foreignClient->id]))
+            ->assertForbidden();
+
+        $this->assertSame(0, ClientIncident::query()->count());
+    }
+
+    public function test_task5_hardening_health_safety_create_permission_does_not_widen_incident_list_or_detail_visibility(): void
+    {
+        $this->client->update(['organization_id' => 1]);
+        $sameOrganizationIncident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create([
+            'organization_id' => 2,
+            'site_id' => $foreignSite->id,
+        ]);
+        $foreignIncident = ClientIncident::factory()->create([
+            'client_id' => $foreignClient->id,
+            'site_id' => $foreignSite->id,
+        ]);
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+
+        $this->actingAs($officer)->get('/incidents')->assertForbidden();
+        $this->actingAs($officer)->get("/incidents/{$sameOrganizationIncident->id}")->assertForbidden();
+        $this->actingAs($officer)->get("/incidents/{$foreignIncident->id}")->assertForbidden();
+    }
+
+    public function test_task5_hardening_report_picker_scopes_view_any_coordinator_by_site_and_organization(): void
+    {
+        $this->client->update([
+            'first_name' => 'Aroha',
+            'organization_id' => 1,
+        ]);
+        $this->coordinator->update(['organization_id' => 1]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $otherSite = Site::factory()->create(['is_active' => true]);
+        Client::factory()->create([
+            'first_name' => 'Bella',
+            'organization_id' => 1,
+            'site_id' => $otherSite->id,
+        ]);
+        Client::factory()->create([
+            'first_name' => 'Charlie',
+            'organization_id' => 2,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('reportClients', 1)
+                ->where('reportClients.0.id', $this->client->id)
+                ->has('sites', 1)
+                ->where('sites.0.id', $this->site->id));
+    }
+
+    public function test_task5_hardening_store_rejects_site_scoped_coordinator_foreign_site_crafted_post(): void
+    {
+        $this->coordinator->update(['organization_id' => 1]);
+        $this->client->update(['organization_id' => 1]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $foreignSiteClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $foreignSite->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post('/incidents', $this->reportPayload([
+                'client_id' => $foreignSiteClient->id,
+                'site_id' => $foreignSite->id,
+            ]))
+            ->assertForbidden();
+
+        $this->assertSame(0, ClientIncident::query()->count());
+    }
+
+    public function test_task5_hardening_report_picker_scopes_cross_site_provider_manager_by_organization(): void
+    {
+        $this->client->update([
+            'first_name' => 'Aroha',
+            'organization_id' => 1,
+        ]);
+        $otherSite = Site::factory()->create();
+        $sameOrganizationClient = Client::factory()->create([
+            'first_name' => 'Bella',
+            'organization_id' => 1,
+            'site_id' => $otherSite->id,
+        ]);
+        Client::factory()->create([
+            'first_name' => 'Charlie',
+            'organization_id' => 2,
+            'site_id' => $otherSite->id,
+        ]);
+        $manager = User::factory()->create([
+            'role' => 'provider_manager',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $manager->roles()->attach(Role::where('name', 'provider_manager')->firstOrFail());
+
+        $this->actingAs($manager)
+            ->get('/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('reportClients', 2)
+                ->where('reportClients.0.id', $this->client->id)
+                ->where('reportClients.1.id', $sameOrganizationClient->id));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -389,8 +630,8 @@ class IncidentControllerTest extends TestCase
 
     public function test_filter_by_site_id(): void
     {
-        $siteA = \App\Models\Site::factory()->create();
-        $siteB = \App\Models\Site::factory()->create();
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
         $clientA = Client::factory()->create(['site_id' => $siteA->id]);
         $clientB = Client::factory()->create(['site_id' => $siteB->id]);
         ClientIncident::factory()->create(['client_id' => $clientA->id]);
@@ -494,7 +735,7 @@ class IncidentControllerTest extends TestCase
     public function test_create_forwards_client_prefill(): void
     {
         $this->actingAs($this->admin)
-            ->get('/incidents/create?client_id=' . $this->client->id)
+            ->get('/incidents/create?client_id='.$this->client->id)
             ->assertRedirect(route('incidents.index', ['report' => 'incident', 'report_client_id' => $this->client->id]));
     }
 
@@ -503,7 +744,7 @@ class IncidentControllerTest extends TestCase
         $incident = ClientIncident::factory()->create(['status' => 'draft']);
 
         $this->actingAs($this->admin)
-            ->get('/incidents/create?incident=' . $incident->id)
+            ->get('/incidents/create?incident='.$incident->id)
             ->assertRedirect(route('incidents.index', ['incident' => $incident->id]));
     }
 
@@ -522,7 +763,9 @@ class IncidentControllerTest extends TestCase
 
         $response = $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
+                'site_id' => $this->site->id,
                 'type' => 'fall',
                 'severity' => 'medium',
                 'occurred_at' => now()->format('Y-m-d H:i:s'),
@@ -533,9 +776,12 @@ class IncidentControllerTest extends TestCase
             ]);
 
         $response->assertRedirect();
+        $incident = ClientIncident::query()->latest('id')->firstOrFail();
+
         $this->assertDatabaseHas('client_incidents', [
             'client_id' => $this->client->id,
             'reported_by' => $this->staff->id,
+            'site_id' => $this->site->id,
             'type' => 'fall',
             'severity' => 'medium',
             'status' => 'draft',
@@ -545,6 +791,487 @@ class IncidentControllerTest extends TestCase
             'immediate_action_taken' => 'Applied ice pack',
             'witnesses' => 'Jane Doe',
         ]);
+        $this->assertNull($incident->submitted_at);
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+        $response->assertSessionHas('incident_report_result', function (array $result) use ($incident): bool {
+            $this->assertSame('draft', $result['result'] ?? null);
+            $this->assertSame($incident->reference_number, $result['incident_reference'] ?? null);
+            $this->assertArrayNotHasKey('hs_reference', $result);
+            $this->assertArrayNotHasKey('handover_state', $result);
+            $this->assertArrayNotHasKey('incident_id', $result);
+            $this->assertArrayNotHasKey('created_incident_id', $result);
+
+            return true;
+        });
+    }
+
+    public function test_store_rejects_invalid_intent_without_creating_a_record(): void
+    {
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload(['intent' => 'save']))
+            ->assertSessionHasErrors(['intent']);
+
+        $this->assertSame(0, ClientIncident::query()->count());
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_store_submit_creates_hs_synchronously_and_returns_official_references(): void
+    {
+        $this->mockNotificationService();
+
+        $response = $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload(['intent' => 'submit']));
+
+        $response->assertRedirect();
+        $incident = ClientIncident::query()->sole();
+        $hsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->sole();
+
+        $this->assertSame('submitted', $incident->status);
+        $this->assertNotNull($incident->submitted_at);
+        $this->assertSame($this->site->id, $incident->site_id);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $hsEvent->handover_status);
+        $this->assertSame(0, ControlRoomAlert::query()->count(), 'Low incidents must not create an automatic alert.');
+        $response->assertSessionHas('incident_report_result', function (array $result) use ($incident, $hsEvent): bool {
+            $this->assertSame('submitted', $result['result'] ?? null);
+            $this->assertSame($incident->reference_number, $result['incident_reference'] ?? null);
+            $this->assertSame($hsEvent->reference_number, $result['hs_reference'] ?? null);
+            $this->assertSame('awaiting_hs_acceptance', $result['handover_state'] ?? null);
+            $this->assertArrayNotHasKey('incident_id', $result);
+            $this->assertArrayNotHasKey('hs_event_id', $result);
+
+            return true;
+        });
+    }
+
+    public function test_store_high_submit_creates_one_canonical_alert(): void
+    {
+        $this->mockNotificationService();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'severity' => 'high',
+            ]))
+            ->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $hsEvent = HsEvent::query()->sole();
+        $alert = ControlRoomAlert::query()->sole();
+
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
+    }
+
+    public function test_task5_hardening_direct_submit_response_loss_retry_reuses_one_uuid_backed_journey(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+        $payload = $this->reportPayload([
+            'intent' => 'submit',
+            'report_request_uuid' => $requestUuid,
+            'severity' => 'high',
+        ]);
+
+        $first = $this->actingAs($this->staff)->post('/incidents', $payload);
+        $retry = $this->actingAs($this->staff)->post('/incidents', $payload);
+
+        $first->assertRedirect();
+        $retry->assertRedirect();
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame(1, HsEvent::query()->count());
+        $this->assertSame(1, ControlRoomAlert::query()->count());
+
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame($requestUuid, $incident->report_request_uuid);
+        $first->assertSessionHas('incident_report_result', fn (array $result): bool => ($result['incident_reference'] ?? null) === $incident->reference_number);
+        $retry->assertSessionHas('incident_report_result', fn (array $result): bool => ($result['incident_reference'] ?? null) === $incident->reference_number);
+    }
+
+    public function test_task5_hardening_shift_linked_draft_to_submit_reuses_the_same_report_uuid(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->staff->id,
+        ]);
+        $draftPayload = $this->reportPayload([
+            'intent' => 'draft',
+            'report_request_uuid' => $requestUuid,
+            'shift_id' => $shift->id,
+            'severity' => 'high',
+        ]);
+
+        $this->actingAs($this->staff)->post('/incidents', $draftPayload)->assertRedirect();
+        $this->actingAs($this->staff)->post('/incidents', array_replace($draftPayload, [
+            'intent' => 'submit',
+        ]))->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame($requestUuid, $incident->report_request_uuid);
+        $this->assertSame($shift->id, $incident->shift_id);
+        $this->assertSame('submitted', $incident->status);
+        $this->assertSame(1, HsEvent::query()->count());
+        $this->assertSame(1, ControlRoomAlert::query()->count());
+    }
+
+    public function test_task5_hardening_report_uuid_collision_rejects_actor_and_incident_context_changes(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'report_request_uuid' => $requestUuid,
+            ]))
+            ->assertRedirect();
+
+        $otherSite = Site::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+        $otherClient->supportWorkers()->attach($this->staff->id);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => $requestUuid,
+                'client_id' => $otherClient->id,
+                'site_id' => $otherSite->id,
+            ]))
+            ->assertForbidden();
+
+        $otherWorker = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $otherWorker->roles()->attach(Role::where('name', 'support_worker')->firstOrFail());
+        $this->client->supportWorkers()->attach($otherWorker->id);
+
+        $this->actingAs($otherWorker)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => $requestUuid,
+            ]))
+            ->assertForbidden();
+
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame('draft', ClientIncident::query()->sole()->status);
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_task5_hardening_rejects_ambiguous_uuid_and_legacy_incident_identity_without_duplication(): void
+    {
+        $this->mockNotificationService();
+        $draftRequestUuid = (string) Str::uuid();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'report_request_uuid' => $draftRequestUuid,
+            ]))
+            ->assertRedirect();
+
+        $draft = ClientIncident::query()->sole();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => (string) Str::uuid(),
+                'incident_id' => $draft->id,
+            ]))
+            ->assertSessionHasErrors(['incident_id']);
+
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_task5_hardening_critical_hs_report_preserves_incident_time_harm_worksafe_and_critical_journey_provenance(): void
+    {
+        $this->mockNotificationService();
+        $occurredAt = now()->subHours(5)->startOfMinute();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'occurred_at' => $occurredAt->format('Y-m-d H:i:s'),
+                'severity' => 'high',
+                'reported_severity' => 'critical',
+                'harm_or_injury' => 'hospitalisation',
+                'consequence' => 'Serious head injury requiring hospital care.',
+                'is_notifiable' => true,
+                'site_preserved' => true,
+                'worksafe_notification_status' => 'notified',
+                'worksafe_reference' => 'WS-2026-7788',
+            ]))
+            ->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $hsEvent = HsEvent::query()->sole();
+        $alert = ControlRoomAlert::query()->sole();
+
+        $this->assertTrue($incident->occurred_at->equalTo($occurredAt));
+        $this->assertSame('high', $incident->severity);
+        $this->assertSame('critical', data_get($incident->metadata, 'journey.original_alert_severity'));
+        $this->assertSame('hospital', $incident->medical_treatment_type);
+        $this->assertSame('notifiable', $incident->injury_classification);
+        $this->assertSame('Serious head injury requiring hospital care.', $incident->potential_consequence);
+        $this->assertTrue((bool) $incident->is_notifiable);
+        $this->assertTrue((bool) $incident->site_preserved);
+        $this->assertSame('notified', $incident->worksafe_notification_status);
+        $this->assertSame('WS-2026-7788', $incident->worksafe_reference);
+        $this->assertNotNull($incident->worksafe_notified_at);
+        $this->assertSame(HsEvent::SEVERITY_CRITICAL, $hsEvent->severity);
+        $this->assertSame(HsEvent::WORKSAFE_NOTIFIED, $hsEvent->worksafe_status);
+        $this->assertSame(HsEvent::SEVERITY_CRITICAL, $alert->severity);
+    }
+
+    public function test_task5_hardening_critical_provenance_forces_the_supported_incident_severity_enum(): void
+    {
+        $this->mockNotificationService();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'severity' => 'low',
+                'reported_severity' => 'critical',
+            ]))
+            ->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame('high', $incident->severity);
+        $this->assertSame('critical', data_get($incident->metadata, 'journey.original_alert_severity'));
+        $this->assertSame(HsEvent::SEVERITY_CRITICAL, HsEvent::query()->sole()->severity);
+        $this->assertSame(HsEvent::SEVERITY_CRITICAL, ControlRoomAlert::query()->sole()->severity);
+    }
+
+    public function test_task5_hardening_create_only_reporter_cannot_assign_followups_or_create_partial_records(): void
+    {
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => $this->client->organization_id,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+
+        $this->actingAs($officer)
+            ->post('/incidents', $this->reportPayload([
+                'followups' => [[
+                    'notes' => 'Assign a manager follow-up.',
+                    'assigned_to_user_id' => $this->coordinator->id,
+                ]],
+            ]))
+            ->assertSessionHasErrors(['followups.0.assigned_to_user_id']);
+
+        $this->assertSame(0, ClientIncident::query()->count());
+        $this->assertSame(0, IncidentFollowup::query()->count());
+    }
+
+    public function test_task5_hardening_reporter_with_followup_manage_permission_can_assign_followups(): void
+    {
+        $this->mockNotificationService();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post('/incidents', $this->reportPayload([
+                'followups' => [[
+                    'notes' => 'Complete the care-plan review.',
+                    'assigned_to_user_id' => $this->staff->id,
+                ]],
+            ]))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('incident_followups', [
+            'notes' => 'Complete the care-plan review.',
+            'assigned_to_user_id' => $this->staff->id,
+        ]);
+    }
+
+    public function test_store_draft_to_submit_and_retry_reuses_one_complete_journey(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'draft',
+                'report_request_uuid' => $requestUuid,
+                'severity' => 'high',
+            ]))
+            ->assertRedirect();
+
+        $draft = ClientIncident::query()->sole();
+        $submitPayload = $this->reportPayload([
+            'intent' => 'submit',
+            'report_request_uuid' => $requestUuid,
+            'severity' => 'high',
+        ]);
+
+        $first = $this->actingAs($this->staff)->post('/incidents', $submitPayload);
+        $retry = $this->actingAs($this->staff)->post('/incidents', $submitPayload);
+
+        $first->assertRedirect();
+        $retry->assertRedirect();
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame(1, HsEvent::query()->count());
+        $this->assertSame(1, ControlRoomAlert::query()->count());
+
+        $incident = $draft->fresh();
+        $this->assertSame('submitted', $incident->status);
+        $this->assertNotNull($incident->submitted_at);
+        $this->assertNotNull($incident->hs_event_id);
+        $this->assertNotNull($incident->control_room_alert_id);
+    }
+
+    public function test_store_rolls_back_incident_when_synchronous_journey_fails(): void
+    {
+        $journeys = \Mockery::mock(IncidentJourneyService::class);
+        $journeys->shouldReceive('ensureForSubmittedIncident')
+            ->once()
+            ->andThrow(new \RuntimeException('Injected journey failure'));
+        $this->app->instance(IncidentJourneyService::class, $journeys);
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->staff)
+                ->post('/incidents', $this->reportPayload(['intent' => 'submit']));
+            $this->fail('The injected journey failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected journey failure', $exception->getMessage());
+        }
+
+        $this->assertSame(0, ClientIncident::query()->count());
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_store_persists_validated_shift_site_snapshot(): void
+    {
+        $this->mockNotificationService();
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->staff->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'draft',
+                'shift_id' => $shift->id,
+            ]))
+            ->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame($shift->id, $incident->shift_id);
+        $this->assertSame($this->site->id, $incident->site_id);
+    }
+
+    public function test_task5_hardening_store_returns_forbidden_for_inaccessible_shift_and_site_context(): void
+    {
+        $otherSite = Site::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+        $otherClient->supportWorkers()->attach($this->staff->id);
+        $otherShift = Shift::factory()->create([
+            'client_id' => $otherClient->id,
+            'site_id' => $otherSite->id,
+            'user_id' => $this->staff->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload(['shift_id' => $otherShift->id]))
+            ->assertForbidden();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload(['site_id' => $otherSite->id]))
+            ->assertForbidden();
+
+        $this->assertSame(0, ClientIncident::query()->count());
+    }
+
+    public function test_store_rejects_unassigned_shift_without_disclosing_or_silently_dropping_it(): void
+    {
+        $otherWorker = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $otherWorker->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload(['shift_id' => $shift->id]))
+            ->assertSessionHasErrors(['shift_id']);
+
+        $this->assertSame(0, ClientIncident::query()->count());
+    }
+
+    public function test_task5_integration_store_rejects_draft_identity_changes_and_foreign_submitted_reuse(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'report_request_uuid' => $requestUuid,
+            ]))
+            ->assertRedirect();
+        $draft = ClientIncident::query()->sole();
+
+        $otherSite = Site::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+        $otherClient->supportWorkers()->attach($this->staff->id);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => $requestUuid,
+                'client_id' => $otherClient->id,
+                'site_id' => $otherSite->id,
+            ]))
+            ->assertForbidden();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => $requestUuid,
+            ]))
+            ->assertRedirect();
+
+        $otherWorker = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $otherWorker->roles()->attach(Role::where('name', 'support_worker')->firstOrFail());
+        $this->client->supportWorkers()->attach($otherWorker->id);
+
+        $this->actingAs($otherWorker)
+            ->post('/incidents', $this->reportPayload([
+                'intent' => 'submit',
+                'report_request_uuid' => $requestUuid,
+            ]))
+            ->assertForbidden();
+
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame(1, HsEvent::query()->count());
     }
 
     public function test_store_generates_title_from_type(): void
@@ -553,6 +1280,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'medication_error',
                 'severity' => 'low',
@@ -566,9 +1294,16 @@ class IncidentControllerTest extends TestCase
     public function test_store_sets_source_manual_and_creates_followups(): void
     {
         $this->mockNotificationService();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
 
-        $response = $this->actingAs($this->staff)
+        $response = $this->actingAs($this->coordinator)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'low',
@@ -596,6 +1331,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'near_miss',
                 'severity' => 'low',
@@ -625,6 +1361,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'template_id' => $template->id,
                 'type' => 'fall',
@@ -645,13 +1382,14 @@ class IncidentControllerTest extends TestCase
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [])
-            ->assertSessionHasErrors(['client_id', 'type', 'severity']);
+            ->assertSessionHasErrors(['intent', 'client_id', 'type', 'severity']);
     }
 
     public function test_store_validates_client_exists(): void
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => 99999,
                 'type' => 'fall',
                 'severity' => 'high',
@@ -663,6 +1401,7 @@ class IncidentControllerTest extends TestCase
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'critical',
@@ -674,6 +1413,7 @@ class IncidentControllerTest extends TestCase
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => str_repeat('a', 121),
                 'severity' => 'low',
@@ -685,6 +1425,7 @@ class IncidentControllerTest extends TestCase
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'low',
@@ -697,6 +1438,7 @@ class IncidentControllerTest extends TestCase
     {
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'template_id' => 99999,
                 'type' => 'fall',
@@ -724,6 +1466,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'high',
@@ -742,6 +1485,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'low',
@@ -999,13 +1743,53 @@ class IncidentControllerTest extends TestCase
             'reported_by' => $this->staff->id,
         ]);
 
-        $this->actingAs($this->staff)
+        $response = $this->actingAs($this->staff)
             ->post("/incidents/{$incident->id}/submit")
             ->assertRedirect();
 
         $incident->refresh();
         $this->assertEquals('submitted', $incident->status);
         $this->assertNotNull($incident->submitted_at);
+        $hsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->sole();
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $response->assertSessionHas('incident_report_result', fn (array $result): bool => ($result['incident_reference'] ?? null) === $incident->reference_number
+            && ($result['hs_reference'] ?? null) === $hsEvent->reference_number
+            && ($result['handover_state'] ?? null) === 'awaiting_hs_acceptance'
+        );
+    }
+
+    public function test_submit_rolls_back_draft_state_when_synchronous_journey_fails(): void
+    {
+        $incident = ClientIncident::factory()->create([
+            'status' => 'draft',
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'reported_by' => $this->staff->id,
+        ]);
+        $journeys = \Mockery::mock(IncidentJourneyService::class);
+        $journeys->shouldReceive('ensureForSubmittedIncident')
+            ->once()
+            ->andThrow(new \RuntimeException('Injected submit journey failure'));
+        $this->app->instance(IncidentJourneyService::class, $journeys);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->staff)->post("/incidents/{$incident->id}/submit");
+            $this->fail('The injected submit journey failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected submit journey failure', $exception->getMessage());
+        }
+
+        $incident->refresh();
+        $this->assertSame('draft', $incident->status);
+        $this->assertNull($incident->submitted_at);
+        $this->assertNull($incident->hs_event_id);
+        $this->assertNull($incident->control_room_alert_id);
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
     }
 
     public function test_submit_sends_notification(): void
@@ -1035,6 +1819,7 @@ class IncidentControllerTest extends TestCase
         $mock->shouldReceive('notifyCrud')
             ->andReturnUsing(function () use (&$callCount) {
                 $callCount++;
+
                 return null;
             });
 
@@ -1074,16 +1859,61 @@ class IncidentControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_submit_not_allowed_on_already_submitted_incident(): void
+    public function test_submit_retry_is_idempotent_for_the_original_reporter(): void
     {
-        $incident = ClientIncident::factory()->submitted()->create([
+        $this->mockNotificationService();
+        $incident = ClientIncident::factory()->create([
+            'status' => 'draft',
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'reported_by' => $this->staff->id,
         ]);
 
         $this->actingAs($this->staff)
             ->post("/incidents/{$incident->id}/submit")
+            ->assertRedirect();
+        $this->actingAs($this->staff)
+            ->post("/incidents/{$incident->id}/submit")
+            ->assertRedirect();
+
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame(1, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_task5_hardening_submit_and_retry_reject_inaccessible_site_before_journey_mutation(): void
+    {
+        $this->mockNotificationService();
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+        $foreignClient->supportWorkers()->attach($this->staff->id);
+        $draft = ClientIncident::factory()->create([
+            'status' => 'draft',
+            'submitted_at' => null,
+            'client_id' => $foreignClient->id,
+            'site_id' => $foreignSite->id,
+            'reported_by' => $this->staff->id,
+        ]);
+        $submitted = ClientIncident::factory()->submitted()->create([
+            'client_id' => $foreignClient->id,
+            'site_id' => $foreignSite->id,
+            'reported_by' => $this->staff->id,
+            'hs_event_id' => null,
+            'control_room_alert_id' => null,
+        ]);
+        $hsEventCount = HsEvent::query()->count();
+        $alertCount = ControlRoomAlert::query()->count();
+
+        $this->actingAs($this->staff)
+            ->post("/incidents/{$draft->id}/submit")
             ->assertForbidden();
+        $this->actingAs($this->staff)
+            ->post("/incidents/{$submitted->id}/submit")
+            ->assertForbidden();
+
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame($hsEventCount, HsEvent::query()->count());
+        $this->assertSame($alertCount, ControlRoomAlert::query()->count());
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -1204,7 +2034,7 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $alert = \App\Models\ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create();
         $incident = ClientIncident::factory()->reviewed()->create(['control_room_alert_id' => $alert->id]);
 
         $this->actingAs($this->coordinator)
@@ -1221,15 +2051,18 @@ class IncidentControllerTest extends TestCase
 
     // ── Corrective actions (Option B: raised from the incident, governed in H&S) ──
 
-    public function test_raise_corrective_action_creates_hs_register_row(): void
+    public function test_task5_failed_gate_raise_corrective_action_creates_hs_register_row(): void
     {
-        $incident = ClientIncident::factory()->create();
-        // The ClientIncidentObserver records the HsEvent when the incident is created.
-        $hsEvent = \App\Models\HsEvent::query()
+        $this->mockNotificationService();
+        $this->actingAs($this->admin)
+            ->post('/incidents', $this->reportPayload(['intent' => 'submit']))
+            ->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
-            ->first();
-        $this->assertNotNull($hsEvent, 'Expected the observer to record an HsEvent for the incident.');
+            ->sole();
 
         $this->actingAs($this->admin)
             ->post("/incidents/{$incident->id}/corrective-actions", [
@@ -1286,7 +2119,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
-        $hsEvent = \App\Models\HsEvent::query()
+        $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
             ->first();
@@ -1294,7 +2127,7 @@ class IncidentControllerTest extends TestCase
 
         // Run the investigation to completion through the real service.
         $this->actingAs($this->admin);
-        $service = app(\App\Services\HealthSafety\HsInvestigationService::class);
+        $service = app(HsInvestigationService::class);
         $investigation = $service->create($hsEvent, [
             'methodology' => '5_whys',
             'lead_investigator_id' => $this->admin->id,
@@ -1325,18 +2158,18 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'critical']);
-        $hsEvent = \App\Models\HsEvent::query()
+        $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
             ->first();
         $this->assertNotNull($hsEvent);
 
-        \App\Models\HsInvestigation::create([
+        HsInvestigation::create([
             'hs_event_id' => $hsEvent->id,
             'organization_id' => $hsEvent->organization_id,
-            'reference_number' => \App\Models\HsInvestigation::generateReferenceNumber(),
+            'reference_number' => HsInvestigation::generateReferenceNumber(),
             'investigation_type' => 'standard',
-            'status' => \App\Models\HsInvestigation::STATUS_COMPLETED,
+            'status' => HsInvestigation::STATUS_COMPLETED,
             'completed_at' => now(),
         ]);
 
@@ -1542,6 +2375,7 @@ class IncidentControllerTest extends TestCase
         // 1. Create (draft)
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $this->client->id,
                 'type' => 'fall',
                 'severity' => 'medium',
@@ -2215,6 +3049,7 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->staff)
             ->post('/incidents', [
+                'intent' => 'draft',
                 'client_id' => $unassignedClient->id,
                 'type' => 'fall',
                 'severity' => 'low',
