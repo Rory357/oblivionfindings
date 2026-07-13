@@ -77,10 +77,18 @@ describe('WizardShell', () => {
         const { onClose } = renderWizard();
         const dialog = screen.getByRole('dialog', { name: 'Log fuel' });
 
-        await waitFor(() => expect(dialog).toContainElement(document.activeElement));
+        await waitFor(() =>
+            expect(dialog).toContainElement(
+                document.activeElement as HTMLElement | null,
+            ),
+        );
 
         document.getElementById('outside-action')?.focus();
-        await waitFor(() => expect(dialog).toContainElement(document.activeElement));
+        await waitFor(() =>
+            expect(dialog).toContainElement(
+                document.activeElement as HTMLElement | null,
+            ),
+        );
 
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(onClose).toHaveBeenCalledTimes(1);

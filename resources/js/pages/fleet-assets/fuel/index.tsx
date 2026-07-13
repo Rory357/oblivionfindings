@@ -11,14 +11,6 @@ import {
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import {
     formatCurrency,
@@ -36,6 +29,7 @@ import {
 } from '@/lib/fleet-utils';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    CheckCircle,
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
@@ -106,6 +100,21 @@ type Props = {
     };
 };
 
+const fuelLogSteps = [
+    {
+        key: 'purchase',
+        label: 'Vehicle & purchase',
+        blurb: 'Record the fill-up details',
+        icon: Fuel,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before saving',
+        icon: CheckCircle,
+    },
+] as const;
+
 export default function FuelIndex({
     fuel_logs: rawFuelLogs,
     vehicles: rawVehicles,
@@ -155,6 +164,7 @@ export default function FuelIndex({
     const last30Href = `/fleet-assets/fuel?date_from=${localDay(30)}`;
 
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [fuelStepIndex, setFuelStepIndex] = useState(0);
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -232,15 +242,29 @@ export default function FuelIndex({
         return `/fleet-assets/fuel?${params.toString()}`;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         form.post('/fleet-assets/fuel', {
             onSuccess: () => {
                 setDialogOpen(false);
+                setFuelStepIndex(0);
                 form.reset();
             },
         });
     };
+
+    const closeFuelDialog = () => {
+        setFuelStepIndex(0);
+        setDialogOpen(false);
+    };
+    const canReviewFuel = Boolean(
+        form.data.asset_id &&
+            form.data.logged_at &&
+            form.data.quantity_litres &&
+            form.data.total_cost,
+    );
+    const selectedFuelVehicle = vehicles.find(
+        (vehicle) => String(vehicle.id) === form.data.asset_id,
+    );
 
     return (
         <AppLayout
@@ -299,7 +323,10 @@ export default function FuelIndex({
                             <Button
                                 size="sm"
                                 className="bg-primary-foreground font-extrabold text-primary shadow-sm hover:bg-primary-foreground/90"
-                                onClick={() => setDialogOpen(true)}
+                                onClick={() => {
+                                    setFuelStepIndex(0);
+                                    setDialogOpen(true);
+                                }}
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Log fuel
@@ -312,18 +339,55 @@ export default function FuelIndex({
                 </HeroShell>
 
                 {can.log_fuel && (
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogContent className="sm:max-w-lg">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Log Fuel Fill-up
-                                            </DialogTitle>
-                                            <DialogDescription>
-                                                Record a fuel purchase for a
-                                                vehicle.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleSubmit}>
+                    <WizardShell
+                        open={dialogOpen}
+                        onClose={closeFuelDialog}
+                        title="Log fuel purchase"
+                        description="Record a Fleet fuel purchase and review it before saving."
+                        railIcon={Fuel}
+                        railTitle="Fuel log"
+                        railSub="Fleet operations"
+                        steps={fuelLogSteps}
+                        stepIndex={fuelStepIndex}
+                        onStepClick={(index) => {
+                            if (index === 0 || canReviewFuel) setFuelStepIndex(index);
+                        }}
+                        footerStart={
+                            <Button type="button" variant="outline" onClick={closeFuelDialog}>
+                                Cancel
+                            </Button>
+                        }
+                        footerEnd={
+                            fuelStepIndex === 0 ? (
+                                <Button
+                                    type="button"
+                                    disabled={!canReviewFuel}
+                                    onClick={() => setFuelStepIndex(1)}
+                                >
+                                    Continue
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setFuelStepIndex(0)}
+                                    >
+                                        Back
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={form.processing}
+                                    >
+                                        {form.processing ? 'Saving…' : 'Save fuel log'}
+                                    </Button>
+                                </>
+                            )
+                        }
+                    >
+                        {fuelStepIndex === 0 ? (
+                            <WizardStepPane>
                                             <div className="grid gap-4 py-4">
                                                 <div className="grid gap-2">
                                                     <Label htmlFor="asset_id">
@@ -340,7 +404,7 @@ export default function FuelIndex({
                                                             )
                                                         }
                                                     >
-                                                        <SelectTrigger>
+                                                        <SelectTrigger id="asset_id">
                                                             <SelectValue placeholder="Select vehicle" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -505,7 +569,7 @@ export default function FuelIndex({
                                                                 )
                                                             }
                                                         >
-                                                            <SelectTrigger>
+                                                            <SelectTrigger id="fuel_type">
                                                                 <SelectValue placeholder="Select type" />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -588,28 +652,34 @@ export default function FuelIndex({
                                                     </Label>
                                                 </div>
                                             </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setDialogOpen(false)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={form.processing}
-                                                >
-                                                    {form.processing
-                                                        ? 'Saving...'
-                                                        : 'Save Fuel Log'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                        </DialogContent>
-                    </Dialog>
+                            </WizardStepPane>
+                        ) : (
+                            <WizardStepPane>
+                                <dl className="grid gap-4 rounded-xl border border-border bg-card/70 p-4 text-sm sm:grid-cols-2">
+                                    <div>
+                                        <dt className="text-muted-foreground">Vehicle</dt>
+                                        <dd className="font-medium">
+                                            {selectedFuelVehicle?.name ?? 'Selected vehicle'}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-muted-foreground">Date</dt>
+                                        <dd className="font-medium">{form.data.logged_at}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-muted-foreground">Fuel</dt>
+                                        <dd className="font-medium">
+                                            {form.data.quantity_litres} L
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-muted-foreground">Total cost</dt>
+                                        <dd className="font-medium">${form.data.total_cost}</dd>
+                                    </div>
+                                </dl>
+                            </WizardStepPane>
+                        )}
+                    </WizardShell>
                 )}
 
                 {/* Dark KPI Cards - 2 rows of 3 */}

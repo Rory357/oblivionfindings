@@ -12,6 +12,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class DeviceControllerTest extends TestCase
@@ -79,6 +80,25 @@ class DeviceControllerTest extends TestCase
                 ->active()
                 ->count(),
         );
+    }
+
+    public function test_pairing_options_present_non_vehicle_records_as_assets(): void
+    {
+        $asset = Asset::factory()->create([
+            'name' => 'Portable hoist',
+            'asset_tag' => 'HOIST-17',
+            'category' => 'Medical Device',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/devices')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/devices/index')
+                ->where('pairing_options.assets.0.id', $asset->id)
+                ->where('pairing_options.assets.0.label', 'Portable hoist - HOIST-17')
+            );
     }
 
     public function test_grant_consent_requires_linked_client(): void

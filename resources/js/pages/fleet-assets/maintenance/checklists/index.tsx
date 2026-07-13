@@ -4,18 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import {
     FleetHeroAction,
@@ -73,8 +68,15 @@ type Props = {
     };
 };
 
+const checklistTemplateSteps = [
+    { key: 'details', label: 'Template details', blurb: 'Name the reusable checklist', icon: ClipboardList },
+    { key: 'items', label: 'Items', blurb: 'Add the checks workers complete', icon: ClipboardCheck },
+    { key: 'review', label: 'Review', blurb: 'Confirm before creating', icon: CheckCircle },
+] as const;
+
 export default function ChecklistsIndex({ templates, recent_runs, stats, can }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [templateStepIndex, setTemplateStepIndex] = useState(0);
     const heroStats = stats ?? {
         templates: (templates ?? []).length,
         runs_30d: 0,
@@ -85,15 +87,23 @@ export default function ChecklistsIndex({ templates, recent_runs, stats, can }: 
         items: [{ label: '', type: 'checkbox', options: null, required: true }] as Array<{ label: string; type: string; options: string[] | null; required: boolean }>,
     });
 
-    const handleCreateTemplate = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleCreateTemplate = () => {
         templateForm.post('/fleet-assets/maintenance/checklists', {
             onSuccess: () => {
                 templateForm.reset();
+                setTemplateStepIndex(0);
                 setDialogOpen(false);
             },
         });
     };
+    const closeTemplateDialog = () => {
+        setTemplateStepIndex(0);
+        setDialogOpen(false);
+    };
+    const hasTemplateName = templateForm.data.name.trim().length > 0;
+    const hasChecklistItems = templateForm.data.items.some(
+        (item) => item.label.trim().length > 0,
+    );
 
     return (
         <AppLayout
@@ -149,7 +159,10 @@ export default function ChecklistsIndex({ templates, recent_runs, stats, can }: 
                                 Run checklist
                             </FleetHeroAction>
                             <HeroActionButton
-                                onClick={() => setDialogOpen(true)}
+                                onClick={() => {
+                                    setTemplateStepIndex(0);
+                                    setDialogOpen(true);
+                                }}
                                 icon={Plus}
                             >
                                 Create template
@@ -159,20 +172,63 @@ export default function ChecklistsIndex({ templates, recent_runs, stats, can }: 
                 </HeroShell>
 
                 {can.manage ? (
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Create Checklist Template</DialogTitle>
-                                    </DialogHeader>
-                                    <form onSubmit={handleCreateTemplate} className="grid gap-4">
+                    <WizardShell
+                        open={dialogOpen}
+                        onClose={closeTemplateDialog}
+                        title="Create checklist template"
+                        description="Build a reusable Fleet checklist and review its items before creating it."
+                        railIcon={ClipboardList}
+                        railTitle="Checklist template"
+                        railSub="Fleet maintenance"
+                        steps={checklistTemplateSteps}
+                        stepIndex={templateStepIndex}
+                        onStepClick={(index) => {
+                            if (index === 0 || (index === 1 && hasTemplateName) || (hasTemplateName && hasChecklistItems)) {
+                                setTemplateStepIndex(index);
+                            }
+                        }}
+                        footerStart={
+                            <Button type="button" variant="outline" onClick={closeTemplateDialog}>
+                                Cancel
+                            </Button>
+                        }
+                        footerEnd={
+                            templateStepIndex < 2 ? (
+                                <Button
+                                    type="button"
+                                    disabled={templateStepIndex === 0 ? !hasTemplateName : !hasChecklistItems}
+                                    onClick={() => setTemplateStepIndex((step) => step + 1)}
+                                >
+                                    Continue
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button type="button" variant="outline" onClick={() => setTemplateStepIndex(1)}>
+                                        Back
+                                    </Button>
+                                    <Button type="button" onClick={handleCreateTemplate} disabled={templateForm.processing}>
+                                        {templateForm.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Create template
+                                    </Button>
+                                </>
+                            )
+                        }
+                    >
+                        {templateStepIndex === 0 ? (
+                            <WizardStepPane>
                                         <div>
-                                            <label className="text-sm font-medium">Name *</label>
+                                            <label htmlFor="checklist-template-name" className="text-sm font-medium">Name *</label>
                                             <Input
+                                                id="checklist-template-name"
                                                 value={templateForm.data.name}
                                                 onChange={(e) => templateForm.setData('name', e.target.value)}
                                                 placeholder="Template name"
                                             />
                                         </div>
+                                        {templateForm.errors.name && <p className="mt-1 text-xs text-destructive">{templateForm.errors.name}</p>}
+                            </WizardStepPane>
+                        ) : templateStepIndex === 1 ? (
+                            <WizardStepPane>
                                         <div>
                                             <label className="text-sm font-medium">Items</label>
                                             {(templateForm.data.items ?? []).map((item, idx) => (
@@ -215,14 +271,26 @@ export default function ChecklistsIndex({ templates, recent_runs, stats, can }: 
                                                 <Plus className="mr-1 h-3 w-3" /> Add Item
                                             </Button>
                                         </div>
-                                        {templateForm.errors.name && <p className="mt-1 text-xs text-destructive">{templateForm.errors.name}</p>}
-                                        <Button type="submit" disabled={templateForm.processing}>
-                                            {templateForm.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Create Template
-                                        </Button>
-                                    </form>
-                        </DialogContent>
-                    </Dialog>
+                            </WizardStepPane>
+                        ) : (
+                            <WizardStepPane>
+                                <div className="space-y-4 rounded-xl border border-border bg-card/70 p-4">
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Template</p>
+                                        <p className="font-medium">{templateForm.data.name.trim()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Items</p>
+                                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                                            {templateForm.data.items.filter((item) => item.label.trim()).map((item, index) => (
+                                                <li key={`${item.label}-${index}`}>{item.label.trim()}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </WizardStepPane>
+                        )}
+                    </WizardShell>
                 ) : null}
 
                 {/* Templates */}

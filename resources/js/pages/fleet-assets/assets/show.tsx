@@ -4,14 +4,6 @@ import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -26,6 +18,7 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/ui/tabs';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { AssetWizardDialog } from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
@@ -69,6 +62,173 @@ type Document = {
     uploaded_at: string | null;
     url: string;
 };
+
+const uploadDocumentSteps = [
+    {
+        key: 'file',
+        label: 'File & type',
+        blurb: 'Choose and describe the document',
+        icon: Upload,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before uploading',
+        icon: CheckCircle,
+    },
+] as const;
+
+export function UploadAssetDocumentWizard({
+    open,
+    file,
+    title,
+    category,
+    error,
+    submitting,
+    onFileChange,
+    onTitleChange,
+    onCategoryChange,
+    onClose,
+    onSubmit,
+}: {
+    open: boolean;
+    file: File | null;
+    title: string;
+    category: string;
+    error: string;
+    submitting: boolean;
+    onFileChange: (file: File | null) => void;
+    onTitleChange: (title: string) => void;
+    onCategoryChange: (category: string) => void;
+    onClose: () => void;
+    onSubmit: () => void;
+}) {
+    const [stepIndex, setStepIndex] = useState(0);
+    const canReview = file !== null && title.trim().length > 0;
+    const categoryLabel = category.replace(/_/g, ' ');
+    const close = () => {
+        setStepIndex(0);
+        onClose();
+    };
+
+    return (
+        <WizardShell
+            open={open}
+            onClose={close}
+            title="Upload asset document"
+            description="Attach a file to this Fleet asset and review its document details before uploading."
+            railIcon={Upload}
+            railTitle="Asset document"
+            railSub="Fleet record"
+            steps={uploadDocumentSteps}
+            stepIndex={stepIndex}
+            onStepClick={(index) => {
+                if (index === 0 || canReview) setStepIndex(index);
+            }}
+            footerStart={
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={close}
+                    disabled={submitting}
+                >
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                stepIndex === 0 ? (
+                    <Button
+                        type="button"
+                        disabled={!canReview || submitting}
+                        onClick={() => setStepIndex(1)}
+                    >
+                        Continue
+                    </Button>
+                ) : (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(0)}
+                            disabled={submitting}
+                        >
+                            Back
+                        </Button>
+                        <Button type="button" onClick={onSubmit} disabled={submitting}>
+                            {submitting ? 'Uploading…' : 'Upload document'}
+                        </Button>
+                    </>
+                )
+            }
+        >
+            {stepIndex === 0 ? (
+                <WizardStepPane>
+                    <div className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label htmlFor="asset-document-file" className="text-sm font-medium">
+                                File
+                            </label>
+                            <Input
+                                id="asset-document-file"
+                                type="file"
+                                onChange={(event) =>
+                                    onFileChange(event.target.files?.[0] ?? null)
+                                }
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="asset-document-title" className="text-sm font-medium">
+                                Title
+                            </label>
+                            <Input
+                                id="asset-document-title"
+                                value={title}
+                                onChange={(event) => onTitleChange(event.target.value)}
+                                placeholder="e.g. Registration certificate"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="asset-document-category" className="text-sm font-medium">
+                                Category
+                            </label>
+                            <Select value={category} onValueChange={onCategoryChange}>
+                                <SelectTrigger id="asset-document-category">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="manual">Manual</SelectItem>
+                                    <SelectItem value="compliance">Compliance</SelectItem>
+                                    <SelectItem value="photo">Photo</SelectItem>
+                                    <SelectItem value="service">Service record</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+                    </div>
+                </WizardStepPane>
+            ) : (
+                <WizardStepPane>
+                    <dl className="space-y-3 rounded-xl border border-border bg-card/70 p-4 text-sm">
+                        <div>
+                            <dt className="text-muted-foreground">File</dt>
+                            <dd className="font-medium">{file?.name}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Title</dt>
+                            <dd className="font-medium">{title.trim()}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Category</dt>
+                            <dd className="font-medium capitalize">{categoryLabel}</dd>
+                        </div>
+                    </dl>
+                </WizardStepPane>
+            )}
+        </WizardShell>
+    );
+}
 
 type WorkOrder = {
     id: number;
@@ -765,59 +925,19 @@ export default function AssetShow({
                             </CardContent>
                         </Card>
 
-                        <Dialog open={docOpen} onOpenChange={setDocOpen}>
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle>Upload document</DialogTitle>
-                                    <DialogDescription>
-                                        Attach a manual, compliance record, or supporting file to this asset.
-                                    </DialogDescription>
-                                </DialogHeader>
-
-                                <div className="space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-medium">File</label>
-                                        <Input type="file" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-medium">Title</label>
-                                        <Input
-                                            value={docTitle}
-                                            onChange={(e) => setDocTitle(e.target.value)}
-                                            placeholder="e.g. Registration certificate"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-medium">Category</label>
-                                        <Select value={docCategory} onValueChange={setDocCategory}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="manual">Manual</SelectItem>
-                                                <SelectItem value="compliance">Compliance</SelectItem>
-                                                <SelectItem value="photo">Photo</SelectItem>
-                                                <SelectItem value="service">Service record</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {docError && <p className="text-sm text-destructive">{docError}</p>}
-                                </div>
-
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setDocOpen(false)} disabled={docSubmitting}>
-                                        Cancel
-                                    </Button>
-                                    <Button onClick={submitDocument} disabled={docSubmitting || !docFile || !docTitle.trim()}>
-                                        {docSubmitting ? 'Uploading...' : 'Upload'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                        <UploadAssetDocumentWizard
+                            open={docOpen}
+                            file={docFile}
+                            title={docTitle}
+                            category={docCategory}
+                            error={docError}
+                            submitting={docSubmitting}
+                            onFileChange={setDocFile}
+                            onTitleChange={setDocTitle}
+                            onCategoryChange={setDocCategory}
+                            onClose={() => setDocOpen(false)}
+                            onSubmit={submitDocument}
+                        />
                     </TabsContent>
 
                     {/* Maintenance Tab */}

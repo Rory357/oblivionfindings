@@ -9,12 +9,6 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -23,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDistance } from '@/lib/fleet-utils';
 import {
@@ -87,6 +82,11 @@ type Props = {
         manage: boolean;
     };
 };
+
+const serviceScheduleSteps = [
+    { key: 'schedule', label: 'Asset & interval', blurb: 'Set the recurring service rule', icon: CalendarClock },
+    { key: 'review', label: 'Review', blurb: 'Confirm before creating', icon: Check },
+] as const;
 
 function isDueSoon(dateStr: string | null): boolean {
     if (!dateStr) return false;
@@ -211,6 +211,7 @@ export default function SchedulesIndex({
     const completionData = monthly_completions ?? [];
 
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [scheduleStepIndex, setScheduleStepIndex] = useState(0);
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [markingId, setMarkingId] = useState<number | null>(null);
@@ -274,15 +275,31 @@ export default function SchedulesIndex({
         next_due_at: '',
     });
 
-    const handleCreate = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleCreate = () => {
         form.post('/fleet-assets/maintenance/schedules', {
             onSuccess: () => {
                 form.reset();
+                setScheduleStepIndex(0);
                 setDialogOpen(false);
             },
         });
     };
+    const openScheduleDialog = () => {
+        setScheduleStepIndex(0);
+        setDialogOpen(true);
+    };
+    const closeScheduleDialog = () => {
+        setScheduleStepIndex(0);
+        setDialogOpen(false);
+    };
+    const canReviewSchedule = Boolean(
+        form.data.name.trim() &&
+            form.data.asset_id &&
+            (form.data.interval_km || form.data.interval_days || form.data.next_due_at),
+    );
+    const selectedScheduleAsset = (assets ?? []).find(
+        (asset) => String(asset.id) === form.data.asset_id,
+    );
 
     // Timeline dot color helper
     function timelineDotColor(type: string): string {
@@ -314,15 +331,49 @@ export default function SchedulesIndex({
     // Create dialog — rendered once, controlled (opened from the hero quick action
     // and the empty state).
     const createScheduleDialog = can.manage ? (
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create Service Schedule</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreate} className="grid gap-4">
+        <WizardShell
+            open={dialogOpen}
+            onClose={closeScheduleDialog}
+            title="Create service schedule"
+            description="Set a Fleet asset service interval and review it before creating the schedule."
+            railIcon={CalendarClock}
+            railTitle="Service schedule"
+            railSub="Fleet maintenance"
+            steps={serviceScheduleSteps}
+            stepIndex={scheduleStepIndex}
+            onStepClick={(index) => {
+                if (index === 0 || canReviewSchedule) setScheduleStepIndex(index);
+            }}
+            footerStart={
+                <Button type="button" variant="outline" onClick={closeScheduleDialog}>
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                scheduleStepIndex === 0 ? (
+                    <Button type="button" disabled={!canReviewSchedule} onClick={() => setScheduleStepIndex(1)}>
+                        Continue
+                    </Button>
+                ) : (
+                    <>
+                        <Button type="button" variant="outline" onClick={() => setScheduleStepIndex(0)}>
+                            Back
+                        </Button>
+                        <Button type="button" onClick={handleCreate} disabled={form.processing}>
+                            {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Create schedule
+                        </Button>
+                    </>
+                )
+            }
+        >
+            {scheduleStepIndex === 0 ? (
+                <WizardStepPane>
+                    <div className="grid gap-4">
                     <div>
-                        <label className="text-sm font-medium">Name *</label>
+                        <label htmlFor="service-schedule-name" className="text-sm font-medium">Name *</label>
                         <Input
+                            id="service-schedule-name"
                             value={form.data.name}
                             onChange={(e) =>
                                 form.setData('name', e.target.value)
@@ -331,12 +382,12 @@ export default function SchedulesIndex({
                         />
                     </div>
                     <div>
-                        <label className="text-sm font-medium">Asset *</label>
+                        <label htmlFor="service-schedule-asset" className="text-sm font-medium">Asset *</label>
                         <Select
                             value={form.data.asset_id}
                             onValueChange={(v) => form.setData('asset_id', v)}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger id="service-schedule-asset">
                                 <SelectValue placeholder="Select asset" />
                             </SelectTrigger>
                             <SelectContent>
@@ -349,10 +400,11 @@ export default function SchedulesIndex({
                         </Select>
                     </div>
                     <div>
-                        <label className="text-sm font-medium">
+                        <label htmlFor="service-schedule-km" className="text-sm font-medium">
                             Interval (km)
                         </label>
                         <Input
+                            id="service-schedule-km"
                             type="number"
                             value={form.data.interval_km}
                             onChange={(e) =>
@@ -362,10 +414,11 @@ export default function SchedulesIndex({
                         />
                     </div>
                     <div>
-                        <label className="text-sm font-medium">
+                        <label htmlFor="service-schedule-days" className="text-sm font-medium">
                             Interval (days)
                         </label>
                         <Input
+                            id="service-schedule-days"
                             type="number"
                             value={form.data.interval_days}
                             onChange={(e) =>
@@ -375,10 +428,11 @@ export default function SchedulesIndex({
                         />
                     </div>
                     <div>
-                        <label className="text-sm font-medium">
+                        <label htmlFor="service-schedule-due" className="text-sm font-medium">
                             Next Due Date
                         </label>
                         <Input
+                            id="service-schedule-due"
                             type="date"
                             value={form.data.next_due_at}
                             onChange={(e) =>
@@ -396,15 +450,19 @@ export default function SchedulesIndex({
                             {form.errors.asset_id}
                         </p>
                     )}
-                    <Button type="submit" disabled={form.processing}>
-                        {form.processing && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Create Schedule
-                    </Button>
-                </form>
-            </DialogContent>
-        </Dialog>
+                    </div>
+                </WizardStepPane>
+            ) : (
+                <WizardStepPane>
+                    <dl className="grid gap-4 rounded-xl border border-border bg-card/70 p-4 text-sm sm:grid-cols-2">
+                        <div><dt className="text-muted-foreground">Schedule</dt><dd className="font-medium">{form.data.name.trim()}</dd></div>
+                        <div><dt className="text-muted-foreground">Asset</dt><dd className="font-medium">{selectedScheduleAsset?.name ?? 'Selected asset'}</dd></div>
+                        <div><dt className="text-muted-foreground">Distance interval</dt><dd className="font-medium">{form.data.interval_km ? `${form.data.interval_km} km` : 'Not set'}</dd></div>
+                        <div><dt className="text-muted-foreground">Time interval</dt><dd className="font-medium">{form.data.interval_days ? `${form.data.interval_days} days` : 'Not set'}</dd></div>
+                    </dl>
+                </WizardStepPane>
+            )}
+        </WizardShell>
     ) : null;
 
     if (totalCount === 0) {
@@ -423,7 +481,7 @@ export default function SchedulesIndex({
                     <SchedulesHero
                         stats={heroStats}
                         canManage={can.manage}
-                        onCreate={() => setDialogOpen(true)}
+                        onCreate={openScheduleDialog}
                     />
                     <FleetEmptyState
                         icon={Clock}
@@ -431,7 +489,7 @@ export default function SchedulesIndex({
                         description="Set up recurring maintenance reminders to keep your fleet in top condition."
                         actionLabel={can.manage ? 'Create Schedule' : undefined}
                         onAction={
-                            can.manage ? () => setDialogOpen(true) : undefined
+                            can.manage ? openScheduleDialog : undefined
                         }
                     />
                     {createScheduleDialog}
@@ -455,7 +513,7 @@ export default function SchedulesIndex({
                 <SchedulesHero
                     stats={heroStats}
                     canManage={can.manage}
-                    onCreate={() => setDialogOpen(true)}
+                    onCreate={openScheduleDialog}
                 />
 
                 {/* Charts Row */}

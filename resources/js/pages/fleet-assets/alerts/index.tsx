@@ -13,14 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -28,6 +20,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    WizardShell,
+    WizardStepPane,
+} from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { Head, Link, router } from '@inertiajs/react';
@@ -116,6 +112,121 @@ function severityVariant(
         default:
             return 'outline';
     }
+}
+
+const resolveAlertSteps = [
+    {
+        key: 'resolution',
+        label: 'Resolution',
+        blurb: 'Record what resolved the alert',
+        icon: AlertTriangle,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before closing',
+        icon: CheckCircle,
+    },
+] as const;
+
+export function ResolveAlertWizard({
+    open,
+    notes,
+    onNotesChange,
+    onClose,
+    onSubmit,
+}: {
+    open: boolean;
+    notes: string;
+    onNotesChange: (notes: string) => void;
+    onClose: () => void;
+    onSubmit: () => void;
+}) {
+    const [stepIndex, setStepIndex] = useState(0);
+    const hasNotes = notes.trim().length > 0;
+
+    const close = () => {
+        setStepIndex(0);
+        onClose();
+    };
+
+    return (
+        <WizardShell
+            open={open}
+            onClose={close}
+            title="Resolve alert"
+            description="Add resolution notes and review them before closing the active alert workflow."
+            railIcon={AlertTriangle}
+            railTitle="Resolve alert"
+            railSub="Fleet operations"
+            steps={resolveAlertSteps}
+            stepIndex={stepIndex}
+            onStepClick={(index) => {
+                if (index === 0 || hasNotes) setStepIndex(index);
+            }}
+            footerStart={
+                <Button type="button" variant="outline" onClick={close}>
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                stepIndex === 0 ? (
+                    <Button
+                        type="button"
+                        disabled={!hasNotes}
+                        onClick={() => setStepIndex(1)}
+                    >
+                        Continue
+                    </Button>
+                ) : (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(0)}
+                        >
+                            Back
+                        </Button>
+                        <Button type="button" onClick={onSubmit}>
+                            Resolve alert
+                        </Button>
+                    </>
+                )
+            }
+        >
+            {stepIndex === 0 ? (
+                <WizardStepPane>
+                    <div className="space-y-2">
+                        <label
+                            htmlFor="resolution-notes"
+                            className="text-sm font-medium"
+                        >
+                            Resolution notes
+                        </label>
+                        <Textarea
+                            id="resolution-notes"
+                            value={notes}
+                            onChange={(event) => onNotesChange(event.target.value)}
+                            rows={8}
+                            required
+                        />
+                        <p className="text-sm text-muted-foreground">
+                            Explain what happened, what was checked, and why the alert can be closed.
+                        </p>
+                    </div>
+                </WizardStepPane>
+            ) : (
+                <WizardStepPane>
+                    <div className="space-y-3 rounded-xl border border-border bg-card/70 p-4">
+                        <h3 className="font-semibold">Resolution notes</h3>
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                            {notes.trim()}
+                        </p>
+                    </div>
+                </WizardStepPane>
+            )}
+        </WizardShell>
+    );
 }
 
 function statusVariant(
@@ -791,52 +902,13 @@ export default function AlertsIndex({
                         ))}
                     </div>
                 )}
-                <Dialog
+                <ResolveAlertWizard
                     open={canManage && resolveDialogOpen}
-                    onOpenChange={(open) => !open && closeResolveDialog()}
-                >
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Resolve Alert</DialogTitle>
-                            <DialogDescription>
-                                Add resolution notes before closing the active
-                                alert workflow.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="resolution-notes"
-                                className="text-sm font-medium"
-                            >
-                                Resolution notes
-                            </label>
-                            <Textarea
-                                id="resolution-notes"
-                                value={resolutionNotes}
-                                onChange={(event) =>
-                                    setResolutionNotes(event.target.value)
-                                }
-                                rows={5}
-                            />
-                        </div>
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={closeResolveDialog}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={submitResolve}
-                                disabled={!resolutionNotes.trim()}
-                            >
-                                Resolve
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                    notes={resolutionNotes}
+                    onNotesChange={setResolutionNotes}
+                    onClose={closeResolveDialog}
+                    onSubmit={submitResolve}
+                />
                 <ConfirmDialog
                     open={canManage && bulkAction !== null}
                     onClose={() => setBulkAction(null)}

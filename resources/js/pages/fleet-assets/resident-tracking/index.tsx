@@ -8,13 +8,6 @@ import type { Geofence, Resident } from '@/components/resident-tracking/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,6 +25,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import {
     formatRelativeTime,
@@ -139,6 +133,12 @@ type AssignPayload = {
     available_trackers: TrackerOption[];
     assigned_trackers: AssignedTracker[];
 };
+
+const assignTrackerSteps = [
+    { key: 'records', label: 'Resident & device', blurb: 'Choose the records to link', icon: UserPlus },
+    { key: 'consent', label: 'Consent check', blurb: 'Confirm tracking authority', icon: Shield },
+    { key: 'review', label: 'Review', blurb: 'Confirm before assigning', icon: CheckCircle },
+] as const;
 
 type Props = {
     tab?: 'tracking' | 'wandering';
@@ -482,7 +482,7 @@ function WanderingAlertsTab({
 /*  Assign-tracker modal (retired /resident-tracking/assign page)      */
 /* ------------------------------------------------------------------ */
 
-function AssignTrackerDialog({
+export function AssignTrackerDialog({
     payload,
     open,
     onClose,
@@ -493,6 +493,8 @@ function AssignTrackerDialog({
     onClose: () => void;
     canManage: boolean;
 }) {
+    const [stepIndex, setStepIndex] = useState(0);
+    const [consentConfirmed, setConsentConfirmed] = useState(false);
     const form = useForm({
         client_id: '',
         tracker_id: '',
@@ -504,12 +506,20 @@ function AssignTrackerDialog({
     const selectedTracker = availableTrackers.find(
         (t) => String(t.id) === form.data.tracker_id,
     );
+    const selectedClient = unassignableClients.find(
+        (client) => String(client.id) === form.data.client_id,
+    );
+    const hasSelection = Boolean(form.data.client_id && form.data.tracker_id);
 
-    const handleAssign = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleAssign = () => {
         form.post('/fleet-assets/resident-tracking/assign', {
             preserveScroll: true,
-            onSuccess: () => form.reset(),
+            onSuccess: () => {
+                form.reset();
+                setStepIndex(0);
+                setConsentConfirmed(false);
+                onClose();
+            },
         });
     };
 
@@ -521,36 +531,75 @@ function AssignTrackerDialog({
         );
     };
 
-    return (
-        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>Assign Tracker Device</DialogTitle>
-                    <DialogDescription>
-                        Link a personal tracker to a resident. Assignments require an
-                        active Fleet Tracking consent for the resident.
-                    </DialogDescription>
-                </DialogHeader>
+    const close = () => {
+        setStepIndex(0);
+        setConsentConfirmed(false);
+        onClose();
+    };
 
-                {!canManage ? (
-                    <p className="text-sm text-muted-foreground">
-                        Assigning or unassigning trackers requires fleet manager access.
-                    </p>
-                ) : (
+    return (
+        <WizardShell
+            open={open}
+            onClose={close}
+            title="Assign tracker to resident"
+            description="Link a personal tracker to a resident after confirming active Fleet Tracking consent."
+            railIcon={UserPlus}
+            railTitle="Assign tracker"
+            railSub="Resident safety"
+            steps={assignTrackerSteps}
+            stepIndex={stepIndex}
+            onStepClick={(index) => {
+                if (index === 0 || (index === 1 && hasSelection) || (hasSelection && consentConfirmed)) {
+                    setStepIndex(index);
+                }
+            }}
+            footerStart={
+                <Button type="button" variant="outline" onClick={close}>
+                    {canManage ? 'Cancel' : 'Close'}
+                </Button>
+            }
+            footerEnd={
+                canManage ? (
+                    stepIndex < 2 ? (
+                        <Button
+                            type="button"
+                            disabled={stepIndex === 0 ? !hasSelection : !consentConfirmed}
+                            onClick={() => setStepIndex((step) => step + 1)}
+                        >
+                            Continue
+                        </Button>
+                    ) : (
+                        <>
+                            <Button type="button" variant="outline" onClick={() => setStepIndex(1)}>
+                                Back
+                            </Button>
+                            <Button type="button" onClick={handleAssign} disabled={form.processing}>
+                                {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+                                Assign tracker
+                            </Button>
+                        </>
+                    )
+                ) : null
+            }
+        >
+            {!canManage ? (
+                <p className="text-sm text-muted-foreground">
+                    Assigning or unassigning trackers requires fleet manager access.
+                </p>
+            ) : stepIndex === 0 ? (
+                <WizardStepPane>
                     <div className="grid gap-6 lg:grid-cols-2">
-                        {/* Assign form */}
-                        <form onSubmit={handleAssign} className="space-y-4">
+                        <div className="space-y-4">
                             <p className="flex items-center gap-2 text-sm font-semibold">
-                                <UserPlus className="h-4 w-4" />
-                                Assign New Tracker
+                                <UserPlus className="h-4 w-4" /> Assign new tracker
                             </p>
                             <div className="space-y-2">
-                                <Label>Resident</Label>
+                                <Label htmlFor="assign-tracker-resident">Resident</Label>
                                 <Select
                                     value={form.data.client_id}
                                     onValueChange={(v) => form.setData('client_id', v)}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger id="assign-tracker-resident">
                                         <SelectValue placeholder="Select a resident..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -569,12 +618,12 @@ function AssignTrackerDialog({
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Tracker Device</Label>
+                                <Label htmlFor="assign-tracker-device">Tracker Device</Label>
                                 <Select
                                     value={form.data.tracker_id}
                                     onValueChange={(v) => form.setData('tracker_id', v)}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger id="assign-tracker-device">
                                         <SelectValue placeholder="Select an available tracker..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -650,23 +699,7 @@ function AssignTrackerDialog({
                                 </div>
                             )}
 
-                            <Button
-                                type="submit"
-                                disabled={
-                                    form.processing ||
-                                    !form.data.client_id ||
-                                    !form.data.tracker_id
-                                }
-                                className="w-full"
-                            >
-                                {form.processing ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Link2 className="mr-2 h-4 w-4" />
-                                )}
-                                Assign Tracker
-                            </Button>
-                        </form>
+                        </div>
 
                         {/* Currently assigned */}
                         <div className="flex flex-col">
@@ -736,9 +769,41 @@ function AssignTrackerDialog({
                             </div>
                         </div>
                     </div>
-                )}
-            </DialogContent>
-        </Dialog>
+                </WizardStepPane>
+            ) : stepIndex === 1 ? (
+                <WizardStepPane>
+                    <div className="space-y-4 rounded-xl border border-border bg-card/70 p-5">
+                        <div className="flex items-start gap-3">
+                            <Shield className="mt-0.5 h-5 w-5 text-primary" />
+                            <div>
+                                <h3 className="font-semibold">Confirm tracking consent</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Confirm the resident has active Fleet Tracking consent before linking this personal tracker.
+                                </p>
+                            </div>
+                        </div>
+                        <label htmlFor="assign-tracker-consent" className="flex items-start gap-3 text-sm">
+                            <input
+                                id="assign-tracker-consent"
+                                type="checkbox"
+                                checked={consentConfirmed}
+                                onChange={(event) => setConsentConfirmed(event.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-border"
+                            />
+                            I have confirmed active consent for this tracking assignment.
+                        </label>
+                    </div>
+                </WizardStepPane>
+            ) : (
+                <WizardStepPane>
+                    <dl className="space-y-4 rounded-xl border border-border bg-card/70 p-4 text-sm">
+                        <div><dt className="text-muted-foreground">Resident</dt><dd className="font-medium">{selectedClient ? `${selectedClient.name} (${selectedClient.house})` : 'Selected resident'}</dd></div>
+                        <div><dt className="text-muted-foreground">Tracker</dt><dd className="font-medium">{selectedTracker?.name ?? selectedTracker?.device_uid ?? 'Selected tracker'}</dd></div>
+                        <div><dt className="text-muted-foreground">Consent</dt><dd className="font-medium text-status-success">Confirmed</dd></div>
+                    </dl>
+                </WizardStepPane>
+            )}
+        </WizardShell>
     );
 }
 

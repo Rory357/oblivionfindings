@@ -4,13 +4,6 @@ import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -19,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
@@ -144,6 +138,36 @@ type Props = {
     device_detail?: DeviceDetail | null;
 };
 
+const pairDeviceSteps = [
+    {
+        key: 'pairing',
+        label: 'Device & asset',
+        blurb: 'Choose records to link',
+        icon: Radio,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before pairing',
+        icon: CheckCircle2,
+    },
+] as const;
+
+const deviceDetailSteps = [
+    {
+        key: 'overview',
+        label: 'Device overview',
+        blurb: 'Status, pairing and latest data',
+        icon: Wifi,
+    },
+    {
+        key: 'telemetry',
+        label: 'Recent telemetry',
+        blurb: 'Latest tracker messages',
+        icon: Radio,
+    },
+] as const;
+
 function statusVariant(
     status: string,
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -228,6 +252,7 @@ export default function DevicesIndex({
     device_detail,
 }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [pairStepIndex, setPairStepIndex] = useState(0);
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -304,15 +329,26 @@ export default function DevicesIndex({
         asset_id: '',
     });
 
-    const handlePair = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handlePair = () => {
         pairForm.post('/fleet-assets/devices/pair', {
             onSuccess: () => {
                 pairForm.reset();
+                setPairStepIndex(0);
                 setDialogOpen(false);
             },
         });
     };
+    const closePairDialog = () => {
+        setPairStepIndex(0);
+        setDialogOpen(false);
+    };
+    const canReviewPair = Boolean(pairForm.data.device_id && pairForm.data.asset_id);
+    const selectedPairDevice = availableDevices.find(
+        (device) => String(device.id) === pairForm.data.device_id,
+    );
+    const selectedPairAsset = availableAssets.find(
+        (asset) => String(asset.id) === pairForm.data.asset_id,
+    );
 
     /* ── Tabs (Devices | Consent) ── */
     const activeTab = tab === 'consent' ? 'consent' : 'devices';
@@ -326,9 +362,11 @@ export default function DevicesIndex({
 
     /* ── Detail dialog (retired /devices/{id} page) ── */
     const [detailOpen, setDetailOpen] = useState(!!device_detail);
+    const [detailStepIndex, setDetailStepIndex] = useState(0);
     useEffect(() => setDetailOpen(!!device_detail), [device_detail]);
     const openDevice = (id: number) => visitWithQuery({ device: String(id) });
     const closeDevice = () => {
+        setDetailStepIndex(0);
         setDetailOpen(false);
         visitWithQuery({ device: null }, { replace: true });
     };
@@ -461,7 +499,10 @@ export default function DevicesIndex({
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setDialogOpen(true)}
+                            onClick={() => {
+                                setPairStepIndex(0);
+                                setDialogOpen(true);
+                            }}
                             className="inline-flex h-[34px] items-center gap-2 rounded-lg bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                         >
                             <Plus className="h-[15px] w-[15px]" />
@@ -766,18 +807,63 @@ export default function DevicesIndex({
                 )}
 
                 {/* ── Pair device dialog ── */}
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Pair Tracking Device</DialogTitle>
-                            <DialogDescription>
-                                Link an existing tracking device from the shared registry
-                                to a fleet asset.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handlePair} className="grid gap-4">
+                <WizardShell
+                    open={dialogOpen}
+                    onClose={closePairDialog}
+                    title="Pair tracking device"
+                    description="Link an existing tracking device to an active Fleet & Assets record."
+                    railIcon={Radio}
+                    railTitle="Pair device"
+                    railSub="Shared device registry"
+                    steps={pairDeviceSteps}
+                    stepIndex={pairStepIndex}
+                    onStepClick={(index) => {
+                        if (index === 0 || canReviewPair) setPairStepIndex(index);
+                    }}
+                    footerStart={
+                        <Button type="button" variant="outline" onClick={closePairDialog}>
+                            Cancel
+                        </Button>
+                    }
+                    footerEnd={
+                        pairStepIndex === 0 ? (
+                            <Button
+                                type="button"
+                                disabled={!canReviewPair}
+                                onClick={() => setPairStepIndex(1)}
+                            >
+                                Continue
+                            </Button>
+                        ) : (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setPairStepIndex(0)}
+                                >
+                                    Back
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handlePair}
+                                    disabled={pairForm.processing}
+                                >
+                                    {pairForm.processing ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Radio className="mr-2 h-4 w-4" />
+                                    )}
+                                    Pair device
+                                </Button>
+                            </>
+                        )
+                    }
+                >
+                    {pairStepIndex === 0 ? (
+                        <WizardStepPane>
+                            <div className="grid gap-5">
                             <div>
-                                <label className="text-sm font-medium">
+                                <label htmlFor="pair-device-id" className="text-sm font-medium">
                                     Tracking Device *
                                 </label>
                                 <Select
@@ -786,7 +872,7 @@ export default function DevicesIndex({
                                         pairForm.setData('device_id', value)
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger id="pair-device-id">
                                         <SelectValue placeholder="Select an unpaired device" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -802,8 +888,8 @@ export default function DevicesIndex({
                                 </Select>
                             </div>
                             <div>
-                                <label className="text-sm font-medium">
-                                    Vehicle Asset *
+                                <label htmlFor="pair-asset-id" className="text-sm font-medium">
+                                    Asset *
                                 </label>
                                 <Select
                                     value={pairForm.data.asset_id}
@@ -811,8 +897,8 @@ export default function DevicesIndex({
                                         pairForm.setData('asset_id', value)
                                     }
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a vehicle" />
+                                    <SelectTrigger id="pair-asset-id">
+                                        <SelectValue placeholder="Select an asset" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableAssets.map((asset) => (
@@ -843,40 +929,61 @@ export default function DevicesIndex({
                                     {pairForm.errors.asset_id}
                                 </p>
                             )}
-                            <Button
-                                type="submit"
-                                disabled={
-                                    pairForm.processing ||
-                                    !pairForm.data.device_id ||
-                                    !pairForm.data.asset_id
-                                }
-                            >
-                                {pairForm.processing ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Radio className="mr-2 h-4 w-4" />
-                                )}
-                                Pair Device
-                            </Button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                            </div>
+                        </WizardStepPane>
+                    ) : (
+                        <WizardStepPane>
+                            <dl className="space-y-4 rounded-xl border border-border bg-card/70 p-4 text-sm">
+                                <div>
+                                    <dt className="text-muted-foreground">Tracking device</dt>
+                                    <dd className="font-medium">
+                                        {selectedPairDevice?.label ?? 'Selected device'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-muted-foreground">Asset</dt>
+                                    <dd className="font-medium">
+                                        {selectedPairAsset?.label ?? 'Selected asset'}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </WizardStepPane>
+                    )}
+                </WizardShell>
 
                 {/* ── Device detail dialog (retired /devices/{id} page) ── */}
-                <Dialog open={detailOpen} onOpenChange={(o) => !o && closeDevice()}>
-                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-                        {detail ? (
-                            <>
-                                <DialogHeader>
-                                    <DialogTitle>
-                                        {detail.vendor} - {detail.device_uid}
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                        Canonical tracking device detail, telemetry and
-                                        pairing status.
-                                    </DialogDescription>
-                                </DialogHeader>
-
+                <WizardShell
+                    open={detailOpen}
+                    onClose={closeDevice}
+                    title={detail ? `${detail.vendor} - ${detail.device_uid}` : 'Device detail'}
+                    description="Canonical tracking device detail, telemetry and pairing status."
+                    railIcon={Radio}
+                    railTitle="Device detail"
+                    railSub={detail?.device_uid ?? 'Loading tracker'}
+                    steps={deviceDetailSteps}
+                    stepIndex={detailStepIndex}
+                    onStepClick={setDetailStepIndex}
+                    headerLabel={deviceDetailSteps[detailStepIndex]?.label}
+                    footerStart={
+                        <Button type="button" variant="outline" onClick={closeDevice}>
+                            Close
+                        </Button>
+                    }
+                    footerEnd={
+                        detail?.asset && detail.link_status === 'paired' ? (
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => setShowUnpairDialog(true)}
+                            >
+                                Unpair device
+                            </Button>
+                        ) : null
+                    }
+                >
+                    {detail ? (
+                        detailStepIndex === 0 ? (
+                            <WizardStepPane>
                                 {/* Status banner */}
                                 <div
                                     className={cn(
@@ -918,18 +1025,6 @@ export default function DevicesIndex({
                                                 </span>
                                             )}
                                         </div>
-                                        {detail.asset &&
-                                            detail.link_status === 'paired' && (
-                                                <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setShowUnpairDialog(true)
-                                                    }
-                                                >
-                                                    Unpair Device
-                                                </Button>
-                                            )}
                                     </div>
                                     {detail.last_seen_at && (
                                         <div className="mt-1.5 text-xs opacity-70">
@@ -1053,7 +1148,9 @@ export default function DevicesIndex({
                                         )}
                                     </div>
                                 </div>
-
+                            </WizardStepPane>
+                        ) : (
+                            <WizardStepPane>
                                 {/* Telemetry history */}
                                 <div>
                                     <p className="mb-2 text-sm font-semibold">
@@ -1103,33 +1200,32 @@ export default function DevicesIndex({
                                         </p>
                                     )}
                                 </div>
-
-                                <ConfirmDialog
-                                    open={showUnpairDialog}
-                                    onClose={() => setShowUnpairDialog(false)}
-                                    onConfirm={() => {
-                                        setShowUnpairDialog(false);
-                                        router.post(
-                                            `/fleet-assets/devices/${detail.id}/unpair`,
-                                            {},
-                                            { preserveScroll: true },
-                                        );
-                                    }}
-                                    title="Unpair Device"
-                                    description={`Are you sure you want to unpair this device from ${detail.asset?.name ?? 'the asset'}? The device will stop tracking.`}
-                                    confirmText="Unpair"
-                                />
-                            </>
+                            </WizardStepPane>
+                        )
                         ) : (
-                            <DialogHeader>
-                                <DialogTitle>Device</DialogTitle>
-                                <DialogDescription>
-                                    Loading device detail…
-                                </DialogDescription>
-                            </DialogHeader>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading device detail…
+                            </div>
                         )}
-                    </DialogContent>
-                </Dialog>
+                </WizardShell>
+                {detail ? (
+                    <ConfirmDialog
+                        open={showUnpairDialog}
+                        onClose={() => setShowUnpairDialog(false)}
+                        onConfirm={() => {
+                            setShowUnpairDialog(false);
+                            router.post(
+                                `/fleet-assets/devices/${detail.id}/unpair`,
+                                {},
+                                { preserveScroll: true },
+                            );
+                        }}
+                        title="Unpair Device"
+                        description={`Are you sure you want to unpair this device from ${detail.asset?.name ?? 'the asset'}? The device will stop tracking.`}
+                        confirmText="Unpair"
+                    />
+                ) : null}
             </PageShell>
         </AppLayout>
     );
