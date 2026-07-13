@@ -19,6 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Check, CheckCircle2, ExternalLink, Settings } from 'lucide-react';
@@ -30,6 +31,7 @@ type ApprovalInstance = {
     chain_name: string;
     approvable_type: string;
     approvable_id: number;
+    item_label: string;
     current_step: number;
     total_steps: number;
     status: string;
@@ -150,6 +152,23 @@ export default function PendingApprovals({
                     />
                 }
             >
+                {instances.data.length === 0 && nativeApprovals.length === 0 ? (
+                    <Card data-approvals-empty>
+                        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                            <CheckCircle2 className="h-10 w-10 text-status-success" />
+                            <div>
+                                <h2 className="font-semibold">
+                                    No approvals need your attention
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    New requests from native HR workflows or
+                                    configured approval chains will appear here.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
                 <Card>
                     <CardHeader>
                         <CardTitle>Native workflow approvals</CardTitle>
@@ -198,7 +217,7 @@ export default function PendingApprovals({
                                                 {approval.summary}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {approval.submitted_at}
+                                                {formatDateTimeLong(approval.submitted_at)}
                                             </TableCell>
                                             <TableCell>
                                                 <Button
@@ -273,8 +292,7 @@ export default function PendingApprovals({
                                                 {instance.chain_name}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {instance.approvable_type} #
-                                                {instance.approvable_id}
+                                                {instance.item_label}
                                             </TableCell>
                                             <TableCell>
                                                 <span className="text-sm">
@@ -286,7 +304,7 @@ export default function PendingApprovals({
                                                 {instance.initiated_by}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {instance.initiated_at}
+                                                {formatDateTimeLong(instance.initiated_at)}
                                             </TableCell>
                                             <TableCell>
                                                 {actionInstanceId ===
@@ -375,6 +393,8 @@ export default function PendingApprovals({
                         </Table>
                     </CardContent>
                 </Card>
+                    </>
+                )}
 
                 {/* Pagination */}
                 {instances.links?.length > 3 && (

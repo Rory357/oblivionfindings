@@ -1,4 +1,5 @@
 import { PerformanceTabs } from '@/components/hr';
+import { SuccessionHero } from '@/components/hr/succession-hero';
 import {
     SuccessionPlanWizard,
     type ExistingSuccessionPlan,
@@ -6,7 +7,6 @@ import {
     type SuccessionPositionOption,
 } from '@/components/hr/succession-wizards';
 import PageShell from '@/components/page-shell';
-import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -126,36 +126,15 @@ export default function SuccessionIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Succession Planning" />
-            <PageHero category="hr"
-                icon={Users}
-                title="Succession Planning"
-                description="Identify and develop talent for key roles."
-                stats={[
-                    { label: 'Active plans', value: stats?.total ?? plans.total },
-                    {
-                        label: 'High / critical risk',
-                        value: stats?.high_risk ?? 0,
-                        tone: (stats?.high_risk ?? 0) > 0 ? 'critical' : 'neutral',
-                    },
-                    {
-                        label: 'Vacant roles',
-                        value: stats?.vacant ?? 0,
-                        tone: (stats?.vacant ?? 0) > 0 ? 'warning' : 'neutral',
-                    },
-                    {
-                        label: 'Ready-now successors',
-                        value: stats?.ready_now ?? 0,
-                        tone: 'success',
-                    },
-                ]}
-                actions={
-                    can.manage ? (
-                        <Button onClick={() => setWizardOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Plan
-                        </Button>
-                    ) : undefined
-                }
+            <SuccessionHero
+                stats={{
+                    total: stats?.total ?? plans.total,
+                    high_risk: stats?.high_risk ?? 0,
+                    vacant: stats?.vacant ?? 0,
+                    ready_now: stats?.ready_now ?? 0,
+                }}
+                canManage={!!can.manage}
+                onCreate={() => setWizardOpen(true)}
             />
             <PageShell>
                 <PerformanceTabs active="succession" />
@@ -210,7 +189,10 @@ export default function SuccessionIndex({
                                                             className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                                                             aria-label={`Edit ${plan.role_title}`}
                                                             onClick={(e) =>
-                                                                openEdit(e, plan)
+                                                                openEdit(
+                                                                    e,
+                                                                    plan,
+                                                                )
                                                             }
                                                         >
                                                             <Pencil className="h-3.5 w-3.5" />
@@ -222,7 +204,9 @@ export default function SuccessionIndex({
                                                             aria-label={`Archive ${plan.role_title}`}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setDeleting(plan);
+                                                                setDeleting(
+                                                                    plan,
+                                                                );
                                                             }}
                                                         >
                                                             <Archive className="h-3.5 w-3.5 text-muted-foreground" />
@@ -293,19 +277,23 @@ export default function SuccessionIndex({
                     <DialogHeader>
                         <DialogTitle>Archive succession plan?</DialogTitle>
                         <DialogDescription>
-                            “{deleting?.role_title}” will leave the active pipeline.
-                            Its{' '}
-                            {deleting?.candidates_count ?? 0} candidate assessment
-                            {(deleting?.candidates_count ?? 0) === 1 ? '' : 's'} will be retained.
+                            “{deleting?.role_title}” will leave the active
+                            pipeline. Its {deleting?.candidates_count ?? 0}{' '}
+                            candidate assessment
+                            {(deleting?.candidates_count ?? 0) === 1
+                                ? ''
+                                : 's'}{' '}
+                            will be retained.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="ghost" onClick={() => setDeleting(null)}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setDeleting(null)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={confirmDelete}>
-                            Archive plan
-                        </Button>
+                        <Button onClick={confirmDelete}>Archive plan</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -1,5 +1,6 @@
 import { ReportsTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import { AnalyticsHero } from '@/components/hr/analytics-hero';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -11,14 +12,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import {
-    BarChart2,
-    BarChart3,
-    Clock,
-    ShieldCheck,
-    TrendingDown,
-    Users,
-} from 'lucide-react';
+import { BarChart2 } from 'lucide-react';
 import {
     Bar,
     BarChart,
@@ -109,99 +103,15 @@ export default function AnalyticsDashboard({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        icon={BarChart3}
-                        title="Workforce Analytics"
-                        description="Showing last 12 months of workforce trends and compliance metrics."
-                        stats={[
-                            { label: 'Headcount', value: currentHeadcount },
-                            { label: 'Turnover', value: `${turnoverRate.rate}%` },
-                            { label: 'Avg Tenure', value: avgTenure },
-                            { label: 'Compliance', value: `${complianceScore.score}%` },
-                        ]}
-                        actions={
-                            <Badge
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-xs font-normal text-primary-foreground backdrop-blur-sm"
-                            >
-                                Showing last 12 months
-                            </Badge>
-                        }
+                    <AnalyticsHero
+                        currentHeadcount={currentHeadcount}
+                        turnoverRate={turnoverRate.rate}
+                        averageTenure={avgTenure}
+                        complianceScore={complianceScore.score}
                     />
                 }
             >
                 <ReportsTabs active="analytics" />
-                {/* KPI Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Headcount
-                            </CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {currentHeadcount}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                Active employees
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Turnover Rate
-                            </CardTitle>
-                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {turnoverRate.rate}%
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {turnoverRate.separations} separations (12
-                                months)
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Avg Tenure
-                            </CardTitle>
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">{avgTenure}</p>
-                            <p className="text-xs text-muted-foreground">
-                                Average employee tenure
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Compliance
-                            </CardTitle>
-                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {complianceScore.score}%
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {complianceScore.compliant} of{' '}
-                                {complianceScore.total} compliant
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
                 {/* Charts Row */}
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* Headcount Trend Line Chart */}

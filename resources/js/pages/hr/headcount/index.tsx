@@ -1,12 +1,12 @@
+import { ReportsTabs } from '@/components/hr';
+import { HeadcountHero } from '@/components/hr/headcount-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ReportsTabs } from '@/components/hr';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, Briefcase, FilePlus2, Users } from 'lucide-react';
+import { FilePlus2 } from 'lucide-react';
 import {
     Bar,
     BarChart,
@@ -75,98 +75,14 @@ export default function HeadcountIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Headcount Planning" />
             <PageShell>
-                <PageHero category="hr"
-                    icon={Users}
-                    title="Headcount Planning"
-                    description="Workforce planning, forecasting, and attrition analysis."
-                    stats={[
-                        { label: 'Headcount', value: current.total },
-                        { label: 'Total FTE', value: current.fte_total },
-                        {
-                            label: 'Vacancies',
-                            value: budgetVsActual.total_vacant,
-                            tone: budgetVsActual.total_vacant > 0 ? 'warning' : 'neutral',
-                        },
-                        {
-                            label: 'Attrition risk',
-                            value: attritionRisk.length,
-                            tone: attritionRisk.length > 0 ? 'critical' : 'neutral',
-                        },
-                    ]}
-                    actions={
-                        canRecruit ? (
-                            <Button asChild variant="secondary">
-                                <Link href="/hr/recruitment?tab=requisitions">
-                                    <Briefcase className="mr-2 h-4 w-4" />
-                                    Open recruitment
-                                </Link>
-                            </Button>
-                        ) : undefined
-                    }
+                <HeadcountHero
+                    headcount={current.total}
+                    totalFte={current.fte_total}
+                    vacancies={budgetVsActual.total_vacant}
+                    attritionRisk={attritionRisk.length}
+                    canRecruit={canRecruit}
                 />
                 <ReportsTabs active="headcount" />
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Users className="h-4 w-4" />
-                                Headcount
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {current.total}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                Active employees
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">
-                                Total FTE
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {current.fte_total}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Briefcase className="h-4 w-4" />
-                                Vacancies
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {budgetVsActual.total_vacant}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                of {budgetVsActual.total_budgeted} budgeted
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <AlertTriangle className="h-4 w-4" />
-                                Attrition Risk
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {attritionRisk.length}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                At milestone points
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -295,7 +211,8 @@ export default function HeadcountIndex({
                                                                 this deep-links to the Requisitions tab. */}
                                                             <Link href="/hr/recruitment?tab=requisitions">
                                                                 <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
-                                                                Create requisition
+                                                                Create
+                                                                requisition
                                                             </Link>
                                                         </Button>
                                                     )}
