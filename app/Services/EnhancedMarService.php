@@ -14,9 +14,10 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class EnhancedMarService
 {
@@ -560,6 +561,21 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        $clientRequestUuid = trim((string) ($data['client_request_uuid'] ?? '')) ?: null;
+        if ($clientRequestUuid !== null) {
+            $existing = ClientMedicationAdministration::withTrashed()
+                ->where('client_request_uuid', $clientRequestUuid)
+                ->first();
+            if ($existing !== null) {
+                return $this->finalizeAdministrationResult(
+                    $this->completedClientRequestResult($existing, $client, $medication),
+                    $medication,
+                    $userId,
+                    $clientRequestUuid,
+                );
+            }
+        }
+
         if ($shiftId !== null && ! Shift::query()
             ->whereKey($shiftId)
             ->where('client_id', $client->id)
@@ -619,11 +635,18 @@ class EnhancedMarService
             // round). Fire it here — the shared choke point — deduped so a
             // worker re-tapping doesn't raise duplicates.
             if ($medication->is_prn && $medication->fresh()->isPrnBlocked()) {
-                $limitIncidentKey = 'emar:prn-over-limit:'.$client->id.':'.$medication->id.':'.now()->format('YmdHi');
-                if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
-                    app(MedicationIncidentIntegrationService::class)
-                        ->handlePrnOverLimit($client, $medication->fresh(), $userId);
+                $attemptId = trim((string) ($data['client_request_uuid'] ?? ''));
+                if ($attemptId === '') {
+                    $attemptId = (string) Str::uuid();
                 }
+
+                app(MedicationIncidentIntegrationService::class)
+                    ->handlePrnOverLimit(
+                        $client,
+                        $medication->fresh(),
+                        $userId,
+                        $attemptId,
+                    );
             }
 
             return [
@@ -668,129 +691,212 @@ class EnhancedMarService
             }
         }
 
-        $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation) {
-            $shift = null;
-            if ($shiftId !== null) {
-                $shift = Shift::query()
-                    ->whereKey($shiftId)
-                    ->where('client_id', $client->id)
-                    ->lockForUpdate()
-                    ->first();
+        try {
+            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation, $clientRequestUuid) {
+                $shift = null;
+                if ($shiftId !== null) {
+                    $shift = Shift::query()
+                        ->whereKey($shiftId)
+                        ->where('client_id', $client->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                if (! $shift) {
+                    if (! $shift) {
+                        return [
+                            'success' => false,
+                            'error' => 'The selected shift does not belong to this client.',
+                            'error_field' => 'shift_id',
+                        ];
+                    }
+                }
+
+                // Re-fetch medication with lock to prevent race conditions
+                $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
+
+                if (! $medication->isAdministrable()) {
                     return [
                         'success' => false,
-                        'error' => 'The selected shift does not belong to this client.',
-                        'error_field' => 'shift_id',
+                        'error' => 'Medication order is awaiting verification before it can be administered.',
+                        'error_field' => 'approval_status',
                     ];
                 }
-            }
 
-            // Re-fetch medication with lock to prevent race conditions
-            $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
+                if ($clientRequestUuid !== null) {
+                    $existing = ClientMedicationAdministration::withTrashed()
+                        ->where('client_request_uuid', $clientRequestUuid)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($existing !== null) {
+                        return $this->completedClientRequestResult($existing, $client, $medication);
+                    }
+                }
 
-            if (! $medication->isAdministrable()) {
+                if ($scheduledFor && ! $medication->is_prn) {
+                    [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
+
+                    $existing = ClientMedicationAdministration::query()
+                        ->where('client_id', $client->id)
+                        ->where('client_medication_id', $medication->id)
+                        ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
+                        ->lockForUpdate()
+                        ->latest('id')
+                        ->first();
+
+                    if ($existing) {
+                        return [
+                            'success' => true,
+                            'administration' => $existing,
+                            'safety_check' => $safetyCheck,
+                            'duplicate' => true,
+                        ];
+                    }
+                }
+
+                // Lock stock record if it exists
+                if ($medication->controlled_drug) {
+                    $medication->load(['stock' => function ($q) {
+                        $q->lockForUpdate();
+                    }]);
+                }
+
+                // Create administration record
+                $admin = new ClientMedicationAdministration;
+                $admin->client_request_uuid = $clientRequestUuid;
+                $admin->client_id = $client->id;
+                $admin->client_medication_id = $medication->id;
+                $admin->shift_id = $shiftId;
+                $admin->administered_by = $userId;
+                $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
+                $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
+                $admin->witness_method = $witnessValidation['witness_method'] ?? null;
+                $admin->scheduled_for = $scheduledFor?->copy()->utc();
+                $admin->administered_at = $adminAt->copy()->utc();
+                $admin->status = $data['status'];
+                $admin->reason = $data['reason'] ?? null;
+                $admin->reason_code = $data['reason_code'] ?? null;
+                $admin->dose_given = $data['dose_given'] ?? null;
+                $admin->notes = $data['notes'] ?? null;
+                $admin->blood_glucose_level = $data['blood_glucose_level'] ?? null;
+                $admin->pulse_bpm = $data['pulse_bpm'] ?? null;
+                $admin->blood_pressure_systolic = $data['blood_pressure_systolic'] ?? null;
+                $admin->blood_pressure_diastolic = $data['blood_pressure_diastolic'] ?? null;
+                $admin->late_minutes = $windowCheck['late_minutes'] ?? null;
+                $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
+                $admin->outcome = $data['outcome'] ?? null;
+                $admin->site = $data['site'] ?? null;
+
+                if ($shift) {
+                    $admin->service_context_id = $shift->service_context_id;
+                }
+
+                if (! $admin->service_context_id) {
+                    $admin->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
+                }
+
+                $admin->save();
+
+                if ($admin->status === 'given') {
+                    $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
+                }
+
+                // Handle controlled drug register entry
+                if ($medication->controlled_drug && $admin->status === 'given') {
+                    $this->recordControlledDrugEntry(
+                        $medication,
+                        $admin,
+                        $userId,
+                        $admin->witnessed_by,
+                        (float) ($data['quantity_administered'] ?? 1)
+                    );
+                }
+
                 return [
-                    'success' => false,
-                    'error' => 'Medication order is awaiting verification before it can be administered.',
-                    'error_field' => 'approval_status',
+                    'success' => true,
+                    'administration' => $admin,
+                    'safety_check' => $safetyCheck,
                 ];
+            });
+        } catch (QueryException $exception) {
+            if ($clientRequestUuid === null) {
+                throw $exception;
             }
 
-            if ($scheduledFor && ! $medication->is_prn) {
-                [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
-
-                $existing = ClientMedicationAdministration::query()
-                    ->where('client_id', $client->id)
-                    ->where('client_medication_id', $medication->id)
-                    ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-                    ->lockForUpdate()
-                    ->latest('id')
-                    ->first();
-
-                if ($existing) {
-                    return [
-                        'success' => true,
-                        'administration' => $existing,
-                        'safety_check' => $safetyCheck,
-                        'duplicate' => true,
-                    ];
-                }
+            $existing = ClientMedicationAdministration::withTrashed()
+                ->where('client_request_uuid', $clientRequestUuid)
+                ->first();
+            if ($existing === null) {
+                throw $exception;
             }
 
-            // Lock stock record if it exists
-            if ($medication->controlled_drug) {
-                $medication->load(['stock' => function ($q) {
-                    $q->lockForUpdate();
-                }]);
-            }
+            $result = $this->completedClientRequestResult($existing, $client, $medication);
+        }
 
-            // Create administration record
-            $admin = new ClientMedicationAdministration;
-            $admin->client_id = $client->id;
-            $admin->client_medication_id = $medication->id;
-            $admin->shift_id = $shiftId;
-            $admin->administered_by = $userId;
-            $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
-            $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
-            $admin->witness_method = $witnessValidation['witness_method'] ?? null;
-            $admin->scheduled_for = $scheduledFor?->copy()->utc();
-            $admin->administered_at = $adminAt->copy()->utc();
-            $admin->status = $data['status'];
-            $admin->reason = $data['reason'] ?? null;
-            $admin->reason_code = $data['reason_code'] ?? null;
-            $admin->dose_given = $data['dose_given'] ?? null;
-            $admin->notes = $data['notes'] ?? null;
-            $admin->blood_glucose_level = $data['blood_glucose_level'] ?? null;
-            $admin->pulse_bpm = $data['pulse_bpm'] ?? null;
-            $admin->blood_pressure_systolic = $data['blood_pressure_systolic'] ?? null;
-            $admin->blood_pressure_diastolic = $data['blood_pressure_diastolic'] ?? null;
-            $admin->late_minutes = $windowCheck['late_minutes'] ?? null;
-            $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
-            $admin->outcome = $data['outcome'] ?? null;
-            $admin->site = $data['site'] ?? null;
+        return $this->finalizeAdministrationResult(
+            $result,
+            $medication,
+            $userId,
+            $clientRequestUuid,
+        );
+    }
 
-            if ($shift) {
-                $admin->service_context_id = $shift->service_context_id;
-            }
+    private function finalizeAdministrationResult(
+        array $result,
+        ClientMedication $medication,
+        int $userId,
+        ?string $clientRequestUuid,
+    ): array {
+        if (! ($result['success'] ?? false) || ! isset($result['administration'])) {
+            return $result;
+        }
 
-            if (! $admin->service_context_id) {
-                $admin->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
-            }
+        /** @var ClientMedicationAdministration $administration */
+        $administration = $result['administration'];
+        $isNewAdministration = empty($result['duplicate']);
+        $isExactDurableReplay = ! $isNewAdministration
+            && $clientRequestUuid !== null
+            && ! $administration->trashed()
+            && (int) $administration->client_id === (int) $medication->client_id
+            && (int) $administration->client_medication_id === (int) $medication->id
+            && hash_equals(
+                (string) $administration->client_request_uuid,
+                $clientRequestUuid,
+            );
 
-            $admin->save();
-
-            if ($admin->status === 'given') {
-                $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
-            }
-
-            // Handle controlled drug register entry
-            if ($medication->controlled_drug && $admin->status === 'given') {
-                $this->recordControlledDrugEntry(
-                    $medication,
-                    $admin,
-                    $userId,
-                    $admin->witnessed_by,
-                    (float) ($data['quantity_administered'] ?? 1)
-                );
-            }
-
-            return [
-                'success' => true,
-                'administration' => $admin,
-                'safety_check' => $safetyCheck,
-            ];
-        });
-
-        // Incident integration fires after the transaction commits so a rolled-back
-        // dose never raises an incident. Living here (not per-controller) means the
-        // MAR wizard, My Day, guided rounds and the client-medical form all raise
-        // the same missed/refused/late incidents.
-        if (($result['success'] ?? false) && empty($result['duplicate']) && isset($result['administration'])) {
-            $this->fireIncidentHooks($result['administration'], $medication, $userId);
+        // Incident integration runs only after the MAR transaction commits so a
+        // rolled-back dose never raises an incident. Exact durable UUID replays
+        // deliberately rerun these source-idempotent hooks to repair a prior
+        // post-commit delivery failure; generic scheduled-slot duplicates do not.
+        if ($isNewAdministration || $isExactDurableReplay) {
+            $reporterId = $isExactDurableReplay
+                ? ((int) $administration->administered_by ?: $userId)
+                : $userId;
+            $this->fireIncidentHooks($administration, $medication, $reporterId);
         }
 
         return $result;
+    }
+
+    private function completedClientRequestResult(
+        ClientMedicationAdministration $administration,
+        Client $client,
+        ClientMedication $medication,
+    ): array {
+        if ((int) $administration->client_id !== (int) $client->id
+            || (int) $administration->client_medication_id !== (int) $medication->id
+        ) {
+            return [
+                'success' => false,
+                'error' => 'This submission identifier has already been used for another medication administration.',
+                'error_field' => 'client_request_uuid',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'administration' => $administration,
+            'safety_check' => null,
+            'duplicate' => true,
+        ];
     }
 
     private function fireIncidentHooks(

@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientMedicationAdministration extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
         'corrected_of_id',
         'is_correction',
+        'client_request_uuid',
         'client_id',
         'client_medication_id',
         'shift_id',

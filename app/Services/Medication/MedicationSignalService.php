@@ -3,6 +3,7 @@
 namespace App\Services\Medication;
 
 use App\Enums\AlertSeverity;
+use App\Exceptions\MedicationSignalDeliveryException;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
@@ -150,8 +151,18 @@ class MedicationSignalService
                 $signal = $this->signalProcessor->ingest($signalData);
                 $alert = $this->signalProcessor->process($signal);
 
+                if ($alert === null && $mustSucceed) {
+                    $signal->refresh();
+
+                    throw new MedicationSignalDeliveryException(
+                        $signal->id === null ? null : (int) $signal->id,
+                        $signalType,
+                        (string) ($signal->status ?: 'not_delivered'),
+                    );
+                }
+
                 if ($alert !== null && $hasIncidentClaim) {
-                    $this->attachSignalToIncidentAlert($signal, $alert, (int) $incidentIdentity);
+                    $this->enrichSignalIncidentEvidence($signal, (int) $incidentIdentity, $alert);
                 }
 
                 if ($alert) {
@@ -303,7 +314,11 @@ class MedicationSignalService
             return null;
         }
 
-        $this->attachSignalToIncidentAlert($signal, $alert, (int) $error->client_incident_id);
+        $this->enrichSignalIncidentEvidence(
+            $signal,
+            (int) $error->client_incident_id,
+            $alert,
+        );
 
         return $alert->fresh();
     }
@@ -363,17 +378,11 @@ class MedicationSignalService
         return [null, null];
     }
 
-    private function attachSignalToIncidentAlert(
+    private function enrichSignalIncidentEvidence(
         Signal $signal,
-        ControlRoomAlert $alert,
         int $incidentId,
+        ?ControlRoomAlert $alert = null,
     ): void {
-        $context = $alert->context ?? [];
-        $normalizedData = array_replace_recursive(
-            (array) ($context['normalized_data'] ?? []),
-            (array) ($signal->normalized_data ?? []),
-            ['incident_id' => $incidentId],
-        );
         $signal->forceFill([
             'normalized_data' => array_replace(
                 (array) $signal->normalized_data,
@@ -381,16 +390,9 @@ class MedicationSignalService
             ),
         ])->saveQuietly();
 
-        $alert->updateQuietly([
-            'context' => array_replace($context, [
-                'incident_id' => $incidentId,
-                'signal_id' => $signal->id,
-                'signal_type_code' => $signal->signal_type_code,
-                'signal_payload' => $signal->payload,
-                'normalized_data' => $normalizedData,
-            ]),
-        ]);
-        $signal->markProcessed($alert, 'Attached to exact incident journey alert');
+        if ($alert !== null) {
+            $signal->markProcessed($alert, 'Medication signal enriched with incident evidence');
+        }
     }
 
     /**

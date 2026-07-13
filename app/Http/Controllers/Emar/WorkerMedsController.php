@@ -222,6 +222,7 @@ class WorkerMedsController extends Controller
                     'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
                     'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                     'notes' => $notes !== '' ? $notes : null,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
                 ],
                 $user->id,
                 $shiftId,
@@ -299,6 +300,8 @@ class WorkerMedsController extends Controller
             ...$this->offlineSubmissionRules(),
         ]);
 
+        $this->reconcilePrnOfflineMarker($data);
+
         return $this->runOfflineSubmissionOnce('prn', $data, function () use ($user, $data) {
             $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
 
@@ -323,6 +326,7 @@ class WorkerMedsController extends Controller
                     'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
                     'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                     'notes' => $data['notes'] ?? null,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
                     'administered_at' => $data['administered_at']
                         ?? $data['captured_offline_at']
                         ?? now()->toIso8601String(),
@@ -339,6 +343,10 @@ class WorkerMedsController extends Controller
                 ]);
             }
 
+            if ($result['duplicate'] ?? false) {
+                return $this->onDuplicateOfflineSubmission('prn', $data);
+            }
+
             $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
 
             return back()->with(
@@ -346,6 +354,33 @@ class WorkerMedsController extends Controller
                 'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
             );
         });
+    }
+
+    /**
+     * A cache marker is only a fast path after the matching MAR row exists.
+     * Failed PRN attempts have no administration row, so an old marker must
+     * never prevent the durable incident handler from reconciling the attempt.
+     */
+    private function reconcilePrnOfflineMarker(array $data): void
+    {
+        $requestUuid = trim((string) ($data['client_request_uuid'] ?? ''));
+        if ($requestUuid === '') {
+            return;
+        }
+
+        $cacheKey = $this->offlineSubmissionKey('prn', $requestUuid);
+        if (! Cache::has($cacheKey)) {
+            return;
+        }
+
+        $completed = ClientMedicationAdministration::withTrashed()
+            ->where('client_request_uuid', $requestUuid)
+            ->where('client_medication_id', $data['client_medication_id'])
+            ->exists();
+
+        if (! $completed) {
+            Cache::forget($cacheKey);
+        }
     }
 
     /**

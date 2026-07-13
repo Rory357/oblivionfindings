@@ -30,6 +30,7 @@ class ControlRoomMessagingController extends Controller
         $bypassPermissions = $this->alertBypassPermissions();
 
         $rankedAlertCommunications = Communication::query()
+            ->conversational()
             ->whereNotNull('alert_id')
             ->whereHas('alert', fn (Builder $alertQuery) => $siteAccess->applyAlertScope(
                 $alertQuery,
@@ -78,6 +79,7 @@ class ControlRoomMessagingController extends Controller
         }
 
         $rankedDirectCommunications = Communication::query()
+            ->conversational()
             ->whereNull('alert_id')
             ->whereNotNull('target_user_id')
             ->whereHas('targetUser', function (Builder $targetUserQuery) use ($siteAccess, $user, $bypassPermissions): void {
@@ -177,6 +179,7 @@ class ControlRoomMessagingController extends Controller
         ]);
 
         $query = Communication::query()
+            ->conversational()
             ->with(['targetUser:id,name', 'initiatedBy:id,name']);
 
         if (filled($validated['alert_id'] ?? null)) {

@@ -35,6 +35,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $notificationService = $this->mock(ControlRoomNotificationService::class);
         $notificationService->shouldReceive('notifyAlert')->andReturnNull();
+        $notificationService->shouldReceive('stageAlertNotifications')->andReturn(collect());
 
         $this->service = new SignalProcessingService($notificationService);
     }

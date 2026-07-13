@@ -135,7 +135,9 @@ class SignalProcessingService
     public function process(Signal $signal): ?ControlRoomAlert
     {
         if ($signal->status !== 'pending') {
-            return $signal->alert;
+            return $signal->status === 'processed'
+                ? ($signal->alert ?? $signal->correlatedAlert)
+                : null;
         }
 
         return DB::transaction(function () use ($signal) {

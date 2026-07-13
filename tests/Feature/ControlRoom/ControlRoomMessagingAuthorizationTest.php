@@ -192,6 +192,47 @@ class ControlRoomMessagingAuthorizationTest extends TestCase
         );
     }
 
+    public function test_notification_outbox_rows_never_appear_as_conversational_messages(): void
+    {
+        $rawSnapshot = '{"type":"control_room_alert","severity":"critical"}';
+        $this->communication([
+            'alert_id' => $this->visibleAlert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'direction' => 'outbound',
+            'purpose' => 'notification',
+            'status' => 'pending',
+            'content' => $rawSnapshot,
+            'sent_at' => now()->addMinute(),
+        ]);
+        $this->communication([
+            'alert_id' => $this->visibleAlert->id,
+            'target_user_id' => $this->visibleStaff->id,
+            'direction' => 'outbound',
+            'purpose' => 'notification',
+            'status' => 'failed',
+            'content' => 'Superseded operational notification',
+            'superseded_at' => now(),
+            'sent_at' => now()->addMinutes(2),
+        ]);
+
+        $indexResponse = $this->actingAs($this->operator)
+            ->get('/control-room/messaging')
+            ->assertOk();
+        $thread = collect($indexResponse->viewData('page')['props']['threads'])
+            ->firstWhere('id', "alert-{$this->visibleAlert->id}");
+
+        $this->assertSame('Visible alert message', $thread['last_message']);
+        $this->assertSame(1, $thread['message_count']);
+
+        $this->actingAs($this->operator)
+            ->getJson("/control-room/messaging/thread?alert_id={$this->visibleAlert->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'messages')
+            ->assertJsonPath('messages.0.id', $this->visibleAlertMessage->id)
+            ->assertJsonMissing(['content' => $rawSnapshot])
+            ->assertJsonMissing(['content' => 'Superseded operational notification']);
+    }
+
     public function test_direct_thread_summary_uses_the_deterministic_latest_row_for_content_time_counts_and_ordering(): void
     {
         $latestAt = now()->addHour()->startOfSecond();

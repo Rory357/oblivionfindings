@@ -713,23 +713,32 @@ class MedicationsApiController extends Controller
         }
 
         if (($data['queued_offline'] ?? false) && !$medication->is_prn && !empty($data['scheduled_for'])) {
-            $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
-            [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
-            $conflictingAdministration = ClientMedicationAdministration::query()
+            $isDurableReplay = filled($data['client_request_uuid'] ?? null)
+                && ClientMedicationAdministration::withTrashed()
+                    ->where('client_id', $client->id)
+                    ->where('client_medication_id', $medication->id)
+                    ->where('client_request_uuid', $data['client_request_uuid'])
+                    ->exists();
+
+            if (! $isDurableReplay) {
+                $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
+                [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
+                $conflictingAdministration = ClientMedicationAdministration::query()
                 ->where('client_id', $client->id)
                 ->where('client_medication_id', $medication->id)
                 ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
                 ->latest('id')
                 ->first();
 
-            if ($conflictingAdministration) {
-                return response()->json(
-                    $this->buildConflictPayload(
-                        $data,
-                        'Medication state changed before this offline administration could sync. Supervisor review is required.',
-                    ),
-                    409
-                );
+                if ($conflictingAdministration) {
+                    return response()->json(
+                        $this->buildConflictPayload(
+                            $data,
+                            'Medication state changed before this offline administration could sync. Supervisor review is required.',
+                        ),
+                        409
+                    );
+                }
             }
         }
 
@@ -769,6 +778,22 @@ class MedicationsApiController extends Controller
         }
 
         $administration = $result['administration'];
+
+        if ($result['duplicate'] ?? false) {
+            $payload = $this->withSync([
+                'success' => true,
+                'administration' => [
+                    'id' => $administration->id,
+                    'status' => $administration->status,
+                    'administered_at' => $administration->administered_at?->toIso8601String(),
+                ],
+                'safety_check' => $result['safety_check'] ?? null,
+            ], $data, 'duplicate', true, 'This medication request was already processed.');
+
+            return response()->json(
+                $this->rememberIdempotentResponse('administration', $data, $payload),
+            );
+        }
 
         // Timeline event
         $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
@@ -942,7 +967,7 @@ class MedicationsApiController extends Controller
                 $user->canDo('medications.view') || $user->canDo('clients.viewAny'),
                 403
             );
-            
+
             $alerts = MedicationDashboardAlert::active()
                 ->with(['medication:id,name', 'client:id,first_name,last_name'])
                 ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")

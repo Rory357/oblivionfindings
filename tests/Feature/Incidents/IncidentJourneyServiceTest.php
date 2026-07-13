@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Incidents;
 
+use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
+use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertQueue;
@@ -9,6 +11,9 @@ use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\Communication;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookRun;
+use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
@@ -19,14 +24,19 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\ControlRoomAlertNotification;
+use App\Observers\ClientIncidentObserver;
+use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
+use Illuminate\Contracts\Notifications\Dispatcher;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -510,6 +520,476 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame(0, HsEvent::query()->whereNull('control_room_alert_id')->count());
     }
 
+    public function test_observer_promotes_an_existing_medium_alert_and_reconciles_high_operations_without_demoting_governance(): void
+    {
+        $actor = User::factory()->create();
+        $acceptor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $mediumQueue = TriageQueue::query()->create([
+            'name' => 'Medium incidents',
+            'code' => 'medium-incidents',
+            'tier' => 2,
+            'handle_severities' => ['medium'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'is_active' => true,
+        ]);
+        $highQueue = TriageQueue::query()->create([
+            'name' => 'High incidents',
+            'code' => 'high-incidents',
+            'tier' => 1,
+            'handle_severities' => ['high'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'is_active' => true,
+        ]);
+        $mediumSla = SlaDefinition::query()->create([
+            'name' => 'Medium incident SLA',
+            'code' => 'medium-incident-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['medium'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 30,
+            'resolution_target_minutes' => 240,
+            'is_active' => true,
+        ]);
+        $highSla = SlaDefinition::query()->create([
+            'name' => 'High incident SLA',
+            'code' => 'high-incident-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['high'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 10,
+            'resolution_target_minutes' => 90,
+            'is_active' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+            'occurred_at' => now()->subHour(),
+        ]);
+        $journey = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Operator requested early triage',
+        );
+        $alert = $journey->alert;
+        $hsEvent = $journey->hsEvent;
+        $acknowledgedAt = $alert->triggered_at->copy()->addMinutes(20);
+        $cycleStartedAt = $alert->triggered_at->copy()->addMinutes(5);
+        $cycleHistory = [[
+            'cycle' => 1,
+            'started_at' => $alert->triggered_at->toIso8601String(),
+            'ended_as' => 'reopened',
+        ]];
+        $alert->sla()->firstOrFail()->forceFill([
+            'acknowledged_at' => $acknowledgedAt,
+            'acknowledge_variance_minutes' => -10,
+            'acknowledge_breached' => false,
+            'first_breach_at' => null,
+            'cycle_number' => 2,
+            'cycle_started_at' => $cycleStartedAt,
+            'cycle_history' => $cycleHistory,
+            'ended_as' => 'reopened',
+        ])->save();
+        $acceptedAt = now()->subMinutes(5);
+        $alert->updateQuietly(['status' => ControlRoomAlert::STATUS_TRIAGING]);
+        $hsEvent->updateQuietly([
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'accepted_by_user_id' => $acceptor->id,
+            'accepted_at' => $acceptedAt,
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_reference' => 'WS-PROMOTION-1',
+            'worksafe_site_preserved' => true,
+        ]);
+
+        $incident->refresh()->updateQuietly(['severity' => 'high']);
+        app(ClientIncidentObserver::class)->updated($incident);
+
+        $alert = $alert->fresh();
+        $hsEvent = $hsEvent->fresh();
+        $this->assertSame('high', $alert->severity);
+        $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->status);
+        $this->assertSame($highQueue->id, $alert->queue_id);
+        $this->assertSame($highSla->id, $alert->sla?->sla_definition_id);
+        $this->assertNotSame($mediumSla->id, $alert->sla?->sla_definition_id);
+        $this->assertSame(10, $alert->sla?->acknowledge_target_minutes);
+        $this->assertSame(
+            $acknowledgedAt->toDateTimeString(),
+            $alert->sla?->acknowledged_at?->toDateTimeString(),
+        );
+        $this->assertSame(10, $alert->sla?->acknowledge_variance_minutes);
+        $this->assertTrue((bool) $alert->sla?->acknowledge_breached);
+        $this->assertSame(
+            $acknowledgedAt->toDateTimeString(),
+            $alert->sla?->first_breach_at?->toDateTimeString(),
+        );
+        $this->assertSame(2, $alert->sla?->cycle_number);
+        $this->assertSame(
+            $cycleStartedAt->toDateTimeString(),
+            $alert->sla?->cycle_started_at?->toDateTimeString(),
+        );
+        $this->assertEquals($cycleHistory, $alert->sla?->cycle_history);
+        $this->assertSame('reopened', $alert->sla?->ended_as);
+        $this->assertDatabaseHas('control_room_alert_queue', [
+            'alert_id' => $alert->id,
+            'queue_id' => $mediumQueue->id,
+        ]);
+        $this->assertNotNull(
+            AlertQueue::query()
+                ->where('alert_id', $alert->id)
+                ->where('queue_id', $mediumQueue->id)
+                ->value('exited_at'),
+        );
+        $this->assertDatabaseHas('control_room_alert_queue', [
+            'alert_id' => $alert->id,
+            'queue_id' => $highQueue->id,
+            'exited_at' => null,
+        ]);
+        $this->assertSame(2, AlertQueue::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame($highSla->id, AlertSla::query()->where('alert_id', $alert->id)->value('sla_definition_id'));
+        $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $hsEvent->handover_status);
+        $this->assertSame($acceptor->id, $hsEvent->accepted_by_user_id);
+        $this->assertSame($acceptedAt->toDateTimeString(), $hsEvent->accepted_at->toDateTimeString());
+        $this->assertTrue($hsEvent->worksafe_notifiable);
+        $this->assertSame(HsEvent::WORKSAFE_ACKNOWLEDGED, $hsEvent->worksafe_status);
+        $this->assertSame('WS-PROMOTION-1', $hsEvent->worksafe_reference);
+        $this->assertTrue($hsEvent->worksafe_site_preserved);
+    }
+
+    public function test_medium_to_critical_promotion_reconciles_queue_sla_playbook_and_delivery_once_on_retry(): void
+    {
+        Notification::fake();
+        $actor = User::factory()->create();
+        $criticalRecipient = User::factory()->create();
+        $acceptor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $mediumQueue = TriageQueue::query()->create([
+            'name' => 'Medium promotion queue',
+            'code' => 'medium-promotion',
+            'tier' => 2,
+            'handle_severities' => ['medium'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'is_active' => true,
+        ]);
+        $criticalQueue = TriageQueue::query()->create([
+            'name' => 'Critical promotion queue',
+            'code' => 'critical-promotion',
+            'tier' => 1,
+            'handle_severities' => ['critical'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$criticalRecipient->id],
+            'is_active' => true,
+        ]);
+        SlaDefinition::query()->create([
+            'name' => 'Medium promotion SLA',
+            'code' => 'medium-promotion-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['medium'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 30,
+            'resolution_target_minutes' => 240,
+            'is_active' => true,
+        ]);
+        $mediumPlaybook = Playbook::query()->create([
+            'name' => 'Medium fall response',
+            'code' => 'medium-fall-response',
+            'category' => Playbook::CATEGORY_SAFETY,
+            'version' => 1,
+            'is_active' => true,
+            'auto_attach' => true,
+            'trigger_alert_types' => ['incident.fall'],
+            'trigger_severities' => ['medium'],
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $mediumPlaybook->id,
+            'order' => 0,
+            'title' => 'Observe and review',
+            'type' => PlaybookStep::TYPE_TASK,
+            'is_required' => true,
+        ]);
+        $criticalSla = SlaDefinition::query()->create([
+            'name' => 'Critical promotion SLA',
+            'code' => 'critical-promotion-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['critical'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 3,
+            'resolution_target_minutes' => 30,
+            'is_active' => true,
+        ]);
+        $playbook = Playbook::query()->create([
+            'name' => 'Critical fall response',
+            'code' => 'critical-fall-response',
+            'category' => Playbook::CATEGORY_EMERGENCY,
+            'version' => 1,
+            'is_active' => true,
+            'auto_attach' => true,
+            'trigger_alert_types' => ['incident.fall'],
+            'trigger_severities' => ['critical'],
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $playbook->id,
+            'order' => 0,
+            'title' => 'Stabilise and escalate',
+            'type' => PlaybookStep::TYPE_TASK,
+            'is_required' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+        ]);
+        DB::beginTransaction();
+        $initial = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Medium operator review',
+        );
+        DB::commit();
+        $alert = $initial->alert->fresh();
+        $hsEvent = $initial->hsEvent->fresh();
+        $mediumRun = $alert->playbookRun()->firstOrFail();
+        $this->assertSame($mediumPlaybook->id, $mediumRun->playbook_id);
+        $this->assertSame(PlaybookRun::STATUS_IN_PROGRESS, $mediumRun->status);
+        $alert->updateQuietly(['status' => ControlRoomAlert::STATUS_TRIAGING]);
+        $hsEvent->updateQuietly([
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'accepted_by_user_id' => $acceptor->id,
+            'accepted_at' => now()->subMinute(),
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_reference' => 'WS-PROMOTION-CRITICAL',
+        ]);
+
+        Notification::fake();
+        DB::beginTransaction();
+        $promoted = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+        $retry = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+        Notification::assertNotSentTo($criticalRecipient, ControlRoomAlertNotification::class);
+        DB::commit();
+
+        $alert = $alert->fresh();
+        $hsEvent = $hsEvent->fresh();
+        $this->assertTrue($retry->alert->is($promoted->alert));
+        $this->assertSame('critical', $alert->severity);
+        $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->status);
+        $this->assertSame($criticalQueue->id, $alert->queue_id);
+        $this->assertSame($criticalSla->id, $alert->sla?->sla_definition_id);
+        $this->assertSame(3, $alert->sla?->acknowledge_target_minutes);
+        $this->assertSame($playbook->id, $alert->playbookRun?->playbook_id);
+        $this->assertSame(PlaybookRun::STATUS_IN_PROGRESS, $alert->playbookRun?->status);
+        $criticalRun = $alert->playbookRun;
+        $this->assertNotSame($mediumRun->id, $criticalRun?->id);
+        $mediumRun->refresh();
+        $this->assertSame(PlaybookRun::STATUS_CANCELLED, $mediumRun->status);
+        $this->assertSame(
+            $criticalRun?->id,
+            data_get($mediumRun->context, 'superseded_by_playbook_run_id'),
+        );
+        $this->assertSame('critical', data_get($mediumRun->context, 'superseded_for_severity'));
+        $this->assertDatabaseCount('control_room_playbook_runs', 2);
+        $this->assertDatabaseCount('control_room_playbook_run_steps', 2);
+        $this->assertSame(2, AlertQueue::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(
+            1,
+            AlertQueue::query()
+                ->where('alert_id', $alert->id)
+                ->whereNull('exited_at')
+                ->where('queue_id', $criticalQueue->id)
+                ->count(),
+        );
+        $this->assertNotNull(
+            AlertQueue::query()
+                ->where('alert_id', $alert->id)
+                ->where('queue_id', $mediumQueue->id)
+                ->value('exited_at'),
+        );
+        Notification::assertSentToTimes($criticalRecipient, ControlRoomAlertNotification::class, 1);
+        $this->assertSame(
+            1,
+            Communication::query()
+                ->where('alert_id', $alert->id)
+                ->where('target_user_id', $criticalRecipient->id)
+                ->where('purpose', 'notification')
+                ->count(),
+        );
+        $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $hsEvent->handover_status);
+        $this->assertSame(HsEvent::WORKSAFE_NOTIFIED, $hsEvent->worksafe_status);
+        $this->assertSame('WS-PROMOTION-CRITICAL', $hsEvent->worksafe_reference);
+    }
+
+    public function test_severity_routing_change_supersedes_pending_snapshot_before_delivering_the_new_generation(): void
+    {
+        Queue::fake([DeliverControlRoomAlertNotificationJob::class]);
+        Notification::fake();
+        $actor = User::factory()->create();
+        $mediumRecipient = User::factory()->create();
+        $criticalRecipient = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        TriageQueue::query()->create([
+            'name' => 'Medium snapshot queue',
+            'code' => 'medium-snapshot',
+            'tier' => 2,
+            'handle_severities' => ['medium'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$mediumRecipient->id],
+            'is_active' => true,
+        ]);
+        TriageQueue::query()->create([
+            'name' => 'Critical snapshot queue',
+            'code' => 'critical-snapshot',
+            'tier' => 1,
+            'handle_severities' => ['critical'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$criticalRecipient->id],
+            'is_active' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+        ]);
+
+        DB::beginTransaction();
+        $journey = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Medium snapshot generation',
+        );
+        DB::commit();
+
+        $mediumDelivery = Communication::query()
+            ->where('alert_id', $journey->alert->id)
+            ->where('target_user_id', $mediumRecipient->id)
+            ->sole();
+        $this->assertSame('Alert incident.fall (medium)', $mediumDelivery->content);
+        $this->assertSame('medium', data_get($mediumDelivery->notification_payload, 'severity'));
+        $this->assertSame('pending', $mediumDelivery->status);
+
+        DB::beginTransaction();
+        app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical snapshot generation',
+            'critical',
+        );
+        DB::commit();
+
+        $mediumDelivery->refresh();
+        $criticalDelivery = Communication::query()
+            ->where('alert_id', $journey->alert->id)
+            ->where('target_user_id', $criticalRecipient->id)
+            ->sole();
+        $this->assertNotNull($mediumDelivery->superseded_at);
+        $this->assertSame('Alert incident.fall (medium)', $mediumDelivery->content);
+        $this->assertSame('medium', data_get($mediumDelivery->notification_payload, 'severity'));
+        $this->assertSame('Alert incident.fall (critical)', $criticalDelivery->content);
+        $this->assertSame('critical', data_get($criticalDelivery->notification_payload, 'severity'));
+        $this->assertNotSame($mediumDelivery->template_used, $criticalDelivery->template_used);
+
+        $notifications = app(ControlRoomNotificationService::class);
+        $notifications->deliverStagedNotification($mediumDelivery);
+        $notifications->deliverStagedNotification($criticalDelivery);
+
+        Notification::assertNotSentTo($mediumRecipient, ControlRoomAlertNotification::class);
+        Notification::assertSentTo(
+            $criticalRecipient,
+            ControlRoomAlertNotification::class,
+            fn (ControlRoomAlertNotification $notification): bool => $notification->toArray($criticalRecipient)['severity'] === 'critical',
+        );
+        $this->assertSame('pending', $mediumDelivery->fresh()->status);
+        $this->assertSame('sent', $criticalDelivery->fresh()->status);
+        $this->assertDatabaseCount('control_room_communications', 2);
+    }
+
+    public function test_delivery_reconciles_a_recipient_configuration_change_into_the_current_outbox_generation(): void
+    {
+        Queue::fake([DeliverControlRoomAlertNotificationJob::class]);
+        Notification::fake();
+        $originalRecipient = User::factory()->create();
+        $replacementRecipient = User::factory()->create();
+        $queue = TriageQueue::query()->create([
+            'name' => 'Mutable recipient queue',
+            'code' => 'mutable-recipient-queue',
+            'tier' => 1,
+            'handle_severities' => ['high'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$originalRecipient->id],
+            'is_active' => true,
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'incident',
+            'alert_type' => 'incident.fall',
+            'severity' => 'high',
+            'queue_id' => $queue->id,
+        ]);
+        $notifications = app(ControlRoomNotificationService::class);
+        $original = $notifications
+            ->stageAlertNotifications($alert, null, $queue)
+            ->sole();
+
+        $queue->forceFill(['assigned_users' => [$replacementRecipient->id]])->save();
+        (new DeliverControlRoomAlertNotificationJob($original->id))
+            ->handle($notifications);
+
+        $original->refresh();
+        $replacement = Communication::query()
+            ->where('alert_id', $alert->id)
+            ->where('target_user_id', $replacementRecipient->id)
+            ->whereNull('superseded_at')
+            ->sole();
+        $replacementId = $replacement->id;
+        $replacementKey = $replacement->delivery_key;
+
+        $this->assertNotNull($original->superseded_at);
+        $this->assertSame('pending', $replacement->status);
+        $this->assertNotNull($replacementKey);
+        $this->assertNotSame($original->delivery_key, $replacementKey);
+        $this->assertSame(
+            'control-room-alert-notification-v2:'.data_get($replacement->notification_payload, 'routing_generation'),
+            $replacement->template_used,
+        );
+        Notification::assertNotSentTo($originalRecipient, ControlRoomAlertNotification::class);
+        Notification::assertNotSentTo($replacementRecipient, ControlRoomAlertNotification::class);
+        Queue::assertPushed(
+            DeliverControlRoomAlertNotificationJob::class,
+            fn (DeliverControlRoomAlertNotificationJob $job): bool => $job->communicationId === $replacementId,
+        );
+
+        (new DeliverControlRoomAlertNotificationJob($original->id))
+            ->handle($notifications);
+
+        $this->assertDatabaseCount('control_room_communications', 2);
+        $this->assertSame(
+            1,
+            Communication::query()
+                ->where('alert_id', $alert->id)
+                ->where('target_user_id', $replacementRecipient->id)
+                ->whereNull('superseded_at')
+                ->count(),
+        );
+        $this->assertSame($replacementId, Communication::query()->where('delivery_key', $replacementKey)->value('id'));
+        Queue::assertPushedTimes(DeliverControlRoomAlertNotificationJob::class, 1);
+    }
+
     public function test_new_explicit_incident_alert_initialises_queue_sla_and_automation_exactly_once(): void
     {
         Notification::fake();
@@ -567,7 +1047,12 @@ class IncidentJourneyServiceTest extends TestCase
         $alert = $first->alert->fresh();
 
         Notification::assertNothingSent();
-        $this->assertDatabaseCount('control_room_communications', 0);
+        $this->assertDatabaseHas('control_room_communications', [
+            'alert_id' => $alert->id,
+            'target_user_id' => $assignee->id,
+            'purpose' => 'notification',
+            'status' => 'pending',
+        ]);
         DB::commit();
 
         $this->assertTrue($retry->alert->is($first->alert));
@@ -587,6 +1072,198 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($alert->id, $communication->alert_id);
         $this->assertSame($assignee->id, $communication->target_user_id);
         $this->assertSame('notification', $communication->purpose);
+        $this->assertSame('sent', $communication->status);
+    }
+
+    public function test_initializer_attaches_the_configured_playbook_before_automation_once_on_retry(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $playbook = Playbook::query()->create([
+            'name' => 'Incident fall response',
+            'code' => 'incident-fall-response',
+            'category' => Playbook::CATEGORY_SAFETY,
+            'version' => 1,
+            'is_active' => true,
+            'auto_attach' => true,
+            'trigger_alert_types' => ['incident.fall'],
+            'trigger_severities' => ['high'],
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $playbook->id,
+            'order' => 0,
+            'title' => 'Assess immediate harm',
+            'type' => PlaybookStep::TYPE_TASK,
+            'is_required' => true,
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $playbook->id,
+            'order' => 1,
+            'title' => 'Preserve evidence',
+            'type' => PlaybookStep::TYPE_EVIDENCE,
+            'is_required' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'high',
+        ]);
+
+        DB::beginTransaction();
+        $first = app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+        $retry = app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident->fresh(), $actor);
+        DB::commit();
+
+        $alert = $first->alert->fresh();
+        $this->assertTrue($retry->alert->is($first->alert));
+        $this->assertSame($playbook->id, $alert->playbookRun?->playbook_id);
+        $this->assertSame(PlaybookRun::STATUS_IN_PROGRESS, $alert->playbookRun?->status);
+        $this->assertSame(2, $alert->playbookRun?->steps()->count());
+        $this->assertDatabaseCount('control_room_playbook_runs', 1);
+        $this->assertDatabaseCount('control_room_playbook_run_steps', 2);
+    }
+
+    public function test_after_commit_delivery_failure_is_persisted_and_retry_succeeds_without_duplicates_or_request_failure(): void
+    {
+        $recipient = User::factory()->create();
+        $queue = TriageQueue::query()->create([
+            'name' => 'Durable notification queue',
+            'code' => 'durable-notification',
+            'tier' => 1,
+            'handle_severities' => ['high'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$recipient->id],
+            'is_active' => true,
+        ]);
+        $dispatcher = \Mockery::mock(Dispatcher::class);
+        $dispatcher->shouldReceive('send')
+            ->once()
+            ->andThrow(new \RuntimeException('Forced post-commit notification failure'));
+        $this->app->instance(Dispatcher::class, $dispatcher);
+        DB::beginTransaction();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'incident',
+            'alert_type' => 'incident.fall',
+            'severity' => 'high',
+        ]);
+        app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert);
+        $this->assertDatabaseHas('control_room_communications', [
+            'alert_id' => $alert->id,
+            'target_user_id' => $recipient->id,
+            'purpose' => 'notification',
+            'status' => 'pending',
+        ]);
+        $commitException = null;
+
+        try {
+            DB::commit();
+        } catch (\Throwable $caught) {
+            $commitException = $caught;
+        }
+
+        $this->assertNull($commitException, 'Post-commit delivery must not turn durable alert creation into request failure.');
+        $failed = Communication::query()->sole();
+        $this->assertSame($alert->id, $failed->alert_id);
+        $this->assertSame($recipient->id, $failed->target_user_id);
+        $this->assertSame('failed', $failed->status);
+        $this->assertSame(1, $failed->retry_count);
+        $this->assertStringContainsString('Forced post-commit notification failure', (string) $failed->status_detail);
+        $this->assertSame($queue->id, $alert->fresh()->queue_id);
+
+        $notificationFake = Notification::fake();
+        $this->app->instance(Dispatcher::class, $notificationFake);
+        $this->app->forgetInstance(IncidentAlertOperationalInitializer::class);
+        DB::beginTransaction();
+        app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert->fresh());
+        DB::commit();
+
+        $delivered = $failed->fresh();
+        $this->assertSame('sent', $delivered->status);
+        $this->assertNotNull($delivered->sent_at);
+        $this->assertNull($delivered->status_detail);
+        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+
+        DB::beginTransaction();
+        app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert->fresh());
+        DB::commit();
+
+        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+        $this->assertDatabaseCount('control_room_communications', 1);
+        $this->assertDatabaseCount('control_room_alert_queue', 1);
+    }
+
+    public function test_recovery_sweep_delivers_a_stranded_outbox_row_exactly_once(): void
+    {
+        Notification::fake();
+        $recipient = User::factory()->create();
+        $freshRecipient = User::factory()->create();
+        $exhaustedRecipient = User::factory()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'incident',
+            'alert_type' => 'incident.fall',
+            'severity' => 'high',
+        ]);
+        $communication = Communication::query()->create([
+            'delivery_key' => hash('sha256', 'stranded-control-room-notification'),
+            'alert_id' => $alert->id,
+            'channel' => 'in_app',
+            'direction' => 'outbound',
+            'purpose' => 'notification',
+            'target_user_id' => $recipient->id,
+            'content' => 'Stranded alert notification',
+            'status' => 'failed',
+            'status_detail' => 'Queue backend was unavailable',
+            'retry_count' => 1,
+        ]);
+        $freshCommunication = Communication::query()->create([
+            'delivery_key' => hash('sha256', 'fresh-control-room-notification'),
+            'alert_id' => $alert->id,
+            'channel' => 'in_app',
+            'direction' => 'outbound',
+            'purpose' => 'notification',
+            'target_user_id' => $freshRecipient->id,
+            'content' => 'Fresh failed alert notification',
+            'status' => 'failed',
+            'status_detail' => 'A current queue retry owns this row',
+            'retry_count' => 1,
+        ]);
+        $exhaustedCommunication = Communication::query()->create([
+            'delivery_key' => hash('sha256', 'exhausted-control-room-notification'),
+            'alert_id' => $alert->id,
+            'channel' => 'in_app',
+            'direction' => 'outbound',
+            'purpose' => 'notification',
+            'target_user_id' => $exhaustedRecipient->id,
+            'content' => 'Exhausted failed alert notification',
+            'status' => 'failed',
+            'status_detail' => 'Delivery retry budget exhausted',
+            'retry_count' => 3,
+        ]);
+        DB::table('control_room_communications')
+            ->where('id', $communication->id)
+            ->update(['updated_at' => now()->subMinutes(3)]);
+        $deliveryJob = new DeliverControlRoomAlertNotificationJob($communication->id);
+        $this->assertInstanceOf(ShouldBeUnique::class, $deliveryJob);
+        $this->assertSame((string) $communication->id, $deliveryJob->uniqueId());
+
+        app(RecoverControlRoomAlertNotificationsJob::class)->handle();
+        app(RecoverControlRoomAlertNotificationsJob::class)->handle();
+        (new DeliverControlRoomAlertNotificationJob($exhaustedCommunication->id))
+            ->handle(app(ControlRoomNotificationService::class));
+
+        $communication->refresh();
+        $this->assertSame('sent', $communication->status);
+        $this->assertSame(1, $communication->retry_count);
+        $this->assertNull($communication->status_detail);
+        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+        $this->assertSame('failed', $freshCommunication->fresh()->status);
+        $this->assertSame(1, $freshCommunication->fresh()->retry_count);
+        Notification::assertNotSentTo($freshRecipient, ControlRoomAlertNotification::class);
+        $this->assertSame('failed', $exhaustedCommunication->fresh()->status);
+        $this->assertSame(3, $exhaustedCommunication->fresh()->retry_count);
+        Notification::assertNotSentTo($exhaustedRecipient, ControlRoomAlertNotification::class);
+        $this->assertDatabaseCount('control_room_communications', 3);
     }
 
     public function test_incident_alert_operational_initialisation_rolls_back_without_notification_leak(): void

@@ -3,13 +3,18 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -29,7 +34,7 @@ class PrnQuickRecordTest extends TestCase
         parent::setUp();
 
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->worker = $this->makeRoleUser('support_worker');
@@ -122,6 +127,8 @@ class PrnQuickRecordTest extends TestCase
             ->post('/meds/today/prn', $payload)
             ->assertRedirect('/meds/today');
 
+        Cache::forget('offline:idempotency:prn:prn-replay-uuid');
+
         $this->actingAs($this->worker)
             ->from('/meds/today')
             ->post('/meds/today/prn', $payload)
@@ -129,6 +136,57 @@ class PrnQuickRecordTest extends TestCase
             ->assertSessionHas('success', 'Already saved — no changes needed.');
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_request_uuid' => 'prn-replay-uuid',
+        ]);
+    }
+
+    public function test_stale_outer_replay_marker_cannot_suppress_a_prn_over_limit_incident(): void
+    {
+        $attemptId = 'prn-stale-outer-marker';
+        $this->prn->update(['max_per_day' => 1]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $this->prn->id,
+            'administered_by' => $this->worker->id,
+            'status' => 'given',
+            'administered_at' => now()->subHour(),
+        ]);
+        Cache::put("offline:idempotency:prn:{$attemptId}", [
+            'processed_at' => now()->subMinute()->toIso8601String(),
+            'device' => 'test-device',
+            'queued_offline' => true,
+        ], now()->addDays(7));
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/prn', [
+                'client_medication_id' => $this->prn->id,
+                'reason' => 'Breakthrough pain',
+                'dose_given' => '500mg',
+                'client_request_uuid' => $attemptId,
+                'captured_offline_at' => now()->toIso8601String(),
+                'origin_device_id' => 'test-device',
+                'queued_offline' => true,
+            ])
+            ->assertRedirect('/meds/today')
+            ->assertSessionHasErrors('client_medication_id');
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $this->assertSame(
+            $attemptId,
+            data_get(ClientIncident::query()->sole()->metadata, 'medication_prn_attempt.id'),
+        );
+        $this->assertSame(
+            $attemptId,
+            data_get(Signal::query()->sole()->normalized_data, 'prn_attempt_id'),
+        );
+        $this->assertSame(
+            ClientIncident::query()->sole()->id,
+            data_get(ControlRoomAlert::query()->sole()->context, 'incident_id'),
+        );
     }
 
     protected function makeRoleUser(string $roleName): User
@@ -147,7 +205,7 @@ class PrnQuickRecordTest extends TestCase
     }
 
     /**
-     * @param array<int, string> $permissionKeys
+     * @param  array<int, string>  $permissionKeys
      */
     protected function grantPermissions(User $user, array $permissionKeys): void
     {

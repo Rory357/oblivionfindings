@@ -131,6 +131,9 @@ class IncidentJourneyService
                 $alertWasCreated = true;
             }
 
+            $alertWasPromoted = $alert !== null
+                && $this->promoteAlertToIncidentFloor($lockedIncident, $alert);
+
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
             $this->linkJourney(
                 $lockedIncident,
@@ -140,7 +143,7 @@ class IncidentJourneyService
                 $alert === null ? [] : $this->incidentAlertContext($lockedIncident, $alertReason),
             );
 
-            if ($alertWasCreated) {
+            if ($alertWasCreated || $alertWasPromoted) {
                 $this->alertOperations->initialiseNewAlert($alert);
             }
 
@@ -170,7 +173,7 @@ class IncidentJourneyService
             $alertWasCreated = $alert === null;
             $alert ??= $this->createIncidentAlert($lockedIncident, $actor, $reason);
 
-            $this->promoteAlertToIncidentFloor($lockedIncident, $alert);
+            $alertWasPromoted = $this->promoteAlertToIncidentFloor($lockedIncident, $alert);
             $this->adoptExplicitIncidentReason($alert, $reason);
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
             $this->linkJourney(
@@ -181,7 +184,7 @@ class IncidentJourneyService
                 $this->incidentAlertContext($lockedIncident, $reason),
             );
 
-            if ($alertWasCreated) {
+            if ($alertWasCreated || $alertWasPromoted) {
                 $this->alertOperations->initialiseNewAlert($alert);
             }
 
@@ -222,7 +225,7 @@ class IncidentJourneyService
 
             $this->assertSubmitted($lockedIncident);
             $this->assertAlertMatchesIncident($lockedIncident, $lockedAlert);
-            $this->promoteAlertToIncidentFloor($lockedIncident, $lockedAlert);
+            $alertWasPromoted = $this->promoteAlertToIncidentFloor($lockedIncident, $lockedAlert);
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
             $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $lockedAlert, $hsEvent);
@@ -236,6 +239,10 @@ class IncidentJourneyService
                     data_get($lockedAlert->context, 'reason'),
                 ),
             );
+
+            if ($alertWasPromoted) {
+                $this->alertOperations->initialiseNewAlert($lockedAlert);
+            }
 
             return $this->freshJourney($lockedIncident, $lockedAlert, $hsEvent);
         }, self::TRANSACTION_ATTEMPTS);
@@ -681,13 +688,16 @@ class IncidentJourneyService
     private function promoteAlertToIncidentFloor(
         ClientIncident $incident,
         ControlRoomAlert $alert,
-    ): void {
+    ): bool {
         $severity = $this->higherSeverity($alert->severity, $this->alertSeverity($incident));
-        if ($severity !== $alert->severity) {
+        $wasPromoted = $severity !== $alert->severity;
+        if ($wasPromoted) {
             $alert->forceFill(['severity' => $severity])->saveQuietly();
         }
 
         $this->stampAlertProvenance($incident, $alert);
+
+        return $wasPromoted;
     }
 
     private function stampAlertProvenance(ClientIncident $incident, ControlRoomAlert $alert): void

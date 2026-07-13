@@ -103,9 +103,12 @@ class MedicationIncidentIntegrationService
     public function handlePrnOverLimit(
         Client $client,
         ClientMedication $medication,
-        int $attemptedBy
+        int $attemptedBy,
+        ?string $attemptId = null,
     ): ?ClientIncident {
-        return DB::transaction(function () use ($client, $medication, $attemptedBy): ?ClientIncident {
+        $attemptId = filled($attemptId) ? (string) $attemptId : (string) Str::uuid();
+
+        return DB::transaction(function () use ($client, $medication, $attemptedBy, $attemptId): ?ClientIncident {
             $lockedClient = Client::query()
                 ->whereKey($client->id)
                 ->lockForUpdate()
@@ -119,6 +122,19 @@ class MedicationIncidentIntegrationService
                 throw new \DomainException('The PRN medication does not belong to the selected client.');
             }
 
+            $existingIncident = ClientIncident::query()
+                ->where('client_id', $lockedClient->id)
+                ->where('metadata->medication_prn_attempt->id', $attemptId)
+                ->where(
+                    'metadata->medication_prn_attempt->client_medication_id',
+                    $lockedMedication->id,
+                )
+                ->lockForUpdate()
+                ->first();
+            if ($existingIncident !== null) {
+                return $existingIncident;
+            }
+
             if (! $this->shouldAutoCreateIncident('prn_over_limit', $lockedMedication)) {
                 return null;
             }
@@ -126,7 +142,6 @@ class MedicationIncidentIntegrationService
             $count24h = $lockedMedication->prnCountLast24Hours;
             $maxPerDay = (int) filter_var($lockedMedication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
             $attemptedAt = now();
-            $attemptId = (string) Str::uuid();
 
             $incident = new ClientIncident;
             $incident->client_id = $lockedClient->id;
@@ -144,6 +159,7 @@ class MedicationIncidentIntegrationService
             $incident->metadata = [
                 'medication_prn_attempt' => [
                     'id' => $attemptId,
+                    'client_medication_id' => $lockedMedication->id,
                     'attempted_by' => $attemptedBy,
                     'prn_count_24h' => $count24h,
                     'max_per_day' => $maxPerDay,

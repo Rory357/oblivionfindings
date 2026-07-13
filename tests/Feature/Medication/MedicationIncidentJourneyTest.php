@@ -19,10 +19,12 @@ use App\Models\MedicationRefusalFollowup;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\EnhancedMarService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Mockery\MockInterface;
@@ -668,6 +670,127 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertDatabaseCount('control_room_signals', 2);
     }
 
+    #[DataProvider('durableAdministrationHookCases')]
+    public function test_durable_client_request_replay_repairs_failed_post_commit_incident_hook(
+        string $status,
+        string $reasonCode,
+        int $scheduledMinutesAgo,
+        string $signalType,
+        string $incidentKind,
+    ): void {
+        [$actor, $client] = $this->medicationFixture();
+        $medication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => "Durable {$incidentKind} replay medication",
+            'is_prn' => false,
+            'controlled_drug' => false,
+            'high_risk' => true,
+            'witness_required' => false,
+            'state' => 'active',
+            'active' => true,
+            'approval_status' => 'verified',
+            'end_date' => null,
+        ]);
+        $signals = new class(app(SignalProcessingService::class), $signalType) extends MedicationSignalService
+        {
+            public int $attempts = 0;
+
+            public function __construct(
+                SignalProcessingService $processor,
+                private readonly string $failOnceFor,
+            ) {
+                parent::__construct($processor);
+            }
+
+            public function emit(
+                string $signalType,
+                int $clientId,
+                string $severity,
+                string $message,
+                array $context = [],
+                bool $requiredDelivery = false,
+            ): void {
+                if ($signalType === $this->failOnceFor && $this->attempts++ === 0) {
+                    throw new \RuntimeException("Forced {$signalType} post-commit hook failure");
+                }
+
+                parent::emit($signalType, $clientId, $severity, $message, $context, $requiredDelivery);
+            }
+        };
+        $this->app->instance(
+            MedicationIncidentIntegrationService::class,
+            new MedicationIncidentIntegrationService(
+                $signals,
+                app(IncidentJourneyService::class),
+            ),
+        );
+        $scheduledFor = now()->subMinutes($scheduledMinutesAgo);
+        $requestUuid = "durable-hook-repair-{$incidentKind}";
+        $data = array_filter([
+            'status' => $status,
+            'reason_code' => $reasonCode ?: null,
+            'reason' => $status === 'given' ? 'Delayed by a clinical emergency.' : null,
+            'dose_given' => '1 tablet',
+            'scheduled_for' => $scheduledFor->toIso8601String(),
+            'administered_at' => now()->toIso8601String(),
+            'client_request_uuid' => $requestUuid,
+        ], fn (mixed $value): bool => $value !== null);
+        $firstException = null;
+
+        try {
+            app(EnhancedMarService::class)->recordAdministration(
+                $client,
+                $medication->fresh(),
+                $data,
+                $actor->id,
+            );
+        } catch (\Throwable $caught) {
+            $firstException = $caught;
+        }
+
+        $this->assertInstanceOf(\RuntimeException::class, $firstException);
+        $this->assertSame("Forced {$signalType} post-commit hook failure", $firstException->getMessage());
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_request_uuid' => $requestUuid,
+            'status' => $status,
+        ]);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+
+        $retry = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $data,
+            $actor->id,
+        );
+        $third = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $data,
+            $actor->id,
+        );
+
+        $this->assertTrue($retry['success']);
+        $this->assertTrue($retry['duplicate']);
+        $this->assertTrue($third['success']);
+        $this->assertTrue($third['duplicate']);
+        $this->assertSame($actor->id, $retry['administration']->administered_by);
+        $this->assertSame(
+            $incidentKind,
+            data_get(ClientIncident::query()->sole()->metadata, 'medication_incident_source.kind'),
+        );
+        $this->assertSame(
+            $signalType,
+            Signal::query()->sole()->signal_type_code,
+        );
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
     public function test_prn_attempts_without_a_stable_source_event_remain_distinct(): void
     {
         [$actor, $client, $medication] = $this->medicationFixture();
@@ -697,6 +820,192 @@ class MedicationIncidentJourneyTest extends TestCase
                 ->get()
                 ->map(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'))
                 ->all(),
+        );
+    }
+
+    public function test_prn_ingress_attempt_releases_failed_marker_then_retries_and_deduplicates_durably(): void
+    {
+        Cache::flush();
+        [$actor, $client] = $this->medicationFixture();
+        $medication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'PRN retry identity medication',
+            'is_prn' => true,
+            'max_per_day' => '1',
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'witness_required' => false,
+            'state' => 'active',
+            'active' => true,
+            'approval_status' => 'verified',
+            'end_date' => null,
+        ]);
+        $this->administration($client, $medication, $actor, [
+            'status' => 'given',
+            'administered_at' => now()->subHour(),
+        ]);
+        $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            public int $attempts = 0;
+
+            public function emit(
+                string $signalType,
+                int $clientId,
+                string $severity,
+                string $message,
+                array $context = [],
+                bool $requiredDelivery = false,
+            ): void {
+                $this->attempts++;
+                if ($this->attempts === 1) {
+                    throw new \RuntimeException('Forced first PRN attempt failure');
+                }
+
+                parent::emit($signalType, $clientId, $severity, $message, $context, $requiredDelivery);
+            }
+        };
+        $this->app->instance(
+            MedicationIncidentIntegrationService::class,
+            new MedicationIncidentIntegrationService(
+                $signals,
+                app(IncidentJourneyService::class),
+            ),
+        );
+        $attemptData = [
+            'status' => 'given',
+            'reason' => 'Breakthrough pain',
+            'dose_given' => '1 tablet',
+            'client_request_uuid' => 'prn-ingress-attempt-a',
+        ];
+        $firstException = null;
+
+        try {
+            app(EnhancedMarService::class)->recordAdministration(
+                $client,
+                $medication->fresh(),
+                $attemptData,
+                $actor->id,
+            );
+        } catch (\Throwable $caught) {
+            $firstException = $caught;
+        }
+
+        $this->assertInstanceOf(\RuntimeException::class, $firstException);
+        $this->assertSame('Forced first PRN attempt failure', $firstException->getMessage());
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+
+        $retry = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $attemptData,
+            $actor->id,
+        );
+
+        $this->assertFalse($retry['success']);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame(
+            'prn-ingress-attempt-a',
+            data_get($incident->metadata, 'medication_prn_attempt.id'),
+        );
+        $this->assertSame(
+            'prn-ingress-attempt-a',
+            data_get(Signal::query()->sole()->normalized_data, 'prn_attempt_id'),
+        );
+
+        Cache::flush();
+        app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $attemptData,
+            $actor->id,
+        );
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+
+        app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            array_replace($attemptData, ['client_request_uuid' => 'prn-ingress-attempt-b']),
+            $actor->id,
+        );
+
+        $this->assertDatabaseCount('client_incidents', 2);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+        $this->assertDatabaseCount('control_room_signals', 2);
+        $this->assertEqualsCanonicalizing(
+            ['prn-ingress-attempt-a', 'prn-ingress-attempt-b'],
+            ClientIncident::query()
+                ->get()
+                ->map(fn (ClientIncident $row): string => (string) data_get($row->metadata, 'medication_prn_attempt.id'))
+                ->all(),
+        );
+    }
+
+    public function test_prn_ingress_replays_through_the_durable_handler_even_when_a_stale_cache_marker_survives(): void
+    {
+        Cache::flush();
+        [$actor, $client] = $this->medicationFixture();
+        $medication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'PRN hard crash replay medication',
+            'is_prn' => true,
+            'max_per_day' => '1',
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'witness_required' => false,
+            'state' => 'active',
+            'active' => true,
+            'approval_status' => 'verified',
+            'end_date' => null,
+        ]);
+        $this->administration($client, $medication, $actor, [
+            'status' => 'given',
+            'administered_at' => now()->subHour(),
+        ]);
+        $attemptId = 'prn-hard-crash-attempt';
+        $staleMarker = 'emar:prn-over-limit:'.hash(
+            'sha256',
+            implode('|', [$client->id, $medication->id, $attemptId]),
+        );
+        Cache::put($staleMarker, true, now()->addMinutes(15));
+        $attemptData = [
+            'status' => 'given',
+            'reason' => 'Breakthrough pain',
+            'dose_given' => '1 tablet',
+            'client_request_uuid' => $attemptId,
+        ];
+
+        $first = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $attemptData,
+            $actor->id,
+        );
+        $retry = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication->fresh(),
+            $attemptData,
+            $actor->id,
+        );
+
+        $this->assertFalse($first['success']);
+        $this->assertFalse($retry['success']);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $this->assertSame(
+            $attemptId,
+            data_get(ClientIncident::query()->sole()->metadata, 'medication_prn_attempt.id'),
+        );
+        $this->assertSame(
+            $attemptId,
+            data_get(Signal::query()->sole()->normalized_data, 'prn_attempt_id'),
         );
     }
 
@@ -940,6 +1249,90 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
+    public function test_medication_enrichment_cannot_overwrite_an_alert_incident_claim_before_canonical_validation(): void
+    {
+        [$actor, $client, $medication] = $this->medicationFixture();
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'error_type' => 'wrong_dose',
+            'severity' => 'major',
+            'description' => 'Conflicting legacy context must fail closed.',
+            'reported_by' => $actor->id,
+            'reported_at' => now(),
+            'status' => 'reported',
+        ]);
+        $signals = app(MedicationSignalService::class);
+        $signals->emitError($error);
+        $signal = Signal::query()->sole();
+        $alert = ControlRoomAlert::query()->sole();
+        $firstIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'reported_by' => $actor->id,
+            'type' => 'medication_error',
+            'severity' => 'high',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]));
+        $secondIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'reported_by' => $actor->id,
+            'type' => 'medication_error',
+            'severity' => 'high',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]));
+        $alert->updateQuietly([
+            'context' => array_replace_recursive((array) $alert->context, [
+                'incident_id' => $firstIncident->id,
+                'normalized_data' => ['incident_id' => $firstIncident->id],
+            ]),
+        ]);
+        $error->updateQuietly(['client_incident_id' => $secondIncident->id]);
+        $exception = null;
+
+        try {
+            DB::transaction(function () use ($signals, $error, $secondIncident, $actor): void {
+                $candidate = $signals->attachExistingErrorSignalToIncident($error->fresh());
+                $this->assertNotNull($candidate);
+                app(IncidentJourneyService::class)->attachAlertToIncident(
+                    $secondIncident,
+                    $candidate,
+                    $actor,
+                );
+            });
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertInstanceOf(\DomainException::class, $exception);
+        $this->assertStringContainsString('context claims a different incident', $exception->getMessage());
+        $this->assertSame($firstIncident->id, data_get($alert->fresh()->context, 'incident_id'));
+        $this->assertSame(
+            $firstIncident->id,
+            data_get($alert->fresh()->context, 'normalized_data.incident_id'),
+        );
+        $this->assertNull(data_get($signal->fresh()->normalized_data, 'incident_id'));
+        $this->assertNull($secondIncident->fresh()->control_room_alert_id);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
+    public function test_incident_journey_service_is_the_only_medication_path_that_writes_alert_incident_claims(): void
+    {
+        $source = file_get_contents(app_path('Services/Medication/MedicationSignalService.php'));
+        $incidentClaimWrite = <<<'REGEX'
+/\$alert->updateQuietly\(\s*\[\s*'context'\s*=>/s
+REGEX;
+
+        $this->assertIsString($source);
+        $this->assertDoesNotMatchRegularExpression(
+            $incidentClaimWrite,
+            $source,
+        );
+    }
+
     /** @return array{User, Client, ClientMedication} */
     private function medicationFixture(): array
     {
@@ -993,6 +1386,33 @@ class MedicationIncidentJourneyTest extends TestCase
             'signed text' => ['+1'],
             'leading zero text' => ['01'],
             'whitespace text' => [' 1 '],
+        ];
+    }
+
+    public static function durableAdministrationHookCases(): array
+    {
+        return [
+            'missed dose' => [
+                'missed',
+                'omitted_in_error',
+                60,
+                MedicationSignalService::TYPE_MISSED_DOSE,
+                'missed_dose',
+            ],
+            'high risk refusal' => [
+                'refused',
+                'refused',
+                60,
+                MedicationSignalService::TYPE_REFUSED_DOSE,
+                'refused_dose',
+            ],
+            'dose more than two hours late' => [
+                'given',
+                '',
+                240,
+                MedicationSignalService::TYPE_LATE_DOSE,
+                'late_dose',
+            ],
         ];
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Emar;
 
-use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Http\Controllers\Controller;
+use App\Jobs\Governance\RegisterIncidentGovernanceEscalationJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
@@ -17,7 +17,9 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Throwable;
 
 class MedicationErrorController extends Controller
 {
@@ -208,6 +210,23 @@ class MedicationErrorController extends Controller
             $error = MedicationError::create($errorAttributes);
 
             app(MedicationSignalService::class)->emitError($error);
+
+            if ($incident !== null) {
+                app(TimelineEmitter::class)->project($incident->fresh());
+
+                $incidentId = (int) $incident->id;
+                DB::afterCommit(function () use ($incidentId): void {
+                    try {
+                        RegisterIncidentGovernanceEscalationJob::dispatch($incidentId);
+                    } catch (Throwable $exception) {
+                        Log::error('Medication incident governance dispatch failed', [
+                            'client_incident_id' => $incidentId,
+                            'exception' => $exception::class,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                });
+            }
         }, 3);
 
         return redirect()->back()->with('success', 'Medication error reported successfully.');
@@ -347,9 +366,14 @@ class MedicationErrorController extends Controller
 
             $createdIncidentId = (int) $journey->incident->id;
             DB::afterCommit(function () use ($createdIncidentId): void {
-                $committedIncident = ClientIncident::query()->find($createdIncidentId);
-                if ($committedIncident !== null) {
-                    app(IncidentEscalationService::class)->escalateClientIncident($committedIncident);
+                try {
+                    RegisterIncidentGovernanceEscalationJob::dispatch($createdIncidentId);
+                } catch (Throwable $exception) {
+                    Log::error('Linked medication incident governance dispatch failed', [
+                        'client_incident_id' => $createdIncidentId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
                 }
             });
 
