@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEapReferral;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementActionPlanNote;
 use App\Domain\Hr\Models\HrEngagementSurvey;
@@ -10,9 +11,10 @@ use App\Domain\Hr\Models\HrWellbeingIndicator;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     Carbon::setTestNow(Carbon::parse('2026-06-29 09:00:00'));
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
@@ -71,6 +73,61 @@ test('flagged staff appear, acknowledge keeps them visible, snooze and dismiss h
     expect(collect($props['flaggedStaff'])->pluck('user_id')->all())->not->toContain($this->staff->id);
 
     expect(HrWellbeingFlagAction::query()->where('staff_user_id', $this->staff->id)->count())->toBe(3);
+});
+
+test('wellbeing undo removes only the acting managers latest triage action', function () {
+    $otherManager = User::factory()->create([
+        'organization_id' => $this->manager->organization_id,
+        'role' => 'hr',
+        'approved_at' => now(),
+    ]);
+    $hrRole = Role::query()->where('name', 'hr')->first();
+    if ($hrRole) {
+        $otherManager->roles()->syncWithoutDetaching([$hrRole->id]);
+    }
+
+    $this->actingAs($this->manager)
+        ->post("/hr/wellbeing/signals/{$this->staff->id}/acknowledge")
+        ->assertRedirect();
+    $this->actingAs($otherManager)
+        ->post("/hr/wellbeing/signals/{$this->staff->id}/acknowledge")
+        ->assertRedirect();
+
+    $this->actingAs($this->manager)
+        ->post("/hr/wellbeing/signals/{$this->staff->id}/undo")
+        ->assertRedirect();
+
+    $actions = HrWellbeingFlagAction::query()
+        ->where('staff_user_id', $this->staff->id)
+        ->get();
+    expect($actions)->toHaveCount(1)
+        ->and($actions->sole()->actor_user_id)->toBe($otherManager->id);
+});
+
+test('wellbeing undo rejects a foreign tenant subject without deleting actions', function () {
+    $foreignStaff = User::factory()->create([
+        'organization_id' => 2,
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'tenant_id' => 2,
+        'user_id' => $foreignStaff->id,
+        'employee_number' => 'WB-FOREIGN-'.$foreignStaff->id,
+        'work_email' => "wb-foreign-{$foreignStaff->id}@example.test",
+    ]);
+    $action = HrWellbeingFlagAction::query()->create([
+        'tenant_id' => 2,
+        'staff_user_id' => $foreignStaff->id,
+        'action' => 'acknowledge',
+        'actor_user_id' => $this->manager->id,
+    ]);
+
+    $this->actingAs($this->manager)
+        ->post("/hr/wellbeing/signals/{$foreignStaff->id}/undo")
+        ->assertNotFound();
+
+    expect($action->fresh())->not->toBeNull();
 });
 
 test('manager creates a standalone action plan from a flag with a system note', function () {

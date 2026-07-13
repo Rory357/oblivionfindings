@@ -1,7 +1,7 @@
 <?php
 
-use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrJobRequisition;
@@ -82,6 +82,13 @@ test('S14 seam: the approvals inbox surfaces a pending instance of every claimed
     expect(collect($data)->pluck('process_type')->sort()->values()->all())
         ->toBe(['document', 'expense', 'leave', 'timesheet']);
     expect(collect($data)->every(fn ($i) => $i['status'] === 'pending'))->toBeTrue();
+
+    $byType = collect($data)->keyBy('process_type');
+    expect($byType['leave']['item_label'])->toBe("Leave request #{$this->hr->id}")
+        ->and($byType['expense']['item_label'])->toBe("Expense claim #{$this->hr->id}")
+        ->and($byType['timesheet']['item_label'])->toBe("Timesheet #{$this->hr->id}")
+        ->and($byType['document']['item_label'])->toBe("Document #{$this->hr->id}")
+        ->and($byType->every(fn ($item) => str_contains($item['initiated_at'], 'T')))->toBeTrue();
 });
 
 test('S14 seam (D-1): real native approvables surface with tenant-safe links while staying off the spine', function () {
@@ -89,7 +96,7 @@ test('S14 seam (D-1): real native approvables surface with tenant-safe links whi
     // leave/expense/timesheet/document), so a recruitment approvable can never
     // create an HrApprovalInstance — initiating one throws.
     expect(fn () => app(ApprovalWorkflowService::class)->initiateApproval($this->hr, 'recruitment', $this->hr))
-        ->toThrow(\LogicException::class, "process type 'recruitment'");
+        ->toThrow(LogicException::class, "process type 'recruitment'");
 
     $requester = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
 

@@ -280,11 +280,18 @@ class ApprovalController extends Controller
             'chain_name' => $instance->chain?->name ?? 'Unknown',
             'approvable_type' => class_basename($instance->approvable_type),
             'approvable_id' => $instance->approvable_id,
+            'item_label' => match ($instance->chain?->process_type) {
+                'leave' => 'Leave request',
+                'expense' => 'Expense claim',
+                'timesheet' => 'Timesheet',
+                'document' => 'Document',
+                default => 'Approval item',
+            }.' #'.$instance->approvable_id,
             'current_step' => $instance->current_step,
             'total_steps' => $instance->chain?->steps?->count() ?? 0,
             'status' => $instance->status,
             'initiated_by' => $instance->initiator?->name ?? 'Unknown',
-            'initiated_at' => $instance->initiated_at?->toDateTimeString(),
+            'initiated_at' => $instance->initiated_at?->toIso8601String(),
             'actions_count' => $instance->actions->count(),
         ]);
 
@@ -304,7 +311,7 @@ class ApprovalController extends Controller
                     'requester' => $leave->user?->name ?? 'Unknown employee',
                     'summary' => "{$leave->hours_requested} hours requested",
                     'status' => $leave->status,
-                    'submitted_at' => ($leave->submitted_at ?? $leave->created_at)?->toDateTimeString(),
+                    'submitted_at' => ($leave->submitted_at ?? $leave->created_at)?->toIso8601String(),
                     'url' => route('hr.leave.show', $leave, false),
                 ]));
         }
@@ -323,7 +330,7 @@ class ApprovalController extends Controller
                     'requester' => $claim->user?->name ?? 'Unknown employee',
                     'summary' => "{$claim->currency} {$claim->total_amount}",
                     'status' => $claim->status,
-                    'submitted_at' => ($claim->submitted_at ?? $claim->created_at)?->toDateTimeString(),
+                    'submitted_at' => ($claim->submitted_at ?? $claim->created_at)?->toIso8601String(),
                     'url' => route('hr.compensation.expenses.show', $claim, false),
                 ]));
         }
@@ -343,7 +350,7 @@ class ApprovalController extends Controller
                     'requester' => $offer->application?->candidate?->full_name ?? 'Unknown candidate',
                     'summary' => 'Offer awaiting approval',
                     'status' => $offer->approval_status,
-                    'submitted_at' => ($offer->approval_requested_at ?? $offer->created_at)?->toDateTimeString(),
+                    'submitted_at' => ($offer->approval_requested_at ?? $offer->created_at)?->toIso8601String(),
                     'url' => route('hr.recruitment.index', ['tab' => 'offers'], false),
                 ]));
 
@@ -361,7 +368,7 @@ class ApprovalController extends Controller
                     'requester' => 'Recruitment',
                     'summary' => "{$requisition->openings} opening(s)",
                     'status' => $requisition->status,
-                    'submitted_at' => $requisition->updated_at?->toDateTimeString(),
+                    'submitted_at' => $requisition->updated_at?->toIso8601String(),
                     'url' => route('hr.recruitment.index', ['tab' => 'requisitions'], false),
                 ]));
         }

@@ -624,10 +624,11 @@ export default function WellbeingIndex(props: PageProps) {
 
             {/* toast */}
             {toast && (
-                <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 120, display: 'flex', alignItems: 'center', gap: 11, background: 'var(--fg)', color: 'var(--bg)', borderRadius: 11, padding: '12px 16px', boxShadow: '0 16px 40px -12px rgba(0,0,0,.5)', animation: 'wbPop .25s', fontSize: 13, fontWeight: 500 }}>
+                <div role="status" aria-live="polite" style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 120, display: 'flex', alignItems: 'center', gap: 11, background: 'var(--fg)', color: 'var(--bg)', borderRadius: 11, padding: '12px 16px', boxShadow: '0 16px 40px -12px rgba(0,0,0,.5)', animation: 'wbPop .25s', fontSize: 13, fontWeight: 500 }}>
                     <span style={{ display: 'grid', placeItems: 'center', width: 20, height: 20, borderRadius: '50%', background: 'var(--ok)', color: '#fff' }}><Svg name="tick" size={13} sw={3} /></span>
                     {toast.msg}
-                    {toast.undo && <GuardrailButton unstyled onClick={() => { toast.undo?.(); setToast(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--amber)', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginLeft: 4 }}>Undo</GuardrailButton>}
+                    {toast.undo && <span style={{ color: 'color-mix(in oklch,var(--bg) 75%,transparent)', fontSize: 11.5 }}>Undo removes only your latest triage action.</span>}
+                    {toast.undo && <GuardrailButton unstyled aria-label="Undo your latest triage action" onClick={() => { toast.undo?.(); setToast(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--amber)', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginLeft: 4 }}>Undo</GuardrailButton>}
                 </div>
             )}
 

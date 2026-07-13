@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
+use App\Domain\Hr\Notifications\SignatureOutcomeNotification;
 use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\SignatureRequestedNotification;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ESignatureService
 {
@@ -24,6 +26,8 @@ class ESignatureService
      */
     public function requestSignature(HrDocument $document, int $signerUserId, int $requestedBy): HrDocumentSignature
     {
+        $this->assertRequestParticipantsInTenant($document, [$signerUserId, $requestedBy]);
+
         return DB::transaction(function () use ($document, $signerUserId, $requestedBy) {
             return HrDocumentSignature::create([
                 'tenant_id' => $document->tenant_id,
@@ -53,7 +57,7 @@ class ESignatureService
             throw new \LogicException("Cannot sign a '{$signature->status}' signature request.");
         }
 
-        return DB::transaction(function () use ($signature, $signatureData, $request) {
+        $fresh = DB::transaction(function () use ($signature, $signatureData, $request) {
             $signature->update([
                 'signature_data' => $signatureData,
                 'signed_at' => now(),
@@ -67,6 +71,10 @@ class ESignatureService
 
             return $fresh;
         });
+
+        $this->notifyRequesterOutcome($fresh, 'signed');
+
+        return $fresh;
     }
 
     /**
@@ -80,7 +88,7 @@ class ESignatureService
             throw new \LogicException("Cannot decline a '{$signature->status}' signature request.");
         }
 
-        return DB::transaction(function () use ($signature, $reason) {
+        $fresh = DB::transaction(function () use ($signature, $reason) {
             $signature->update([
                 'status' => 'declined',
                 'declined_reason' => $reason,
@@ -88,6 +96,10 @@ class ESignatureService
 
             return $signature->fresh();
         });
+
+        $this->notifyRequesterOutcome($fresh, 'declined');
+
+        return $fresh;
     }
 
     /**
@@ -99,6 +111,8 @@ class ESignatureService
      */
     public function bulkRequestSignatures(HrDocument $document, array $userIds, int $requestedBy, array $options = []): array
     {
+        $this->assertRequestParticipantsInTenant($document, [...$userIds, $requestedBy]);
+
         $signatures = [];
         $order = ($options['order'] ?? 'parallel') === 'sequential' ? 'sequential' : 'parallel';
         $dueAt = $options['due_at'] ?? null;
@@ -160,15 +174,63 @@ class ESignatureService
     }
 
     /**
+     * @param  list<int>  $userIds
+     */
+    private function assertRequestParticipantsInTenant(HrDocument $document, array $userIds): void
+    {
+        $participantIds = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $sameTenantCount = User::query()
+            ->whereIn('id', $participantIds->all())
+            ->where('organization_id', $document->tenant_id)
+            ->count();
+
+        if ($sameTenantCount !== $participantIds->count()) {
+            throw new \LogicException('Signature request participants must belong to the same organisation as the document.');
+        }
+    }
+
+    /**
      * Get all pending signature requests for a user (signer side).
      */
-    public function getPendingForUser(int $userId): Collection
+    public function getPendingForUser(int $userId, int $tenantId): Collection
     {
         return HrDocumentSignature::forSigner($userId)
+            ->forTenant($tenantId)
             ->pending()
             ->with(['document', 'requestedBy:id,name'])
             ->orderByDesc('requested_at')
             ->get();
+    }
+
+    private function notifyRequesterOutcome(HrDocumentSignature $signature, string $outcome): void
+    {
+        $signature->loadMissing(['document', 'signer:id,name', 'requestedBy:id,name,organization_id']);
+        $requester = $signature->requestedBy;
+
+        if (! $requester
+            || $requester->id === $signature->signer_user_id
+            || (int) $requester->organization_id !== (int) $signature->tenant_id) {
+            return;
+        }
+
+        try {
+            $requester->notify(new SignatureOutcomeNotification([
+                'signature_id' => $signature->id,
+                'document_title' => $signature->document?->title ?? 'Document',
+                'signer_name' => $signature->signer?->name ?? 'The signer',
+                'outcome' => $outcome,
+            ]));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send signature outcome notification', [
+                'signature_id' => $signature->id,
+                'requester_user_id' => $requester->id,
+                'outcome' => $outcome,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -276,7 +338,7 @@ class ESignatureService
         $html = $this->buildCertificateHtml($document, $signatures, $hash);
         $pdf = $this->mergeService->renderPdf($html);
 
-        $path = "hr-documents/{$document->tenant_id}/{$document->employee_profile_id}/signed_{$document->id}_" . now()->format('Ymd_His') . '.pdf';
+        $path = "hr-documents/{$document->tenant_id}/{$document->employee_profile_id}/signed_{$document->id}_".now()->format('Ymd_His').'.pdf';
         Storage::disk('private')->put($path, $pdf);
 
         $document->update([
@@ -296,7 +358,7 @@ class ESignatureService
             // fall through
         }
 
-        return hash('sha256', (string) $document->id . '|' . (string) $document->title);
+        return hash('sha256', (string) $document->id.'|'.(string) $document->title);
     }
 
     /**
@@ -309,17 +371,17 @@ class ESignatureService
         $generatedAt = now()->format('d F Y H:i');
 
         $rows = $signatures->map(function (HrDocumentSignature $s) {
-            $name = e($s->signer?->name ?? ('User #' . $s->signer_user_id));
+            $name = e($s->signer?->name ?? ('User #'.$s->signer_user_id));
             $when = $s->signed_at?->format('d M Y H:i') ?? '—';
             $ip = e($s->ip_address ?? '—');
-            $ua = e(\Illuminate\Support\Str::limit((string) $s->user_agent, 80));
+            $ua = e(Str::limit((string) $s->user_agent, 80));
             $img = '';
             $data = (string) $s->signature_data;
             if (str_starts_with($data, 'data:image')) {
                 $safe = e($data);
                 $img = "<img src=\"{$safe}\" style=\"max-height:46px; max-width:200px;\" alt=\"signature\">";
             } elseif ($data !== '') {
-                $img = '<span style="font-family: DejaVu Sans; font-style: italic; font-size: 18px;">' . e($data) . '</span>';
+                $img = '<span style="font-family: DejaVu Sans; font-style: italic; font-size: 18px;">'.e($data).'</span>';
             }
 
             return "<tr>
