@@ -37,6 +37,12 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatDate, formatDateTime, formatDurationMinutes } from '@/lib/fleet-utils';
+import {
+    OutingWizard,
+    type ClientOption,
+    type DriverOption,
+    type VehicleOption,
+} from './create';
 
 type Outing = {
     id: number;
@@ -87,6 +93,10 @@ type Props = {
     can: {
         manage: boolean;
     };
+    clients: ClientOption[];
+    vehicles: VehicleOption[];
+    drivers: DriverOption[];
+    auth_user: { id: number; name: string };
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -104,7 +114,7 @@ const PURPOSE_LABELS: Record<string, string> = {
     shopping: 'Shopping',
 };
 
-export default function OutingsIndex({ outings, filters, stats, hero, chart_data, can }: Props) {
+export default function OutingsIndex({ outings, filters, stats, hero, chart_data, can, clients, vehicles, drivers, auth_user }: Props) {
     const safeOutings = outings?.data ?? [];
     const safeMeta = outings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeLinks = outings?.links ?? [];
@@ -116,6 +126,17 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
     const safeChartData = chart_data ?? [];
 
     const [search, setSearch] = useState(filters?.search ?? '');
+    const searchParams = useMemo(
+        () =>
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ),
+        [],
+    );
+    const wizardOpen = searchParams.get('new') === '1';
+    const closeWizard = () => {
+        router.get('/fleet-assets/outings', filters, { preserveScroll: true });
+    };
 
     const applyFilters = (newFilters: Record<string, string>) => {
         router.get('/fleet-assets/outings', {
@@ -183,7 +204,7 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                     {can.manage && (
                         <div className="flex flex-wrap items-center gap-2">
                             <FleetHeroAction
-                                href="/fleet-assets/outings/create"
+                                href="/fleet-assets/outings?new=1"
                                 icon={Plus}
                                 emphasis
                             >
@@ -392,12 +413,21 @@ export default function OutingsIndex({ outings, filters, stats, hero, chart_data
                                 title="No Outings Yet"
                                 description="Plan community outings, medical appointments, and social activities for your residents."
                                 actionLabel={can.manage ? 'Plan First Outing' : undefined}
-                                actionHref={can.manage ? '/fleet-assets/outings/create' : undefined}
+                                actionHref={can.manage ? '/fleet-assets/outings?new=1' : undefined}
                             />
                         </CardContent>
                     </Card>
                 )}
             </PageShell>
+            <OutingWizard
+                open={wizardOpen}
+                clients={clients ?? []}
+                vehicles={vehicles ?? []}
+                drivers={drivers ?? []}
+                auth_user={auth_user}
+                can={can}
+                onClose={closeWizard}
+            />
         </AppLayout>
     );
 }

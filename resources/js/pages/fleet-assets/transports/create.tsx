@@ -1,6 +1,4 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
-import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +10,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
+import {
+    WizardShell,
+    WizardStepPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
@@ -20,11 +22,14 @@ import {
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
 import { cn } from '@/lib/utils';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    ArrowLeft,
     Calendar,
+    Car,
+    ClipboardCheck,
     Heart,
     Loader2,
     MapPin,
@@ -37,7 +42,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ClientMedication = {
+export type ClientMedication = {
     id: number;
     name: string;
     dosage: string | null;
@@ -50,12 +55,12 @@ type ClientMedication = {
     scan_verification?: MedicationScanVerification | null;
 };
 
-type ClientOption = {
+export type ClientOption = {
     id: number;
     name: string;
 };
 
-type ShiftOption = {
+export type ShiftOption = {
     id: number;
     client_id?: number | null;
     client_name?: string | null;
@@ -69,7 +74,7 @@ type ShiftOption = {
 };
 
 type Props = {
-    vehicles: Array<{ id: number; name: string; asset_tag?: string }>;
+    vehicles: TransportVehicleOption[];
     recent_residents?: string[];
     clients?: ClientOption[];
     client_medications?: ClientMedication[];
@@ -77,6 +82,19 @@ type Props = {
     selected_shift_id?: number | null;
     auth_user: { id: number; name: string };
 };
+
+export type TransportVehicleOption = {
+    id: number;
+    name: string;
+    asset_tag?: string;
+};
+
+const transportSteps = [
+    { key: 'resident', label: 'Resident & destination', blurb: 'Trip type, resident, and route', icon: MapPin },
+    { key: 'vehicle', label: 'Vehicle & staff', blurb: 'Confirm vehicle and worker', icon: Car },
+    { key: 'medication', label: 'Medication & accessibility', blurb: 'Medication transit checks', icon: Pill },
+    { key: 'review', label: 'Review', blurb: 'Notes and final confirmation', icon: ClipboardCheck },
+] as const satisfies readonly WizardStep[];
 
 const TRANSPORT_TYPES = [
     {
@@ -129,7 +147,8 @@ const TRANSPORT_TYPES = [
     },
 ];
 
-export default function TransportCreate({
+export function TransportWizard({
+    open,
     vehicles,
     recent_residents,
     clients,
@@ -137,7 +156,8 @@ export default function TransportCreate({
     shifts,
     selected_shift_id,
     auth_user,
-}: Props) {
+    onClose,
+}: Props & { open: boolean; onClose: () => void }) {
     const safeVehicles = vehicles ?? [];
     const safeRecentResidents = useMemo(() => recent_residents ?? [], [recent_residents]);
     const safeClients = clients ?? [];
@@ -181,6 +201,7 @@ export default function TransportCreate({
     const [submitMode, setSubmitMode] = useState<'transport' | 'pack'>(
         'transport',
     );
+    const [stepIndex, setStepIndex] = useState(0);
 
     const selectedShift = useMemo(
         () =>
@@ -247,8 +268,8 @@ export default function TransportCreate({
         form.setData('client_id', clientId);
         form.setData('shift_id', '');
         // Reload page with client_id to fetch medications
-        router.visit('/fleet-assets/transports/create', {
-            data: { client_id: clientId || null },
+        router.visit('/fleet-assets/transports', {
+            data: { new: 1, client_id: clientId || null },
             preserveState: true,
             preserveScroll: true,
             only: [
@@ -286,8 +307,9 @@ export default function TransportCreate({
                 );
             }
 
-            router.visit('/fleet-assets/transports/create', {
+            router.visit('/fleet-assets/transports', {
                 data: {
+                    new: 1,
                     shift_id: shiftId || null,
                     client_id: nextShift?.client_id ?? null,
                 },
@@ -401,13 +423,14 @@ export default function TransportCreate({
             }));
             form.post('/fleet-assets/transports', {
                 preserveScroll: true,
+                onSuccess: onClose,
                 onFinish: () => {
                     form.transform((data) => data);
                     setSubmitMode('transport');
                 },
             });
         },
-        [form, safeMedications, scanCaptures, selectedMedIds, witnessNames],
+        [form, onClose, safeMedications, scanCaptures, selectedMedIds, witnessNames],
     );
 
     const handleSubmit = useCallback(
@@ -419,23 +442,44 @@ export default function TransportCreate({
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Transport Logs', href: '/fleet-assets/transports' },
-                { title: 'Log Transport', href: '#' },
-            ]}
+        <WizardShell
+            open={open}
+            onClose={onClose}
+            title="Log resident transport"
+            description="Choose the resident and destination, confirm vehicle and staff, complete medication checks, and review before logging transport."
+            railIcon={Car}
+            railTitle="Log transport"
+            railSub={form.data.resident_name || 'Resident transport'}
+            steps={transportSteps}
+            stepIndex={stepIndex}
+            onStepClick={setStepIndex}
+            pct={Math.round(((stepIndex + 1) / transportSteps.length) * 100)}
+            maxWidth="min(96vw, 1120px)"
+            maxHeight="min(90vh, 840px)"
+            footerStart={
+                <Button type="button" variant="ghost" onClick={onClose}>
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                <>
+                    {stepIndex > 0 ? (
+                        <Button type="button" variant="outline" onClick={() => setStepIndex(stepIndex - 1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    ) : null}
+                    {stepIndex < transportSteps.length - 1 ? (
+                        <Button type="button" onClick={() => setStepIndex(stepIndex + 1)}>
+                            Continue
+                        </Button>
+                    ) : null}
+                </>
+            }
         >
-            <Head title="Log Transport" />
-            <PageShell>
-                <FleetCompactHero
-                    pill="Resident transports · new entry"
-                    title="Log Resident Transport"
-                    backHref="/fleet-assets/transports"
-                    backLabel="Transport Logs"
-                />
-
+            <WizardStepPane>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {stepIndex === 0 ? (
+                        <>
                     {/* Transport Type */}
                     <Card>
                         <CardHeader>
@@ -803,9 +847,37 @@ export default function TransportCreate({
                         </Card>
                     </div>
                     {/* end 2-col grid */}
+                        </>
+                    ) : null}
+
+                    {stepIndex === 1 ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Vehicle & staff confirmation</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-lg border bg-muted/20 p-3">
+                                    <div className="text-xs text-muted-foreground">Vehicle</div>
+                                    <div className="mt-1 text-sm font-semibold">
+                                        {safeVehicles.find((vehicle) => String(vehicle.id) === form.data.asset_id)?.name ?? 'Return to the previous step to select a vehicle'}
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border bg-muted/20 p-3">
+                                    <div className="text-xs text-muted-foreground">Worker</div>
+                                    <div className="mt-1 text-sm font-semibold">{auth_user?.name ?? 'Current user'}</div>
+                                </div>
+                                <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+                                    <div className="text-xs text-muted-foreground">Linked shift</div>
+                                    <div className="mt-1 text-sm font-semibold">
+                                        {selectedShift ? `Shift #${selectedShift.id}${selectedShift.staff_name ? ` · ${selectedShift.staff_name}` : ''}` : 'No shift linked'}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
                     {/* Medications Section */}
-                    {safeMedications.length > 0 && (
+                    {stepIndex === 2 && safeMedications.length > 0 && (
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -1003,6 +1075,17 @@ export default function TransportCreate({
                         </Card>
                     )}
 
+                    {stepIndex === 2 && safeMedications.length === 0 ? (
+                        <Card>
+                            <CardHeader><CardTitle>Medication & accessibility</CardTitle></CardHeader>
+                            <CardContent className="text-sm text-muted-foreground">
+                                No active transport medications are available for the selected resident. Continue without packing medication, or return to select a linked client.
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    {stepIndex === 3 ? (
+                        <>
                     <Card>
                         <CardHeader>
                             <CardTitle>Notes</CardTitle>
@@ -1061,12 +1144,14 @@ export default function TransportCreate({
                                 Create and Pack Selected Medications
                             </Button>
                         )}
-                        <Button variant="outline" asChild>
-                            <Link href="/fleet-assets/transports">Cancel</Link>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
                         </Button>
                     </div>
+                        </>
+                    ) : null}
                 </form>
-            </PageShell>
-        </AppLayout>
+            </WizardStepPane>
+        </WizardShell>
     );
 }

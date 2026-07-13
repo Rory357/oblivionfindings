@@ -235,8 +235,8 @@ export function FleetIncidentDialog({
 
     const footerEnd = action ? null : (
         <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/fleet-assets/incidents/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
-                <ExternalLink className="h-4 w-4" /> Open full page
+            <Link href={`/fleet-assets/incidents?incident=${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
+                <Link2 className="h-4 w-4" /> Modal link
             </Link>
             {d.can.manage ? (
                 <>

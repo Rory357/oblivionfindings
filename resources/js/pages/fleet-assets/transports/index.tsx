@@ -35,6 +35,13 @@ import {
     Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+    TransportWizard,
+    type ClientMedication,
+    type ClientOption,
+    type ShiftOption,
+    type TransportVehicleOption,
+} from './create';
 
 type Transport = {
     id: number;
@@ -76,7 +83,13 @@ type Props = {
         date_from?: string;
         date_to?: string;
     };
-    vehicles?: Array<{ id: number; name: string; asset_tag?: string }>;
+    vehicles?: TransportVehicleOption[];
+    recent_residents?: string[];
+    clients?: ClientOption[];
+    client_medications?: ClientMedication[];
+    shifts?: ShiftOption[];
+    selected_shift_id?: number | null;
+    auth_user: { id: number; name: string };
     stats: {
         total_this_month: number;
         residents_this_month: number;
@@ -134,6 +147,12 @@ export default function TransportsIndex({
     vehicles: rawVehicles,
     stats: rawStats,
     hero: rawHero,
+    recent_residents,
+    clients,
+    client_medications,
+    shifts,
+    selected_shift_id,
+    auth_user,
 }: Props) {
     const hero = rawHero ?? {
         today: 0,
@@ -158,6 +177,19 @@ export default function TransportsIndex({
     };
 
     const [searchValue, setSearchValue] = useState(filters.search ?? '');
+    const searchParams = useMemo(
+        () =>
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ),
+        [],
+    );
+    const wizardOpen = searchParams.get('new') === '1';
+    const closeWizard = () => {
+        router.get('/fleet-assets/transports', filters, {
+            preserveScroll: true,
+        });
+    };
 
     // Generate transports per day of week data
     const dayOfWeekData = useMemo(() => {
@@ -240,7 +272,7 @@ export default function TransportsIndex({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <FleetHeroAction
-                            href="/fleet-assets/transports/create"
+                            href="/fleet-assets/transports?new=1"
                             icon={Plus}
                             emphasis
                         >
@@ -530,7 +562,7 @@ export default function TransportsIndex({
                                             title="No transport logs yet"
                                             description="Log a resident transport to get started."
                                             actionLabel="Log Transport"
-                                            actionHref="/fleet-assets/transports/create"
+                                            actionHref="/fleet-assets/transports?new=1"
                                         />
                                     </td>
                                 </tr>
@@ -555,6 +587,17 @@ export default function TransportsIndex({
                     </div>
                 )}
             </PageShell>
+            <TransportWizard
+                open={wizardOpen}
+                vehicles={vehicles}
+                recent_residents={recent_residents ?? []}
+                clients={clients ?? []}
+                client_medications={client_medications ?? []}
+                shifts={shifts ?? []}
+                selected_shift_id={selected_shift_id}
+                auth_user={auth_user}
+                onClose={closeWizard}
+            />
         </AppLayout>
     );
 }

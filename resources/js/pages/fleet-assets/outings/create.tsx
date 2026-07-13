@@ -1,5 +1,3 @@
-import PageShell from '@/components/page-shell';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +9,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    WizardShell,
+    WizardStepPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
+import { useForm } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -37,7 +39,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
-type ClientOption = {
+export type ClientOption = {
     id: number;
     name: string;
     transport_needs?: Record<string, boolean> | null;
@@ -45,7 +47,7 @@ type ClientOption = {
     site?: string | null;
 };
 
-type VehicleOption = {
+export type VehicleOption = {
     id: number;
     name: string;
     asset_tag?: string;
@@ -56,7 +58,7 @@ type VehicleOption = {
     seating_capacity?: number | null;
 };
 
-type DriverOption = {
+export type DriverOption = {
     id: number;
     name: string;
 };
@@ -80,6 +82,15 @@ type Props = {
     };
 };
 
+const outingSteps = [
+    { key: 'people-purpose', label: 'People & purpose', blurb: 'Purpose and outing details', icon: Heart },
+    { key: 'residents', label: 'Residents', blurb: 'Select people joining', icon: Users },
+    { key: 'transport-timing', label: 'Transport & timing', blurb: 'Route, stops, and timing', icon: Route },
+    { key: 'vehicle-staff', label: 'Vehicle & staff', blurb: 'Accessible vehicle and driver', icon: Car },
+    { key: 'safety', label: 'Safety checks', blurb: 'Risks and mitigations', icon: AlertTriangle },
+    { key: 'review', label: 'Review', blurb: 'Confirm the outing plan', icon: Save },
+] as const satisfies readonly WizardStep[];
+
 const PURPOSE_TYPES = [
     { value: 'community', label: 'Community', icon: MapPin, color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30' },
     { value: 'medical', label: 'Medical', icon: Stethoscope, color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30' },
@@ -88,7 +99,15 @@ const PURPOSE_TYPES = [
     { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary' },
 ];
 
-export default function OutingCreate({ clients, vehicles, drivers, auth_user, can }: Props) {
+export function OutingWizard({
+    open,
+    clients,
+    vehicles,
+    drivers,
+    auth_user,
+    can,
+    onClose,
+}: Props & { open: boolean; onClose: () => void }) {
     const safeClients = useMemo(() => clients ?? [], [clients]);
     const safeVehicles = useMemo(() => vehicles ?? [], [vehicles]);
     const safeDrivers = drivers ?? [];
@@ -233,92 +252,40 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
-        form.post('/fleet-assets/outings');
-    }, [form]);
+        form.post('/fleet-assets/outings', { onSuccess: onClose });
+    }, [form, onClose]);
 
     if (!can.manage) {
-        return (
-            <AppLayout
-                breadcrumbs={[
-                    { title: 'Fleet & Assets', href: '/fleet-assets' },
-                    { title: 'Outings', href: '/fleet-assets/outings' },
-                    { title: 'Plan Outing', href: '#' },
-                ]}
-            >
-                <Head title="Plan Outing" />
-                <PageShell>
-                    <FleetCompactHero
-                        pill="Community outings · view only"
-                        title="Plan Community Outing"
-                        backHref="/fleet-assets/outings"
-                        backLabel="Outings"
-                    />
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">View-only</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Planning or changing outings requires fleet outing management access.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </PageShell>
-            </AppLayout>
-        );
+        return null;
     }
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Outings', href: '/fleet-assets/outings' },
-                { title: 'Plan Outing', href: '#' },
-            ]}
+        <WizardShell
+            open={open}
+            onClose={onClose}
+            title="Plan community outing"
+            description="Select residents, plan transport and timing, complete safety checks, and review before creating the outing."
+            railIcon={MapPin}
+            railTitle="Plan outing"
+            railSub={`${selectedResidents.length} resident${selectedResidents.length === 1 ? '' : 's'} selected`}
+            steps={outingSteps}
+            stepIndex={step - 1}
+            onStepClick={(index) => setStep(index + 1)}
+            pct={Math.round((step / outingSteps.length) * 100)}
+            maxWidth="min(96vw, 1120px)"
+            maxHeight="min(90vh, 840px)"
+            footerStart={
+                <Button type="button" variant="ghost" onClick={onClose}>
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                <span className="text-xs text-muted-foreground">
+                    {form.processing ? 'Saving outing…' : 'Changes are saved when you create the outing.'}
+                </span>
+            }
         >
-            <Head title="Plan Outing" />
-            <PageShell>
-                <FleetCompactHero
-                    pill="Community outings · new plan"
-                    title="Plan Community Outing"
-                    backHref="/fleet-assets/outings"
-                    backLabel="Outings"
-                />
-
-                {/* Step Indicators */}
-                <div className="flex items-center gap-2 mb-6 flex-wrap">
-                    {[
-                        { num: 1, label: 'Details' },
-                        { num: 2, label: 'Residents' },
-                        { num: 3, label: 'Route Planner' },
-                        { num: 4, label: 'Vehicle & Driver' },
-                        { num: 5, label: 'Risk Assessment' },
-                    ].map((s) => (
-                        <Button
-                            key={s.num}
-                            type="button"
-                            variant="outline"
-                            onClick={() => setStep(s.num)}
-                            className={cn(
-                                "h-auto gap-2 rounded-lg px-4 py-2 transition-all",
-                                step === s.num
-                                    ? "bg-primary text-white shadow-md"
-                                    : step > s.num
-                                        ? "bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary"
-                                        : "bg-muted text-muted-foreground"
-                            )}
-                        >
-                            <span className={cn(
-                                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
-                                step === s.num ? "bg-white text-primary" : step > s.num ? "bg-primary text-white" : "bg-muted-foreground/20"
-                            )}>
-                                {step > s.num ? <Check className="h-3.5 w-3.5" /> : s.num}
-                            </span>
-                            <span className="hidden sm:inline">{s.label}</span>
-                        </Button>
-                    ))}
-                </div>
-
+            <WizardStepPane>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Step 1: Details */}
                     {step === 1 && (
@@ -772,7 +739,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                             <div className="flex justify-between">
                                 <Button type="button" variant="outline" onClick={() => setStep(3)}>Back</Button>
                                 <Button type="button" onClick={() => setStep(5)}>
-                                    Next: Risk Assessment
+                                    Next: Safety Checks
                                 </Button>
                             </div>
                         </>
@@ -808,6 +775,17 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={() => setStep(4)}>Back</Button>
+                                <Button type="button" onClick={() => setStep(6)}>Next: Review</Button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Step 6: Review */}
+                    {step === 6 && (
+                        <>
 
                             {/* Summary card */}
                             <Card className="border-primary dark:border-primary/30">
@@ -845,10 +823,10 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                             </Card>
 
                             <div className="flex items-center justify-between">
-                                <Button type="button" variant="outline" onClick={() => setStep(4)}>Back</Button>
+                                <Button type="button" variant="outline" onClick={() => setStep(5)}>Back</Button>
                                 <div className="flex items-center gap-2">
-                                    <Button variant="outline" asChild>
-                                        <Link href="/fleet-assets/outings">Cancel</Link>
+                                    <Button type="button" variant="outline" onClick={onClose}>
+                                        Cancel
                                     </Button>
                                     <Button type="submit" disabled={form.processing}>
                                         {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -859,7 +837,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                         </>
                     )}
                 </form>
-            </PageShell>
-        </AppLayout>
+            </WizardStepPane>
+        </WizardShell>
     );
 }

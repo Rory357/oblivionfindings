@@ -42,9 +42,11 @@ class GeofenceController extends Controller
                 'scope' => $g->scope ?? 'vehicle',
                 'breach_type' => $g->breach_type,
                 'is_active' => $g->is_active,
-                'shape' => $g->shape,
+                'shape' => array_merge(['type' => $g->type], $g->shape ?? []),
                 'time_rules' => $g->time_rules,
                 'alert_config' => $g->alert_config,
+                'asset_id' => $g->asset_id,
+                'site_id' => $g->site_id,
                 'asset' => $g->asset ? [
                     'id' => $g->asset->id,
                     'name' => $g->asset->name,
@@ -59,7 +61,11 @@ class GeofenceController extends Controller
         $sites = Site::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'latitude', 'longitude']);
+
+        $assets = Asset::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'asset_tag', 'category']);
 
         // Hero — whole-register counts (independent of filters). Coverage counts
         // distinct vehicles reached by an active geofence (direct asset_id plus
@@ -92,6 +98,7 @@ class GeofenceController extends Controller
             'hero' => $hero,
             'geofences' => $geofences,
             'sites' => $sites,
+            'assets' => $assets,
             'filters' => [
                 'status' => $request->input('status', ''),
                 'type' => $request->input('type', ''),
@@ -102,21 +109,10 @@ class GeofenceController extends Controller
 
     public function create(Request $request)
     {
-        $assets = Asset::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'asset_tag', 'category']);
-
-        $sites = Site::query()
-            ->where('is_active', true)
-            ->whereNotNull('latitude')
-            ->orderBy('name')
-            ->get(['id', 'name', 'latitude', 'longitude']);
-
-        return Inertia::render('fleet-assets/geofences/create', [
-            'assets' => $assets,
-            'sites' => $sites,
-            'prefillSiteId' => $request->query('site_id'),
-        ]);
+        return redirect()->route('fleet-assets.geofences.index', array_filter([
+            'new' => 1,
+            'site_id' => $request->query('site_id'),
+        ]));
     }
 
     public function store(Request $request)
@@ -148,34 +144,8 @@ class GeofenceController extends Controller
 
     public function edit(Request $request, AssetGeofence $geofence)
     {
-        $geofence->load(['asset:id,name,asset_tag', 'site:id,name']);
-
-        $assets = Asset::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'asset_tag', 'category']);
-
-        $sites = Site::query()
-            ->where('is_active', true)
-            ->whereNotNull('latitude')
-            ->orderBy('name')
-            ->get(['id', 'name', 'latitude', 'longitude']);
-
-        return Inertia::render('fleet-assets/geofences/edit', [
-            'geofence' => [
-                'id' => $geofence->id,
-                'name' => $geofence->name,
-                'type' => $geofence->type,
-                'scope' => $geofence->scope ?? 'vehicle',
-                'breach_type' => $geofence->breach_type,
-                'is_active' => $geofence->is_active,
-                'shape' => $geofence->shape,
-                'time_rules' => $geofence->time_rules,
-                'alert_config' => $geofence->alert_config,
-                'asset_id' => $geofence->asset_id,
-                'site_id' => $geofence->site_id,
-            ],
-            'assets' => $assets,
-            'sites' => $sites,
+        return redirect()->route('fleet-assets.geofences.index', [
+            'edit' => $geofence->id,
         ]);
     }
 

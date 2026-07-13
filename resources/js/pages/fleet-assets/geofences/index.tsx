@@ -46,15 +46,21 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import {
+    GeofenceWizard,
+    type GeofenceAssetOption,
+    type GeofenceSiteOption,
+} from './create';
 
 type Geofence = {
     id: number;
     name: string;
     type: 'circle' | 'polygon';
-    scope: string;
+    scope: 'vehicle' | 'resident';
     breach_type: string;
     is_active: boolean;
     shape: {
+        type: 'circle' | 'polygon';
         center?: { lat: number; lng: number };
         radius_m?: number;
         coordinates?: { lat: number; lng: number }[];
@@ -67,6 +73,8 @@ type Geofence = {
         severity?: string;
         notify_control_room?: boolean;
     } | null;
+    asset_id: number | null;
+    site_id: number | null;
     asset: { id: number; name: string; asset_tag: string | null } | null;
     site: { id: number; name: string } | null;
 };
@@ -78,7 +86,8 @@ type Props = {
         breaches_7d: number;
     };
     geofences: Geofence[];
-    sites: Array<{ id: number; name: string }>;
+    sites: GeofenceSiteOption[];
+    assets: GeofenceAssetOption[];
     filters: {
         status: string;
         type: string;
@@ -91,13 +100,29 @@ const GEOFENCE_COLORS = [
     '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
 ];
 
-export default function GeofencesIndex({ hero: rawHero, geofences, sites, filters }: Props) {
+export default function GeofencesIndex({ hero: rawHero, geofences, sites, assets, filters }: Props) {
     const hero = rawHero ?? { active: 0, vehicles_covered: 0, breaches_7d: 0 };
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(
         !!(filters?.status || filters?.type || filters?.site_id)
     );
+    const searchParams = useMemo(
+        () =>
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ),
+        [],
+    );
+    const editingId = Number(searchParams.get('edit')) || null;
+    const editingGeofence =
+        (geofences ?? []).find((geofence) => geofence.id === editingId) ?? null;
+    const wizardOpen = searchParams.get('new') === '1' || !!editingGeofence;
+    const closeWizard = () => {
+        router.get('/fleet-assets/geofences', filters, {
+            preserveScroll: true,
+        });
+    };
 
     // Assign colors to geofences
     const colorMap = useMemo(() => {
@@ -227,7 +252,7 @@ export default function GeofencesIndex({ hero: rawHero, geofences, sites, filter
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href="/fleet-assets/geofences/create" icon={Plus} emphasis>
+                        <FleetHeroAction href="/fleet-assets/geofences?new=1" icon={Plus} emphasis>
                             Create geofence
                         </FleetHeroAction>
                         {/* eslint-disable-next-line no-restricted-syntax -- onDark filters toggle in the hero action row */}
@@ -404,7 +429,7 @@ export default function GeofencesIndex({ hero: rawHero, geofences, sites, filter
                                     {/* Actions */}
                                     <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                         <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                                            <Link href={`/fleet-assets/geofences/${gf.id}/edit`}>
+                                            <Link href={`/fleet-assets/geofences?edit=${gf.id}`}>
                                                 <Edit className="mr-1 h-3 w-3" />
                                                 Edit
                                             </Link>
@@ -456,7 +481,7 @@ export default function GeofencesIndex({ hero: rawHero, geofences, sites, filter
                                     {searchQuery ? 'No geofences match your search.' : 'No geofences configured.'}
                                 </p>
                                 <Button asChild className="mt-4" size="sm">
-                                    <Link href="/fleet-assets/geofences/create">
+                                    <Link href="/fleet-assets/geofences?new=1">
                                         <Plus className="mr-2 h-4 w-4" />
                                         Create Geofence
                                     </Link>
@@ -466,6 +491,14 @@ export default function GeofencesIndex({ hero: rawHero, geofences, sites, filter
                     </div>
                 </div>
             </PageShell>
+            <GeofenceWizard
+                open={wizardOpen}
+                assets={assets ?? []}
+                sites={sites ?? []}
+                prefillSiteId={searchParams.get('site_id')}
+                geofence={editingGeofence}
+                onClose={closeWizard}
+            />
         </AppLayout>
     );
 }

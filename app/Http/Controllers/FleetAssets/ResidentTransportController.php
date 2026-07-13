@@ -183,12 +183,9 @@ class ResidentTransportController extends Controller
 
     public function index(Request $request)
     {
-        if (!Schema::hasTable('fleet_resident_transports')) {
-            $vehicles = Asset::vehicles()
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->get(['id', 'name', 'asset_tag']);
+        $formOptions = $this->formOptions($request);
 
+        if (!Schema::hasTable('fleet_resident_transports')) {
             return Inertia::render('fleet-assets/transports/index', [
                 'transports' => [
                     'data' => [],
@@ -196,7 +193,7 @@ class ResidentTransportController extends Controller
                     'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0],
                 ],
                 'filters' => $request->only(['transport_type', 'asset_id', 'status', 'search', 'date_from', 'date_to']),
-                'vehicles' => $vehicles,
+                'vehicles' => $formOptions['vehicles'],
                 'stats' => [
                     'total_this_month' => 0,
                     'residents_this_month' => 0,
@@ -209,6 +206,7 @@ class ResidentTransportController extends Controller
                     'completed_7d' => 0,
                     'with_medications_7d' => 0,
                 ],
+                ...$formOptions,
             ]);
         }
 
@@ -305,21 +303,6 @@ class ResidentTransportController extends Controller
             $mostActiveVehicleName = Asset::where('id', $mostActiveVehicle->asset_id)->value('name');
         }
 
-        $vehicles = Asset::vehicles()
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name', 'asset_tag']);
-
-        // Recent resident names for autocomplete
-        $recentResidents = Schema::hasTable('fleet_resident_transports')
-            ? FleetResidentTransport::query()
-                ->select('resident_name')
-                ->distinct()
-                ->orderBy('resident_name')
-                ->limit(100)
-                ->pluck('resident_name')
-            : collect();
-
         return Inertia::render('fleet-assets/transports/index', [
             'transports' => [
                 'data' => $transports->getCollection()->map(fn ($t) => [
@@ -356,7 +339,7 @@ class ResidentTransportController extends Controller
                 ],
             ],
             'filters' => $request->only(['transport_type', 'asset_id', 'status', 'search', 'date_from', 'date_to']),
-            'vehicles' => $vehicles,
+            'vehicles' => $formOptions['vehicles'],
             'stats' => [
                 'total_this_month' => $totalThisMonth,
                 'residents_this_month' => $residentsThisMonth,
@@ -377,10 +360,11 @@ class ResidentTransportController extends Controller
                         ->count('transport_id')
                     : 0,
             ],
+            ...$formOptions,
         ]);
     }
 
-    public function create(Request $request)
+    private function formOptions(Request $request): array
     {
         $vehicles = Asset::vehicles()
             ->where('status', 'active')
@@ -393,7 +377,6 @@ class ResidentTransportController extends Controller
                 ->find($request->input('shift_id'))
             : null;
 
-        // Recent resident names for autocomplete
         $recentResidents = Schema::hasTable('fleet_resident_transports')
             ? FleetResidentTransport::query()
                 ->select('resident_name')
@@ -403,64 +386,16 @@ class ResidentTransportController extends Controller
                 ->pluck('resident_name')
             : collect();
 
-        // If a client/resident is selected, pass their active medications
-        $clientMedications = [];
-        $clientIdForContext = $selectedShift?->client_id ?: ($request->filled('client_id') ? (int) $request->input('client_id') : null);
-        $scanClient = $selectedShift?->client;
-
-        if (! $scanClient && $clientIdForContext) {
-            $scanClient = Client::query()->find($clientIdForContext, ['id']);
-        }
-
-        if ($clientIdForContext && Schema::hasTable('client_medications')) {
-            $clientMedications = ClientMedication::where('client_id', $clientIdForContext)
-                ->where('active', true)
-                ->whereNull('ceased_at')
-                ->where(function ($q) {
-                    $q->where('is_prn', true)
-                      ->orWhereNotNull('dose_times');
-                })
-                ->get([
-                    'id',
-                    'name',
-                    'dosage',
-                    'frequency',
-                    'is_prn',
-                    'controlled_drug',
-                    'dose_times',
-                    'route',
-                    'instructions',
-                    'barcode',
-                    'nzulm_code',
-                ])
-                ->map(fn ($m) => [
-                    'id' => $m->id,
-                    'name' => $m->name,
-                    'dosage' => $m->dosage,
-                    'frequency' => $m->frequency,
-                    'is_prn' => (bool) $m->is_prn,
-                    'controlled_drug' => (bool) $m->controlled_drug,
-                    'dose_times' => $m->dose_times,
-                    'route' => $m->route,
-                    'instructions' => $m->instructions,
-                    'scan_verification' => $scanClient
-                        ? $this->buildMedicationScanPayload($scanClient, $m)
-                        : null,
-                ]);
-        }
-
-        // Get clients for resident selection
-        $clients = [];
-        if (Schema::hasTable('clients')) {
-            $clients = Client::query()
+        $clients = Schema::hasTable('clients')
+            ? Client::query()
                 ->orderBy('first_name')
                 ->limit(200)
                 ->get(['id', 'first_name', 'last_name'])
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
-                ]);
-        }
+                ->map(fn ($client) => [
+                    'id' => $client->id,
+                    'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                ])->values()
+            : collect();
 
         $shifts = Shift::query()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
@@ -472,7 +407,9 @@ class ResidentTransportController extends Controller
             ->map(fn ($shift) => [
                 'id' => $shift->id,
                 'client_id' => $shift->client_id,
-                'client_name' => $shift->client ? trim(($shift->client->first_name ?? '') . ' ' . ($shift->client->last_name ?? '')) : null,
+                'client_name' => $shift->client
+                    ? trim(($shift->client->first_name ?? '') . ' ' . ($shift->client->last_name ?? ''))
+                    : null,
                 'staff_name' => $shift->staff?->name,
                 'starts_at' => optional($shift->starts_at)->toISOString(),
                 'ends_at' => optional($shift->ends_at)->toISOString(),
@@ -480,10 +417,46 @@ class ResidentTransportController extends Controller
                 'shift_type' => $shift->shift_type ?? 'standard',
                 'location' => $shift->location,
                 'service_context' => $shift->serviceContext?->name,
-            ])
-            ->values();
+            ])->values();
 
-        return Inertia::render('fleet-assets/transports/create', [
+        $clientId = $selectedShift?->client_id
+            ?: ($request->filled('client_id') ? (int) $request->input('client_id') : null);
+        $scanClient = $selectedShift?->client;
+        if (! $scanClient && $clientId) {
+            $scanClient = Client::query()->find($clientId, ['id']);
+        }
+
+        $clientMedications = collect();
+        if ($clientId && Schema::hasTable('client_medications')) {
+            $clientMedications = ClientMedication::query()
+                ->where('client_id', $clientId)
+                ->where('active', true)
+                ->whereNull('ceased_at')
+                ->where(fn ($query) => $query
+                    ->where('is_prn', true)
+                    ->orWhereNotNull('dose_times'))
+                ->get([
+                    'id', 'name', 'dosage', 'frequency', 'is_prn',
+                    'controlled_drug', 'dose_times', 'route', 'instructions',
+                    'barcode', 'nzulm_code',
+                ])
+                ->map(fn ($medication) => [
+                    'id' => $medication->id,
+                    'name' => $medication->name,
+                    'dosage' => $medication->dosage,
+                    'frequency' => $medication->frequency,
+                    'is_prn' => (bool) $medication->is_prn,
+                    'controlled_drug' => (bool) $medication->controlled_drug,
+                    'dose_times' => $medication->dose_times,
+                    'route' => $medication->route,
+                    'instructions' => $medication->instructions,
+                    'scan_verification' => $scanClient
+                        ? $this->buildMedicationScanPayload($scanClient, $medication)
+                        : null,
+                ]);
+        }
+
+        return [
             'vehicles' => $vehicles,
             'recent_residents' => $recentResidents,
             'clients' => $clients,
@@ -494,7 +467,16 @@ class ResidentTransportController extends Controller
                 'id' => $request->user()->id,
                 'name' => $request->user()->name,
             ],
-        ]);
+        ];
+    }
+
+    public function create(Request $request)
+    {
+        return redirect()->route('fleet-assets.transports.index', array_filter([
+            'new' => 1,
+            'shift_id' => $request->query('shift_id'),
+            'client_id' => $request->query('client_id'),
+        ]));
     }
 
     public function store(Request $request)

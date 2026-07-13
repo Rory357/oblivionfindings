@@ -20,6 +20,8 @@ class OutingController extends Controller
 {
     public function index(Request $request)
     {
+        $formOptions = $this->formOptions($request);
+
         if (!Schema::hasTable('fleet_outings')) {
             return Inertia::render('fleet-assets/outings/index', [
                 'outings' => [
@@ -44,6 +46,7 @@ class OutingController extends Controller
                     'critical_alerts' => 0,
                 ],
                 'chart_data' => [],
+                ...$formOptions,
             ]);
         }
 
@@ -180,10 +183,11 @@ class OutingController extends Controller
                 'manage' => (bool) $request->user()?->canDo('fleet.manage')
                     || (bool) $request->user()?->canDo('fleet.outings.manage'),
             ],
+            ...$formOptions,
         ]);
     }
 
-    public function create(Request $request)
+    private function formOptions(Request $request): array
     {
         $hasTransportNeeds = Schema::hasColumn('clients', 'transport_needs');
         $selectCols = ['id', 'first_name', 'last_name', 'site_id'];
@@ -191,50 +195,52 @@ class OutingController extends Controller
             $selectCols[] = 'transport_needs';
             $selectCols[] = 'transport_notes';
         }
+
         $clients = Client::query()
             ->where('status', 'active')
             ->orderBy('first_name')
             ->with('site:id,name')
             ->get($selectCols)
-            ->map(fn ($c) => [
-                'id' => $c->id,
-                'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
-                'transport_needs' => $hasTransportNeeds ? $c->transport_needs : null,
-                'transport_notes' => $hasTransportNeeds ? $c->transport_notes : null,
-                'site' => $c->site?->name,
+            ->map(fn ($client) => [
+                'id' => $client->id,
+                'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'transport_needs' => $hasTransportNeeds ? $client->transport_needs : null,
+                'transport_notes' => $hasTransportNeeds ? $client->transport_notes : null,
+                'site' => $client->site?->name,
             ])->values();
 
         $hasAccessibility = Schema::hasColumn('assets', 'has_wheelchair_ramp');
-
         $vehicles = Asset::vehicles()
             ->where('status', 'active')
             ->orderBy('name')
             ->get(array_merge(
                 ['id', 'name', 'asset_tag'],
-                $hasAccessibility ? ['has_wheelchair_ramp', 'has_hoist', 'has_child_seat_anchors', 'has_medical_storage', 'seating_capacity'] : []
+                $hasAccessibility
+                    ? ['has_wheelchair_ramp', 'has_hoist', 'has_child_seat_anchors', 'has_medical_storage', 'seating_capacity']
+                    : [],
             ))
-            ->map(fn ($v) => array_merge([
-                'id' => $v->id,
-                'name' => $v->name,
-                'asset_tag' => $v->asset_tag,
+            ->map(fn ($vehicle) => array_merge([
+                'id' => $vehicle->id,
+                'name' => $vehicle->name,
+                'asset_tag' => $vehicle->asset_tag,
             ], $hasAccessibility ? [
-                'has_wheelchair_ramp' => (bool) $v->has_wheelchair_ramp,
-                'has_hoist' => (bool) $v->has_hoist,
-                'has_child_seat_anchors' => (bool) $v->has_child_seat_anchors,
-                'has_medical_storage' => (bool) $v->has_medical_storage,
-                'seating_capacity' => $v->seating_capacity,
+                'has_wheelchair_ramp' => (bool) $vehicle->has_wheelchair_ramp,
+                'has_hoist' => (bool) $vehicle->has_hoist,
+                'has_child_seat_anchors' => (bool) $vehicle->has_child_seat_anchors,
+                'has_medical_storage' => (bool) $vehicle->has_medical_storage,
+                'seating_capacity' => $vehicle->seating_capacity,
             ] : []))->values();
 
         $drivers = User::query()
             ->whereHas('hrDriverEligibility')
             ->orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->map(fn ($u) => [
-                'id' => $u->id,
-                'name' => $u->name,
+            ->get(['id', 'name'])
+            ->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
             ])->values();
 
-        return Inertia::render('fleet-assets/outings/create', [
+        return [
             'clients' => $clients,
             'vehicles' => $vehicles,
             'drivers' => $drivers,
@@ -246,7 +252,12 @@ class OutingController extends Controller
                 'manage' => (bool) $request->user()?->canDo('fleet.manage')
                     || (bool) $request->user()?->canDo('fleet.outings.manage'),
             ],
-        ]);
+        ];
+    }
+
+    public function create(Request $request)
+    {
+        return redirect()->route('fleet-assets.outings.index', ['new' => 1]);
     }
 
     public function store(Request $request)
