@@ -1,38 +1,12 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
-import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { submitEmarMutation } from '@/lib/emar-offline';
-import { applyFormRequestErrors } from '@/lib/form-request-errors';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
-import {
-    emptyMedicationScanCapture,
-    hasVerifiedMedicationScan,
-    toMedicationScanPayload,
-    type MedicationScanCapture,
-    type MedicationScanVerification,
-} from '@/lib/medication-scan';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -52,42 +26,18 @@ import {
     Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    AdministerTransportMedicationWizard,
+    PackMedicationWizard,
+    ReturnTransportMedicationWizard,
+    type TransportMedicationLog as TransitLog,
+    type TransportMedicationOption as TransitMedicationOption,
+} from './components/transport-medication-dialogs';
 
 type CareNeed = {
     id: number;
     label: string;
     notes: string | null;
-};
-
-type TransitMedicationOption = {
-    id: number;
-    name: string;
-    dosage: string | null;
-    frequency: string | null;
-    is_prn: boolean;
-    controlled_drug: boolean;
-    dose_times: string[] | null;
-    route: string | null;
-    instructions: string | null;
-    scan_verification?: MedicationScanVerification | null;
-};
-
-type TransitLog = {
-    id: number;
-    client: { id: number; name: string } | null;
-    medication_id: number | null;
-    medication_name: string;
-    is_controlled_drug: boolean;
-    packed_witness_name?: string | null;
-    packed_by: { id: number; name: string } | null;
-    packed_at: string | null;
-    administered_by: { id: number; name: string } | null;
-    administered_at: string | null;
-    witnessed_by: { id: number; name: string } | null;
-    returned_to_house_at: string | null;
-    status: string;
-    notes: string | null;
-    scan_verification?: MedicationScanVerification | null;
 };
 
 type MedicationContext = {
@@ -225,43 +175,14 @@ export default function TransportShow({
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const [packDialogOpen, setPackDialogOpen] = useState(false);
-    const [packingMedication, setPackingMedication] = useState(false);
     const [administeringLog, setAdministeringLog] = useState<TransitLog | null>(
         null,
     );
     const [returningLog, setReturningLog] = useState<TransitLog | null>(null);
-    const [packScanCapture, setPackScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [administerScanCapture, setAdministerScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [returnScanCapture, setReturnScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [submittingAdminister, setSubmittingAdminister] = useState(false);
-    const [submittingReturn, setSubmittingReturn] = useState(false);
-
-    const packClientId = medicationContext.client
-        ? String(medicationContext.client.id)
-        : '';
 
     const completeForm = useForm({
         arrived_at: new Date().toISOString().slice(0, 16),
         notes: '',
-    });
-    const packForm = useForm({
-        client_id: packClientId,
-        medication_id: '',
-        witness_name: '',
-        notes: '',
-        scan_code: '',
-    });
-    const administerForm = useForm({
-        witnessed_by_user_id: '',
-        notes: '',
-        scan_code: '',
-    });
-    const returnForm = useForm({
-        notes: '',
-        scan_code: '',
     });
 
     useEffect(() => {
@@ -276,11 +197,6 @@ export default function TransportShow({
             if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
         };
     }, [t.status]);
-
-    useEffect(() => {
-        packForm.setData('client_id', packClientId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Keep the Inertia pack form synchronized with the selected medication client.
-    }, [packClientId]);
 
     const vehicleMarkers: MapMarker[] = useMemo(() => {
         if (!vehicle_position?.lat || !vehicle_position?.lng) return [];
@@ -305,39 +221,11 @@ export default function TransportShow({
         return { lat: -41.2865, lng: 174.7762 };
     }, [vehicle_position]);
 
-    const selectedPackMedication = useMemo(
-        () =>
-            safeMedicationOptions.find(
-                (medication) =>
-                    String(medication.id) === String(packForm.data.medication_id),
-            ) ?? null,
-        [safeMedicationOptions, packForm.data.medication_id],
-    );
-
     const unresolvedMedicationCount = useMemo(
         () =>
             safeTransitLogs.filter((log) => log.status !== 'returned').length,
         [safeTransitLogs],
     );
-
-    const requiresPackWitness = !!selectedPackMedication?.controlled_drug;
-    const requiresPackScan = !!selectedPackMedication?.scan_verification;
-    const requiresAdminWitness = !!administeringLog?.is_controlled_drug;
-    const requiresAdminScan = !!administeringLog?.scan_verification;
-    const requiresReturnScan = !!returningLog?.scan_verification;
-
-    const canSubmitPack =
-        !!selectedPackMedication &&
-        (!requiresPackWitness || !!packForm.data.witness_name.trim()) &&
-        (!requiresPackScan || hasVerifiedMedicationScan(packScanCapture));
-    const canSubmitAdminister =
-        !!administeringLog &&
-        (!requiresAdminWitness ||
-            !!administerForm.data.witnessed_by_user_id) &&
-        (!requiresAdminScan || hasVerifiedMedicationScan(administerScanCapture));
-    const canSubmitReturn =
-        !!returningLog &&
-        (!requiresReturnScan || hasVerifiedMedicationScan(returnScanCapture));
 
     const refreshMedicationContext = () => {
         router.reload({
@@ -345,206 +233,33 @@ export default function TransportShow({
         });
     };
 
-    const resetPackDialog = () => {
-        packForm.reset();
-        packForm.clearErrors();
-        packForm.setData('client_id', packClientId);
-        setPackScanCapture(emptyMedicationScanCapture());
-    };
-
     const closePackDialog = () => {
         setPackDialogOpen(false);
-        resetPackDialog();
     };
 
     const openPackDialog = () => {
-        resetPackDialog();
         setPackDialogOpen(true);
     };
 
     const closeAdministerDialog = () => {
         setAdministeringLog(null);
-        administerForm.reset();
-        administerForm.clearErrors();
-        setAdministerScanCapture(emptyMedicationScanCapture());
     };
 
     const closeReturnDialog = () => {
         setReturningLog(null);
-        returnForm.reset();
-        returnForm.clearErrors();
-        setReturnScanCapture(emptyMedicationScanCapture());
     };
 
     const openAdministerDialog = (log: TransitLog) => {
         setAdministeringLog(log);
-        administerForm.reset();
-        administerForm.clearErrors();
-        setAdministerScanCapture(emptyMedicationScanCapture());
     };
 
     const openReturnDialog = (log: TransitLog) => {
         setReturningLog(log);
-        returnForm.reset();
-        returnForm.clearErrors();
-        setReturnScanCapture(emptyMedicationScanCapture());
     };
 
     const handleComplete = (e: React.FormEvent) => {
         e.preventDefault();
         completeForm.post(`/fleet-assets/transports/${t.id}/complete`);
-    };
-
-    const submitPack = async () => {
-        if (!medicationContext.client || !selectedPackMedication || !canSubmitPack) {
-            return;
-        }
-
-        packForm.clearErrors();
-        setPackingMedication(true);
-
-        try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/transports/${t.id}/pack-medication`,
-                {
-                    client_id: medicationContext.client.id,
-                    medication_id: selectedPackMedication.id,
-                    medication_name: selectedPackMedication.name,
-                    is_controlled_drug: selectedPackMedication.controlled_drug,
-                    witness_name: packForm.data.witness_name || null,
-                    notes: packForm.data.notes || null,
-                    ...toMedicationScanPayload(packScanCapture),
-                },
-                {
-                    successMessage: 'Medication packed for transit.',
-                    queuedMessage:
-                        'Medication packing was saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            closePackDialog();
-
-            if (result.status !== 'queued') {
-                refreshMedicationContext();
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        packForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to pack medication for this transport.',
-            );
-        } finally {
-            setPackingMedication(false);
-        }
-    };
-
-    const submitAdminister = async () => {
-        if (!administeringLog || !canSubmitAdminister) {
-            return;
-        }
-
-        administerForm.clearErrors();
-        setSubmittingAdminister(true);
-
-        try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/medication-transit/${administeringLog.id}/administer`,
-                {
-                    witnessed_by_user_id: administerForm.data.witnessed_by_user_id
-                        ? Number(administerForm.data.witnessed_by_user_id)
-                        : null,
-                    notes: administerForm.data.notes || null,
-                    ...toMedicationScanPayload(administerScanCapture),
-                },
-                {
-                    successMessage: 'Medication administration recorded.',
-                    queuedMessage:
-                        'Medication administration was saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            closeAdministerDialog();
-
-            if (result.status !== 'queued') {
-                refreshMedicationContext();
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        administerForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to record transport administration.',
-            );
-        } finally {
-            setSubmittingAdminister(false);
-        }
-    };
-
-    const submitReturn = async () => {
-        if (!returningLog || !canSubmitReturn) {
-            return;
-        }
-
-        returnForm.clearErrors();
-        setSubmittingReturn(true);
-
-        try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/medication-transit/${returningLog.id}/return`,
-                {
-                    notes: returnForm.data.notes || null,
-                    ...toMedicationScanPayload(returnScanCapture),
-                },
-                {
-                    successMessage: 'Medication return recorded.',
-                    queuedMessage:
-                        'Medication return was saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            closeReturnDialog();
-
-            if (result.status !== 'queued') {
-                refreshMedicationContext();
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        returnForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to record medication return.',
-            );
-        } finally {
-            setSubmittingReturn(false);
-        }
     };
 
     return (
@@ -1289,441 +1004,32 @@ export default function TransportShow({
                 </div>
             </PageShell>
 
-            <Dialog
+            <PackMedicationWizard
                 open={packDialogOpen}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closePackDialog();
-                    } else {
-                        setPackDialogOpen(true);
-                    }
+                transportId={t.id}
+                client={medicationContext.client}
+                residentName={t.resident_name}
+                medications={safeMedicationOptions}
+                onClose={closePackDialog}
+                onCompleted={(queued) => {
+                    if (!queued) refreshMedicationContext();
                 }}
-            >
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Pack Medication for Transit</DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium">
-                                {medicationContext.client?.name ?? t.resident_name}
-                            </div>
-                            <div className="text-muted-foreground">
-                                Select an active medication to add to this transport.
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Medication</Label>
-                            <Select
-                                value={packForm.data.medication_id || 'none'}
-                                onValueChange={(value) => {
-                                    packForm.clearErrors('medication_id');
-                                    packForm.clearErrors('scan_code');
-                                    packForm.setData(
-                                        'medication_id',
-                                        value === 'none' ? '' : value,
-                                    );
-                                    setPackScanCapture(
-                                        emptyMedicationScanCapture(),
-                                    );
-                                }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select medication" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select medication
-                                    </SelectItem>
-                                    {safeMedicationOptions.map((medication) => (
-                                        <SelectItem
-                                            key={medication.id}
-                                            value={String(medication.id)}
-                                        >
-                                            {medication.name}
-                                            {medication.dosage
-                                                ? ` ${medication.dosage}`
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {packForm.errors.medication_id && (
-                                <p className="text-sm text-destructive">
-                                    {packForm.errors.medication_id}
-                                </p>
-                            )}
-                        </div>
-
-                        {selectedPackMedication && (
-                            <div className="rounded-md border p-3">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-sm font-medium">
-                                        {selectedPackMedication.name}
-                                    </span>
-                                    {selectedPackMedication.dosage && (
-                                        <span className="text-xs text-muted-foreground">
-                                            {selectedPackMedication.dosage}
-                                        </span>
-                                    )}
-                                    {selectedPackMedication.is_prn ? (
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[10px]"
-                                        >
-                                            PRN
-                                        </Badge>
-                                    ) : (
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px]"
-                                        >
-                                            Scheduled
-                                        </Badge>
-                                    )}
-                                    {selectedPackMedication.controlled_drug && (
-                                        <Badge
-                                            variant="destructive"
-                                            className="text-[10px]"
-                                        >
-                                            Controlled
-                                        </Badge>
-                                    )}
-                                </div>
-                                {(selectedPackMedication.route ||
-                                    selectedPackMedication.instructions) && (
-                                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                                        {selectedPackMedication.route && (
-                                            <div>
-                                                Route:{' '}
-                                                {selectedPackMedication.route}
-                                            </div>
-                                        )}
-                                        {selectedPackMedication.instructions && (
-                                            <div>
-                                                {selectedPackMedication.instructions}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {requiresPackWitness && (
-                            <div className="space-y-2">
-                                <Label>Witness name</Label>
-                                <Input
-                                    value={packForm.data.witness_name}
-                                    onChange={(event) => {
-                                        packForm.clearErrors('witness_name');
-                                        packForm.setData(
-                                            'witness_name',
-                                            event.target.value,
-                                        );
-                                    }}
-                                    placeholder="Required for controlled drugs"
-                                />
-                                {packForm.errors.witness_name && (
-                                    <p className="text-sm text-destructive">
-                                        {packForm.errors.witness_name}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {selectedPackMedication?.scan_verification && (
-                            <MedicationScanVerificationPanel
-                                clientId={medicationContext.client?.id ?? null}
-                                medicationId={selectedPackMedication.id}
-                                scanVerification={
-                                    selectedPackMedication.scan_verification
-                                }
-                                requirementText="Verification is required before packing this medication for transit."
-                                resetKey={`pack-${selectedPackMedication.id}-${packDialogOpen}`}
-                                onChange={(capture) => {
-                                    packForm.clearErrors('scan_code');
-                                    setPackScanCapture(capture);
-                                }}
-                            />
-                        )}
-                        {packForm.errors.scan_code && (
-                            <p className="text-sm text-destructive">
-                                {packForm.errors.scan_code}
-                            </p>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={packForm.data.notes}
-                                onChange={(event) =>
-                                    packForm.setData(
-                                        'notes',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Add any chain-of-custody or handling notes..."
-                            />
-                            {packForm.errors.notes && (
-                                <p className="text-sm text-destructive">
-                                    {packForm.errors.notes}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closePackDialog}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={submitPack}
-                            disabled={packingMedication || !canSubmitPack}
-                        >
-                            {packingMedication ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <Package className="mr-2 h-4 w-4" />
-                            )}
-                            Pack Medication
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={!!administeringLog}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeAdministerDialog();
-                    }
+            />
+            <AdministerTransportMedicationWizard
+                log={administeringLog}
+                witnesses={safeWitnesses}
+                onClose={closeAdministerDialog}
+                onCompleted={(queued) => {
+                    if (!queued) refreshMedicationContext();
                 }}
-            >
-                <DialogContent className="sm:max-w-xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Record Transport Administration
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium">
-                                {administeringLog?.medication_name ?? '---'}
-                            </div>
-                            <div className="text-muted-foreground">
-                                {administeringLog?.client?.name ?? '---'}
-                            </div>
-                        </div>
-
-                        {requiresAdminWitness && (
-                            <div className="space-y-2">
-                                <Label>Witness</Label>
-                                <Select
-                                    value={
-                                        administerForm.data
-                                            .witnessed_by_user_id || 'none'
-                                    }
-                                    onValueChange={(value) => {
-                                        administerForm.clearErrors(
-                                            'witnessed_by_user_id',
-                                        );
-                                        administerForm.setData(
-                                            'witnessed_by_user_id',
-                                            value === 'none' ? '' : value,
-                                        );
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select witness" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            Select witness
-                                        </SelectItem>
-                                        {safeWitnesses.map((witness) => (
-                                            <SelectItem
-                                                key={witness.id}
-                                                value={String(witness.id)}
-                                            >
-                                                {witness.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {administerForm.errors
-                                    .witnessed_by_user_id && (
-                                    <p className="text-sm text-destructive">
-                                        {
-                                            administerForm.errors
-                                                .witnessed_by_user_id
-                                        }
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {requiresAdminScan && administeringLog && (
-                            <MedicationScanVerificationPanel
-                                clientId={administeringLog.client?.id ?? null}
-                                medicationId={administeringLog.medication_id}
-                                scanVerification={
-                                    administeringLog.scan_verification
-                                }
-                                requirementText="Verification is required before recording this administration."
-                                resetKey={`administer-${administeringLog.id}`}
-                                onChange={(capture) => {
-                                    administerForm.clearErrors('scan_code');
-                                    setAdministerScanCapture(capture);
-                                }}
-                            />
-                        )}
-                        {administerForm.errors.scan_code && (
-                            <p className="text-sm text-destructive">
-                                {administerForm.errors.scan_code}
-                            </p>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={administerForm.data.notes}
-                                onChange={(event) =>
-                                    administerForm.setData(
-                                        'notes',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Add any transport administration notes..."
-                            />
-                            {administerForm.errors.notes && (
-                                <p className="text-sm text-destructive">
-                                    {administerForm.errors.notes}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeAdministerDialog}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={submitAdminister}
-                            disabled={
-                                submittingAdminister || !canSubmitAdminister
-                            }
-                        >
-                            {submittingAdminister ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                            )}
-                            Record Administration
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={!!returningLog}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeReturnDialog();
-                    }
+            />
+            <ReturnTransportMedicationWizard
+                log={returningLog}
+                onClose={closeReturnDialog}
+                onCompleted={(queued) => {
+                    if (!queued) refreshMedicationContext();
                 }}
-            >
-                <DialogContent className="sm:max-w-xl">
-                    <DialogHeader>
-                        <DialogTitle>Record Medication Return</DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium">
-                                {returningLog?.medication_name ?? '---'}
-                            </div>
-                            <div className="text-muted-foreground">
-                                {returningLog?.client?.name ?? '---'}
-                            </div>
-                        </div>
-
-                        {requiresReturnScan && returningLog && (
-                            <MedicationScanVerificationPanel
-                                clientId={returningLog.client?.id ?? null}
-                                medicationId={returningLog.medication_id}
-                                scanVerification={
-                                    returningLog.scan_verification
-                                }
-                                requirementText="Verification is required before returning this medication to house stock."
-                                resetKey={`return-${returningLog.id}`}
-                                onChange={(capture) => {
-                                    returnForm.clearErrors('scan_code');
-                                    setReturnScanCapture(capture);
-                                }}
-                            />
-                        )}
-                        {returnForm.errors.scan_code && (
-                            <p className="text-sm text-destructive">
-                                {returnForm.errors.scan_code}
-                            </p>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>Return notes</Label>
-                            <Textarea
-                                value={returnForm.data.notes}
-                                onChange={(event) =>
-                                    returnForm.setData(
-                                        'notes',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Add any hand-back or chain-of-custody notes..."
-                            />
-                            {returnForm.errors.notes && (
-                                <p className="text-sm text-destructive">
-                                    {returnForm.errors.notes}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeReturnDialog}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={submitReturn}
-                            disabled={submittingReturn || !canSubmitReturn}
-                        >
-                            {submittingReturn ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <ArrowLeftRight className="mr-2 h-4 w-4" />
-                            )}
-                            Record Return
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            />
         </AppLayout>
     );
 }

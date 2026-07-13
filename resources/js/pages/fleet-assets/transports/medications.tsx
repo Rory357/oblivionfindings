@@ -1,16 +1,8 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,7 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import {
     FleetHeroAction,
@@ -30,16 +21,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
-import {
-    emptyMedicationScanCapture,
-    hasVerifiedMedicationScan,
-    toMedicationScanPayload,
-    type MedicationScanCapture,
-    type MedicationScanVerification,
-} from '@/lib/medication-scan';
-import { submitEmarMutation } from '@/lib/emar-offline';
-import { applyFormRequestErrors } from '@/lib/form-request-errors';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -51,33 +33,11 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { formatDateTime } from '@/lib/fleet-utils';
-
-type MedLog = {
-    id: number;
-    transport?: {
-        id: number;
-        resident_name: string;
-        transport_type: string;
-        status: string;
-        departed_at: string | null;
-        arrived_at: string | null;
-        asset?: { id: number; name: string; asset_tag?: string | null } | null;
-    } | null;
-    client: { id: number; name: string } | null;
-    medication_id: number | null;
-    medication_name: string;
-    is_controlled_drug: boolean;
-    packed_witness_name?: string | null;
-    packed_by: { id: number; name: string } | null;
-    packed_at: string | null;
-    administered_by: { id: number; name: string } | null;
-    administered_at: string | null;
-    witnessed_by: { id: number; name: string } | null;
-    returned_to_house_at: string | null;
-    status: string;
-    notes: string | null;
-    scan_verification?: MedicationScanVerification | null;
-};
+import {
+    AdministerTransportMedicationWizard,
+    ReturnTransportMedicationWizard,
+    type TransportMedicationLog as MedLog,
+} from './components/transport-medication-dialogs';
 
 type Props = {
     logs: {
@@ -151,26 +111,6 @@ export default function MedicationTransitIndex({
     });
     const [administeringLog, setAdministeringLog] = useState<MedLog | null>(null);
     const [returningLog, setReturningLog] = useState<MedLog | null>(null);
-    const [administerScanCapture, setAdministerScanCapture] = useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [returnScanCapture, setReturnScanCapture] = useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [submittingAdminister, setSubmittingAdminister] = useState(false);
-    const [submittingReturn, setSubmittingReturn] = useState(false);
-
-    const administerForm = useForm({
-        witnessed_by_user_id: '',
-        notes: '',
-        scan_code: '',
-        scan_source: 'manual' as 'manual' | 'scanner',
-        scan_verified: false,
-        scan_match_source: '',
-    });
-    const returnForm = useForm({
-        notes: '',
-        scan_code: '',
-        scan_source: 'manual' as 'manual' | 'scanner',
-        scan_verified: false,
-        scan_match_source: '',
-    });
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -207,148 +147,18 @@ export default function MedicationTransitIndex({
 
     const closeAdministerDialog = () => {
         setAdministeringLog(null);
-        administerForm.reset();
-        administerForm.clearErrors();
-        setAdministerScanCapture(emptyMedicationScanCapture());
     };
 
     const closeReturnDialog = () => {
         setReturningLog(null);
-        returnForm.reset();
-        returnForm.clearErrors();
-        setReturnScanCapture(emptyMedicationScanCapture());
     };
 
     const openAdministerDialog = (log: MedLog) => {
         setAdministeringLog(log);
-        administerForm.reset();
-        administerForm.clearErrors();
-        setAdministerScanCapture(emptyMedicationScanCapture());
     };
 
     const openReturnDialog = (log: MedLog) => {
         setReturningLog(log);
-        returnForm.reset();
-        returnForm.clearErrors();
-        setReturnScanCapture(emptyMedicationScanCapture());
-    };
-
-    const requiresAdminWitness = !!administeringLog?.is_controlled_drug;
-    const requiresAdminScan = !!administeringLog?.scan_verification;
-    const requiresReturnScan = !!returningLog?.scan_verification;
-
-    const canSubmitAdminister =
-        !!administeringLog &&
-        (!requiresAdminWitness || !!administerForm.data.witnessed_by_user_id) &&
-        (!requiresAdminScan || hasVerifiedMedicationScan(administerScanCapture));
-
-    const canSubmitReturn =
-        !!returningLog &&
-        (!requiresReturnScan || hasVerifiedMedicationScan(returnScanCapture));
-
-    const submitAdminister = async () => {
-        if (!administeringLog || !canSubmitAdminister) {
-            return;
-        }
-
-        administerForm.clearErrors();
-        setSubmittingAdminister(true);
-
-        try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/medication-transit/${administeringLog.id}/administer`,
-                {
-                    ...administerForm.data,
-                    witnessed_by_user_id: administerForm.data.witnessed_by_user_id
-                        ? Number(administerForm.data.witnessed_by_user_id)
-                        : null,
-                    notes: administerForm.data.notes || null,
-                    ...toMedicationScanPayload(administerScanCapture),
-                },
-                {
-                    successMessage: 'Medication administration recorded.',
-                    queuedMessage:
-                        'Medication transit administration saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            closeAdministerDialog();
-
-            if (result.status !== 'queued') {
-                router.reload({
-                    only: ['logs', 'stats'],
-                });
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        administerForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to record transport administration.',
-            );
-        } finally {
-            setSubmittingAdminister(false);
-        }
-    };
-
-    const submitReturn = async () => {
-        if (!returningLog || !canSubmitReturn) {
-            return;
-        }
-
-        returnForm.clearErrors();
-        setSubmittingReturn(true);
-
-        try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/medication-transit/${returningLog.id}/return`,
-                {
-                    ...returnForm.data,
-                    notes: returnForm.data.notes || null,
-                    ...toMedicationScanPayload(returnScanCapture),
-                },
-                {
-                    successMessage: 'Medication return recorded.',
-                    queuedMessage:
-                        'Medication return saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            closeReturnDialog();
-
-            if (result.status !== 'queued') {
-                router.reload({
-                    only: ['logs', 'stats'],
-                });
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        returnForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to record medication return.',
-            );
-        } finally {
-            setSubmittingReturn(false);
-        }
     };
 
     return (
@@ -803,226 +613,25 @@ export default function MedicationTransitIndex({
                 )}
             </PageShell>
 
-            <Dialog
-                open={!!administeringLog}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeAdministerDialog();
+            <AdministerTransportMedicationWizard
+                log={administeringLog}
+                witnesses={safeWitnesses}
+                onClose={closeAdministerDialog}
+                onCompleted={(queued) => {
+                    if (!queued) {
+                        router.reload({ only: ['logs', 'stats'] });
                     }
                 }}
-            >
-                <DialogContent className="sm:max-w-xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Record Transport Administration
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium">
-                                {administeringLog?.medication_name ?? '---'}
-                            </div>
-                            <div className="text-muted-foreground">
-                                {administeringLog?.client?.name ?? '---'}
-                            </div>
-                        </div>
-
-                        {requiresAdminWitness && (
-                            <div className="space-y-2">
-                                <Label>Witness</Label>
-                                <Select
-                                    value={
-                                        administerForm.data
-                                            .witnessed_by_user_id
-                                    }
-                                    onValueChange={(value) => {
-                                        administerForm.clearErrors(
-                                            'witnessed_by_user_id',
-                                        );
-                                        administerForm.setData(
-                                            'witnessed_by_user_id',
-                                            value,
-                                        );
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select witness" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {safeWitnesses.map((witness) => (
-                                            <SelectItem
-                                                key={witness.id}
-                                                value={String(witness.id)}
-                                            >
-                                                {witness.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {administerForm.errors
-                                    .witnessed_by_user_id && (
-                                    <p className="text-sm text-destructive">
-                                        {
-                                            administerForm.errors
-                                                .witnessed_by_user_id
-                                        }
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {requiresAdminScan && administeringLog && (
-                            <MedicationScanVerificationPanel
-                                clientId={administeringLog.client?.id ?? null}
-                                medicationId={
-                                    administeringLog.medication_id
-                                }
-                                scanVerification={
-                                    administeringLog.scan_verification
-                                }
-                                requirementText="Verification is required before recording this administration."
-                                resetKey={`administer-${administeringLog.id}`}
-                                onChange={(capture) => {
-                                    administerForm.clearErrors('scan_code');
-                                    setAdministerScanCapture(capture);
-                                }}
-                            />
-                        )}
-                        {administerForm.errors.scan_code && (
-                            <p className="text-sm text-destructive">
-                                {administerForm.errors.scan_code}
-                            </p>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={administerForm.data.notes}
-                                onChange={(event) =>
-                                    administerForm.setData(
-                                        'notes',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Add any transport administration notes..."
-                            />
-                            {administerForm.errors.notes && (
-                                <p className="text-sm text-destructive">
-                                    {administerForm.errors.notes}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeAdministerDialog}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={submitAdminister}
-                            disabled={
-                                submittingAdminister ||
-                                !canSubmitAdminister
-                            }
-                        >
-                            <Check className="mr-2 h-4 w-4" />
-                            Record Administration
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={!!returningLog}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeReturnDialog();
+            />
+            <ReturnTransportMedicationWizard
+                log={returningLog}
+                onClose={closeReturnDialog}
+                onCompleted={(queued) => {
+                    if (!queued) {
+                        router.reload({ only: ['logs', 'stats'] });
                     }
                 }}
-            >
-                <DialogContent className="sm:max-w-xl">
-                    <DialogHeader>
-                        <DialogTitle>Record Medication Return</DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium">
-                                {returningLog?.medication_name ?? '---'}
-                            </div>
-                            <div className="text-muted-foreground">
-                                {returningLog?.client?.name ?? '---'}
-                            </div>
-                        </div>
-
-                        {requiresReturnScan && returningLog && (
-                            <MedicationScanVerificationPanel
-                                clientId={returningLog.client?.id ?? null}
-                                medicationId={returningLog.medication_id}
-                                scanVerification={
-                                    returningLog.scan_verification
-                                }
-                                requirementText="Verification is required before returning this medication to house stock."
-                                resetKey={`return-${returningLog.id}`}
-                                onChange={(capture) => {
-                                    returnForm.clearErrors('scan_code');
-                                    setReturnScanCapture(capture);
-                                }}
-                            />
-                        )}
-                        {returnForm.errors.scan_code && (
-                            <p className="text-sm text-destructive">
-                                {returnForm.errors.scan_code}
-                            </p>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>Return notes</Label>
-                            <Textarea
-                                value={returnForm.data.notes}
-                                onChange={(event) =>
-                                    returnForm.setData(
-                                        'notes',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Add any hand-back or chain-of-custody notes..."
-                            />
-                            {returnForm.errors.notes && (
-                                <p className="text-sm text-destructive">
-                                    {returnForm.errors.notes}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeReturnDialog}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={submitReturn}
-                            disabled={
-                                submittingReturn || !canSubmitReturn
-                            }
-                        >
-                            <ArrowLeftRight className="mr-2 h-4 w-4" />
-                            Record Return
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            />
         </AppLayout>
     );
 }

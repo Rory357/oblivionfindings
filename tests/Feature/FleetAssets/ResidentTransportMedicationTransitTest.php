@@ -287,4 +287,112 @@ class ResidentTransportMedicationTransitTest extends TestCase
             'medication_name' => 'Packed Medication 10mg',
         ]);
     }
+
+    public function test_controlled_drug_pack_requires_a_witness_name(): void
+    {
+        [$transport, $client] = $this->createInProgressTransport();
+
+        $this->actingAs($this->admin)
+            ->from("/fleet-assets/transports/{$transport->id}")
+            ->post("/fleet-assets/transports/{$transport->id}/pack-medication", [
+                'client_id' => $client->id,
+                'medication_name' => 'Controlled transit medication',
+                'is_controlled_drug' => true,
+                'witness_name' => '',
+                'notes' => 'Prepared for the appointment.',
+            ])
+            ->assertRedirect("/fleet-assets/transports/{$transport->id}")
+            ->assertSessionHasErrors(['witness_name']);
+
+        $this->assertDatabaseCount('fleet_medication_transit_logs', 0);
+    }
+
+    public function test_controlled_drug_administration_requires_a_witness_user(): void
+    {
+        [$transport, $client] = $this->createInProgressTransport();
+
+        $log = FleetMedicationTransitLog::query()->create([
+            'transport_id' => $transport->id,
+            'client_id' => $client->id,
+            'medication_name' => 'Controlled transit medication',
+            'is_controlled_drug' => true,
+            'packed_witness_name' => 'Packing Witness',
+            'packed_by_user_id' => $this->admin->id,
+            'packed_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from("/fleet-assets/transports/{$transport->id}")
+            ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
+                'witnessed_by_user_id' => null,
+                'notes' => 'Dose given during transport.',
+            ])
+            ->assertRedirect("/fleet-assets/transports/{$transport->id}")
+            ->assertSessionHasErrors(['witnessed_by_user_id']);
+
+        $this->assertNull($log->fresh()->administered_at);
+    }
+
+    public function test_pack_administer_and_return_preserve_transit_consequences(): void
+    {
+        [$transport, $client] = $this->createInProgressTransport();
+
+        $this->actingAs($this->admin)
+            ->post("/fleet-assets/transports/{$transport->id}/pack-medication", [
+                'client_id' => $client->id,
+                'medication_name' => 'Transit medication',
+                'is_controlled_drug' => false,
+                'witness_name' => null,
+                'notes' => 'Packed at the house.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $log = FleetMedicationTransitLog::query()->sole();
+        $this->assertSame('packed', $log->status);
+        $this->assertSame($this->admin->id, $log->packed_by_user_id);
+
+        $this->actingAs($this->admin)
+            ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
+                'witnessed_by_user_id' => null,
+                'notes' => 'Given at the scheduled time.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $log->refresh();
+        $this->assertSame('administered', $log->status);
+        $this->assertNotNull($log->administered_at);
+        $this->assertSame($this->admin->id, $log->administered_by_user_id);
+
+        $this->actingAs($this->admin)
+            ->post("/fleet-assets/medication-transit/{$log->id}/return", [
+                'notes' => 'Returned to house stock.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $log->refresh();
+        $this->assertSame('returned', $log->status);
+        $this->assertNotNull($log->returned_to_house_at);
+        $this->assertSame('Returned to house stock.', $log->notes);
+    }
+
+    /** @return array{FleetResidentTransport, Client} */
+    private function createInProgressTransport(): array
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create();
+        $asset = Asset::factory()->vehicle()->forSite($site)->create();
+
+        $transport = FleetResidentTransport::query()->create([
+            'asset_id' => $asset->id,
+            'driver_user_id' => $this->admin->id,
+            'resident_id' => $client->id,
+            'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+            'transport_type' => 'medical',
+            'departed_at' => now(),
+            'passengers_count' => 1,
+            'status' => 'in_progress',
+        ]);
+
+        return [$transport, $client];
+    }
 }
