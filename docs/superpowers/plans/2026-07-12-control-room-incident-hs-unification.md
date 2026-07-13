@@ -396,7 +396,7 @@ git commit -m "fix(incidents): prevent duplicate journey bridges"
 - Test: `tests/Feature/IncidentControllerTest.php`
 - Test: `resources/js/components/incidents/incident-report-dialog.test.tsx`
 
-- [ ] **Step 1: Write failing intent tests**
+- [x] **Step 1: Write failing intent tests**
 
 ```php
 it('saves a draft without hs and submits atomically with hs', function () {
@@ -409,36 +409,45 @@ it('saves a draft without hs and submits atomically with hs', function () {
 });
 ```
 
-- [ ] **Step 2: Run backend and component tests and confirm mismatch**
+- [x] **Step 2: Run backend and component tests and confirm mismatch**
 
 Expected: the current “Submit incident” path persists `draft` and the tests fail.
 
-- [ ] **Step 3: Add `intent=draft|submit` and validate incident context**
+- [x] **Step 3: Add `intent=draft|submit` and validate incident context**
 
 Store `site_id` from the selected incident-time context. Reject a selected shift whose client/site does not match. For submit, call `IncidentJourneyService` inside the request transaction and return the incident/H&S references in flash data.
 
-- [ ] **Step 4: Consolidate H&S launcher onto the canonical dialog**
+- [x] **Step 4: Consolidate H&S launcher onto the canonical dialog**
 
 Remove the separate H&S payload mapping that puts site in description, collapses people, maps Critical incorrectly, or promises a corrective action it does not create. H&S passes defaults into the canonical dialog.
 
-- [ ] **Step 5: Update labels and success panes**
+- [x] **Step 5: Update labels and success panes**
 
 Render two explicit buttons: `Save draft` and `Submit incident`. Success headings are `Draft saved` or `Incident submitted`. Show the official incident reference and `Awaiting H&S acceptance` when submitted.
 
-- [ ] **Step 6: Align role permissions**
+- [x] **Step 6: Align role permissions**
 
 Give the H&S officer the minimum incident create/view permissions needed by visible H&S actions. Give the coordinator the narrow Control Room create/handover permission used by the operator workflow. Remove full Control Room dashboard permission from the support-worker role while retaining Control Room tasks in canonical My Day.
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run: `php artisan test tests/Feature/IncidentControllerTest.php tests/Feature/ControlRoom/ControlRoomDashboardTest.php && npm test -- resources/js/components/incidents/incident-report-dialog.test.tsx`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add app/Http/Controllers/IncidentController.php resources/js/components/incidents resources/js/pages/health-safety/components database/seeders/RbacSeeder.php tests/Feature resources/js/components/incidents/incident-report-dialog.test.tsx
 git commit -m "feat(incidents): separate draft and submit workflows"
 ```
+
+**Task 5 completion evidence — 2026-07-13**
+
+- Canonical reporting implementation: `492cadb4f717a8a9a4eee8f1b872e26c5c90c594`; final draft/site/safeguarding hardening: `d620e30c04fad2d14470546a75ccdbd0cdef7cc2`.
+- One desktop dialog now owns Incidents and H&S reporting. It sends explicit draft/submit intent, preserves a DB-unique request UUID across retry and draft → submit, renders visible validation with first-invalid-step routing, and shows only official incident/H&S references with truthful `Draft saved`, `Incident submitted`, and `Awaiting H&S acceptance` states.
+- Submitted reports synchronously create one canonical H&S journey inside the request transaction; drafts create no H&S event, Control Room alert, escalation notification, communication, or safeguarding side effect. Abuse/neglect submission adds one linked safeguarding concern while retaining one H&S event/alert, and critical escalation creates one idempotent statutory notifiable record.
+- Incident-time client/site/shift context, deep-link prefill, draft reuse, and legacy submit/retry all use `UserSiteAccessService` and organization scope. H&S has create-only incident permission, coordinators have narrow alert creation, support workers no longer receive the full dashboard, and follow-up assignment requires `incidents.followups.manage`.
+- Final Task 5 backend union before the bounded safeguarding fix: 194 tests / 1,076 assertions. Final review-fix proof: 7 tests / 60 assertions; affected governance + bridge proof: 36 tests / 84 assertions. Component suite: 20/20; TypeScript, ESLint, Prettier, Pint, PHP lint, `git diff --check`, and reversible UUID migration proof passed.
+- Same independent code-quality reviewer: `READY`. Final independent specification reconciliation: `PASS`. No Task 6, dashboard redesign, mobile, WebView, merge, push, or deployment work was included.
 
 ---
 
