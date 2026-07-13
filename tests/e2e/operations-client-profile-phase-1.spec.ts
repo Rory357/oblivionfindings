@@ -9,6 +9,8 @@ import {
 
 const fixtureClientIds = new Set<number>();
 
+test.use({ viewport: { width: 1440, height: 900 } });
+
 function seedClientProfilePhaseOneFixture() {
     const output = runLaravelPhp(`
 $client = \\App\\Models\\Client::factory()->create([
@@ -174,11 +176,10 @@ test.describe('operations client profile phase 1', () => {
         await expect(
             page.getByRole('heading', { name: /Playwright Profile/i }),
         ).toBeVisible();
-        await expect(
-            page.getByTestId('client-profile-quick-note-button'),
-        ).toBeVisible();
+        await expect(page.getByTestId('client-profile-add-note')).toBeVisible();
 
-        await page.getByTestId('client-profile-quick-note-button').click();
+        await page.getByTestId('client-profile-add-note').click();
+        await page.getByRole('menuitem', { name: 'Quick note' }).click();
         await expect(
             page.getByTestId('client-quick-note-dialog'),
         ).toBeVisible();
@@ -222,9 +223,7 @@ echo json_encode([
         await loginAsStaff(page);
 
         await page.goto(`/operations/clients/${clientId}`);
-        await expect(
-            page.getByTestId('client-profile-quick-note-button'),
-        ).toBeVisible();
+        await expect(page.getByTestId('client-profile-add-note')).toBeVisible();
 
         await page.keyboard.press('n');
         await expect(
@@ -258,5 +257,68 @@ echo json_encode([
                 .getByTestId('client-daily-notes-tab')
                 .getByText('Review Queue'),
         ).toBeVisible();
+    });
+
+    test('resumes, saves and discards an author-owned daily note draft in profile', async ({
+        page,
+    }) => {
+        const { clientId } = seedClientProfilePhaseOneFixture();
+        runLaravelPhp(`
+$client = \\App\\Models\\Client::query()->findOrFail(${clientId});
+$author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
+\\App\\Models\\ClientNote::query()->create([
+    'client_id' => $client->id,
+    'organization_id' => $client->organization_id,
+    'user_id' => $author->id,
+    'type' => 'daily_note',
+    'category' => 'activity',
+    'subject' => 'Draft pool visit',
+    'body' => 'Draft detail from the morning shift.',
+    'occurred_at' => now(),
+    'visibility' => 'internal',
+    'is_draft' => true,
+]);
+`);
+        await loginAsStaff(page);
+
+        await page.goto(`/operations/clients/${clientId}?tab=progress_notes`);
+        await page
+            .getByRole('button', { name: 'Resume draft' })
+            .first()
+            .click();
+        await expect(
+            page.getByTestId('client-daily-note-dialog'),
+        ).toBeVisible();
+        await page.getByTestId('daily-note-next').click();
+        await expect(page.getByLabel('Short heading')).toHaveValue(
+            'Draft pool visit',
+        );
+        await expect(page.getByTestId('daily-note-body')).toHaveValue(
+            'Draft detail from the morning shift.',
+        );
+
+        await page.getByLabel('Short heading').fill('Updated pool visit');
+        await page
+            .getByTestId('daily-note-body')
+            .fill('Updated detail ready for the next worker.');
+        await page.getByRole('button', { name: 'Save Draft' }).click();
+        await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
+        await expect(
+            page.getByText('Updated pool visit').first(),
+        ).toBeVisible();
+
+        await page
+            .getByRole('button', { name: 'Resume draft' })
+            .first()
+            .click();
+        await page.getByRole('button', { name: 'Discard draft' }).click();
+        await expect(
+            page.getByRole('alertdialog', { name: 'Discard draft?' }),
+        ).toBeVisible();
+        await page.getByRole('button', { name: 'Discard draft' }).click();
+        await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
+        await expect(
+            page.getByRole('button', { name: 'Resume draft' }),
+        ).toHaveCount(0);
     });
 });

@@ -30,6 +30,7 @@ type CommunicationNotesTabProps = {
     canUpdate?: boolean;
     onMarkReviewed?: (noteId: number) => void;
     onClearFlag?: (noteId: number) => void;
+    onEditNote?: (note: ClientDailyNote) => void;
     isLoading?: boolean;
 };
 
@@ -53,6 +54,7 @@ export function CommunicationNotesTab({
     canUpdate = false,
     onMarkReviewed,
     onClearFlag,
+    onEditNote,
     isLoading = false,
 }: CommunicationNotesTabProps) {
     const openFamilyNotes = familyNotes.filter((note) =>
@@ -161,6 +163,7 @@ export function CommunicationNotesTab({
                                 canUpdate={canUpdate}
                                 onMarkReviewed={onMarkReviewed}
                                 onClearFlag={onClearFlag}
+                                onEdit={onEditNote}
                                 showCommunicationContext
                             />
                         ))

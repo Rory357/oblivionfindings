@@ -10,6 +10,7 @@ use App\Models\ServiceAgreementRate;
 use App\Models\ServiceAgreementStatusChange;
 use App\Services\Operations\OpsNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ServiceAgreementController extends Controller
 {
@@ -48,7 +49,7 @@ class ServiceAgreementController extends Controller
         $agreements = (clone $baseQuery)
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
             ->withCount(['lineItems', 'fundingClaims'])
-            ->when(!empty($data['q']), function ($q) use ($data) {
+            ->when(! empty($data['q']), function ($q) use ($data) {
                 $search = $data['q'];
                 $q->where(function ($sub) use ($search) {
                     $sub->where('title', 'like', "%{$search}%")
@@ -57,10 +58,10 @@ class ServiceAgreementController extends Controller
                         ->orWhere('funding_reference', 'like', "%{$search}%");
                 });
             })
-            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
-            ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
-            ->when(!empty($data['agreement_type']), fn ($q) => $q->where('agreement_type', $data['agreement_type']))
-            ->when(!empty($data['funding_type']), fn ($q) => $q->where('funding_type', $data['funding_type']))
+            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->when(! empty($data['agreement_type']), fn ($q) => $q->where('agreement_type', $data['agreement_type']))
+            ->when(! empty($data['funding_type']), fn ($q) => $q->where('funding_type', $data['funding_type']))
             ->orderByDesc('updated_at')
             ->paginate(15)
             ->withQueryString();
@@ -68,6 +69,7 @@ class ServiceAgreementController extends Controller
         // Append the budget_utilisation_percent accessor to each item
         $agreements->getCollection()->transform(function ($agreement) {
             $agreement->append(['budget_utilisation_percent', 'budget_remaining']);
+
             return $agreement;
         });
 
@@ -105,7 +107,13 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.create'), 403);
 
         $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('clients', 'id')->where(
+                    fn ($query) => $query->where('organization_id', $auth->organization_id),
+                ),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'agreement_type' => ['required', 'string', 'max:100'],
             'reference_number' => ['nullable', 'string', 'max:100'],
@@ -295,7 +303,14 @@ class ServiceAgreementController extends Controller
             ->findOrFail($agreement);
 
         $data = $request->validate([
-            'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
+            'client_id' => [
+                'sometimes',
+                'required',
+                'integer',
+                Rule::exists('clients', 'id')->where(
+                    fn ($query) => $query->where('organization_id', $auth->organization_id),
+                ),
+            ],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'agreement_type' => ['sometimes', 'required', 'string', 'max:100'],
             'reference_number' => ['nullable', 'string', 'max:100'],

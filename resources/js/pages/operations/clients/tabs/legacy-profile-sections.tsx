@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -874,6 +875,7 @@ export function PhotoGalleryTab({
     canEdit: boolean;
 }) {
     const [showUpload, setShowUpload] = useState(false);
+    const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
     const photoForm = useForm<{
         photo: File | null;
         caption: string;
@@ -896,7 +898,6 @@ export function PhotoGalleryTab({
         });
     };
     const deletePhoto = (photoId: number) => {
-        if (!confirm('Delete this photo?')) return;
         router.delete(
             `/operations/clients/${clientId}/gallery-photos/${photoId}`,
             { preserveScroll: true },
@@ -1028,8 +1029,8 @@ export function PhotoGalleryTab({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => deletePhoto(p.id)}
-                                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 p-1 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
+                                        onClick={() => setDeletingPhotoId(p.id)}
+                                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 p-1 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical focus-visible:opacity-100"
                                         title="Delete photo"
                                     >
                                         <svg
@@ -1060,10 +1061,24 @@ export function PhotoGalleryTab({
                     </div>
                 ) : (
                     <div className="py-12 text-center text-sm text-muted-foreground">
-                        No photos yet. Upload the first one!
+                        {canEdit
+                            ? 'No photos yet. Upload the first one.'
+                            : 'No photos are available to view.'}
                     </div>
                 )}
             </CardContent>
+            <ConfirmDialog
+                open={deletingPhotoId !== null}
+                onClose={() => setDeletingPhotoId(null)}
+                onConfirm={() => {
+                    if (deletingPhotoId !== null) {
+                        deletePhoto(deletingPhotoId);
+                    }
+                }}
+                title="Delete photo?"
+                description="This permanently removes the photo from the client gallery. This action cannot be undone."
+                confirmText="Delete photo"
+            />
         </Card>
     );
 }
@@ -1200,6 +1215,9 @@ export function PersonalAssetsTab({
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [deletingAsset, setDeletingAsset] = useState<PersonalAsset | null>(
+        null,
+    );
     const [search, setSearch] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -1520,12 +1538,13 @@ export function PersonalAssetsTab({
                             </div>
                         </div>
                         {canEdit && (
-                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 w-7 p-0"
                                     onClick={() => startEdit(a)}
+                                    aria-label={`Edit ${a.name}`}
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                 </Button>
@@ -1533,18 +1552,8 @@ export function PersonalAssetsTab({
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 w-7 p-0 text-status-critical hover:text-status-critical"
-                                    onClick={() => {
-                                        if (
-                                            confirm(
-                                                `Remove "${a.name}" from personal assets?`,
-                                            )
-                                        ) {
-                                            router.delete(
-                                                `/operations/clients/${clientId}/personal-assets/${a.id}`,
-                                                { preserveScroll: true },
-                                            );
-                                        }
-                                    }}
+                                    onClick={() => setDeletingAsset(a)}
+                                    aria-label={`Remove ${a.name}`}
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1704,7 +1713,7 @@ export function PersonalAssetsTab({
 
                     {/* Quick status actions */}
                     {canEdit && a.status === 'active' && (
-                        <div className="flex flex-wrap gap-1 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex flex-wrap gap-1 pt-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -2509,6 +2518,25 @@ export function PersonalAssetsTab({
                     {filtered.map(renderAssetCard)}
                 </div>
             )}
+            <ConfirmDialog
+                open={deletingAsset !== null}
+                onClose={() => setDeletingAsset(null)}
+                onConfirm={() => {
+                    if (deletingAsset) {
+                        router.delete(
+                            `/operations/clients/${clientId}/personal-assets/${deletingAsset.id}`,
+                            { preserveScroll: true },
+                        );
+                    }
+                }}
+                title="Remove personal asset?"
+                description={
+                    deletingAsset
+                        ? `This permanently removes ${deletingAsset.name} from the personal inventory. This action cannot be undone.`
+                        : ''
+                }
+                confirmText="Remove asset"
+            />
         </div>
     );
 }

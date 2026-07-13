@@ -116,7 +116,15 @@ vi.mock('@/components/client-edit-dialog', () => ({
 }));
 
 vi.mock('@/pages/operations/clients/dialogs/daily-note-wizard', () => ({
-    DailyNoteWizard: ({ open, mode }: { open: boolean; mode?: string }) =>
+    DailyNoteWizard: ({
+        open,
+        mode,
+        note,
+    }: {
+        open: boolean;
+        mode?: string;
+        note?: { id?: number } | null;
+    }) =>
         open ? (
             <div
                 data-testid={
@@ -124,7 +132,9 @@ vi.mock('@/pages/operations/clients/dialogs/daily-note-wizard', () => ({
                         ? 'communication-note-dialog'
                         : 'daily-note-dialog'
                 }
-            />
+            >
+                {note?.id ? `note-${note.id}` : 'new-note'}
+            </div>
         ) : null,
 }));
 
@@ -673,6 +683,35 @@ describe('client profile navigation registry', () => {
         expect(screen.getByRole('button', { name: 'Shift' })).toBeVisible();
     });
 
+    it('shows the agreement creation action only with its exact capability', async () => {
+        window.history.replaceState(
+            {},
+            '',
+            '/operations/clients/1?tab=service_agreements',
+        );
+        const restricted = clientShowProps();
+        const { rerender } = render(<ClientShow {...restricted} />);
+
+        expect(await screen.findByText('No Service Agreements')).toBeVisible();
+        expect(
+            screen.queryByRole('link', { name: 'New Agreement' }),
+        ).toBeNull();
+
+        (
+            clientShowHarness.pageProps.auth as {
+                can: Record<string, unknown>;
+            }
+        ).can.service_agreements = { create: true };
+        rerender(<ClientShow {...clientShowProps()} />);
+
+        expect(
+            screen.getByRole('link', { name: 'New Agreement' }),
+        ).toHaveAttribute(
+            'href',
+            '/operations/service-agreements/create?client_id=1',
+        );
+    });
+
     it('fails restored dialogs closed and exposes only exact hero capture actions', async () => {
         window.history.replaceState(
             {},
@@ -738,5 +777,46 @@ describe('client profile navigation registry', () => {
         fireEvent.keyDown(window, { key: 'N', shiftKey: true });
         expect(await screen.findByTestId('daily-note-dialog')).toBeVisible();
         expect(screen.queryByTestId('quick-note-dialog')).toBeNull();
+    });
+
+    it('opens an editable draft in the daily note wizard and preserves its record URL', async () => {
+        window.history.replaceState(
+            {},
+            '',
+            '/operations/clients/1?tab=progress_notes',
+        );
+        clientShowHarness.pageProps.client_daily_notes = [
+            {
+                id: 73,
+                type: 'daily_note',
+                category: 'activity',
+                subject: 'Pool visit',
+                body: 'Draft detail',
+                is_draft: true,
+                can: { update: true, delete: true },
+                author: { id: 7, name: 'Support Worker' },
+            },
+        ];
+        clientShowHarness.pageProps.daily_notes_summary = {
+            total: 1,
+            drafts: 1,
+        };
+        const props = clientShowProps();
+        props.can.create_daily_note = true;
+
+        render(<ClientShow {...props} />);
+        fireEvent.click(
+            (
+                await screen.findAllByRole('button', {
+                    name: 'Resume draft',
+                })
+            )[0],
+        );
+
+        expect(
+            await screen.findByTestId('daily-note-dialog'),
+        ).toHaveTextContent('note-73');
+        expect(window.location.search).toContain('dialog=daily_note');
+        expect(window.location.search).toContain('record=73');
     });
 });

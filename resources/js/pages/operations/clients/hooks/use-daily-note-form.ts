@@ -1,7 +1,13 @@
 import { useForm } from '@inertiajs/react';
 
 export type DailyNoteFormValues = {
-    type: 'daily_note' | 'quick' | 'communication';
+    type:
+        | 'daily_note'
+        | 'quick'
+        | 'communication'
+        | 'note'
+        | 'progress_note'
+        | 'handover';
     category: string;
     subject: string;
     goal: string;
