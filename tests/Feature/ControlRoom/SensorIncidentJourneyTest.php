@@ -11,6 +11,7 @@ use App\Models\HsEvent;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
+use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -18,6 +19,27 @@ use Tests\TestCase;
 class SensorIncidentJourneyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_sensor_confirmation_and_trusted_signal_processing_expose_outer_deadlock_retries(): void
+    {
+        foreach ([
+            [SensorIncidentBridgeService::class, 'confirm'],
+            [SignalProcessingService::class, 'process'],
+        ] as [$service, $method]) {
+            $reflection = new \ReflectionClass($service);
+            $attempts = $reflection->getReflectionConstant('TRANSACTION_ATTEMPTS');
+            $this->assertNotFalse($attempts, "{$service} must declare its outer retry contract.");
+            $this->assertSame(3, $attempts->getValue());
+
+            $methodReflection = $reflection->getMethod($method);
+            $source = implode('', array_slice(
+                file($methodReflection->getFileName()),
+                $methodReflection->getStartLine() - 1,
+                $methodReflection->getEndLine() - $methodReflection->getStartLine() + 1,
+            ));
+            $this->assertStringContainsString('self::TRANSACTION_ATTEMPTS', $source);
+        }
+    }
 
     public function test_confirm_reuses_the_sensor_alert_and_builds_one_evidenced_journey_on_retry(): void
     {

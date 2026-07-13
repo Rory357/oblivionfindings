@@ -4,20 +4,29 @@ namespace Tests\Feature\Incidents;
 
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\Communication;
 use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SlaDefinition;
+use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\ControlRoomAlertNotification;
+use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -499,6 +508,160 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->assertSame(0, ClientIncident::query()->whereNull('control_room_alert_id')->count());
         $this->assertSame(0, HsEvent::query()->whereNull('control_room_alert_id')->count());
+    }
+
+    public function test_new_explicit_incident_alert_initialises_queue_sla_and_automation_exactly_once(): void
+    {
+        Notification::fake();
+        $actor = User::factory()->create();
+        $assignee = User::factory()->create();
+        $notificationRole = Role::query()->create([
+            'name' => 'incident_alert_recipient',
+            'label' => 'Incident alert recipient',
+            'level' => 10,
+            'type' => 'custom',
+        ]);
+        $assignee->roles()->attach($notificationRole);
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $queue = TriageQueue::create([
+            'name' => 'Critical incident queue',
+            'code' => 'critical-incidents',
+            'tier' => 1,
+            'handle_severities' => ['critical'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$assignee->id],
+            'assigned_roles' => [$notificationRole->name],
+            'is_active' => true,
+        ]);
+        $slaDefinition = SlaDefinition::create([
+            'name' => 'Critical incident SLA',
+            'code' => 'critical-incident-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['critical'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 5,
+            'response_target_minutes' => 10,
+            'resolution_target_minutes' => 60,
+            'is_active' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'low',
+        ]);
+        DB::beginTransaction();
+
+        $first = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Operator critical escalation',
+            'critical',
+        );
+        $retry = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Operator critical escalation',
+            'critical',
+        );
+        $alert = $first->alert->fresh();
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('control_room_communications', 0);
+        DB::commit();
+
+        $this->assertTrue($retry->alert->is($first->alert));
+        $this->assertSame('critical', $alert->severity);
+        $this->assertSame($queue->id, $alert->queue_id);
+        $this->assertSame($assignee->id, $alert->assigned_to_user_id);
+        $this->assertTrue((bool) data_get($alert->context, 'auto_assigned'));
+        $this->assertSame($slaDefinition->id, $alert->sla?->sla_definition_id);
+        $this->assertSame($alert->id, AlertQueue::query()->sole()->alert_id);
+        $this->assertDatabaseCount('control_room_alert_queue', 1);
+        $this->assertDatabaseCount('control_room_alert_sla', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        Notification::assertSentTo($assignee, ControlRoomAlertNotification::class);
+        Notification::assertCount(1);
+        $communication = Communication::query()->sole();
+        $this->assertSame($alert->id, $communication->alert_id);
+        $this->assertSame($assignee->id, $communication->target_user_id);
+        $this->assertSame('notification', $communication->purpose);
+    }
+
+    public function test_incident_alert_operational_initialisation_rolls_back_without_notification_leak(): void
+    {
+        Notification::fake();
+        $recipient = User::factory()->create();
+        TriageQueue::create([
+            'name' => 'Rollback queue',
+            'code' => 'rollback-queue',
+            'tier' => 1,
+            'handle_severities' => ['high'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'assigned_users' => [$recipient->id],
+            'is_active' => true,
+        ]);
+        SlaDefinition::create([
+            'name' => 'Rollback SLA',
+            'code' => 'rollback-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['high'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 5,
+            'is_active' => true,
+        ]);
+
+        try {
+            DB::transaction(function (): void {
+                $alert = ControlRoomAlert::factory()->open()->create([
+                    'source' => 'incident',
+                    'alert_type' => 'incident.fall',
+                    'severity' => 'high',
+                ]);
+                app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert);
+
+                throw new \RuntimeException('Force operational transaction rollback');
+            });
+            $this->fail('The operational transaction must roll back.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Force operational transaction rollback', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_alert_queue', 0);
+        $this->assertDatabaseCount('control_room_alert_sla', 0);
+        Notification::assertNothingSent();
+    }
+
+    public function test_attach_uses_the_sensor_compatible_alert_then_incident_lock_order(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'severity' => 'high',
+            'context' => [],
+        ]);
+        DB::enableQueryLog();
+
+        app(IncidentJourneyService::class)->attachAlertToIncident($incident, $alert, $actor);
+
+        $locks = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $query): bool => str_contains(strtolower($query), 'for update'))
+            ->filter(fn (string $query): bool => str_contains($query, 'control_room_alerts')
+                || str_contains($query, 'client_incidents'))
+            ->values();
+
+        $this->assertStringContainsString('control_room_alerts', $locks->get(0, ''));
+        $this->assertStringContainsString('client_incidents', $locks->get(1, ''));
     }
 
     public function test_reused_alert_context_keeps_existing_nested_operational_provenance_and_fills_missing_journey_defaults(): void

@@ -93,9 +93,11 @@ class MedicationSignalService
         string $severity,
         string $message,
         array $context = [],
+        bool $requiredDelivery = false,
     ): void {
         $signal = null;
         $hasIncidentClaim = $this->hasIncidentClaim($context);
+        $mustSucceed = $hasIncidentClaim || $requiredDelivery;
         $incidentIdentity = $context['incident_id'] ?? null;
 
         $idempotencyKey = $this->buildIdempotencyKey(
@@ -113,13 +115,18 @@ class MedicationSignalService
                 $context,
                 $idempotencyKey,
                 $hasIncidentClaim,
+                $mustSucceed,
                 $incidentIdentity,
                 &$signal,
             ): void {
                 $source = $this->getSignalSource();
 
-                if ($hasIncidentClaim && $source === null) {
-                    throw new \RuntimeException('Medication signal source is unavailable for an incident journey.');
+                if ($mustSucceed && $source === null) {
+                    throw new \RuntimeException(
+                        $hasIncidentClaim
+                            ? 'Medication signal source is unavailable for an incident journey.'
+                            : 'Medication signal source is unavailable for required operational delivery.',
+                    );
                 }
 
                 $signalData = [
@@ -157,23 +164,34 @@ class MedicationSignalService
                 }
             };
 
-            if ($hasIncidentClaim) {
+            if ($mustSucceed) {
                 DB::transaction($operation);
             } else {
                 $operation();
             }
         } catch (\Throwable $exception) {
-            if ($hasIncidentClaim) {
+            if ($mustSucceed) {
                 $this->signalSource = null;
-                Log::error('incident_journey_repair_required', [
-                    'incident_id' => $this->incidentIdentityForLog($incidentIdentity),
-                    'incident_id_type' => get_debug_type($incidentIdentity),
-                    'signal_id' => $signal?->id,
-                    'signal_type' => $signalType,
-                    'signal_client_id' => $clientId,
-                    'exception' => $exception::class,
-                    'error' => $exception->getMessage(),
-                ]);
+                if ($hasIncidentClaim) {
+                    Log::error('incident_journey_repair_required', [
+                        'incident_id' => $this->incidentIdentityForLog($incidentIdentity),
+                        'incident_id_type' => get_debug_type($incidentIdentity),
+                        'signal_id' => $signal?->id,
+                        'signal_type' => $signalType,
+                        'signal_client_id' => $clientId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                } else {
+                    Log::error('medication_operational_alert_delivery_failed', [
+                        'medication_error_id' => $context['medication_error_id'] ?? null,
+                        'signal_id' => $signal?->id,
+                        'signal_type' => $signalType,
+                        'signal_client_id' => $clientId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
 
                 throw $exception;
             }
@@ -249,7 +267,45 @@ class MedicationSignalService
                 'controlled_drug' => $medication?->controlled_drug ?? false,
                 'high_risk' => $medication?->high_risk ?? false,
             ],
+            requiredDelivery: true,
         );
+    }
+
+    public function attachExistingErrorSignalToIncident(MedicationError $error): ?ControlRoomAlert
+    {
+        if ($error->client_incident_id === null) {
+            return null;
+        }
+
+        $signal = Signal::query()
+            ->where('idempotency_key', $this->buildIdempotencyKey(
+                self::TYPE_ERROR,
+                (int) $error->client_id,
+                [
+                    'medication_error_id' => $error->id,
+                    'client_medication_id' => $error->client_medication_id,
+                ],
+            ))
+            ->lockForUpdate()
+            ->first();
+        $alertId = $signal?->alert_id ?? $signal?->correlated_alert_id;
+
+        if ($signal === null || $alertId === null) {
+            return null;
+        }
+
+        $alert = ControlRoomAlert::query()
+            ->whereKey($alertId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($alert === null) {
+            return null;
+        }
+
+        $this->attachSignalToIncidentAlert($signal, $alert, (int) $error->client_incident_id);
+
+        return $alert->fresh();
     }
 
     /**
@@ -277,8 +333,11 @@ class MedicationSignalService
             $medicationId ?? 'all',
             $entityType ?? 'check',
             $entityId ?? 'check',
-            $window,
         ];
+
+        if ($entityType === null) {
+            $parts[] = $window;
+        }
 
         return hash('sha256', implode('|', $parts));
     }
@@ -293,8 +352,8 @@ class MedicationSignalService
             'correction_id' => 'correction',
             'administration_id' => 'administration',
             'transport_log_id' => 'transport_log',
+            'prn_attempt_id' => 'prn_attempt',
             'incident_id' => 'client_incident',
-            'client_medication_id' => 'medication',
         ] as $key => $type) {
             if (filled($context[$key] ?? null)) {
                 return [$type, $context[$key]];
@@ -315,6 +374,12 @@ class MedicationSignalService
             (array) ($signal->normalized_data ?? []),
             ['incident_id' => $incidentId],
         );
+        $signal->forceFill([
+            'normalized_data' => array_replace(
+                (array) $signal->normalized_data,
+                ['incident_id' => $incidentId],
+            ),
+        ])->saveQuietly();
 
         $alert->updateQuietly([
             'context' => array_replace($context, [

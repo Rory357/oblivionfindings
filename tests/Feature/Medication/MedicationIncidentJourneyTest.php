@@ -33,6 +33,69 @@ class MedicationIncidentJourneyTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_stable_event_identities_ignore_time_windows_while_condition_checks_remain_bucketed(): void
+    {
+        $keys = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            public function key(string $signalType, int $clientId, array $context): string
+            {
+                return $this->buildIdempotencyKey($signalType, $clientId, $context);
+            }
+        };
+        $beforeBoundary = '2026-07-13T10:29:59+12:00';
+        $afterBoundary = '2026-07-13T10:30:01+12:00';
+        $base = ['client_medication_id' => 41];
+
+        $this->assertSame(
+            $keys->key(MedicationSignalService::TYPE_ERROR, 7, $base + [
+                'medication_error_id' => 501,
+                'occurred_at' => $beforeBoundary,
+            ]),
+            $keys->key(MedicationSignalService::TYPE_ERROR, 7, $base + [
+                'medication_error_id' => 501,
+                'occurred_at' => $afterBoundary,
+            ]),
+        );
+        $this->assertNotSame(
+            $keys->key(MedicationSignalService::TYPE_ERROR, 7, $base + [
+                'medication_error_id' => 501,
+                'occurred_at' => $beforeBoundary,
+            ]),
+            $keys->key(MedicationSignalService::TYPE_ERROR, 7, $base + [
+                'medication_error_id' => 502,
+                'occurred_at' => $beforeBoundary,
+            ]),
+        );
+        $this->assertSame(
+            $keys->key(MedicationSignalService::TYPE_PRN_OVER_LIMIT, 7, $base + [
+                'prn_attempt_id' => 'attempt-a',
+                'occurred_at' => $beforeBoundary,
+            ]),
+            $keys->key(MedicationSignalService::TYPE_PRN_OVER_LIMIT, 7, $base + [
+                'prn_attempt_id' => 'attempt-a',
+                'occurred_at' => $afterBoundary,
+            ]),
+        );
+        $this->assertNotSame(
+            $keys->key(MedicationSignalService::TYPE_PRN_OVER_LIMIT, 7, $base + [
+                'prn_attempt_id' => 'attempt-a',
+                'occurred_at' => $beforeBoundary,
+            ]),
+            $keys->key(MedicationSignalService::TYPE_PRN_OVER_LIMIT, 7, $base + [
+                'prn_attempt_id' => 'attempt-b',
+                'occurred_at' => $beforeBoundary,
+            ]),
+        );
+        $this->assertNotSame(
+            $keys->key(MedicationSignalService::TYPE_OVERDUE, 7, $base + [
+                'occurred_at' => $beforeBoundary,
+            ]),
+            $keys->key(MedicationSignalService::TYPE_OVERDUE, 7, $base + [
+                'occurred_at' => $afterBoundary,
+            ]),
+        );
+    }
+
     public function test_distinct_medication_errors_on_one_incident_emit_distinct_retry_safe_signals(): void
     {
         [$actor, $client, $medication] = $this->medicationFixture();

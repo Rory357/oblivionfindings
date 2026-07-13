@@ -24,6 +24,8 @@ use InvalidArgumentException;
  */
 class SensorIncidentBridgeService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     public function __construct(
         private readonly IncidentJourneyService $journeys,
     ) {}
@@ -86,7 +88,7 @@ class SensorIncidentBridgeService
             ]);
 
             return $incident;
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     /**
@@ -141,7 +143,7 @@ class SensorIncidentBridgeService
                 'reason' => $reason,
                 'dismissed_by' => $operator->id,
             ]);
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     /**

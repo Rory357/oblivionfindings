@@ -35,6 +35,8 @@ use Illuminate\Support\Facades\Log;
 
 class SignalProcessingService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     private const INCIDENT_CORRELATION_CAPABILITY = 'incident_correlation';
 
     private const TRUSTED_INCIDENT_SOURCE_SLUGS = ['medication'];
@@ -151,6 +153,14 @@ class SignalProcessingService
                     $signal->markCorrelated($existingAlert);
                     $this->addSignalToAlert($signal, $existingAlert);
 
+                    $existingAlert = $this->journeys
+                        ->attachAlertToIncident($incident, $existingAlert->fresh())
+                        ->alert;
+
+                    if ($existingAlert === null) {
+                        throw new \RuntimeException('The canonical incident journey lost its operational alert.');
+                    }
+
                     return $existingAlert;
                 }
             }
@@ -179,7 +189,7 @@ class SignalProcessingService
 
             // Create new alert
             return $this->createAlertForSignal($signal, $rule, $incident);
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     private function createAlertForSignal(
@@ -391,7 +401,7 @@ class SignalProcessingService
             $query->where('site_id', $signal->site_id);
         }
 
-        return $query->latest('triggered_at')->first();
+        return $query->latest('triggered_at')->lockForUpdate()->first();
     }
 
     private function trustedIncidentForSignal(Signal $signal): ?ClientIncident
@@ -421,7 +431,6 @@ class SignalProcessingService
 
         $incident = ClientIncident::query()
             ->whereKey((int) $incidentId)
-            ->lockForUpdate()
             ->first();
 
         if ($incident === null
@@ -454,9 +463,7 @@ class SignalProcessingService
                 ->first();
 
             if ($direct !== null) {
-                return $this->journeys
-                    ->attachAlertToIncident($incident, $direct)
-                    ->alert;
+                return $direct;
             }
         }
 
@@ -480,11 +487,6 @@ class SignalProcessingService
         }
 
         $alert = $claims->first();
-        if ($alert !== null) {
-            $alert = $this->journeys
-                ->attachAlertToIncident($incident, $alert)
-                ->alert;
-        }
 
         return $alert;
     }

@@ -7,6 +7,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\User;
+use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Support\Arr;
@@ -58,6 +59,7 @@ class IncidentJourneyService
     public function __construct(
         private readonly HsEventService $hsEventService,
         private readonly ReferenceNumberGenerator $references,
+        private readonly IncidentAlertOperationalInitializer $alertOperations,
     ) {}
 
     /**
@@ -117,6 +119,7 @@ class IncidentJourneyService
             $alertReason = $alert === null
                 ? 'Automatic high-severity incident escalation'
                 : data_get($alert->context, 'reason');
+            $alertWasCreated = false;
 
             if ($alert === null && $this->requiresAutomaticAlert($lockedIncident)) {
                 $alertActor = $this->actorRequiredForAlert($lockedIncident, $actor);
@@ -125,6 +128,7 @@ class IncidentJourneyService
                     $alertActor,
                     $alertReason,
                 );
+                $alertWasCreated = true;
             }
 
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
@@ -135,6 +139,10 @@ class IncidentJourneyService
                 $actor,
                 $alert === null ? [] : $this->incidentAlertContext($lockedIncident, $alertReason),
             );
+
+            if ($alertWasCreated) {
+                $this->alertOperations->initialiseNewAlert($alert);
+            }
 
             return $this->freshJourney($lockedIncident, $alert, $hsEvent);
         }, self::TRANSACTION_ATTEMPTS);
@@ -149,16 +157,20 @@ class IncidentJourneyService
         ClientIncident $incident,
         User $actor,
         ?string $reason = null,
+        ?string $requestedSeverity = null,
     ): IncidentJourney {
-        return DB::transaction(function () use ($incident, $actor, $reason): IncidentJourney {
+        return DB::transaction(function () use ($incident, $actor, $reason, $requestedSeverity): IncidentJourney {
             $lockedIncident = $this->lockIncident($incident);
             $this->assertSubmitted($lockedIncident);
+            $this->applyRequestedSeverityFloor($lockedIncident, $requestedSeverity);
 
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
             $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
-            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent)
-                ?? $this->createIncidentAlert($lockedIncident, $actor, $reason);
+            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent);
+            $alertWasCreated = $alert === null;
+            $alert ??= $this->createIncidentAlert($lockedIncident, $actor, $reason);
 
+            $this->promoteAlertToIncidentFloor($lockedIncident, $alert);
             $this->adoptExplicitIncidentReason($alert, $reason);
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
             $this->linkJourney(
@@ -168,6 +180,10 @@ class IncidentJourneyService
                 $actor,
                 $this->incidentAlertContext($lockedIncident, $reason),
             );
+
+            if ($alertWasCreated) {
+                $this->alertOperations->initialiseNewAlert($alert);
+            }
 
             return $this->freshJourney($lockedIncident, $alert, $hsEvent);
         }, self::TRANSACTION_ATTEMPTS);
@@ -186,11 +202,11 @@ class IncidentJourneyService
         ?User $actor = null,
     ): IncidentJourney {
         return DB::transaction(function () use ($incident, $alert, $actor): IncidentJourney {
-            $lockedIncident = $this->lockIncident($incident);
             $lockedAlert = ControlRoomAlert::query()
                 ->whereKey($alert->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+            $lockedIncident = $this->lockIncident($incident);
 
             if ($lockedIncident->status === 'draft') {
                 $this->assertDraftAlertLinkDoesNotConflict($lockedIncident, $lockedAlert);
@@ -206,7 +222,7 @@ class IncidentJourneyService
 
             $this->assertSubmitted($lockedIncident);
             $this->assertAlertMatchesIncident($lockedIncident, $lockedAlert);
-            $this->stampAlertProvenance($lockedIncident, $lockedAlert);
+            $this->promoteAlertToIncidentFloor($lockedIncident, $lockedAlert);
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
             $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $lockedAlert, $hsEvent);
@@ -643,6 +659,37 @@ class IncidentJourneyService
         $alert->forceFill(['context' => $context])->saveQuietly();
     }
 
+    private function applyRequestedSeverityFloor(
+        ClientIncident $incident,
+        ?string $requestedSeverity,
+    ): void {
+        if ($requestedSeverity === null || trim($requestedSeverity) === '') {
+            return;
+        }
+
+        $metadata = is_array($incident->metadata) ? $incident->metadata : [];
+        $journey = is_array($metadata['journey'] ?? null) ? $metadata['journey'] : [];
+        $journey['original_alert_severity'] = $this->higherSeverity(
+            $this->hsSeverity($incident),
+            HsEventService::normaliseSeverity($requestedSeverity),
+        );
+        $metadata['journey'] = $journey;
+
+        $incident->forceFill(['metadata' => $metadata])->saveQuietly();
+    }
+
+    private function promoteAlertToIncidentFloor(
+        ClientIncident $incident,
+        ControlRoomAlert $alert,
+    ): void {
+        $severity = $this->higherSeverity($alert->severity, $this->alertSeverity($incident));
+        if ($severity !== $alert->severity) {
+            $alert->forceFill(['severity' => $severity])->saveQuietly();
+        }
+
+        $this->stampAlertProvenance($incident, $alert);
+    }
+
     private function stampAlertProvenance(ClientIncident $incident, ControlRoomAlert $alert): void
     {
         $metadata = is_array($incident->metadata) ? $incident->metadata : [];
@@ -795,7 +842,11 @@ class IncidentJourneyService
             'incident_id' => $incident->id,
             'type' => $incident->type,
             'incident_type' => $incident->type,
+            'shift_id' => $incident->shift_id,
+            'site_id' => $this->incidentSiteId($incident),
+            'occurred_at' => $incident->occurred_at?->toIso8601String(),
             'description' => $incident->description,
+            'reported_by' => $incident->reported_by,
             'reason' => $reason,
             'provenance' => [
                 'source' => 'incident_journey',
@@ -902,11 +953,16 @@ class IncidentJourneyService
     private function hsSeverity(ClientIncident $incident): string
     {
         $originalAlertSeverity = data_get($incident->metadata, 'journey.original_alert_severity');
-        if ($originalAlertSeverity === HsEvent::SEVERITY_CRITICAL) {
-            return HsEvent::SEVERITY_CRITICAL;
+        $incidentSeverity = HsEventService::normaliseSeverity((string) $incident->severity);
+
+        if (! is_string($originalAlertSeverity) || trim($originalAlertSeverity) === '') {
+            return $incidentSeverity;
         }
 
-        return HsEventService::normaliseSeverity((string) $incident->severity);
+        return $this->higherSeverity(
+            $incidentSeverity,
+            HsEventService::normaliseSeverity($originalAlertSeverity),
+        );
     }
 
     private function alertSeverity(ClientIncident $incident): string

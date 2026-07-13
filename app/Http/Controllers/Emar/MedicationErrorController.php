@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -206,7 +208,7 @@ class MedicationErrorController extends Controller
             $error = MedicationError::create($errorAttributes);
 
             app(MedicationSignalService::class)->emitError($error);
-        });
+        }, 3);
 
         return redirect()->back()->with('success', 'Medication error reported successfully.');
     }
@@ -305,29 +307,55 @@ class MedicationErrorController extends Controller
      */
     public function linkIncident(Request $request, MedicationError $error)
     {
-        if ($error->client_incident_id) {
-            return redirect()->route('incidents.show', $error->client_incident_id);
-        }
+        $incidentId = DB::transaction(function () use ($request, $error): int {
+            $lockedError = MedicationError::query()
+                ->whereKey($error->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $incident = ClientIncident::create([
-            'client_id' => $error->client_id,
-            'title' => 'Medication Error: '.str_replace('_', ' ', (string) $error->error_type),
-            'description' => $error->description ?: 'Linked from medication error '.$error->id.'.',
-            'occurred_at' => $error->reported_at ?? now(),
-            'reported_by' => $request->user()->id,
-            'severity' => match ($error->severity) {
-                'critical' => 'critical',
-                'major' => 'high',
-                'moderate' => 'medium',
-                default => 'low',
-            },
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'type' => 'medication_error',
-        ]);
+            if ($lockedError->client_incident_id !== null) {
+                return (int) $lockedError->client_incident_id;
+            }
 
-        $error->update(['client_incident_id' => $incident->id]);
+            $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
+                'client_id' => $lockedError->client_id,
+                'title' => 'Medication Error: '.str_replace('_', ' ', (string) $lockedError->error_type),
+                'description' => $lockedError->description ?: 'Linked from medication error '.$lockedError->id.'.',
+                'occurred_at' => $lockedError->reported_at ?? now(),
+                'reported_by' => $request->user()->id,
+                'severity' => match ($lockedError->severity) {
+                    'critical' => 'critical',
+                    'major' => 'high',
+                    'moderate' => 'medium',
+                    default => 'low',
+                },
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'type' => 'medication_error',
+            ]));
 
-        return redirect()->route('incidents.show', $incident);
+            $lockedError->forceFill(['client_incident_id' => $incident->id])->save();
+            $linkedError = $lockedError->fresh();
+            $signals = app(MedicationSignalService::class);
+            $signals->emitError($linkedError);
+            $existingAlert = $signals->attachExistingErrorSignalToIncident($linkedError);
+            $journeys = app(IncidentJourneyService::class);
+            $journey = $existingAlert === null
+                ? $journeys->ensureForSubmittedIncident($incident, $request->user())
+                : $journeys->attachAlertToIncident($incident, $existingAlert, $request->user());
+            app(TimelineEmitter::class)->project($journey->incident);
+
+            $createdIncidentId = (int) $journey->incident->id;
+            DB::afterCommit(function () use ($createdIncidentId): void {
+                $committedIncident = ClientIncident::query()->find($createdIncidentId);
+                if ($committedIncident !== null) {
+                    app(IncidentEscalationService::class)->escalateClientIncident($committedIncident);
+                }
+            });
+
+            return $createdIncidentId;
+        }, 3);
+
+        return redirect()->route('incidents.show', $incidentId);
     }
 }

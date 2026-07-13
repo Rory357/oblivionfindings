@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\SafeguardingConcern;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\GovernanceTestHelpers;
 use Tests\TestCase;
 
@@ -68,18 +69,37 @@ class GovernanceCrossModuleEscalationTest extends TestCase
     {
         $reporter = $this->createAdminUser();
         $client = Client::factory()->create();
-        $incident = ClientIncident::factory()->create([
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'client_id' => $client->id,
             'reported_by' => $reporter->id,
             'severity' => 'critical',
             'status' => 'submitted',
-        ]);
+        ]));
 
         $service = app(IncidentEscalationService::class);
+        DB::enableQueryLog();
         $service->escalateClientIncident($incident);
         $service->escalateClientIncident($incident);
 
         $this->assertSame(1, IncidentGovernanceEscalation::query()->where('client_incident_id', $incident->id)->count());
+        $lockQueries = collect(DB::getQueryLog())->filter(
+            fn (array $query): bool => str_contains(strtolower($query['query']), 'client_incidents')
+                && str_contains(strtolower($query['query']), 'for update'),
+        );
+        $this->assertCount(2, $lockQueries, 'Every governance escalation attempt must serialize on the incident row.');
+    }
+
+    public function test_escalation_failure_is_not_masked_by_unavailable_reason_context(): void
+    {
+        $missingIncident = new ClientIncident;
+        $missingIncident->forceFill([
+            'id' => 999_999_999,
+            'severity' => 'critical',
+        ]);
+
+        $this->assertNull(
+            app(IncidentEscalationService::class)->escalateClientIncident($missingIncident),
+        );
     }
 
     public function test_critical_safeguarding_concern_creates_notifiable_incident(): void

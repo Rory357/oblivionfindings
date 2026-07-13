@@ -15,8 +15,10 @@ use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class SignalProcessingServiceTest extends TestCase
@@ -446,6 +448,71 @@ class SignalProcessingServiceTest extends TestCase
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 1);
         $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    public function test_critical_trusted_signal_promotes_the_complete_existing_medium_journey(): void
+    {
+        $actor = User::factory()->create();
+        $client = Client::factory()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'reported_by' => $actor->id,
+            'status' => 'submitted',
+            'submitted_at' => now()->subMinute(),
+            'severity' => 'medium',
+            'control_room_alert_id' => null,
+            'hs_event_id' => null,
+        ]));
+        $journey = app(IncidentJourneyService::class)
+            ->ensureAlertForIncident($incident, $actor, 'Initial medium escalation');
+        $alert = $journey->alert;
+        $event = $journey->hsEvent;
+        $event->updateQuietly([
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_reference' => 'WS-CANONICAL-CRITICAL',
+        ]);
+        $incident->updateQuietly([
+            'worksafe_notification_status' => HsEvent::WORKSAFE_PENDING,
+            'worksafe_reference' => 'WS-STALE',
+        ]);
+        $source = $this->medicationIncidentSource();
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'medication.incident',
+            'idempotency_key' => 'critical-existing-medium-journey',
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $incident->id],
+            'severity_hint' => 'critical',
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+        DB::enableQueryLog();
+
+        $result = $this->service->process($signal);
+        $journeyLocks = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $query): bool => str_contains(strtolower($query), 'for update'))
+            ->filter(fn (string $query): bool => str_contains($query, 'control_room_alerts')
+                || str_contains($query, 'client_incidents'))
+            ->values();
+
+        $this->assertTrue($result->is($alert));
+        $this->assertStringContainsString('control_room_alerts', $journeyLocks->first() ?? '');
+        $this->assertTrue(
+            $journeyLocks->contains(fn (string $query): bool => str_contains($query, 'client_incidents')),
+            'The canonical attach must re-lock and revalidate the incident after the alert lock.',
+        );
+        $this->assertSame('critical', $alert->fresh()->severity);
+        $this->assertSame('critical', $event->fresh()->severity);
+        $this->assertSame('critical', data_get($incident->fresh()->metadata, 'journey.original_alert_severity'));
+        $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $event->fresh()->handover_status);
+        $this->assertSame(HsEvent::WORKSAFE_ACKNOWLEDGED, $event->fresh()->worksafe_status);
+        $this->assertSame('WS-CANONICAL-CRITICAL', $event->fresh()->worksafe_reference);
+        $this->assertSame($alert->id, $signal->fresh()->correlated_alert_id);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
     }
 
     public function test_direct_incident_alert_with_a_different_client_is_rejected_without_correlation(): void

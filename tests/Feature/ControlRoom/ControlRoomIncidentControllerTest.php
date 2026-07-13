@@ -182,6 +182,87 @@ class ControlRoomIncidentControllerTest extends TestCase
         $this->assertSame('high', $hsEvent->severity);
     }
 
+    public function test_create_alert_from_low_incident_honours_a_critical_operator_escalation(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = ClientIncident::create([
+            'client_id' => $client->id,
+            'reported_by' => $this->admin->id,
+            'title' => 'Low incident requiring urgent review',
+            'type' => 'injury',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'occurred_at' => now()->subHour(),
+            'description' => 'The operator has identified critical escalation evidence.',
+        ]);
+
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('hs_events', 1);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/create-alert', [
+                'source_type' => 'client_incident',
+                'source_id' => $incident->id,
+                'severity' => 'critical',
+                'notes' => 'Operator identified a critical escalation.',
+            ])
+            ->assertRedirect();
+
+        $incident->refresh();
+        $alert = ControlRoomAlert::query()->sole();
+        $hsEvent = HsEvent::query()->sole();
+
+        $this->assertSame('low', $incident->severity);
+        $this->assertSame('critical', $alert->severity);
+        $this->assertSame('critical', $hsEvent->severity);
+        $this->assertSame('critical', data_get($incident->metadata, 'journey.original_alert_severity'));
+        $this->assertSame('incident', data_get($incident->metadata, 'journey.original_alert_source'));
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
+    public function test_requested_incident_alert_severity_is_monotonic_below_critical(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = ClientIncident::create([
+            'client_id' => $client->id,
+            'reported_by' => $this->admin->id,
+            'title' => 'Low incident requiring elevated review',
+            'type' => 'injury',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'occurred_at' => now()->subHour(),
+            'description' => 'The operator has identified high-severity evidence.',
+        ]);
+
+        foreach (['high', 'medium'] as $requestedSeverity) {
+            $this->actingAs($this->admin)
+                ->post('/control-room/incidents/create-alert', [
+                    'source_type' => 'client_incident',
+                    'source_id' => $incident->id,
+                    'severity' => $requestedSeverity,
+                    'notes' => 'Operator requested elevated review.',
+                ])
+                ->assertRedirect();
+        }
+
+        $incident->refresh();
+        $alert = ControlRoomAlert::query()->sole();
+        $hsEvent = HsEvent::query()->sole();
+
+        $this->assertSame('low', $incident->severity);
+        $this->assertSame('high', $alert->severity);
+        $this->assertSame('high', $hsEvent->severity);
+        $this->assertSame('high', data_get($incident->metadata, 'journey.original_alert_severity'));
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
     public function test_flag_as_incident_requires_create_permission(): void
     {
         $client = Client::factory()->create();

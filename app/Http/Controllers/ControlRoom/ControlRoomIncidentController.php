@@ -333,6 +333,7 @@ class ControlRoomIncidentController extends Controller
                 $source,
                 $user,
                 $data['notes'] ?? null,
+                $data['severity'],
             );
             $alert = $journey->alert;
 

@@ -104,19 +104,6 @@ class ComprehensiveAlertBridgeService
             return null;
         }
 
-        $context = array_replace_recursive([
-            'incident_id' => $incident->id,
-            'incident_type' => $incident->type,
-            'shift_id' => $incident->shift_id,
-            'site_id' => $incident->site_id ?? $incident->client?->site_id,
-            'occurred_at' => $incident->occurred_at?->toIso8601String(),
-            'description' => $incident->description,
-            'reported_by' => $incident->reported_by,
-        ], (array) $alert->context, [
-            'incident_id' => $incident->id,
-        ]);
-        $alert->updateQuietly(['context' => $context]);
-
         return $alert->fresh();
     }
 
