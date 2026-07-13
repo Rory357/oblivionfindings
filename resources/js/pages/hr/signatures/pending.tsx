@@ -12,6 +12,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Eye, PenSquare, PenTool } from 'lucide-react';
@@ -54,13 +55,16 @@ const statusConfig: Record<string, { className: string; label: string }> = {
 };
 
 export default function PendingSignatures({ signatures }: Props) {
-    const pendingCount = signatures.filter((s) => s.status === 'pending').length;
+    const pendingCount = signatures.filter(
+        (s) => s.status === 'pending',
+    ).length;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Pending Signatures" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={PenSquare}
                         title="Documents Awaiting Signature"
                         description="Review and sign documents that require your signature."
@@ -102,7 +106,9 @@ export default function PendingSignatures({ signatures }: Props) {
                                                 {sig.requested_by}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {sig.requested_at}
+                                                {formatDateTimeLong(
+                                                    sig.requested_at,
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
