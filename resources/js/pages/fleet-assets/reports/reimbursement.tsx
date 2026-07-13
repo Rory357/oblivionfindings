@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
+import { formatDateForFilename } from '@/lib/datetime';
 import { Head } from '@inertiajs/react';
 import { Calculator, DollarSign, Download, MapPin, Receipt, Users } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -53,7 +54,7 @@ export default function MileageReimbursement() {
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url;
-        a.download = `mileage-reimbursement-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `mileage-reimbursement-${formatDateForFilename(new Date())}.csv`;
         a.click(); URL.revokeObjectURL(url);
     };
 

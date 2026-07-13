@@ -20,6 +20,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/datetime';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -344,7 +345,7 @@ export function WorkOrderCreateWizard({
                                         {checklistRuns.map((run) => (
                                             <SelectItem key={run.id} value={String(run.id)}>
                                                 {run.template_name} - {run.asset_name}
-                                                {run.run_at ? ` (${new Date(run.run_at).toLocaleDateString()})` : ''}
+                                                {run.run_at ? ` (${formatDate(run.run_at)})` : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

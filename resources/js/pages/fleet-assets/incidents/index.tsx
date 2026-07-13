@@ -25,7 +25,7 @@ import {
 import { FleetIncidentDialog, type FleetIncidentDetail } from '@/components/fleet/fleet-incident-dialog';
 import { FleetIncidentReportDialog, type ReportMode } from '@/components/fleet/fleet-incident-report-dialog';
 import { FleetTelematicsStoryboard } from '@/components/fleet/fleet-telematics-storyboard';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, toDateInput } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import {
@@ -175,12 +175,12 @@ function titleCase(s: string): string {
 /* date helpers (browser-local) */
 const todayStr = () => {
     const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return toDateInput(d);
 };
 const daysAgoStr = (n: number) => {
     const d = new Date();
     d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return toDateInput(d);
 };
 
 /* ------------------------------------------------------------------ */

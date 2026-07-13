@@ -375,7 +375,7 @@ export default function VehicleShow({
                                     {(bookings ?? []).slice(0, 4).map((b) => (
                                         <Link key={String(b.id ?? '')} href={`/fleet-assets/bookings/${b.id}`} className="block rounded border p-1.5 text-[10px] hover:bg-muted/50">
                                             <div className="font-medium">{String(b.purpose ?? b.notes ?? 'Booking')}</div>
-                                            <div className="text-muted-foreground">{b.start_at ? new Date(String(b.start_at)).toLocaleDateString() : '---'}</div>
+                                            <div className="text-muted-foreground">{formatDate(b.start_at ? String(b.start_at) : null)}</div>
                                         </Link>
                                     ))}
                                 </div>
@@ -597,7 +597,7 @@ export default function VehicleShow({
                         <CardContent className="space-y-1.5 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Provider</span><span className="font-medium">{(vehicle as Record<string, unknown>).insurance_provider ? String((vehicle as Record<string, unknown>).insurance_provider) : '---'}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Policy #</span><span className="font-medium font-mono">{(vehicle as Record<string, unknown>).insurance_policy_number ? String((vehicle as Record<string, unknown>).insurance_policy_number) : '---'}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Expires</span><span className="font-medium">{(vehicle as Record<string, unknown>).insurance_expires_at ? new Date(String((vehicle as Record<string, unknown>).insurance_expires_at)).toLocaleDateString() : '---'}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Expires</span><span className="font-medium">{formatDate((vehicle as Record<string, unknown>).insurance_expires_at ? String((vehicle as Record<string, unknown>).insurance_expires_at) : null)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="font-medium capitalize">{(vehicle as Record<string, unknown>).insurance_type ? String((vehicle as Record<string, unknown>).insurance_type).replace(/_/g, ' ') : '---'}</span></div>
                         </CardContent>
                     </Card>

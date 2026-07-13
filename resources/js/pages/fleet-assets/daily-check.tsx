@@ -21,6 +21,7 @@ import {
     Clock,
 } from 'lucide-react';
 import { useState } from 'react';
+import { formatTime } from '@/lib/datetime';
 
 type Vehicle = {
     id: number;
@@ -200,7 +201,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                                 </div>
                                                 {vehicle.checked_today && (
                                                     <div className="mt-0.5 text-xs text-muted-foreground">
-                                                        Checked {vehicle.checked_at ? new Date(vehicle.checked_at).toLocaleTimeString() : ''}
+                                                        Checked {formatTime(vehicle.checked_at, '')}
                                                         {vehicle.checked_by && ` by ${vehicle.checked_by}`}
                                                         {vehicle.check_notes && ` - ${vehicle.check_notes}`}
                                                     </div>

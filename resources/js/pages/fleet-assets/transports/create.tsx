@@ -21,6 +21,7 @@ import {
     type MedicationScanCapture,
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
+import { toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
 import {
@@ -172,7 +173,7 @@ export function TransportWizard({
         transport_type: '',
         pickup_location: '',
         dropoff_location: '',
-        departed_at: new Date().toISOString().slice(0, 16),
+        departed_at: toDatetimeLocal(new Date()),
         passengers_count: '1',
         supervisor_name: '',
         notes: '',

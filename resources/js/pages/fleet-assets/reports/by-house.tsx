@@ -11,6 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Building2, Calendar, Car, Fuel, Route, Truck, Users } from 'lucide-react';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
+import { toDateInput } from '@/lib/datetime';
 
 
 type HouseSummary = {
@@ -39,7 +40,7 @@ export default function ReportByHouse({
     const summaries = rawSummaries ?? [];
     const details = rawDetails ?? [];
     const months = available_months ?? [];
-    const currentMonth = selected_month ?? new Date().toISOString().slice(0, 7);
+    const currentMonth = selected_month ?? toDateInput(new Date()).slice(0, 7);
     const selectedSummary = summaries.find((s) => s.id === selected_house_id);
 
     const handleHouseChange = (value: string) => {

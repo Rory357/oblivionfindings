@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatDate as formatDateStr } from '@/lib/fleet-utils';
+import { formatDate as formatWorkerDate, toDateInput } from '@/lib/datetime';
 import {
     BookVehicleWizard,
     type BookingConflict,
@@ -93,9 +94,9 @@ function getMonday(d: Date): Date {
     date.setDate(diff); date.setHours(0, 0, 0, 0); return date;
 }
 function addDays(d: Date, n: number): Date { const date = new Date(d); date.setDate(date.getDate() + n); return date; }
-function formatDate(d: Date): string { return d.toISOString().split('T')[0]; }
-function formatShortDay(d: Date): string { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
-function isSameDay(a: Date, b: Date): boolean { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+function formatDate(d: Date): string { return toDateInput(d); }
+function formatShortDay(d: Date): string { return formatWorkerDate(d); }
+function isSameDay(a: Date, b: Date): boolean { return toDateInput(a) === toDateInput(b); }
 
 function BookingCalendar({ bookings, vehicles, weekStart, onWeekChange }: {
     bookings: Booking[]; vehicles: Vehicle[]; weekStart: Date; onWeekChange: (s: string) => void;
@@ -138,8 +139,7 @@ function BookingCalendar({ bookings, vehicles, weekStart, onWeekChange }: {
                         <div className="border-r px-3 py-2 text-xs font-medium text-muted-foreground">Vehicle</div>
                         {days.map((day, i) => (
                             <div key={i} className={`border-r px-2 py-2 text-center text-xs font-medium last:border-r-0 ${isSameDay(day, today) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}>
-                                <div>{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                                <div className="text-[11px]">{day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                                <div>{formatWorkerDate(day)}</div>
                             </div>
                         ))}
                     </div>

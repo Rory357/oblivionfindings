@@ -45,7 +45,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { formatCurrency, formatRelativeTime, severityVariant } from '@/lib/fleet-utils';
+import { formatCurrency, formatRelativeTime, formatTime, severityVariant } from '@/lib/fleet-utils';
 
 
 /* ------------------------------------------------------------------ */
@@ -524,7 +524,7 @@ export default function FleetAssetsDashboard({
                             <HeroStatusPill>
                                 Fleet command · updated{' '}
                                 <span aria-live="polite">
-                                    {lastUpdated.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                                    {formatTime(lastUpdated.toISOString())}
                                 </span>
                                 {isRefreshing && (
                                     <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
@@ -912,7 +912,7 @@ export default function FleetAssetsDashboard({
                                         <div className="flex items-center gap-2 text-muted-foreground">
                                             {outing.asset && <span>{outing.asset.name}</span>}
                                             {outing.resident_count > 0 && <span>{outing.resident_count} resident{outing.resident_count !== 1 ? 's' : ''}</span>}
-                                            {outing.planned_departure && <span>{new Date(outing.planned_departure).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}</span>}
+                                            {outing.planned_departure && <span>{formatTime(outing.planned_departure)}</span>}
                                         </div>
                                     </Link>
                                 ))}

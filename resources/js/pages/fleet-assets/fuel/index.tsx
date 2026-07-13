@@ -27,6 +27,7 @@ import {
     formatDate,
     formatDistance,
 } from '@/lib/fleet-utils';
+import { toDateInput } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
@@ -153,12 +154,12 @@ export default function FuelIndex({
     const localDay = (offset = 0) => {
         const d = new Date();
         d.setDate(d.getDate() - offset);
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        return toDateInput(d);
     };
     const monthStartStr = () => {
         const d = new Date();
         d.setDate(1);
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        return toDateInput(d);
     };
     const monthHref = `/fleet-assets/fuel?date_from=${monthStartStr()}`;
     const last30Href = `/fleet-assets/fuel?date_from=${localDay(30)}`;
@@ -211,7 +212,7 @@ export default function FuelIndex({
 
     const form = useForm({
         asset_id: '',
-        logged_at: new Date().toISOString().split('T')[0],
+        logged_at: toDateInput(new Date()),
         odometer_km: '',
         quantity_litres: '',
         total_cost: '',

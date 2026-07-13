@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { formatCurrency, formatDate, formatDistance, statusColor } from '@/lib/fleet-utils';
+import { toDateInput } from '@/lib/datetime';
 
 type PersonalTrip = {
     id: number;
@@ -154,7 +155,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
     const localDay = (offset = 0) => {
         const d = new Date();
         d.setDate(d.getDate() - offset);
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        return toDateInput(d);
     };
     const last30Href = `/fleet-assets/mileage?date_from=${localDay(30)}`;
 
@@ -548,7 +549,7 @@ function MileageClaimWizard({
     const [submitted, setSubmitted] = useState(false);
 
     const form = useForm({
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateInput(new Date()),
         start_location: '',
         end_location: '',
         distance_km: '',

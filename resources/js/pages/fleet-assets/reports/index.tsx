@@ -38,7 +38,7 @@ import {
     Users,
     Wrench,
 } from 'lucide-react';
-import { formatCurrency, formatDistance } from '@/lib/fleet-utils';
+import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
 
 
 type UtilizationRow = {
@@ -675,7 +675,7 @@ export default function FleetReports({
                                                     <td className="py-2 pr-3 text-right">{r.transport_count}</td>
                                                     <td className="py-2 pr-3 text-right">{r.per_week}</td>
                                                     <td className="py-2 text-right text-muted-foreground">
-                                                        {r.last_transport ? new Date(r.last_transport).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—'}
+                                                        {r.last_transport ? formatDate(r.last_transport) : '—'}
                                                     </td>
                                                 </tr>
                                             ))}

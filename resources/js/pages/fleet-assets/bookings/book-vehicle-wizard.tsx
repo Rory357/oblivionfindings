@@ -23,6 +23,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDate, formatDateTime } from '@/lib/fleet-utils';
+import { toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -124,17 +125,17 @@ function AvailabilityCalendar({ bookings, selectedStart, selectedEnd }: {
     for (let i = 0; i < firstDay; i++) days.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month, d);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = toDateInput(date);
 
         const dayBookings = bookings.filter(b => {
             if (!b.starts_at || !b.ends_at) return false;
-            const start = new Date(b.starts_at).toISOString().split('T')[0];
-            const end = new Date(b.ends_at).toISOString().split('T')[0];
+            const start = toDateInput(b.starts_at);
+            const end = toDateInput(b.ends_at);
             return dateStr >= start && dateStr <= end;
         });
 
         const isSelected = !!(selectedStart && selectedEnd && dateStr >= selectedStart.split('T')[0] && dateStr <= selectedEnd.split('T')[0]);
-        const isToday = dateStr === new Date().toISOString().split('T')[0];
+        const isToday = dateStr === toDateInput(new Date());
 
         days.push({ day: d, bookings: dayBookings, isSelected, isToday, date: dateStr });
     }

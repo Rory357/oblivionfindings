@@ -3,6 +3,13 @@
  * Formatting, badge helpers, and color constants for consistent display.
  */
 
+import {
+    formatDate as formatWorkerDate,
+    formatDateTime as formatWorkerDateTime,
+    formatRelative as formatWorkerRelative,
+    formatTime as formatWorkerTime,
+} from './datetime';
+
 /* ------------------------------------------------------------------ */
 /*  Number & Currency Formatting                                       */
 /* ------------------------------------------------------------------ */
@@ -55,46 +62,19 @@ export function formatDurationMinutes(minutes: number | null | undefined): strin
 /* ------------------------------------------------------------------ */
 
 export function formatDate(isoDate: string | null | undefined): string {
-    if (!isoDate) return '---';
-    try {
-        return new Date(isoDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch { return '---'; }
+    return formatWorkerDate(isoDate, '---');
 }
 
 export function formatDateTime(isoDate: string | null | undefined): string {
-    if (!isoDate) return '---';
-    try {
-        return new Date(isoDate).toLocaleDateString('en-NZ', {
-            day: 'numeric', month: 'short', year: 'numeric',
-            hour: 'numeric', minute: '2-digit', hour12: true,
-        });
-    } catch { return '---'; }
+    return formatWorkerDateTime(isoDate, '---');
 }
 
 export function formatTime(isoDate: string | null | undefined): string {
-    if (!isoDate) return '---';
-    try {
-        return new Date(isoDate).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true });
-    } catch { return '---'; }
+    return formatWorkerTime(isoDate, '---');
 }
 
 export function formatRelativeTime(isoDate: string | null | undefined): string {
-    if (!isoDate) return '---';
-    try {
-        const now = Date.now();
-        const then = new Date(isoDate).getTime();
-        const diffSec = Math.floor((now - then) / 1000);
-        if (diffSec < 0) return 'just now';
-        if (diffSec < 60) return 'just now';
-        const mins = Math.floor(diffSec / 60);
-        if (mins < 60) return `${mins}m ago`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
-        const days = Math.floor(hrs / 24);
-        if (days < 7) return `${days}d ago`;
-        if (days < 30) return `${Math.floor(days / 7)}w ago`;
-        return formatDate(isoDate);
-    } catch { return '---'; }
+    return formatWorkerRelative(isoDate, Date.now(), '---');
 }
 
 /* ------------------------------------------------------------------ */

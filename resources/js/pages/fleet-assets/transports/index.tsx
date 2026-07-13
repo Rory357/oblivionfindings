@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDuration } from '@/lib/fleet-utils';
+import { formatDate, formatDuration, formatTime } from '@/lib/fleet-utils';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Car,
@@ -471,15 +471,7 @@ export default function TransportsIndex({
                                             <br />
                                             <span className="text-xs text-muted-foreground">
                                                 {t.departed_at
-                                                    ? new Date(
-                                                          t.departed_at,
-                                                      ).toLocaleTimeString(
-                                                          'en-NZ',
-                                                          {
-                                                              hour: '2-digit',
-                                                              minute: '2-digit',
-                                                          },
-                                                      )
+                                                    ? formatTime(t.departed_at)
                                                     : ''}
                                             </span>
                                         </td>

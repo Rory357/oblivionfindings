@@ -32,7 +32,9 @@ import {
     formatDateTime,
     formatDistance,
     formatDuration,
+    formatTime,
 } from '@/lib/fleet-utils';
+import { toDateInput } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -185,7 +187,7 @@ export default function TripsIndex({
     const localDay = (offset = 0) => {
         const d = new Date();
         d.setDate(d.getDate() - offset);
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        return toDateInput(d);
     };
     const todayHref = `/fleet-assets/trips?date_from=${localDay()}&date_to=${localDay()}`;
     const weekHref = `/fleet-assets/trips?date_from=${localDay(7)}`;
@@ -832,17 +834,9 @@ function TripRow({
                                                             {seg.seq ?? i + 1}
                                                         </div>
                                                         <div className="text-muted-foreground">
-                                                            {seg.started_at
-                                                                ? new Date(
-                                                                      seg.started_at,
-                                                                  ).toLocaleTimeString()
-                                                                : '---'}
+                                                            {formatTime(seg.started_at)}
                                                             {' - '}
-                                                            {seg.ended_at
-                                                                ? new Date(
-                                                                      seg.ended_at,
-                                                                  ).toLocaleTimeString()
-                                                                : '---'}
+                                                            {formatTime(seg.ended_at)}
                                                         </div>
                                                         <div className="text-muted-foreground">
                                                             {formatDistance(

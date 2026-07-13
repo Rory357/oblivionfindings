@@ -33,6 +33,49 @@ function toDate(value: DateInput): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function dateParts(value: Date): Record<string, string> {
+    return Object.fromEntries(
+        new Intl.DateTimeFormat(WORKER_LOCALE, {
+            timeZone: WORKER_TIMEZONE,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        })
+            .formatToParts(value)
+            .map((part) => [part.type, part.value]),
+    );
+}
+
+/** "2026-07-13" — the Auckland calendar date for an HTML date input. */
+export function toDateInput(value: DateInput): string {
+    const date = toDate(value);
+    if (!date) return '';
+    const parts = dateParts(date);
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/** "July 2026" — month heading for Fleet calendars and reports. */
+export function formatMonthYear(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
+    const date = toDate(value);
+    if (!date) return fallback;
+    return date.toLocaleDateString(WORKER_LOCALE, {
+        timeZone: WORKER_TIMEZONE,
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+/** "2026-07-13" — filesystem-safe Auckland date for generated exports. */
+export function formatDateForFilename(
+    value: DateInput,
+    fallback = 'unknown-date',
+): string {
+    return toDateInput(value) || fallback;
+}
+
 /**
  * "Fri 17 Apr" — short weekday, day, short month. No year (workers are in
  * the now; year appears only when explicitly needed elsewhere).

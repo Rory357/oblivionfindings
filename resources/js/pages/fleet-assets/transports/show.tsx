@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
+import { toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -181,7 +182,7 @@ export default function TransportShow({
     const [returningLog, setReturningLog] = useState<TransitLog | null>(null);
 
     const completeForm = useForm({
-        arrived_at: new Date().toISOString().slice(0, 16),
+        arrived_at: toDatetimeLocal(new Date()),
         notes: '',
     });
 
