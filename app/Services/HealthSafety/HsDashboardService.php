@@ -2,8 +2,8 @@
 
 namespace App\Services\HealthSafety;
 
-use App\Domain\Governance\Models\NotifiableIncident;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Models\ClientIncident;
 use App\Models\EmergencyDrill;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
@@ -14,6 +14,8 @@ use App\Models\PpeInventory;
 use App\Models\SafetyDataSheet;
 use App\Models\Site;
 use App\Models\SiteHazard;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -28,39 +30,63 @@ use Illuminate\Support\Facades\DB;
  */
 class HsDashboardService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /* ------------------------------------------------------------------ */
-    /*  Event KPIs                                                         */
+    /*  Event KPIs */
     /* ------------------------------------------------------------------ */
 
     /**
      * Core H&S KPIs powered by the HsEvent backbone.
      */
-    public function getEventKpis(?Carbon $since = null): array
-    {
+    public function getEventKpis(
+        ?Carbon $since = null,
+        ?int $siteId = null,
+        ?User $viewer = null,
+    ): array {
         $since = $since ?? now()->subDays(30);
+        $base = $this->hsEventQuery($siteId, $viewer);
 
         return [
-            'open_events' => HsEvent::open()->count(),
-            'open_events_high_critical' => HsEvent::open()->highOrCritical()->count(),
-            'events_period' => HsEvent::where('reported_at', '>=', $since)->count(),
-            'events_by_category' => HsEvent::where('reported_at', '>=', $since)
+            'open_events' => (clone $base)->open()->count(),
+            'open_events_high_critical' => (clone $base)->open()->highOrCritical()->count(),
+            'events_period' => (clone $base)->where('reported_at', '>=', $since)->count(),
+            'events_by_category' => (clone $base)->where('reported_at', '>=', $since)
                 ->select('event_category', DB::raw('COUNT(*) as count'))
                 ->groupBy('event_category')
                 ->pluck('count', 'event_category')
                 ->toArray(),
-            'events_by_severity' => HsEvent::open()
+            'events_by_severity' => (clone $base)->open()
                 ->select('severity', DB::raw('COUNT(*) as count'))
                 ->groupBy('severity')
                 ->pluck('count', 'severity')
                 ->toArray(),
-            'worksafe_notifiable_open' => HsEvent::open()
+            'worksafe_notifiable_open' => (clone $base)->open()
                 ->worksafeNotifiable()
+                ->count(),
+            // WorkSafe is an independent lifecycle: a legacy closed governance
+            // event with pending notification remains actionable and countable.
+            'worksafe_pending' => (clone $base)
+                ->worksafeNotifiable()
+                ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
+                ->count(),
+            // Comparable subset for the Incident register. The H&S-wide count
+            // above also includes standalone injury/exposure/safeguarding events.
+            'incident_worksafe_pending' => (clone $base)
+                ->worksafeNotifiable()
+                ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
+                ->where(function (Builder $query): void {
+                    $query->where('source_type', ClientIncident::class)
+                        ->orWhereHas('clientIncident');
+                })
                 ->count(),
         ];
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Investigation KPIs                                                 */
+    /*  Investigation KPIs */
     /* ------------------------------------------------------------------ */
 
     public function getInvestigationKpis(): array
@@ -77,7 +103,7 @@ class HsDashboardService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Corrective Action KPIs                                             */
+    /*  Corrective Action KPIs */
     /* ------------------------------------------------------------------ */
 
     public function getCorrectiveActionKpis(): array
@@ -99,7 +125,7 @@ class HsDashboardService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Risk Assessment KPIs                                               */
+    /*  Risk Assessment KPIs */
     /* ------------------------------------------------------------------ */
 
     public function getRiskAssessmentKpis(): array
@@ -117,7 +143,7 @@ class HsDashboardService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Training Compliance KPIs                                           */
+    /*  Training Compliance KPIs */
     /* ------------------------------------------------------------------ */
 
     public function getTrainingComplianceKpis(): array
@@ -161,7 +187,7 @@ class HsDashboardService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Worklist row builders (G6) — actionable rows, not just counts      */
+    /*  Worklist row builders (G6) — actionable rows, not just counts */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -224,34 +250,43 @@ class HsDashboardService
     }
 
     /**
-     * WorkSafe notifiable events as worklist rows (awaiting-notification first).
-     * Org/PCBU-level — not site-scoped. `related_incident_id` deep-links to the source incident.
+     * WorkSafe notifiable events from the authoritative HsEvent backbone.
+     * `related_incident_id` deep-links to the source incident when present.
      */
-    public function notifiableEvents(int $limit = 10): array
-    {
-        return NotifiableIncident::query()
-            ->whereNull('closed_at')
-            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+    public function notifiableEvents(
+        ?int $siteId = null,
+        int $limit = 10,
+        ?User $viewer = null,
+    ): array {
+        return $this->hsEventQuery($siteId, $viewer)
+            ->worksafeNotifiable()
+            ->with(['clientIncident:id,hs_event_id,reference_number,title,description,type'])
+            ->orderByRaw("CASE worksafe_status WHEN 'pending' THEN 0 WHEN 'notified' THEN 1 WHEN 'acknowledged' THEN 2 ELSE 3 END")
             ->orderByDesc('occurred_at')
             ->limit($limit)
             ->get()
-            ->map(fn (NotifiableIncident $n) => [
-                'id' => $n->id,
-                'title' => $n->title,
-                'incident_type' => $n->incident_type,
-                'status' => $n->status,
-                'occurred_at' => optional($n->occurred_at)->toIso8601String(),
-                'notified_at' => optional($n->notified_at)->toIso8601String(),
-                'notification_deadline' => optional($n->notification_deadline)->toIso8601String(),
-                'site_preserved' => (bool) $n->site_preserved,
-                'worksafe_ref' => $n->notification_reference,
-                'related_incident_id' => $n->related_incident_id,
+            ->map(fn (HsEvent $event) => [
+                'id' => $event->id,
+                'event_reference' => $event->reference_number,
+                'title' => $event->clientIncident?->title
+                    ?: $event->clientIncident?->description,
+                'incident_type' => $event->clientIncident?->type
+                    ?: $event->event_category,
+                'status' => $event->worksafe_status,
+                'occurred_at' => $event->occurred_at?->toIso8601String(),
+                'notified_at' => $event->worksafe_notified_at?->toIso8601String(),
+                'acknowledged_at' => $event->worksafe_acknowledged_at?->toIso8601String(),
+                'notification_deadline' => null,
+                'site_preserved' => (bool) $event->worksafe_site_preserved,
+                'worksafe_ref' => $event->worksafe_reference,
+                'related_incident_id' => $event->clientIncident?->id
+                    ?? ($event->source_type === ClientIncident::class ? $event->source_id : null),
             ])
             ->all();
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Unified expiring feed (G5)                                         */
+    /*  Unified expiring feed (G5) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -385,17 +420,39 @@ class HsDashboardService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Combined summary for main dashboard                                */
+    /*  Combined summary for main dashboard */
     /* ------------------------------------------------------------------ */
 
-    public function getDashboardSummary(?Carbon $since = null): array
-    {
+    public function getDashboardSummary(
+        ?Carbon $since = null,
+        ?int $siteId = null,
+        ?User $viewer = null,
+    ): array {
         return [
-            'events' => $this->getEventKpis($since),
+            'events' => $this->getEventKpis($since, $siteId, $viewer),
             'investigations' => $this->getInvestigationKpis(),
             'corrective_actions' => $this->getCorrectiveActionKpis(),
             'risk_assessments' => $this->getRiskAssessmentKpis(),
             'training' => $this->getTrainingComplianceKpis(),
         ];
+    }
+
+    private function hsEventQuery(?int $siteId, ?User $viewer): Builder
+    {
+        $query = HsEvent::query();
+
+        if ($viewer !== null) {
+            $this->siteAccess->applyHsEventScope(
+                $query,
+                $viewer,
+                ['healthSafety.viewAllSites'],
+            );
+        }
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query;
     }
 }

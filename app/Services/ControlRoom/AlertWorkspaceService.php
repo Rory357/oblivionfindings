@@ -317,7 +317,7 @@ class AlertWorkspaceService
                 'categories' => ConfigOption::forGroup('category'),
                 'resolution_codes' => ConfigOption::forGroup('resolution_code'),
             ],
-            'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert),
+            'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
         ];
     }
 

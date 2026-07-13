@@ -15,6 +15,7 @@ use App\Http\Controllers\HealthSafety\RestraintController;
 use App\Http\Controllers\HealthSafety\ReturnToWorkController;
 use App\Http\Controllers\HealthSafety\SafeWorkProcedureController;
 use App\Http\Controllers\HealthSafety\WorkerParticipationController;
+use App\Http\Controllers\Sites\SiteGeocodingController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -40,6 +41,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
+        Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');
+        Route::get('/events/{hsEvent}/control-room-evidence/{item}/download', [HsEventController::class, 'downloadControlRoomEvidence'])->name('events.control-room-evidence.download');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
         Route::get('/risk-assessments', [HsRiskAssessmentController::class, 'index'])->name('risk-assessments.index');
         Route::get('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'show'])->name('risk-assessments.show');
@@ -48,6 +51,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {
+        Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
         Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
         Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
         Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
@@ -375,7 +379,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             // wizard — reuses the shared geocoder, gated to anyone who can view the page
             // (the sites/clients geocode proxies require sites.update/clients.update which
             // an H&S coordinator may not hold).
-            Route::get('/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])->name('geocode.search');
+            Route::get('/geocode/search', [SiteGeocodingController::class, 'search'])->name('geocode.search');
         });
 
         // Worker self check-in (auth-only). The 3-actor model puts the lone

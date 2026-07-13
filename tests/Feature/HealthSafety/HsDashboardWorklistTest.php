@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\HealthSafety;
 
-use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\Client;
 use App\Models\EmergencyDrill;
 use App\Models\HsCorrectiveAction;
@@ -92,19 +91,26 @@ class HsDashboardWorklistTest extends TestCase
         $this->assertFalse($rows[1]['is_overdue']);
     }
 
-    public function test_notifiable_events_list_pending_first_and_exclude_closed(): void
+    public function test_notifiable_events_list_pending_first_and_keep_closed_pending_obligations_visible(): void
     {
-        $submitter = User::factory()->create();
-
-        $this->makeNotifiable($submitter, 'notified', now()->subDays(2));
-        $this->makeNotifiable($submitter, 'pending', now()->subDay());
-        $closed = $this->makeNotifiable($submitter, 'closed', now()->subDays(5));
-        $closed->update(['closed_at' => now()]);
+        HsEvent::factory()->worksafeNotifiable()->create([
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'occurred_at' => now()->subDays(2),
+        ]);
+        HsEvent::factory()->worksafeNotifiable()->create([
+            'worksafe_status' => HsEvent::WORKSAFE_PENDING,
+            'occurred_at' => now()->subDay(),
+        ]);
+        HsEvent::factory()->worksafeNotifiable()->closed()->create([
+            'occurred_at' => now()->subDays(5),
+        ]);
 
         $rows = $this->svc->notifiableEvents();
 
-        $this->assertCount(2, $rows); // closed excluded
-        $this->assertEquals('pending', $rows[0]['status']); // awaiting notification first
+        $this->assertCount(3, $rows);
+        $this->assertEquals(HsEvent::WORKSAFE_PENDING, $rows[0]['status']);
+        $this->assertEquals(HsEvent::WORKSAFE_PENDING, $rows[1]['status']);
+        $this->assertEquals(HsEvent::WORKSAFE_NOTIFIED, $rows[2]['status']);
     }
 
     public function test_expiring_feed_unifies_sources_and_sorts_by_due_date(): void
@@ -140,20 +146,5 @@ class HsDashboardWorklistTest extends TestCase
 
         $this->assertCount(1, $feed);
         $this->assertLessThan(0, $feed[0]['days_until']);
-    }
-
-    private function makeNotifiable(User $submitter, string $status, \Carbon\CarbonInterface $occurredAt): NotifiableIncident
-    {
-        return NotifiableIncident::create([
-            'incident_type' => 'serious_harm',
-            'notification_authority' => 'worksafe',
-            'title' => 'Notifiable '.$status,
-            'description' => 'Test notifiable event.',
-            'severity' => 'high',
-            'status' => $status,
-            'occurred_at' => $occurredAt,
-            'notified_at' => $status === 'notified' ? now() : null,
-            'submitted_by' => $submitter->id,
-        ]);
     }
 }

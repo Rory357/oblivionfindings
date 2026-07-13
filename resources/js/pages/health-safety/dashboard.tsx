@@ -44,6 +44,7 @@ type Props = {
             open_events_high_critical: number;
             events_period: number;
             worksafe_notifiable_open: number;
+            worksafe_pending: number;
             events_by_severity: Record<string, number>;
         };
         investigations: {
@@ -187,7 +188,7 @@ export default function HealthSafetyDashboard({
                     filters={filters}
                     sites={sites}
                     expiring={worklists.expiring}
-                    notifiableEvents={worklists.notifiable_events}
+                    worksafePending={backbone?.events.worksafe_pending ?? 0}
                     activeAlerts={kpis.active_alerts ?? 0}
                     openSafeguarding={kpis.open_safeguarding ?? 0}
                     fleetUnresolved={kpis.fleet_unresolved ?? 0}
@@ -271,7 +272,9 @@ export default function HealthSafetyDashboard({
                     <div className="flex flex-col gap-4">
                         <CompliancePanel
                             expiring={worklists.expiring}
-                            notifiableEvents={worklists.notifiable_events}
+                            worksafePending={
+                                backbone?.events.worksafe_pending ?? 0
+                            }
                         />
                         <HsWorklists
                             worklists={worklists}

@@ -73,7 +73,7 @@ class IncidentController extends Controller
                 })
                 ->when($severity, fn ($query) => $query->where('severity', $severity))
                 ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
-                ->when($siteId, fn ($query) => $query->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+                ->when($siteId, fn (Builder $query) => $this->whereIncidentSite($query, (int) $siteId))
                 ->when($source, fn ($query) => $query->where('source', $source))
                 ->when($from, fn ($query) => $query->whereDate('occurred_at', '>=', $from))
                 ->when($to, fn ($query) => $query->whereDate('occurred_at', '<=', $to));
@@ -82,7 +82,7 @@ class IncidentController extends Controller
         $applyTab = fn ($query, string $t) => match ($t) {
             'open' => $query->where('status', '!=', 'closed'),
             'investigation' => $query->whereIn('investigation_status', ['pending', 'in_progress']),
-            'worksafe' => $query->where('is_notifiable', true),
+            'worksafe' => $this->whereCanonicalWorksafeEvent($query),
             'near_misses' => $query->where('type', 'near_miss'),
             'review' => $query->where('status', 'submitted'),
             'closed' => $query->where('status', 'closed'),
@@ -131,7 +131,14 @@ class IncidentController extends Controller
             $rowsKind = 'followups';
         } else {
             $rows = $applyTab($applyFilters(ClientIncident::query()), $tab)
-                ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'reporter:id,name'])
+                ->with([
+                    'client:id,first_name,last_name,site_id',
+                    'client.site:id,name',
+                    'site:id,name',
+                    'reporter:id,name',
+                    'hsEvent:id,site_id,worksafe_notifiable,worksafe_status,worksafe_reference,worksafe_notified_at,worksafe_acknowledged_at,worksafe_method,worksafe_site_preserved',
+                    'hsEvent.site:id,name',
+                ])
                 ->withCount([
                     'attachments',
                     'followups as open_followups_count' => fn ($qq) => $qq->whereNull('completed_at'),
@@ -140,32 +147,42 @@ class IncidentController extends Controller
                 ->orderByDesc('id')
                 ->paginate(50)
                 ->withQueryString()
-                ->through(fn (ClientIncident $i) => [
-                    'id' => $i->id,
-                    'ref' => $i->reference_number,
-                    'occurred_at' => $i->occurred_at,
-                    'type' => $i->type,
-                    'description' => $i->description,
-                    'severity' => $i->severity,
-                    'status' => $i->status,
-                    'source' => $i->source,
-                    'interactive' => $i->interactive,
-                    'is_notifiable' => (bool) $i->is_notifiable,
-                    'worksafe_notification_status' => $i->worksafe_notification_status,
-                    'potential_severity' => $i->potential_severity,
-                    'investigation_status' => $i->investigation_status,
-                    'control_room_alert_id' => $i->control_room_alert_id,
-                    'requires_followup' => (bool) $i->requires_followup,
-                    'attachments_count' => $i->attachments_count,
-                    'open_followups_count' => $i->open_followups_count,
-                    'client' => $i->client ? [
-                        'id' => $i->client->id,
-                        'first_name' => $i->client->first_name,
-                        'last_name' => $i->client->last_name,
-                        'site' => $i->client->site?->name,
-                    ] : null,
-                    'reporter' => $i->reporter ? ['name' => $i->reporter->name] : null,
-                ]);
+                ->through(function (ClientIncident $incident): array {
+                    $event = $incident->hsEvent;
+
+                    return [
+                        'id' => $incident->id,
+                        'ref' => $incident->reference_number,
+                        'occurred_at' => $incident->occurred_at,
+                        'type' => $incident->type,
+                        'description' => $incident->description,
+                        'severity' => $incident->severity,
+                        'status' => $incident->status,
+                        'source' => $incident->source,
+                        'interactive' => $incident->interactive,
+                        'is_notifiable' => $event
+                            ? (bool) $event->worksafe_notifiable
+                            : (bool) $incident->is_notifiable,
+                        'worksafe_notification_status' => $event
+                            ? $event->worksafe_status
+                            : $incident->worksafe_notification_status,
+                        'potential_severity' => $incident->potential_severity,
+                        'investigation_status' => $incident->investigation_status,
+                        'control_room_alert_id' => $incident->control_room_alert_id,
+                        'requires_followup' => (bool) $incident->requires_followup,
+                        'attachments_count' => $incident->attachments_count,
+                        'open_followups_count' => $incident->open_followups_count,
+                        'client' => $incident->client ? [
+                            'id' => $incident->client->id,
+                            'first_name' => $incident->client->first_name,
+                            'last_name' => $incident->client->last_name,
+                            'site' => $incident->site?->name
+                                ?? $event?->site?->name
+                                ?? $incident->client->site?->name,
+                        ] : null,
+                        'reporter' => $incident->reporter ? ['name' => $incident->reporter->name] : null,
+                    ];
+                });
             $rowsKind = 'incidents';
         }
 
@@ -182,10 +199,10 @@ class IncidentController extends Controller
         $closedPrev = $applyFilters(ClientIncident::query())->where('status', 'closed')->whereBetween('closed_at', [$p60, $p30])->count();
 
         $overdueFollowups = $openFollowupsQuery()->where('due_at', '<', now())->count();
-        $worksafeAwaiting = $applyFilters(ClientIncident::query())
-            ->where('is_notifiable', true)
-            ->where(fn ($w) => $w->whereNull('worksafe_notification_status')->orWhere('worksafe_notification_status', 'pending'))
-            ->count();
+        $worksafeAwaiting = $this->whereCanonicalWorksafeEvent(
+            $applyFilters(ClientIncident::query()),
+            HsEvent::WORKSAFE_PENDING,
+        )->count();
         $activeAlerts = $applyFilters(ClientIncident::query())
             ->whereNotNull('control_room_alert_id')
             ->whereHas('controlRoomAlert', fn ($a) => $a->whereNotIn('status', ['resolved', 'closed']))
@@ -305,6 +322,82 @@ class IncidentController extends Controller
         ]);
     }
 
+    private function whereCanonicalWorksafeEvent(
+        Builder $query,
+        ?string $status = null,
+    ): Builder {
+        $eventFilter = function (Builder $eventQuery) use ($status): void {
+            $eventQuery->where('worksafe_notifiable', true)
+                ->when($status, fn (Builder $statusQuery) => $statusQuery->where('worksafe_status', $status));
+        };
+
+        return $query->where(function (Builder $canonicalQuery) use ($eventFilter): void {
+            $canonicalQuery->whereHas('hsEvent', $eventFilter);
+        });
+    }
+
+    /**
+     * Apply the immutable incident-site snapshot, with deterministic fallbacks
+     * for rows that pre-date client_incidents.site_id. A linked H&S event wins
+     * over the client's current placement so historic incidents do not move.
+     */
+    private function whereIncidentSite(Builder $query, int $siteId): Builder
+    {
+        return $query->where(function (Builder $siteQuery) use ($siteId): void {
+            $siteQuery->where($siteQuery->qualifyColumn('site_id'), $siteId)
+                ->orWhere(function (Builder $historicQuery) use ($siteId): void {
+                    $historicQuery->whereNull($historicQuery->qualifyColumn('site_id'))
+                        ->where(function (Builder $fallbackQuery) use ($siteId): void {
+                            $fallbackQuery
+                                ->whereHas('hsEvent', fn (Builder $eventQuery) => $eventQuery->where('site_id', $siteId))
+                                ->orWhere(function (Builder $shiftQuery) use ($siteId): void {
+                                    $shiftQuery
+                                        ->whereDoesntHave('hsEvent', fn (Builder $eventQuery) => $eventQuery->whereNotNull('site_id'))
+                                        ->whereHas('shift', fn (Builder $linkedShiftQuery) => $linkedShiftQuery->where('site_id', $siteId));
+                                })
+                                ->orWhere(function (Builder $clientQuery) use ($siteId): void {
+                                    $clientQuery
+                                        ->whereDoesntHave('hsEvent', fn (Builder $eventQuery) => $eventQuery->whereNotNull('site_id'))
+                                        ->whereDoesntHave('shift', fn (Builder $linkedShiftQuery) => $linkedShiftQuery->whereNotNull('site_id'))
+                                        ->whereHas('client', fn (Builder $linkedClientQuery) => $linkedClientQuery->where('site_id', $siteId));
+                                });
+                        });
+                });
+        });
+    }
+
+    private function canOpenHsEvent(User $user, HsEvent $event): bool
+    {
+        if (! $user->canDo('hazards.view')) {
+            return false;
+        }
+
+        $query = HsEvent::query()->whereKey($event->id);
+        app(UserSiteAccessService::class)->applyHsEventScope(
+            $query,
+            $user,
+            $this->healthSafetySiteBypassPermissions(),
+        );
+
+        return $query->exists();
+    }
+
+    private function canOpenControlRoomAlert(User $user, ControlRoomAlert $alert): bool
+    {
+        if (! $user->canDo('controlRoom.viewAny')) {
+            return false;
+        }
+
+        $query = ControlRoomAlert::query()->whereKey($alert->id);
+        app(UserSiteAccessService::class)->applyAlertScope(
+            $query,
+            $user,
+            ['reports.viewAny'],
+        );
+
+        return $query->exists();
+    }
+
     /**
      * The full, read-only detail payload behind the IncidentDetailDialog — shared
      * by the modal-over-list (index `?incident=`) and the `/incidents/{id}`
@@ -320,6 +413,7 @@ class IncidentController extends Controller
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
+                'site:id,name',
                 'reporter:id,name,email',
                 'shift:id,starts_at,ends_at,actual_ends_at',
                 'attachments.uploader:id,name',
@@ -339,13 +433,37 @@ class IncidentController extends Controller
         }
 
         // Governance wrapper recorded by ClientIncidentObserver (idempotent).
-        $hsEvent = HsEvent::query()
+        $hsEventQuery = HsEvent::query()->with([
+            'site:id,name',
+            'latestInvestigation',
+            'correctiveActions.assignedTo:id,name',
+            'owner:id,name',
+            'acceptedBy:id,name',
+        ]);
+        $hsEvent = $incident->hs_event_id
+            ? (clone $hsEventQuery)->find($incident->hs_event_id)
+            : null;
+        $historicCategory = $incident->type === 'near_miss'
+            ? HsEvent::CATEGORY_NEAR_MISS
+            : HsEvent::CATEGORY_INCIDENT;
+        $sourceEvents = $hsEvent ? collect() : (clone $hsEventQuery)
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
-            ->with(['latestInvestigation', 'correctiveActions.assignedTo:id,name'])
-            ->first();
+            ->where('event_category', $historicCategory)
+            ->where('idempotency_key', HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                $incident->id,
+                $historicCategory,
+            ))
+            ->orderBy('id')
+            ->limit(2)
+            ->get();
+        $hsEvent ??= $sourceEvents->count() === 1 ? $sourceEvents->first() : null;
 
         $inv = $hsEvent?->latestInvestigation;
+        $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
+        $canOpenControlRoomAlert = $incident->controlRoomAlert
+            && $this->canOpenControlRoomAlert($user, $incident->controlRoomAlert);
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
@@ -366,10 +484,18 @@ class IncidentController extends Controller
             'description' => $incident->description,
             'immediate_action_taken' => $incident->immediate_action_taken,
             'witnesses' => $incident->witnesses,
-            'is_notifiable' => (bool) $incident->is_notifiable,
-            'worksafe_notification_status' => $incident->worksafe_notification_status,
-            'worksafe_notified_at' => $incident->worksafe_notified_at,
-            'worksafe_reference' => $incident->worksafe_reference,
+            'is_notifiable' => $hsEvent
+                ? (bool) $hsEvent->worksafe_notifiable
+                : (bool) $incident->is_notifiable,
+            'worksafe_notification_status' => $hsEvent
+                ? $hsEvent->worksafe_status
+                : $incident->worksafe_notification_status,
+            'worksafe_notified_at' => $hsEvent
+                ? $hsEvent->worksafe_notified_at
+                : $incident->worksafe_notified_at,
+            'worksafe_reference' => $hsEvent
+                ? $hsEvent->worksafe_reference
+                : $incident->worksafe_reference,
             'potential_severity' => $incident->potential_severity,
             'potential_consequence' => $incident->potential_consequence,
             'investigation_status' => $incident->investigation_status,
@@ -386,7 +512,9 @@ class IncidentController extends Controller
                 'id' => $incident->client->id,
                 'first_name' => $incident->client->first_name,
                 'last_name' => $incident->client->last_name,
-                'site' => $incident->client->site?->name,
+                'site' => $incident->site?->name
+                    ?? $hsEvent?->site?->name
+                    ?? $incident->client->site?->name,
             ] : null,
             'reporter' => $incident->reporter ? ['name' => $incident->reporter->name, 'email' => $incident->reporter->email] : null,
             'investigator' => $incident->investigator?->name,
@@ -426,11 +554,39 @@ class IncidentController extends Controller
                 'alert_type' => $incident->controlRoomAlert->alert_type,
                 'triggered_at' => $incident->controlRoomAlert->triggered_at,
                 'resolved_at' => $incident->controlRoomAlert->resolved_at,
+                'url' => $canOpenControlRoomAlert
+                    ? "/control-room/alerts/{$incident->controlRoomAlert->id}"
+                    : null,
             ] : null,
             'hs_event' => $hsEvent ? [
                 'id' => $hsEvent->id,
                 'reference_number' => $hsEvent->reference_number,
                 'status' => $hsEvent->status,
+                'url' => $canOpenHsEvent
+                    ? "/health-safety/events/{$hsEvent->id}"
+                    : null,
+                'corrective_actions_url' => $canOpenHsEvent
+                    ? "/health-safety/corrective-actions?event={$hsEvent->id}"
+                    : null,
+                'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
+                'worksafe_status' => $hsEvent->worksafe_status,
+                'worksafe_reference' => $hsEvent->worksafe_reference,
+                'worksafe_notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
+                'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
+                'handover' => [
+                    'status' => $hsEvent->handover_status,
+                    'owner' => $hsEvent->owner ? [
+                        'id' => $hsEvent->owner->id,
+                        'name' => $hsEvent->owner->name,
+                    ] : null,
+                    'accepted_by' => $hsEvent->acceptedBy ? [
+                        'id' => $hsEvent->acceptedBy->id,
+                        'name' => $hsEvent->acceptedBy->name,
+                    ] : null,
+                    'accepted_at' => $hsEvent->accepted_at?->toIso8601String(),
+                    'notes' => $hsEvent->acceptance_notes,
+                    'can_accept' => false,
+                ],
                 'investigation_required' => (bool) $hsEvent->investigation_required,
                 'investigation' => $inv ? [
                     'reference_number' => $inv->reference_number,
@@ -1168,6 +1324,7 @@ class IncidentController extends Controller
                 'potential_severity', 'potential_consequence',
                 'injured_person_name', 'injured_person_role', 'injured_person_age',
                 'injury_body_part', 'injury_nature', 'injury_classification', 'medical_treatment_type',
+                'is_notifiable',
             ] as $field) {
                 unset($data[$field]);
             }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
-use App\Domain\Governance\Models\NotifiableIncident;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Client;
@@ -10,6 +9,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
 use App\Models\HsCommittee;
+use App\Models\HsEvent;
 use App\Models\HsRepresentative;
 use App\Models\PpeAllocation;
 use App\Models\PpeInventory;
@@ -61,6 +61,11 @@ class HealthSafetyDashboardController extends Controller
             ? Carbon::parse($request->input('to'))->endOfDay()
             : $now;
         $siteId = $request->integer('site') ?: null;
+        $user = $request->user();
+        $hsSiteBypass = ['healthSafety.viewAllSites'];
+        if ($siteId !== null) {
+            $this->siteAccess->assertCanAccessSiteId($user, $siteId, $hsSiteBypass);
+        }
         $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
             ? $request->input('lens')
             : 'manager';
@@ -84,7 +89,13 @@ class HealthSafetyDashboardController extends Controller
         $lostTimeDaysYtd = (int) (WorkplaceInjury::where('injury_date', '>=', $startOfYear)
             ->sum('lost_time_days') ?? 0);
 
-        $lastNotifiable = NotifiableIncident::orderByDesc('occurred_at')->value('occurred_at');
+        $lastNotifiableQuery = HsEvent::query()
+            ->where('worksafe_notifiable', true)
+            ->when($siteId, fn ($query) => $query->where('site_id', $siteId));
+        $this->siteAccess->applyHsEventScope($lastNotifiableQuery, $user, $hsSiteBypass);
+        $lastNotifiable = $lastNotifiableQuery
+            ->orderByDesc('occurred_at')
+            ->value('occurred_at');
         $daysSinceNotifiable = $lastNotifiable
             ? (int) Carbon::parse($lastNotifiable)->diffInDays($now)
             : null;
@@ -163,9 +174,11 @@ class HealthSafetyDashboardController extends Controller
             ->values();
 
         // ── H&S Backbone summary (PR5 addition — additive) ──
-        $backboneSummary = $this->dashboardService->getDashboardSummary($thirtyDaysAgo);
-        $user = $request->user();
-        $hsSiteBypass = ['healthSafety.viewAllSites'];
+        $backboneSummary = $this->dashboardService->getDashboardSummary(
+            $thirtyDaysAgo,
+            $siteId,
+            $user,
+        );
         $siteQuery = Site::query()->orderBy('name');
         $this->siteAccess->applySiteScope($siteQuery, $user, $hsSiteBypass);
         $clientQuery = Client::query()->orderBy('first_name');
@@ -203,7 +216,7 @@ class HealthSafetyDashboardController extends Controller
             'worklists' => [
                 'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteId),
                 'open_investigations' => $this->dashboardService->openInvestigations($siteId),
-                'notifiable_events' => $this->dashboardService->notifiableEvents(),
+                'notifiable_events' => $this->dashboardService->notifiableEvents($siteId, 10, $user),
                 'expiring' => $this->dashboardService->expiringFeed($siteId),
             ],
             'frequency_operands' => $this->kpiService->nearMissOperands($from, $to, $siteId),

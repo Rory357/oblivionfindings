@@ -131,7 +131,7 @@ class HsEventRegisterTest extends TestCase
             );
     }
 
-    public function test_detail_resolves_the_originating_source_link(): void
+    public function test_detail_resolves_the_originating_source_and_only_links_for_an_authorised_viewer(): void
     {
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
         $event = HsEvent::factory()->forClientIncident($incident)->create();
@@ -139,6 +139,18 @@ class HsEventRegisterTest extends TestCase
         $this->assertTrue($event->source->is($incident));
 
         $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source.type', 'ClientIncident')
+                ->where('detail.source.url', null)
+                ->where('detail.source.unwired', false)
+            );
+
+        $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+
+        $this->actingAs($admin)
             ->get('/health-safety/events?event='.$event->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page

@@ -448,7 +448,8 @@ class IncidentJourneyService
                 'worksafe_notifiable' => (bool) $incident->is_notifiable,
                 'created_by' => $actor?->id ?? $incident->reported_by,
                 'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
-                'owner_user_id' => $actor?->id ?? $incident->reported_by,
+                // Ownership starts only when an authorised H&S user accepts the handover.
+                'owner_user_id' => null,
             ]);
 
             if ($hsEvent === null) {
@@ -732,6 +733,12 @@ class IncidentJourneyService
         $mayAdoptIncidentWorksafe = $incident->hs_event_id === null
             || ! $this->hsTupleIsCanonical($incident, $hsEvent);
         $incidentLinks = ['hs_event_id' => $hsEvent->id];
+        if ($incident->site_id === null && $hsEvent->site_id !== null) {
+            // Historic source-linked events already contain the incident-time
+            // site snapshot. Freeze that value on the new direct incident link
+            // before synchronisation can consult the client's current site.
+            $incidentLinks['site_id'] = $hsEvent->site_id;
+        }
         if ($alert !== null) {
             $incidentLinks['control_room_alert_id'] = $alert->id;
         }
@@ -784,7 +791,9 @@ class IncidentJourneyService
                 || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true),
             'control_room_alert_id' => $alert?->id ?? $hsEvent->control_room_alert_id,
             'handover_status' => $handoverStatus,
-            'owner_user_id' => $hsEvent->owner_user_id ?? $actor?->id ?? $incident->reported_by,
+            'owner_user_id' => $handoverStatus === HsEvent::HANDOVER_ACCEPTED
+                ? $hsEvent->owner_user_id
+                : null,
         ])->saveQuietly();
     }
 

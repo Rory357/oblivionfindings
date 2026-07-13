@@ -195,8 +195,21 @@ export type AlertWorkspaceDetail = {
         id: number;
         reference_number: string;
         status: string;
+        worksafe_notifiable: boolean;
+        worksafe_status: string | null;
+        worksafe_reference: string | null;
+        worksafe_notified_at: string | null;
+        worksafe_acknowledged_at: string | null;
+        handover: {
+            status: string;
+            owner: { id: number; name: string } | null;
+            accepted_by: { id: number; name: string } | null;
+            accepted_at: string | null;
+            notes: string | null;
+        };
         investigation_required: boolean;
         investigation: { reference_number: string; status: string } | null;
+        href: string | null;
     } | null;
 };
 
@@ -2356,7 +2369,7 @@ function DiscussionEntry({ entry, canManage }: { entry: { id: number; content: s
 
 /* --- Linked records --------------------------------------------------- */
 
-function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
+export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
     const a = d.alert;
     const ctx = (a.context ?? {}) as Record<string, any>;
     const incidentId = ctx.incident_id ? Number(ctx.incident_id) : null;
@@ -2377,13 +2390,30 @@ function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
         );
     }
     if (hs) {
+        const handover = hs.handover.status === 'accepted'
+            ? [
+                  'Accepted into H&S',
+                  hs.handover.owner ? `owner ${hs.handover.owner.name}` : null,
+                  hs.handover.accepted_by ? `accepted by ${hs.handover.accepted_by.name}` : null,
+                  hs.handover.accepted_at ? formatDateTime(hs.handover.accepted_at) : null,
+              ].filter(Boolean).join(' · ')
+            : 'Awaiting H&S acceptance';
+        const worksafe = hs.worksafe_notifiable
+            ? `WorkSafe ${titleCase(hs.worksafe_status ?? 'pending')}${hs.worksafe_reference ? ` · ${hs.worksafe_reference}` : ''}`
+            : null;
         rows.push(
             <LinkedRow
                 key="hs"
                 icon={Activity}
                 title="Health & Safety event"
-                sub={`${hs.reference_number} · ${titleCase(hs.status)}${hs.investigation ? ` · investigation ${titleCase(hs.investigation.status)}` : ''}`}
-                href={`/health-safety/events/${hs.id}`}
+                sub={[
+                    hs.reference_number,
+                    titleCase(hs.status),
+                    handover,
+                    worksafe,
+                    hs.investigation ? `investigation ${titleCase(hs.investigation.status)}` : null,
+                ].filter(Boolean).join(' · ')}
+                href={hs.href}
             />,
         );
     } else {
@@ -2421,9 +2451,9 @@ function EmptyLinkedRow({ icon: Icon, title, children }: { icon: ComponentType<{
     );
 }
 
-function LinkedRow({ icon: Icon, title, sub, href }: { icon: ComponentType<{ className?: string }>; title: string; sub: string; href: string }) {
-    return (
-        <Link href={href} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+function LinkedRow({ icon: Icon, title, sub, href }: { icon: ComponentType<{ className?: string }>; title: string; sub: string; href: string | null }) {
+    const content = (
+        <>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </span>
@@ -2431,7 +2461,15 @@ function LinkedRow({ icon: Icon, title, sub, href }: { icon: ComponentType<{ cla
                 <p className="text-sm font-medium text-foreground">{title}</p>
                 <p className="truncate text-xs text-muted-foreground">{sub}</p>
             </div>
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            {href ? <ExternalLink className="h-4 w-4 text-muted-foreground" /> : null}
+        </>
+    );
+
+    return href ? (
+        <Link href={href} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+            {content}
         </Link>
+    ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-border p-3">{content}</div>
     );
 }

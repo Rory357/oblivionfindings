@@ -2,10 +2,13 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Domain\Governance\Models\NotifiableIncident;
+use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -168,6 +171,58 @@ class HsEventService
         $hsEvent->updateQuietly(['control_room_alert_id' => $alertId]);
     }
 
+    /**
+     * Accept an incident-backed H&S handover without changing its governance stage.
+     *
+     * Acceptance is monotonic: retries return the first accepted record and never
+     * replace its owner, actor, timestamp, or notes.
+     */
+    public function acceptHandover(
+        HsEvent $event,
+        User $actor,
+        ?User $owner = null,
+        ?string $notes = null,
+    ): HsEvent {
+        return DB::transaction(function () use ($event, $actor, $owner, $notes): HsEvent {
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+
+            if ($locked->handover_status === HsEvent::HANDOVER_ACCEPTED) {
+                return $locked->loadMissing(['owner:id,name', 'acceptedBy:id,name']);
+            }
+
+            if ($locked->handover_status !== HsEvent::HANDOVER_AWAITING_ACCEPTANCE) {
+                throw new \DomainException('This H&S event is not awaiting handover acceptance.');
+            }
+
+            if ($locked->source_type !== ClientIncident::class) {
+                throw new \DomainException('Only submitted incident handovers can be accepted.');
+            }
+
+            $incident = ClientIncident::query()->find($locked->source_id);
+            if (! $incident || $incident->status === 'draft' || $incident->submitted_at === null) {
+                throw new \DomainException('Submit the incident before accepting its H&S handover.');
+            }
+
+            $owner ??= $actor;
+            $locked->update([
+                'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+                'owner_user_id' => $owner->id,
+                'accepted_by_user_id' => $actor->id,
+                'accepted_at' => now(),
+                'acceptance_notes' => filled($notes) ? trim((string) $notes) : null,
+            ]);
+
+            Log::info('HsEventService: incident handover accepted', [
+                'hs_event_id' => $locked->id,
+                'incident_id' => $incident->id,
+                'accepted_by' => $actor->id,
+                'owner_user_id' => $owner->id,
+            ]);
+
+            return $locked->fresh(['owner:id,name', 'acceptedBy:id,name']);
+        }, 3);
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Governance — gated closure (E-Gap 1) */
     /* ------------------------------------------------------------------ */
@@ -261,30 +316,36 @@ class HsEventService
         ?string $reference = null,
         bool $sitePreserved = false,
     ): HsEvent {
-        if (! $event->worksafe_notifiable) {
-            throw new \DomainException('This event is not WorkSafe-notifiable.');
-        }
+        return DB::transaction(function () use ($event, $notifiedAt, $method, $reference, $sitePreserved): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
 
-        if ($event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
-            throw new \DomainException('WorkSafe has already acknowledged this notification.');
-        }
+            if (! $locked->worksafe_notifiable) {
+                throw new \DomainException('This event is not WorkSafe-notifiable.');
+            }
 
-        $event->update([
-            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
-            'worksafe_notified_at' => $notifiedAt,
-            'worksafe_method' => $method,
-            'worksafe_reference' => $reference ?: $event->worksafe_reference,
-            'worksafe_site_preserved' => $sitePreserved,
-        ]);
+            if ($locked->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
+                throw new \DomainException('WorkSafe has already acknowledged this notification.');
+            }
 
-        Log::info('HsEventService: WorkSafe notification recorded', [
-            'hs_event_id' => $event->id,
-            'reference' => $event->worksafe_reference,
-            'method' => $method,
-            'site_preserved' => $sitePreserved,
-        ]);
+            $locked->update([
+                'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+                'worksafe_notified_at' => $notifiedAt,
+                'worksafe_method' => $method,
+                'worksafe_reference' => $reference ?: $locked->worksafe_reference,
+                'worksafe_site_preserved' => $sitePreserved,
+            ]);
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
 
-        return $event;
+            Log::info('HsEventService: WorkSafe notification recorded', [
+                'hs_event_id' => $locked->id,
+                'reference' => $locked->fresh()->worksafe_reference,
+                'method' => $method,
+                'site_preserved' => $sitePreserved,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
     }
 
     /**
@@ -294,20 +355,83 @@ class HsEventService
      */
     public function acknowledgeWorksafe(HsEvent $event, \DateTimeInterface|string $acknowledgedAt): HsEvent
     {
-        if ($event->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
-            throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
+        return DB::transaction(function () use ($event, $acknowledgedAt): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+
+            if ($locked->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
+                throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
+            }
+
+            $locked->update([
+                'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+                'worksafe_acknowledged_at' => $acknowledgedAt,
+            ]);
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
+
+            Log::info('HsEventService: WorkSafe acknowledgement recorded', [
+                'hs_event_id' => $locked->id,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    /**
+     * Keep legacy incident/governance rows as one-way projections of HsEvent.
+     */
+    private function projectWorksafeCompatibility(HsEvent $event, ?ClientIncident $incident): void
+    {
+        if (! $incident) {
+            return;
         }
 
-        $event->update([
-            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
-            'worksafe_acknowledged_at' => $acknowledgedAt,
+        $incident->updateQuietly([
+            'is_notifiable' => (bool) $event->worksafe_notifiable,
+            'worksafe_notification_status' => $event->worksafe_status,
+            'worksafe_notified_at' => $event->worksafe_notified_at,
+            'worksafe_reference' => $event->worksafe_reference,
+            'site_preserved' => (bool) $event->worksafe_site_preserved,
         ]);
 
-        Log::info('HsEventService: WorkSafe acknowledgement recorded', [
-            'hs_event_id' => $event->id,
-        ]);
+        NotifiableIncident::query()
+            ->where('related_incident_id', $incident->id)
+            ->where('notification_authority', 'worksafe')
+            ->get()
+            ->each(function (NotifiableIncident $legacy) use ($event): void {
+                $tracking = $legacy->authority_response_tracking ?? [];
+                if ($event->worksafe_acknowledged_at) {
+                    $tracking['worksafe_acknowledged_at'] = $event->worksafe_acknowledged_at->toIso8601String();
+                }
 
-        return $event;
+                $legacy->updateQuietly([
+                    'status' => $event->worksafe_status,
+                    'notified_at' => $event->worksafe_notified_at,
+                    'notification_reference' => $event->worksafe_reference,
+                    'notified_by' => auth()->id() ?: $legacy->notified_by,
+                    'site_preserved' => (bool) $event->worksafe_site_preserved,
+                    'authority_response_tracking' => $tracking ?: null,
+                ]);
+            });
+    }
+
+    /**
+     * Match IncidentJourneyService's incident -> HsEvent lock order before
+     * projecting canonical WorkSafe state back to the compatibility columns.
+     */
+    private function lockIncidentForWorksafeProjection(HsEvent $event): ?ClientIncident
+    {
+        $incidentId = ClientIncident::query()
+            ->where('hs_event_id', $event->id)
+            ->value('id');
+
+        if (! $incidentId && $event->source_type === ClientIncident::class) {
+            $incidentId = $event->source_id;
+        }
+
+        return $incidentId
+            ? ClientIncident::query()->whereKey($incidentId)->lockForUpdate()->first()
+            : null;
     }
 
     /* ------------------------------------------------------------------ */
