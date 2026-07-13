@@ -91,7 +91,10 @@ export function WizardShell({
                 ) : (
                     <div className="flex min-h-0 overflow-hidden" style={{ height: maxHeight }}>
                         {/* ── Stepper rail ── */}
-                        <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
+                        <aside
+                            data-wizard-region="rail"
+                            className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex"
+                        >
                             <div className="mb-3 flex items-center gap-2.5">
                                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                                     <RailIcon className="h-5 w-5" />
@@ -190,7 +193,10 @@ export function WizardShell({
 
                         {/* ── Main column ── */}
                         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                            <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
+                            <header
+                                data-wizard-region="header"
+                                className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5"
+                            >
                                 <div className="text-[13px] font-semibold text-muted-foreground">
                                     {headerLabel ? (
                                         <span className="text-foreground">{headerLabel}</span>
@@ -215,7 +221,10 @@ export function WizardShell({
                                 </button>
                             </header>
 
-                            <div className="h-[3px] shrink-0 bg-muted">
+                            <div
+                                data-wizard-region="progress"
+                                className="h-[3px] shrink-0 bg-muted"
+                            >
                                 <div
                                     className="h-full bg-primary transition-[width] duration-300"
                                     style={{
@@ -224,11 +233,17 @@ export function WizardShell({
                                 />
                             </div>
 
-                            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
+                            <div
+                                data-wizard-region="body"
+                                className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
+                            >
                                 {children}
                             </div>
 
-                            <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5">
+                            <footer
+                                data-wizard-region="footer"
+                                className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
+                            >
                                 <div>{footerStart}</div>
                                 <div className="flex items-center gap-2.5">
                                     {footerEnd}
