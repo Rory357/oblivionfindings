@@ -10,8 +10,7 @@ class ClientOnboardingAccess
     public function canViewWorkflows(User $user): bool
     {
         return $user->canDo('onboarding.viewAny')
-            || $user->canDo('onboarding.view')
-            || $user->canDo('clients.viewAny');
+            || $user->canDo('onboarding.view');
     }
 
     public function canCreateWorkflows(User $user): bool
