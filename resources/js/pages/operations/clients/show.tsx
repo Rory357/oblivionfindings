@@ -71,7 +71,10 @@ import {
 import { ActionsReviewsTab } from '@/pages/operations/clients/tabs/actions-reviews';
 import { clientAppointmentActionAllowed } from '@/pages/operations/clients/tabs/client-appointment-access';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
-import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
+import {
+    DailyNotesTab,
+    type ClientDailyNote,
+} from '@/pages/operations/clients/tabs/daily-notes';
 import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
@@ -851,6 +854,7 @@ export default function ClientShow({
     const respiteCan = auth?.can?.respite ?? {};
     const consentsCan = auth?.can?.consents ?? {};
     const privacyCan = auth?.can?.privacy ?? {};
+    const serviceAgreementsCan = auth?.can?.service_agreements ?? {};
     const canCreateAppointment = clientAppointmentActionAllowed(
         'create',
         auth?.can?.calendar,
@@ -918,9 +922,15 @@ export default function ClientShow({
         pageProps,
         'actions_reviews',
     );
-    const clientDailyNotes = pageProps.client_daily_notes ?? [];
+    const clientDailyNotes = useMemo(
+        () => pageProps.client_daily_notes ?? [],
+        [pageProps.client_daily_notes],
+    );
     const dailyNotesSummary = pageProps.daily_notes_summary ?? {};
-    const communicationNotes = pageProps.communication_notes ?? [];
+    const communicationNotes = useMemo(
+        () => pageProps.communication_notes ?? [],
+        [pageProps.communication_notes],
+    );
     const healthMonitoring = pageProps.health_monitoring ?? {};
     const clientRoutines = useMemo(
         () => pageProps.client_routines ?? [],
@@ -1300,6 +1310,10 @@ export default function ClientShow({
                     carePlansSummary?.review_plan,
                 ].filter((plan): plan is any => Boolean(plan?.id)),
                 goals: carePlanGoals as any[],
+                dailyNotes: [
+                    ...clientDailyNotes,
+                    ...communicationNotes,
+                ] as any[],
                 risks: (pageProps.client_risks ?? []) as any[],
                 carePlanContext: { serviceAgreementOptions },
             });
@@ -1311,6 +1325,8 @@ export default function ClientShow({
             carePlanGoals,
             carePlansSummary?.active_plan,
             carePlansSummary?.review_plan,
+            clientDailyNotes,
+            communicationNotes,
             pageProps.client_risks,
             serviceAgreementOptions,
         ],
@@ -2226,6 +2242,11 @@ export default function ClientShow({
                     shiftOptions={dailyNoteShiftOptions}
                     goalOptions={dailyNoteGoalOptions}
                     onSubmitted={() => openDailyNotes('all')}
+                    note={
+                        (authorizedProfileDialog?.ctx?.note as
+                            | ClientDailyNote
+                            | undefined) ?? null
+                    }
                 />
                 <DailyNoteWizard
                     clientId={client.id}
@@ -2242,6 +2263,11 @@ export default function ClientShow({
                         setTab('communication_notes');
                         updateProfileQuery({ tab: 'communication_notes' });
                     }}
+                    note={
+                        (authorizedProfileDialog?.ctx?.note as
+                            | ClientDailyNote
+                            | undefined) ?? null
+                    }
                 />
 
                 <div className="mt-3">
@@ -3680,6 +3706,9 @@ export default function ClientShow({
                                 ? () => openProfileDialog('quick_note')
                                 : undefined
                         }
+                        onEditNote={(note) =>
+                            openProfileDialog('daily_note', { note })
+                        }
                         filterPreset={dailyNotesFilter}
                         onFilterChange={setDailyNotesFilter}
                         onShowReviewQueue={() => openDailyNotes('flagged')}
@@ -3717,6 +3746,9 @@ export default function ClientShow({
                                 { is_flagged: false },
                                 { preserveScroll: true },
                             )
+                        }
+                        onEditNote={(note) =>
+                            openProfileDialog('comm_note', { note })
                         }
                         isLoading={!hasCommunicationNotesProp}
                     />
@@ -4175,17 +4207,19 @@ export default function ClientShow({
                                     <span className="text-sm font-medium">
                                         Agreements ({agreements.length})
                                     </span>
-                                    <Button
-                                        size="sm"
-                                        className="gap-1.5 bg-primary hover:bg-primary"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/operations/service-agreements/create?client_id=${client.id}`}
+                                    {serviceAgreementsCan.create && (
+                                        <Button
+                                            size="sm"
+                                            className="gap-1.5 bg-primary hover:bg-primary"
+                                            asChild
                                         >
-                                            New Agreement
-                                        </Link>
-                                    </Button>
+                                            <Link
+                                                href={`/operations/service-agreements/create?client_id=${client.id}`}
+                                            >
+                                                New Agreement
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </div>
 
                                 {/* Agreement Cards */}
@@ -4199,8 +4233,9 @@ export default function ClientShow({
                                                 No Service Agreements
                                             </p>
                                             <p className="mt-1 text-sm text-muted-foreground">
-                                                Create a funding agreement for{' '}
-                                                {client.first_name}.
+                                                {serviceAgreementsCan.create
+                                                    ? `Create a funding agreement for ${client.first_name}.`
+                                                    : 'No agreements are available to view.'}
                                             </p>
                                         </CardContent>
                                     </Card>

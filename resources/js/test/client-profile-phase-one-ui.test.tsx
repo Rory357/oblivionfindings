@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -139,6 +139,60 @@ describe('client profile phase-one tabs', () => {
         ).not.toBeInTheDocument();
     });
 
+    it('offers the author an in-profile resume action for an editable draft', () => {
+        const onEditNote = vi.fn();
+
+        render(
+            <DailyNotesTab
+                clientId={1}
+                notes={[
+                    {
+                        ...notes[2],
+                        can: {
+                            update: true,
+                            delete: true,
+                            flag: false,
+                            review: false,
+                        },
+                    },
+                ]}
+                summary={{ total: 1, drafts: 1 }}
+                onEditNote={onEditNote}
+            />,
+        );
+
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Resume draft' })[0],
+        );
+
+        expect(onEditNote).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 3, is_draft: true }),
+        );
+    });
+
+    it('offers an exact-capability edit action for a communication note', () => {
+        const onEditNote = vi.fn();
+        const note: ClientDailyNote = {
+            id: 81,
+            type: 'communication',
+            category: 'communication',
+            body: 'Spoke with the client’s sister.',
+            can: { update: true, delete: false, flag: false, review: false },
+        };
+
+        render(
+            <CommunicationNotesTab
+                notes={[note]}
+                familyNotes={[]}
+                familyNotesOpenCount={0}
+                onEditNote={onEditNote}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit note' }));
+        expect(onEditNote).toHaveBeenCalledWith(note);
+    });
+
     it('groups actions by due bucket before severity', () => {
         // The "due this week" / "upcoming" buckets are computed relative to the
         // current date, so pin the clock to keep the fixed due_at dates below in
@@ -185,6 +239,38 @@ describe('client profile phase-one tabs', () => {
         expect(screen.getByText('Due this week')).toBeVisible();
         expect(screen.getByText('Upcoming')).toBeVisible();
         expect(screen.getByText('Call GP')).toBeVisible();
+    });
+
+    it('reveals a long timeline source detail in profile without a page escape', () => {
+        const fullDetail = `${'Detailed source context. '.repeat(20)}Final outcome.`;
+
+        render(
+            <ClientTimelineTab
+                clientId={1}
+                events={[
+                    {
+                        id: 91,
+                        type: 'incident',
+                        subject: 'Incident follow-up',
+                        body: fullDetail,
+                        occurred_at: '2026-07-12T08:00:00Z',
+                    },
+                ]}
+                handover={[]}
+                canCreateNote={false}
+                canPinHandover={false}
+            />,
+        );
+
+        expect(screen.queryByText('Final outcome.')).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Show full detail' }),
+        );
+        expect(screen.getByText(fullDetail)).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Hide detail' }),
+        ).toBeVisible();
+        expect(screen.queryByRole('link', { name: /view source/i })).toBeNull();
     });
 
     it('keeps goal management and PATH editing independently gated', () => {

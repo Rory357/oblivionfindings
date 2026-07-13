@@ -175,6 +175,7 @@ type ProfileDialogRecord = Record<string, unknown> & {
 
 export type ProfileDialogRecordSources = {
     carePlans?: ProfileDialogRecord[];
+    dailyNotes?: ProfileDialogRecord[];
     goals?: ProfileDialogRecord[];
     risks?: ProfileDialogRecord[];
     carePlanContext?: Record<string, unknown>;
@@ -241,6 +242,16 @@ export function profileDialogStateFromSearch(
                 plan,
                 ...sources.carePlanContext,
             },
+        };
+    }
+
+    if (dialog.key === 'daily_note' || dialog.key === 'comm_note') {
+        const note = recordWithId(sources.dailyNotes, recordId);
+        if (!note) return null;
+
+        return {
+            ...dialog,
+            ctx: { ...dialog.ctx, note },
         };
     }
 

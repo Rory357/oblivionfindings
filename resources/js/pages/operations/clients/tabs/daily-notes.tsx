@@ -55,6 +55,7 @@ type DailyNotesTabProps = {
     currentUserId?: number;
     onCreateDaily?: () => void;
     onCreateQuick?: () => void;
+    onEditNote?: (note: ClientDailyNote) => void;
     filterPreset?: DailyNotesFilter;
     onFilterChange?: (filter: DailyNotesFilter) => void;
     onShowReviewQueue?: () => void;
@@ -151,6 +152,7 @@ export function DailyNotesTab({
     currentUserId,
     onCreateDaily,
     onCreateQuick,
+    onEditNote,
     filterPreset,
     onFilterChange,
     onShowReviewQueue,
@@ -599,6 +601,7 @@ export function DailyNotesTab({
                                 canUpdate={canUpdate}
                                 onMarkReviewed={markReviewed}
                                 onClearFlag={clearFlag}
+                                onEdit={onEditNote}
                             />
                         ))
                     ) : (
@@ -705,16 +708,32 @@ export function DailyNotesTab({
                                                         note.occurred_at,
                                                 )}
                                             </span>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    handleFilterChange('drafts')
-                                                }
-                                            >
-                                                Show drafts
-                                            </Button>
+                                            {(note.can?.update ?? canUpdate) &&
+                                            onEditNote ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        onEditNote(note)
+                                                    }
+                                                >
+                                                    Resume draft
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        handleFilterChange(
+                                                            'drafts',
+                                                        )
+                                                    }
+                                                >
+                                                    Show drafts
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
