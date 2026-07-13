@@ -529,8 +529,25 @@ class IncidentController extends Controller
         $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident'];
 
         if ($request->filled('shift_id')) {
-            $shift = Shift::query()->find((int) $request->query('shift_id'));
-            if ($shift && ($shift->user_id === $user->id || $user->canDo('incidents.viewAny'))) {
+            $shiftQuery = Shift::query()->with('client:id,organization_id');
+            app(UserSiteAccessService::class)->applyShiftScope(
+                $shiftQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $shiftQuery->whereHas('client', function (Builder $clientQuery) use ($user): void {
+                $this->applyOrganizationScope($clientQuery, $user);
+            });
+            $shift = $shiftQuery->find((int) $request->query('shift_id'));
+
+            if (
+                $shift
+                && (
+                    (int) $shift->user_id === (int) $user->id
+                    || $user->canDo('incidents.viewAny')
+                    || $this->canReportAcrossHealthSafety($user, $shift->client)
+                )
+            ) {
                 $params['report_shift_id'] = $shift->id;
                 if ($shift->client_id) {
                     $params['report_client_id'] = (int) $shift->client_id;
@@ -757,27 +774,31 @@ class IncidentController extends Controller
                         ]);
                     }
 
-                    $incident->fill($attributes);
+                    $updateAttributes = $attributes;
+                    unset($updateAttributes['report_request_uuid']);
+                    $incident->fill($updateAttributes);
                     $incident->save();
                     $submittedNow = $isSubmit;
                 } else {
                     $submittedNow = $isSubmit;
                 }
 
-                if ($created && preg_match('/abuse|neglect/i', $incident->type)) {
-                    SafeguardingConcern::query()->create([
+                if ($submittedNow && preg_match('/abuse|neglect/i', $incident->type)) {
+                    SafeguardingConcern::query()->firstOrCreate([
+                        'related_incident_id' => $incident->id,
+                        'concern_type' => 'incident_escalation',
+                    ], [
                         'subject_type' => Client::class,
                         'subject_id' => $client->id,
                         'subject_name' => $client->first_name.' '.$client->last_name,
-                        'concern_type' => 'incident_escalation',
                         'severity' => $incident->severity,
                         'description' => $incident->description,
                         'occurred_at' => $incident->occurred_at,
                         'reported_by_user_id' => $actor->id,
                         'reported_by_name' => $actor->name,
-                        'status' => 'open',
+                        'status' => 'reported',
                         'requires_external_referral' => true,
-                        'related_incident_id' => $incident->id,
+                        'site_id' => $siteId,
                         'created_by' => $actor->id,
                     ]);
                 }
@@ -802,24 +823,6 @@ class IncidentController extends Controller
             },
             3,
         );
-
-        if ($created && ! $isSubmit && $incident->severity === 'high') {
-            app(NotificationService::class)->notifyCrud(
-                $actor,
-                'created',
-                'incident',
-                $incident,
-                $client,
-                [
-                    'event_key' => 'incidents.high_severity_alert',
-                    'severity' => $incident->severity,
-                    'title' => 'High severity incident drafted',
-                    'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
-                    'url' => url("/incidents/{$incident->id}"),
-                    'include_assigned_workers' => false,
-                ],
-            );
-        }
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);

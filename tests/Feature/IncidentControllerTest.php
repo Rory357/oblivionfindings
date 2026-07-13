@@ -12,6 +12,7 @@ use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
 use App\Models\Role;
+use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
@@ -739,6 +740,109 @@ class IncidentControllerTest extends TestCase
             ->assertRedirect(route('incidents.index', ['report' => 'incident', 'report_client_id' => $this->client->id]));
     }
 
+    public function test_task5_review_fix_create_shift_prefill_scopes_view_any_users_to_their_accessible_same_organization_sites(): void
+    {
+        $this->client->update(['organization_id' => 1]);
+        $this->coordinator->update(['organization_id' => 1]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $accessibleShift = Shift::factory()->create([
+            'organization_id' => 1,
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->staff->id,
+        ]);
+        $foreignSite = Site::factory()->create();
+        $sameOrganizationForeignSiteClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $foreignSite->id,
+        ]);
+        $foreignSiteShift = Shift::factory()->create([
+            'organization_id' => 1,
+            'client_id' => $sameOrganizationForeignSiteClient->id,
+            'site_id' => $foreignSite->id,
+            'user_id' => $this->staff->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/incidents/create?shift_id='.$accessibleShift->id)
+            ->assertRedirect(route('incidents.index', [
+                'report' => 'incident',
+                'report_shift_id' => $accessibleShift->id,
+                'report_client_id' => $this->client->id,
+            ]));
+
+        $this->actingAs($this->coordinator)
+            ->get('/incidents/create?shift_id='.$foreignSiteShift->id)
+            ->assertRedirect(route('incidents.index', ['report' => 'incident']));
+    }
+
+    public function test_task5_review_fix_create_shift_prefill_allows_same_organization_health_safety_reporting_bypass(): void
+    {
+        $this->client->update(['organization_id' => 1]);
+        $foreignSite = Site::factory()->create();
+        $sameOrganizationClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $foreignSite->id,
+        ]);
+        $shift = Shift::factory()->create([
+            'organization_id' => 1,
+            'client_id' => $sameOrganizationClient->id,
+            'site_id' => $foreignSite->id,
+            'user_id' => $this->staff->id,
+        ]);
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+
+        $this->actingAs($officer)
+            ->get('/incidents/create?shift_id='.$shift->id)
+            ->assertRedirect(route('incidents.index', [
+                'report' => 'incident',
+                'report_shift_id' => $shift->id,
+                'report_client_id' => $sameOrganizationClient->id,
+            ]));
+    }
+
+    public function test_task5_review_fix_create_shift_prefill_is_nondisclosing_for_missing_and_foreign_organization_shifts(): void
+    {
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create([
+            'organization_id' => 2,
+            'site_id' => $foreignSite->id,
+        ]);
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $foreignShift = Shift::factory()->create([
+            'organization_id' => 2,
+            'client_id' => $foreignClient->id,
+            'site_id' => $foreignSite->id,
+            'user_id' => $officer->id,
+        ]);
+        $nondisclosingRedirect = route('incidents.index', ['report' => 'incident']);
+
+        $this->actingAs($officer)
+            ->get('/incidents/create?shift_id=999999999')
+            ->assertRedirect($nondisclosingRedirect);
+
+        $this->actingAs($officer)
+            ->get('/incidents/create?shift_id='.$foreignShift->id)
+            ->assertRedirect($nondisclosingRedirect);
+    }
+
     public function test_create_resume_draft_redirects_to_detail(): void
     {
         $incident = ClientIncident::factory()->create(['status' => 'draft']);
@@ -892,6 +996,51 @@ class IncidentControllerTest extends TestCase
         $this->assertSame($requestUuid, $incident->report_request_uuid);
         $first->assertSessionHas('incident_report_result', fn (array $result): bool => ($result['incident_reference'] ?? null) === $incident->reference_number);
         $retry->assertSessionHas('incident_report_result', fn (array $result): bool => ($result['incident_reference'] ?? null) === $incident->reference_number);
+    }
+
+    public function test_task5_review_fix_uuid_draft_submitted_by_legacy_id_preserves_uuid_for_retry_without_duplicate_journey(): void
+    {
+        $this->mockNotificationService();
+        $requestUuid = (string) Str::uuid();
+        $draftPayload = $this->reportPayload([
+            'intent' => 'draft',
+            'report_request_uuid' => $requestUuid,
+            'severity' => 'high',
+        ]);
+
+        $this->actingAs($this->staff)->post('/incidents', $draftPayload)->assertRedirect();
+        $draft = ClientIncident::query()->sole();
+        $legacySubmitPayload = array_replace($draftPayload, [
+            'intent' => 'submit',
+            'incident_id' => $draft->id,
+        ]);
+        unset($legacySubmitPayload['report_request_uuid']);
+
+        $legacySubmit = $this->actingAs($this->staff)->post('/incidents', $legacySubmitPayload);
+        $legacySubmit->assertRedirect();
+        $legacyResult = session('incident_report_result');
+
+        $uuidRetry = $this->actingAs($this->staff)->post('/incidents', array_replace($draftPayload, [
+            'intent' => 'submit',
+        ]));
+        $uuidRetry->assertRedirect();
+        $retryResult = session('incident_report_result');
+
+        $this->assertSame(1, ClientIncident::query()->count());
+        $this->assertSame(1, HsEvent::query()->count());
+        $this->assertSame(1, ControlRoomAlert::query()->count());
+
+        $incident = ClientIncident::query()->sole();
+        $hsEvent = HsEvent::query()->sole();
+        $alert = ControlRoomAlert::query()->sole();
+        $this->assertSame($requestUuid, $incident->report_request_uuid);
+        $this->assertSame('submitted', $incident->status);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($incident->reference_number, $legacyResult['incident_reference'] ?? null);
+        $this->assertSame($incident->reference_number, $retryResult['incident_reference'] ?? null);
+        $this->assertSame($hsEvent->reference_number, $legacyResult['hs_reference'] ?? null);
+        $this->assertSame($hsEvent->reference_number, $retryResult['hs_reference'] ?? null);
     }
 
     public function test_task5_hardening_shift_linked_draft_to_submit_reuses_the_same_report_uuid(): void
@@ -1448,30 +1597,128 @@ class IncidentControllerTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  17. High severity notification triggers on store
+    //  17. Drafts stay silent until submission
     // ──────────────────────────────────────────────────────────────
 
-    public function test_store_high_severity_sends_notification(): void
+    public function test_task5_review_fix_store_high_severity_draft_emits_no_alert_notification_or_communication(): void
     {
-        $mock = $this->mockNotificationService();
-
-        $mock->shouldReceive('notifyCrud')
-            ->once()
-            ->withArgs(function ($actor, $action, $label, $entity, $client, $options) {
-                return $action === 'created'
-                    && $label === 'incident'
-                    && ($options['event_key'] ?? null) === 'incidents.high_severity_alert';
-            })
-            ->andReturnNull();
-
         $this->actingAs($this->staff)
-            ->post('/incidents', [
+            ->post('/incidents', $this->reportPayload([
                 'intent' => 'draft',
-                'client_id' => $this->client->id,
-                'type' => 'fall',
                 'severity' => 'high',
                 'description' => 'Serious fall',
-            ]);
+            ]))
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertDatabaseCount('control_room_communications', 0);
+    }
+
+    public function test_task5_review_fix_abuse_draft_defers_safeguarding_journey_until_first_submit(): void
+    {
+        $requestUuid = (string) Str::uuid();
+        $draftPayload = $this->reportPayload([
+            'intent' => 'draft',
+            'report_request_uuid' => $requestUuid,
+            'type' => 'suspected abuse',
+            'severity' => 'high',
+        ]);
+
+        $this->actingAs($this->staff)->post('/incidents', $draftPayload)->assertRedirect();
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('safeguarding_concerns', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertDatabaseCount('control_room_communications', 0);
+
+        $firstSubmit = $this->actingAs($this->staff)->post('/incidents', array_replace($draftPayload, [
+            'intent' => 'submit',
+        ]));
+        $firstSubmit->assertRedirect();
+
+        $incident = ClientIncident::query()->sole();
+        $concern = SafeguardingConcern::query()
+            ->where('related_incident_id', $incident->id)
+            ->where('concern_type', 'incident_escalation')
+            ->sole();
+        $incidentHsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->sole();
+        $canonicalAlert = ControlRoomAlert::query()->sole();
+        $this->assertSame($incident->id, $concern->related_incident_id);
+        $this->assertSame($incidentHsEvent->id, $incident->hs_event_id);
+        $this->assertSame($canonicalAlert->id, $incident->control_room_alert_id);
+        $this->assertSame(0, HsEvent::query()
+            ->where('source_type', SafeguardingConcern::class)
+            ->where('source_id', $concern->id)
+            ->count());
+        $this->assertSame(0, ControlRoomAlert::query()
+            ->where('source', 'safeguarding')
+            ->where('context->concern_id', $concern->id)
+            ->count());
+
+        $this->actingAs($this->staff)->post('/incidents', array_replace($draftPayload, [
+            'intent' => 'submit',
+        ]))->assertRedirect();
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('safeguarding_concerns', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertSame($requestUuid, $incident->fresh()->report_request_uuid);
+        $this->assertSame($incidentHsEvent->id, $incident->fresh()->hs_event_id);
+        $this->assertSame($canonicalAlert->id, $incident->fresh()->control_room_alert_id);
+
+        $concern->update(['severity' => 'critical']);
+
+        $this->assertDatabaseHas('notifiable_incidents', [
+            'incident_type' => 'safeguarding',
+            'related_incident_id' => $concern->id,
+            'severity' => 'critical',
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseCount('notifiable_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+
+        $concern->update(['description' => 'Critical safeguarding follow-up recorded.']);
+
+        $this->assertDatabaseCount('notifiable_incidents', 1);
+        $this->assertSame($incidentHsEvent->id, $incident->fresh()->hs_event_id);
+        $this->assertSame($canonicalAlert->id, $incident->fresh()->control_room_alert_id);
+    }
+
+    public function test_task5_review_fix_standalone_safeguarding_concern_keeps_its_own_observer_journey(): void
+    {
+        $concern = SafeguardingConcern::factory()->create([
+            'subject_type' => Client::class,
+            'subject_id' => $this->client->id,
+            'subject_name' => $this->client->first_name.' '.$this->client->last_name,
+            'concern_type' => 'abuse',
+            'severity' => 'high',
+            'site_id' => $this->site->id,
+            'reported_by_user_id' => $this->staff->id,
+            'reported_by_name' => $this->staff->name,
+            'related_incident_id' => null,
+        ]);
+
+        $hsEvent = HsEvent::query()
+            ->where('source_type', SafeguardingConcern::class)
+            ->where('source_id', $concern->id)
+            ->sole();
+        $alert = ControlRoomAlert::query()
+            ->where('source', 'safeguarding')
+            ->where('context->concern_id', $concern->id)
+            ->sole();
+
+        $this->assertSame($hsEvent->id, $concern->linkedHsEvent()?->id);
+        $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
     }
 
     public function test_store_low_severity_does_not_send_high_severity_notification(): void

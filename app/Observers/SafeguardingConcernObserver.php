@@ -25,6 +25,12 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
 
     public function created(SafeguardingConcern $concern): void
     {
+        if ($this->usesCanonicalIncidentJourney($concern)) {
+            $this->maybeCreateNotifiableIncident($concern);
+
+            return;
+        }
+
         $this->recordHsEvent($concern);
         $this->dispatchBridge($concern);
         $this->maybeCreateNotifiableIncident($concern);
@@ -36,6 +42,12 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
      */
     public function updated(SafeguardingConcern $concern): void
     {
+        if ($this->usesCanonicalIncidentJourney($concern)) {
+            $this->maybeCreateNotifiableIncident($concern);
+
+            return;
+        }
+
         if ($concern->wasChanged('severity')) {
             $this->syncHsEventSeverity($concern);
         }
@@ -48,6 +60,12 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
             $this->dispatchBridge($concern, escalation: true);
             $this->maybeCreateNotifiableIncident($concern);
         }
+    }
+
+    private function usesCanonicalIncidentJourney(SafeguardingConcern $concern): bool
+    {
+        return $concern->concern_type === 'incident_escalation'
+            && $concern->related_incident_id !== null;
     }
 
     /**
