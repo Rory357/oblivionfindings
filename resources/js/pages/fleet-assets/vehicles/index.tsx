@@ -21,6 +21,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Battery,
@@ -341,7 +342,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, hero, comp
                                                             </span>
                                                         )}
                                                         {vehicle.state?.last_seen_at && (
-                                                            <span>Last seen: {vehicle.state.last_seen_at}</span>
+                                                            <span>Last seen: {formatDateTime(vehicle.state.last_seen_at)}</span>
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground">
