@@ -19,7 +19,6 @@ import {
     CheckCircle,
     ClipboardCheck,
     Clock,
-    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -140,13 +139,13 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                 label="Not checked"
                                 value={fmt(summary.unchecked)}
                                 caption="still due"
-                                tone={summary.unchecked > 0 ? 'critical' : 'success'}
+                                tone={summary.unchecked > 0 ? 'warning' : 'success'}
                             />
                             <HeroClusterTile
                                 label="Completion"
                                 value={`${checkedPercentage}%`}
                                 caption="of today's checks"
-                                tone={checkedPercentage === 100 ? 'success' : checkedPercentage >= 50 ? 'warning' : 'critical'}
+                                tone={checkedPercentage === 100 ? 'success' : 'warning'}
                             />
                         </div>
                     </div>
@@ -176,8 +175,8 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
                                             ? 'border-primary/30 bg-primary/5 dark:bg-primary/10'
-                                            : 'border-status-warning/30 bg-status-warning-bg'
-                                        : 'border-status-critical/30 bg-status-critical-bg'
+                                            : 'border-status-critical/30 bg-status-critical-bg'
+                                        : 'border-status-warning/30 bg-status-warning-bg'
                                 }`}
                             >
                                 <CardContent className="p-4">
@@ -187,10 +186,10 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                                 vehicle.check_result === 'good' ? (
                                                     <CheckCircle className="h-5 w-5 text-primary shrink-0" />
                                                 ) : (
-                                                    <AlertTriangle className="h-5 w-5 text-status-warning shrink-0" />
+                                                    <AlertTriangle className="h-5 w-5 text-status-critical shrink-0" />
                                                 )
                                             ) : (
-                                                <XCircle className="h-5 w-5 text-status-critical shrink-0" />
+                                                <Clock className="h-5 w-5 text-status-warning shrink-0" />
                                             )}
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">

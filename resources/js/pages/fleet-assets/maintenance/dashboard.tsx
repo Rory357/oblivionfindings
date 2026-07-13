@@ -373,7 +373,7 @@ export default function MaintenanceDashboard({
                                 tone={hero.wo_open > 0 ? 'warning' : 'success'}
                             />
                             <HeroClusterTile
-                                href="/fleet-assets/maintenance/work-orders"
+                                href="/fleet-assets/maintenance/work-orders?overdue=1"
                                 label="Overdue"
                                 value={fmt(hero.wo_overdue)}
                                 caption="past due date"

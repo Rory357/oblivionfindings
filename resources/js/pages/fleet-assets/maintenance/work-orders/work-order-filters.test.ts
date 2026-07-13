@@ -7,6 +7,17 @@ import {
 } from './work-order-filters';
 
 describe('work order filters', () => {
+    it('links the maintenance overdue tile to the canonical overdue filter', () => {
+        const dashboard = readFileSync(
+            'resources/js/pages/fleet-assets/maintenance/dashboard.tsx',
+            'utf8',
+        );
+
+        expect(dashboard).toMatch(
+            /href="\/fleet-assets\/maintenance\/work-orders\?overdue=1"\s+label="Overdue"/,
+        );
+    });
+
     it('clears the hidden overdue filter when status changes', () => {
         expect(
             mergeWorkOrderFilters(
@@ -52,3 +63,4 @@ describe('work order filters', () => {
         expect(workOrderStatusFilterUpdate('all')).toEqual({ status: '' });
     });
 });
+import { readFileSync } from 'node:fs';

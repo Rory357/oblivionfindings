@@ -140,7 +140,7 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 const SEV: Record<string, { tone: Tone; label: string }> = {
-    minor: { tone: 'success', label: 'Minor' },
+    minor: { tone: 'neutral', label: 'Minor' },
     moderate: { tone: 'warning', label: 'Moderate' },
     major: { tone: 'critical', label: 'Major' },
     critical: { tone: 'critical', label: 'Critical' },
@@ -162,8 +162,8 @@ const TONE_DOT: Record<Tone, string> = {
 const STATUS: Record<string, { label: string; cls: string; icon: typeof Clock }> = {
     reported: { label: 'Reported', cls: 'bg-status-info-bg text-status-info', icon: Clock },
     investigating: { label: 'Investigating', cls: 'bg-status-warning-bg text-status-warning', icon: Search },
-    resolved: { label: 'Resolved', cls: 'bg-primary/10 text-primary', icon: CheckCircle2 },
-    closed: { label: 'Closed', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
+    resolved: { label: 'Resolved', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
+    closed: { label: 'Closed', cls: 'bg-muted text-muted-foreground', icon: CheckCircle2 },
 };
 
 const REPORT_MODES: ReportMode[] = ['vehicle', 'asset', 'near_miss'];
