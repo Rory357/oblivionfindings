@@ -464,6 +464,7 @@ git commit -m "feat(incidents): separate draft and submit workflows"
 - Modify: `resources/js/pages/health-safety/dashboard.tsx`
 - Modify: `resources/js/pages/health-safety/events/index.tsx`
 - Modify: `resources/js/pages/health-safety/events/show.tsx`
+- Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
 - Modify: `resources/js/components/incidents/incident-detail-dialog.tsx`
 - Test: `tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php`
 - Test: `tests/Feature/HealthSafety/HsWorksafeConsistencyTest.php`
@@ -834,8 +835,9 @@ git commit -m "feat(control-room): require incoming handover acceptance"
 - Modify: `resources/js/pages/control-room/playbooks/show.tsx`
 - Modify: `resources/js/pages/control-room/sla/index.tsx`
 - Modify: `resources/js/pages/control-room/sla/breaches.tsx`
-- Modify: `resources/js/pages/control-room/broadcasts/index.tsx`
-- Modify: `resources/js/pages/control-room/broadcasts/show.tsx`
+- Modify: `resources/js/pages/control-room/broadcast.tsx`
+- Modify: `resources/js/pages/control-room/broadcast-show.tsx`
+- Modify: `resources/js/pages/control-room/show.tsx`
 - Test: `resources/js/components/command-centre/workspace-strip.test.tsx`
 - Test: `resources/js/components/command-centre/command-centre-page.test.tsx`
 - Test: `tests/Feature/ControlRoom/ControlRoomShellConsistencyTest.php`
