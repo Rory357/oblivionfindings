@@ -5,6 +5,7 @@
  * Create/edit run through CarePlanWizardDialog (opened via the on*Plan props);
  * reviews, sign-offs and the PDF export are handled here against the care-plan
  * endpoints. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -301,6 +302,9 @@ export function CareSupportPlanTab({
     const [signForm, setSignForm] = useState(emptySignOff);
     const [signOpen, setSignOpen] = useState(false);
     const [signBusy, setSignBusy] = useState(false);
+    const [signOffToRemove, setSignOffToRemove] = useState<SignOff | null>(
+        null,
+    );
 
     const addSignOff = () => {
         if (!plan) return;
@@ -324,7 +328,6 @@ export function CareSupportPlanTab({
     };
     const removeSignOff = (id: number) => {
         if (!plan) return;
-        if (!window.confirm('Remove this sign-off?')) return;
         router.delete(`/operations/care-plans/${plan.id}/sign-offs/${id}`, {
             preserveScroll: true,
         });
@@ -1022,7 +1025,10 @@ export function CareSupportPlanTab({
                                             variant="ghost"
                                             size="icon"
                                             className="h-7 w-7 text-muted-foreground hover:text-status-critical"
-                                            onClick={() => removeSignOff(s.id)}
+                                            onClick={() =>
+                                                setSignOffToRemove(s)
+                                            }
+                                            aria-label={`Remove sign-off from ${s.party_name}`}
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
@@ -1096,6 +1102,16 @@ export function CareSupportPlanTab({
                     </CardContent>
                 </Card>
             ) : null}
+            <ConfirmDialog
+                open={signOffToRemove !== null}
+                onClose={() => setSignOffToRemove(null)}
+                onConfirm={() =>
+                    signOffToRemove && removeSignOff(signOffToRemove.id)
+                }
+                title="Remove sign-off?"
+                description={`Remove the sign-off from ${signOffToRemove?.party_name ?? 'this person'}? This action cannot be undone.`}
+                confirmText="Remove sign-off"
+            />
         </div>
     );
 }

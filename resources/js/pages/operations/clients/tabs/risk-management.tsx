@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -167,6 +168,7 @@ export function RiskManagementTab({
     >('active');
     const [severityFilter, setSeverityFilter] = useState<string>('all');
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [riskToDelete, setRiskToDelete] = useState<ClientRiskItem | null>(null);
 
     const filtered = useMemo(() => {
         return list
@@ -213,13 +215,6 @@ export function RiskManagementTab({
 
     const remove = (risk: ClientRiskItem) => {
         if (deletingId) return;
-        if (
-            !window.confirm(
-                `Remove the risk “${risk.label ?? 'Unlabelled risk'}” from this client?`,
-            )
-        ) {
-            return;
-        }
         setDeletingId(risk.id);
         router.delete(`/operations/clients/${clientId}/risks/${risk.id}`, {
             preserveScroll: true,
@@ -483,9 +478,8 @@ export function RiskManagementTab({
                                                             deletingId ===
                                                             risk.id
                                                         }
-                                                        onClick={() =>
-                                                            remove(risk)
-                                                        }
+                                                        onClick={() => setRiskToDelete(risk)}
+                                                        aria-label={`Remove ${risk.label ?? 'unlabelled risk'}`}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
@@ -515,6 +509,14 @@ export function RiskManagementTab({
             {homeHazardDetail ? (
                 <HazardDetailDialog key={homeHazardDetail.id} detail={homeHazardDetail} open onClose={closeHazard} readOnly registerHref="/compliance/hazards" />
             ) : null}
+            <ConfirmDialog
+                open={riskToDelete !== null}
+                onClose={() => setRiskToDelete(null)}
+                onConfirm={() => riskToDelete && remove(riskToDelete)}
+                title="Remove risk?"
+                description={`Remove “${riskToDelete?.label ?? 'Unlabelled risk'}” from this client? This action cannot be undone.`}
+                confirmText="Remove risk"
+            />
         </div>
     );
 }
