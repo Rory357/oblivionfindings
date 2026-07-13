@@ -26,6 +26,7 @@ use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\ShiftSignal;
 use App\Services\AuditLogger;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\ShiftSignalService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -41,8 +42,10 @@ class SignalProcessingService
     public function __construct(
         protected ControlRoomNotificationService $notifications,
         protected ?ShiftSignalService $shiftSignals = null,
+        protected ?IncidentJourneyService $journeys = null,
     ) {
         $this->shiftSignals ??= app(ShiftSignalService::class);
+        $this->journeys ??= app(IncidentJourneyService::class);
     }
 
     /**
@@ -187,7 +190,13 @@ class SignalProcessingService
         $alert = $this->createAlertFromSignal($signal, $rule);
 
         if ($incident !== null) {
-            $this->linkAlertToIncident($alert, $incident);
+            $alert = $this->journeys
+                ->attachAlertToIncident($incident, $alert)
+                ->alert;
+
+            if ($alert === null) {
+                throw new \RuntimeException('The canonical incident journey did not return its operational alert.');
+            }
         }
 
         return $alert;
@@ -445,7 +454,9 @@ class SignalProcessingService
                 ->first();
 
             if ($direct !== null) {
-                return $direct;
+                return $this->journeys
+                    ->attachAlertToIncident($incident, $direct)
+                    ->alert;
             }
         }
 
@@ -470,21 +481,12 @@ class SignalProcessingService
 
         $alert = $claims->first();
         if ($alert !== null) {
-            $this->linkAlertToIncident($alert, $incident);
+            $alert = $this->journeys
+                ->attachAlertToIncident($incident, $alert)
+                ->alert;
         }
 
         return $alert;
-    }
-
-    private function linkAlertToIncident(ControlRoomAlert $alert, ClientIncident $incident): void
-    {
-        $context = $alert->context ?? [];
-        $context['incident_id'] = $incident->id;
-        $alert->updateQuietly(['context' => $context]);
-
-        if ($incident->control_room_alert_id === null) {
-            $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
-        }
     }
 
     /**

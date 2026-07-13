@@ -173,6 +173,58 @@ class IncidentJourneyService
     }
 
     /**
+     * Adopt an already-created operational alert into an incident journey.
+     *
+     * Draft incidents receive only the alert compatibility link. Submitted
+     * incidents receive the complete alert/incident/H&S backlink set. This is
+     * the canonical write boundary for integrations that create their own alert.
+     */
+    public function attachAlertToIncident(
+        ClientIncident $incident,
+        ControlRoomAlert $alert,
+        ?User $actor = null,
+    ): IncidentJourney {
+        return DB::transaction(function () use ($incident, $alert, $actor): IncidentJourney {
+            $lockedIncident = $this->lockIncident($incident);
+            $lockedAlert = ControlRoomAlert::query()
+                ->whereKey($alert->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedIncident->status === 'draft') {
+                $this->assertDraftAlertLinkDoesNotConflict($lockedIncident, $lockedAlert);
+                $this->stampAlertProvenance($lockedIncident, $lockedAlert);
+                $this->linkDraftAlert($lockedIncident, $lockedAlert);
+
+                return new IncidentJourney(
+                    $lockedIncident->fresh(),
+                    $lockedAlert->fresh(),
+                    null,
+                );
+            }
+
+            $this->assertSubmitted($lockedIncident);
+            $this->assertAlertMatchesIncident($lockedIncident, $lockedAlert);
+            $this->stampAlertProvenance($lockedIncident, $lockedAlert);
+            $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
+            $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
+            $this->assertJourneyLinksDoNotConflict($lockedIncident, $lockedAlert, $hsEvent);
+            $this->linkJourney(
+                $lockedIncident,
+                $lockedAlert,
+                $hsEvent,
+                $actor,
+                $this->incidentAlertContext(
+                    $lockedIncident,
+                    data_get($lockedAlert->context, 'reason'),
+                ),
+            );
+
+            return $this->freshJourney($lockedIncident, $lockedAlert, $hsEvent);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
      * Resolve the journey without taking locks or repairing legacy gaps.
      */
     public function journeyForIncident(ClientIncident $incident): IncidentJourney
@@ -463,6 +515,10 @@ class IncidentJourneyService
         ?ControlRoomAlert $alert,
         HsEvent $hsEvent,
     ): void {
+        if ($alert !== null) {
+            $this->assertAlertMatchesIncident($incident, $alert);
+        }
+
         if ($incident->hs_event_id !== null && (int) $incident->hs_event_id !== (int) $hsEvent->id) {
             throw new \DomainException('Incident journey conflict: the incident has a different direct H&S event.');
         }
@@ -506,6 +562,98 @@ class IncidentJourneyService
                 throw new \DomainException('Incident journey conflict: the alert is directly linked to a different H&S event.');
             }
         }
+    }
+
+    private function assertDraftAlertLinkDoesNotConflict(
+        ClientIncident $incident,
+        ControlRoomAlert $alert,
+    ): void {
+        $this->assertAlertMatchesIncident($incident, $alert);
+        $existingHsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($incident->hs_event_id !== null
+            || $existingHsEvent !== null
+        ) {
+            throw new \DomainException('Incident journey conflict: a draft incident cannot own an H&S event.');
+        }
+
+        if ($incident->control_room_alert_id !== null
+            && (int) $incident->control_room_alert_id !== (int) $alert->id
+        ) {
+            throw new \DomainException('Incident journey conflict: the draft incident has a different direct alert.');
+        }
+
+        $otherIncident = ClientIncident::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->where('id', '!=', $incident->id)
+            ->lockForUpdate()
+            ->first();
+        if ($otherIncident !== null) {
+            throw new \DomainException('Incident journey conflict: the alert is directly linked to a different incident.');
+        }
+
+        $claimedHsEvent = HsEvent::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->lockForUpdate()
+            ->first();
+        if ($claimedHsEvent !== null) {
+            throw new \DomainException('Incident journey conflict: a draft incident alert is already linked to H&S.');
+        }
+    }
+
+    private function assertAlertMatchesIncident(
+        ClientIncident $incident,
+        ControlRoomAlert $alert,
+    ): void {
+        if ($incident->client_id === null
+            || $alert->client_id === null
+            || (int) $incident->client_id !== (int) $alert->client_id
+        ) {
+            throw new \DomainException('Incident journey conflict: the alert client does not match the incident client.');
+        }
+
+        foreach (['incident_id', 'normalized_data.incident_id'] as $path) {
+            $claim = data_get($alert->context, $path);
+            if ($claim === null || $claim === '') {
+                continue;
+            }
+
+            if (! is_numeric($claim) || (int) $claim !== (int) $incident->id) {
+                throw new \DomainException('Incident journey conflict: the alert context claims a different incident.');
+            }
+        }
+    }
+
+    private function linkDraftAlert(ClientIncident $incident, ControlRoomAlert $alert): void
+    {
+        $incident->forceFill(['control_room_alert_id' => $alert->id])->saveQuietly();
+        $context = array_replace((array) $alert->context, [
+            'incident_id' => $incident->id,
+        ]);
+        $alert->forceFill(['context' => $context])->saveQuietly();
+    }
+
+    private function stampAlertProvenance(ClientIncident $incident, ControlRoomAlert $alert): void
+    {
+        $metadata = is_array($incident->metadata) ? $incident->metadata : [];
+        $journey = is_array($metadata['journey'] ?? null) ? $metadata['journey'] : [];
+        $alertSeverity = HsEventService::normaliseSeverity((string) $alert->severity);
+
+        $journey['control_room_alert_id'] = $alert->id;
+        $journey['original_alert_source'] ??= $alert->source;
+        $journey['original_alert_severity'] = $this->higherSeverity(
+            is_string($journey['original_alert_severity'] ?? null)
+                ? $journey['original_alert_severity']
+                : null,
+            $alertSeverity,
+        );
+        $metadata['journey'] = $journey;
+
+        $incident->forceFill(['metadata' => $metadata])->saveQuietly();
     }
 
     /**

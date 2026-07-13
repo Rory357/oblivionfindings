@@ -4,14 +4,21 @@ namespace Tests\Feature\Emar;
 
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Medication\MedicationSignalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /**
@@ -72,6 +79,66 @@ class MedicationErrorsTest extends TestCase
         $error = MedicationError::query()->firstOrFail();
         $this->assertSame('yes', $error->reached_client);
         $this->assertSame('pending', $error->open_disclosure);
+    }
+
+    public function test_store_rolls_back_the_official_journey_when_signal_source_fails_and_retry_is_exact(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            protected function getSignalSource(): ?SignalSource
+            {
+                return null;
+            }
+        };
+        $this->app->instance(MedicationSignalService::class, $signals);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client));
+            $this->fail('Signal source failure must abort the medication error request.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Medication signal source is unavailable for an incident journey.', $exception->getMessage());
+        }
+
+        $this->assertNoMedicationErrorJourneyRecords();
+
+        $this->app->forgetInstance(MedicationSignalService::class);
+        $response = $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client));
+
+        $response->assertRedirect();
+        $this->assertOneCompleteMedicationErrorJourney();
+    }
+
+    public function test_store_rolls_back_the_official_journey_when_signal_processing_fails_and_retry_is_exact(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $processor = $this->partialMock(SignalProcessingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('process')
+                ->once()
+                ->andThrow(new \RuntimeException('Forced medication error processing failure'));
+        });
+        $this->app->instance(
+            MedicationSignalService::class,
+            new MedicationSignalService($processor),
+        );
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client));
+            $this->fail('Signal processing failure must abort the medication error request.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced medication error processing failure', $exception->getMessage());
+        }
+
+        $this->assertNoMedicationErrorJourneyRecords();
+
+        $this->app->forgetInstance(MedicationSignalService::class);
+        $this->app->forgetInstance(SignalProcessingService::class);
+        $response = $this->actingAs($user)->post('/emar/errors', $this->majorIncidentPayload($client));
+
+        $response->assertRedirect();
+        $this->assertOneCompleteMedicationErrorJourney();
     }
 
     public function test_close_out_marks_closed(): void
@@ -179,5 +246,47 @@ class MedicationErrorsTest extends TestCase
             ->all();
 
         $user->permissionOverrides()->syncWithoutDetaching($permissionMap);
+    }
+
+    private function majorIncidentPayload(Client $client): array
+    {
+        return [
+            'client_id' => $client->id,
+            'error_type' => 'wrong_dose',
+            'severity' => 'major',
+            'description' => 'A major medication error requiring an official incident.',
+            'immediate_action' => 'Clinical review completed.',
+            'create_incident' => true,
+        ];
+    }
+
+    private function assertNoMedicationErrorJourneyRecords(): void
+    {
+        $this->assertDatabaseCount('medication_errors', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+    }
+
+    private function assertOneCompleteMedicationErrorJourney(): void
+    {
+        $error = MedicationError::query()->sole();
+        $incident = ClientIncident::query()->sole();
+        $event = HsEvent::query()->sole();
+        $alert = ControlRoomAlert::query()->sole();
+        $signal = Signal::query()->sole();
+
+        $this->assertSame($incident->id, $error->client_incident_id);
+        $this->assertSame($event->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($alert->id, $event->control_room_alert_id);
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertDatabaseCount('medication_errors', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
     }
 }

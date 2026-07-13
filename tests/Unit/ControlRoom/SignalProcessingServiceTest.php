@@ -11,6 +11,8 @@ use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
+use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
 use Database\Seeders\RbacSeeder;
@@ -404,6 +406,109 @@ class SignalProcessingServiceTest extends TestCase
         $this->assertSame(2, ControlRoomAlert::query()->count());
     }
 
+    public function test_submitted_incident_signal_synchronises_the_existing_hs_event_alert_backlink(): void
+    {
+        $actor = User::factory()->create();
+        $client = Client::factory()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'reported_by' => $actor->id,
+            'status' => 'submitted',
+            'submitted_at' => now()->subMinute(),
+            'severity' => 'high',
+            'control_room_alert_id' => null,
+            'hs_event_id' => null,
+        ]));
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
+            'created_by' => $actor->id,
+            'control_room_alert_id' => null,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+        $source = $this->medicationIncidentSource();
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'medication.incident',
+            'idempotency_key' => 'submitted-existing-hs-backlink',
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $incident->id],
+            'severity_hint' => 'high',
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        $alert = $this->service->process($signal);
+
+        $this->assertNotNull($alert);
+        $this->assertSame($alert->id, $incident->fresh()->control_room_alert_id);
+        $this->assertSame($alert->id, $event->fresh()->control_room_alert_id);
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    public function test_direct_incident_alert_with_a_different_client_is_rejected_without_correlation(): void
+    {
+        $incidentClient = Client::factory()->create();
+        $alertClient = Client::factory()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $incidentClient->id,
+            'status' => 'draft',
+            'submitted_at' => null,
+            'control_room_alert_id' => null,
+        ]));
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'client_id' => $alertClient->id,
+            'context' => ['source_note' => 'legacy direct claim'],
+        ]);
+        $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
+        $signal = $this->incidentSignal($incidentClient, $incident, 'direct-client-mismatch');
+
+        try {
+            $this->service->process($signal);
+            $this->fail('A direct alert belonging to another client must not be correlated.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('client', $exception->getMessage());
+        }
+
+        $this->assertSame('pending', $signal->fresh()->status);
+        $this->assertNull($signal->fresh()->alert_id);
+        $this->assertNull($signal->fresh()->correlated_alert_id);
+        $this->assertSame(['source_note' => 'legacy direct claim'], $alert->fresh()->context);
+        $this->assertSame($alert->id, $incident->fresh()->control_room_alert_id);
+    }
+
+    public function test_context_incident_alert_with_a_different_client_is_rejected_without_linking(): void
+    {
+        $incidentClient = Client::factory()->create();
+        $alertClient = Client::factory()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $incidentClient->id,
+            'status' => 'draft',
+            'submitted_at' => null,
+            'control_room_alert_id' => null,
+        ]));
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'client_id' => $alertClient->id,
+            'context' => ['incident_id' => $incident->id],
+        ]);
+        $signal = $this->incidentSignal($incidentClient, $incident, 'context-client-mismatch');
+
+        try {
+            $this->service->process($signal);
+            $this->fail('A context claimant belonging to another client must not be linked.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('client', $exception->getMessage());
+        }
+
+        $this->assertSame('pending', $signal->fresh()->status);
+        $this->assertNull($signal->fresh()->alert_id);
+        $this->assertNull($signal->fresh()->correlated_alert_id);
+        $this->assertNull($incident->fresh()->control_room_alert_id);
+        $this->assertSame(['incident_id' => $incident->id], $alert->fresh()->context);
+    }
+
     public function test_generic_signals_still_use_fuzzy_deduplication(): void
     {
         $source = SignalSource::create([
@@ -579,6 +684,22 @@ class SignalProcessingServiceTest extends TestCase
             'vendor' => 'internal',
             'status' => 'active',
             'capabilities' => ['scheduled_checks', 'event_driven', 'incident_correlation'],
+        ]);
+    }
+
+    private function incidentSignal(Client $client, ClientIncident $incident, string $key): Signal
+    {
+        $source = $this->medicationIncidentSource();
+
+        return Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'medication.incident',
+            'idempotency_key' => $key,
+            'client_id' => $client->id,
+            'normalized_data' => ['incident_id' => $incident->id],
+            'severity_hint' => 'high',
+            'occurred_at' => now(),
+            'status' => 'pending',
         ]);
     }
 }

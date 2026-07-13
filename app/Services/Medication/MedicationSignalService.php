@@ -10,6 +10,7 @@ use App\Models\MedicationError;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -94,6 +95,8 @@ class MedicationSignalService
         array $context = [],
     ): void {
         $signal = null;
+        $hasIncidentClaim = $this->hasIncidentClaim($context);
+        $incidentIdentity = $context['incident_id'] ?? null;
 
         $idempotencyKey = $this->buildIdempotencyKey(
             $signalType,
@@ -102,49 +105,69 @@ class MedicationSignalService
         );
 
         try {
-            $source = $this->getSignalSource();
+            $operation = function () use (
+                $signalType,
+                $clientId,
+                $severity,
+                $message,
+                $context,
+                $idempotencyKey,
+                $hasIncidentClaim,
+                $incidentIdentity,
+                &$signal,
+            ): void {
+                $source = $this->getSignalSource();
 
-            if (is_numeric($context['incident_id'] ?? null) && $source === null) {
-                throw new \RuntimeException('Medication signal source is unavailable for an incident journey.');
-            }
+                if ($hasIncidentClaim && $source === null) {
+                    throw new \RuntimeException('Medication signal source is unavailable for an incident journey.');
+                }
 
-            $signalData = [
-                'signal_source_id' => $source?->id,
-                'signal_type_code' => $signalType,
-                'idempotency_key' => $idempotencyKey,
-                'site_id' => $context['site_id'] ?? null,
-                'client_id' => $clientId,
-                'severity_hint' => $severity,
-                'occurred_at' => $context['occurred_at'] ?? now(),
-                'payload' => [],
-                'normalized_data' => array_merge([
-                    'title' => $message,
-                    'description' => $message,
-                    'source_module' => 'medication',
-                    'signal_type' => $signalType,
+                $signalData = [
+                    'signal_source_id' => $source?->id,
+                    'signal_type_code' => $signalType,
+                    'idempotency_key' => $idempotencyKey,
+                    'site_id' => $context['site_id'] ?? null,
                     'client_id' => $clientId,
-                ], $context),
-            ];
+                    'severity_hint' => $severity,
+                    'occurred_at' => $context['occurred_at'] ?? now(),
+                    'payload' => [],
+                    'normalized_data' => array_merge([
+                        'title' => $message,
+                        'description' => $message,
+                        'source_module' => 'medication',
+                        'signal_type' => $signalType,
+                        'client_id' => $clientId,
+                    ], $context),
+                ];
 
-            $signal = $this->signalProcessor->ingest($signalData);
-            $alert = $this->signalProcessor->process($signal);
+                $signal = $this->signalProcessor->ingest($signalData);
+                $alert = $this->signalProcessor->process($signal);
 
-            if ($alert !== null && is_numeric($context['incident_id'] ?? null)) {
-                $this->attachSignalToIncidentAlert($signal, $alert, (int) $context['incident_id']);
-            }
+                if ($alert !== null && $hasIncidentClaim) {
+                    $this->attachSignalToIncidentAlert($signal, $alert, (int) $incidentIdentity);
+                }
 
-            if ($alert) {
-                Log::info('MedicationSignalService: alert created', [
-                    'signal_type' => $signalType,
-                    'alert_id' => $alert->id,
-                    'severity' => $severity,
-                    'client_id' => $clientId,
-                ]);
+                if ($alert) {
+                    Log::info('MedicationSignalService: alert created', [
+                        'signal_type' => $signalType,
+                        'alert_id' => $alert->id,
+                        'severity' => $severity,
+                        'client_id' => $clientId,
+                    ]);
+                }
+            };
+
+            if ($hasIncidentClaim) {
+                DB::transaction($operation);
+            } else {
+                $operation();
             }
         } catch (\Throwable $exception) {
-            if (is_numeric($context['incident_id'] ?? null)) {
+            if ($hasIncidentClaim) {
+                $this->signalSource = null;
                 Log::error('incident_journey_repair_required', [
-                    'incident_id' => (int) $context['incident_id'],
+                    'incident_id' => $this->incidentIdentityForLog($incidentIdentity),
+                    'incident_id_type' => get_debug_type($incidentIdentity),
                     'signal_id' => $signal?->id,
                     'signal_type' => $signalType,
                     'signal_client_id' => $clientId,
@@ -162,6 +185,20 @@ class MedicationSignalService
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function hasIncidentClaim(array $context): bool
+    {
+        return array_key_exists('incident_id', $context)
+            && $context['incident_id'] !== null
+            && $context['incident_id'] !== '';
+    }
+
+    private function incidentIdentityForLog(mixed $identity): int|string|float|bool|null
+    {
+        return is_scalar($identity) || $identity === null
+            ? $identity
+            : '['.get_debug_type($identity).']';
     }
 
     /**

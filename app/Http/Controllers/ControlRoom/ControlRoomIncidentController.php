@@ -16,6 +16,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -376,8 +377,8 @@ class ControlRoomIncidentController extends Controller
      * ControlRoomAlert together, bidirectionally linked. The alert drives the real-time
      * operator response; the incident is the system of record that flows on to H&S.
      *
-     * Wrapped in a transaction so the ClientIncidentObserver (afterCommit) sees the
-     * control_room_alert_id and back-links the HsEvent without raising a duplicate alert.
+     * Wrapped in a transaction and attached through IncidentJourneyService so the
+     * incident, alert, and H&S backlinks become visible together.
      */
     public function flagAsIncident(Request $request)
     {
@@ -409,18 +410,20 @@ class ControlRoomIncidentController extends Controller
         $incidentSeverity = $data['severity'] === 'critical' ? 'high' : $data['severity'];
 
         $result = DB::transaction(function () use ($data, $client, $incidentSeverity, $user) {
-            $incident = ClientIncident::create([
-                'client_id' => $client->id,
-                'reported_by' => $user->id,
-                'type' => $data['type'],
-                'source' => 'control_room',
-                'severity' => $incidentSeverity,
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'occurred_at' => now(),
-                'description' => $data['note'] ?? null,
-                'title' => $data['type'].' incident',
-            ]);
+            $incident = ClientIncident::withoutEvents(
+                fn () => ClientIncident::create([
+                    'client_id' => $client->id,
+                    'reported_by' => $user->id,
+                    'type' => $data['type'],
+                    'source' => 'control_room',
+                    'severity' => $incidentSeverity,
+                    'status' => 'submitted',
+                    'submitted_at' => now(),
+                    'occurred_at' => now(),
+                    'description' => $data['note'] ?? null,
+                    'title' => $data['type'].' incident',
+                ]),
+            );
 
             $alertData = [
                 'source' => 'control_room',
@@ -461,12 +464,10 @@ class ControlRoomIncidentController extends Controller
                 }
             }
 
-            // Bidirectional link (Gap D): incident -> alert (first-class FK).
-            // updateQuietly avoids re-firing the observer; the alert -> incident
-            // direction lives in the alert context above.
-            $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
+            $journey = app(IncidentJourneyService::class)
+                ->attachAlertToIncident($incident, $alert, $user);
 
-            return ['incident' => $incident, 'alert' => $alert];
+            return ['incident' => $journey->incident, 'alert' => $journey->alert];
         });
 
         AuditLogger::log('controlRoom.alert.flagAsIncident', $result['alert'], [

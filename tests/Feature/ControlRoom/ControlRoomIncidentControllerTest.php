@@ -5,10 +5,14 @@ namespace Tests\Feature\ControlRoom;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ControlRoomIncidentControllerTest extends TestCase
@@ -23,7 +27,7 @@ class ControlRoomIncidentControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -202,6 +206,10 @@ class ControlRoomIncidentControllerTest extends TestCase
         $this->assertSame('control_room', $alert->source);
         $this->assertSame('open', $alert->status);
         $this->assertSame($incident->id, $alert->context['incident_id']);
+        $event = HsEvent::query()->sole();
+        $this->assertSame($event->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $event->control_room_alert_id);
+        $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
     public function test_flag_as_incident_maps_critical_alert_to_high_incident(): void
@@ -222,5 +230,35 @@ class ControlRoomIncidentControllerTest extends TestCase
         // Incidents top out at 'high'; the alert keeps the operator's 'critical'.
         $this->assertSame('high', $incident->severity);
         $this->assertSame('critical', $alert->severity);
+        $event = HsEvent::query()->sole();
+        $this->assertSame('critical', $event->severity);
+        $this->assertSame($alert->id, $event->control_room_alert_id);
+    }
+
+    public function test_flag_as_incident_rolls_back_when_canonical_journey_attachment_fails(): void
+    {
+        $client = Client::factory()->create();
+        $this->partialMock(IncidentJourneyService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('attachAlertToIncident')
+                ->once()
+                ->andThrow(new \RuntimeException('Forced canonical attachment failure'));
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->admin)
+                ->post('/control-room/incidents/flag', [
+                    'client_id' => $client->id,
+                    'type' => 'fall',
+                    'severity' => 'high',
+                ]);
+            $this->fail('Canonical attachment failure must abort incident flagging.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced canonical attachment failure', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('hs_events', 0);
     }
 }

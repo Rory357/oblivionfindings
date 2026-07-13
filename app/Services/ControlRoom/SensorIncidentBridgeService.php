@@ -67,8 +67,8 @@ class SensorIncidentBridgeService
                 return $incident;
             }
 
+            $lockedAlert->refresh();
             $context = $lockedAlert->context ?? [];
-            $context['incident_id'] = $incident->id;
             $context['confirmed_by'] = $operator->name;
             $context['confirmed_at'] = now()->toISOString();
 

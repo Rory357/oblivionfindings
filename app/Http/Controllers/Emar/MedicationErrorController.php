@@ -9,10 +9,12 @@ use App\Models\MedicationError;
 use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class MedicationErrorController extends Controller
@@ -173,35 +175,38 @@ class MedicationErrorController extends Controller
         $validated['reported_at'] = now();
         $validated['status'] = 'reported';
 
-        // Optionally create a linked incident
-        $incidentId = null;
-        if ($request->boolean('create_incident')) {
-            $incident = ClientIncident::create([
-                'client_id' => $validated['client_id'],
-                'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
-                'description' => $validated['description'],
-                'occurred_at' => now(),
-                'reported_by' => $request->user()->id,
-                'severity' => match ($validated['severity']) {
-                    'critical' => 'critical',
-                    'major' => 'high',
-                    'moderate' => 'medium',
-                    default => 'low',
-                },
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'type' => 'medication_error',
-            ]);
-            $incidentId = $incident->id;
-        }
+        DB::transaction(function () use ($request, $validated): void {
+            $incident = null;
+            if ($request->boolean('create_incident')) {
+                $incident = ClientIncident::withoutEvents(
+                    fn () => ClientIncident::create([
+                        'client_id' => $validated['client_id'],
+                        'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
+                        'description' => $validated['description'],
+                        'occurred_at' => now(),
+                        'reported_by' => $request->user()->id,
+                        'severity' => match ($validated['severity']) {
+                            'critical' => 'critical',
+                            'major' => 'high',
+                            'moderate' => 'medium',
+                            default => 'low',
+                        },
+                        'status' => 'submitted',
+                        'submitted_at' => now(),
+                        'type' => 'medication_error',
+                    ]),
+                );
+                app(IncidentJourneyService::class)
+                    ->ensureForSubmittedIncident($incident, $request->user());
+            }
 
-        unset($validated['create_incident']);
-        $validated['client_incident_id'] = $incidentId;
+            $errorAttributes = $validated;
+            unset($errorAttributes['create_incident']);
+            $errorAttributes['client_incident_id'] = $incident?->id;
+            $error = MedicationError::create($errorAttributes);
 
-        $error = MedicationError::create($validated);
-
-        // Emit canonical signal for major/critical medication errors → Control Room
-        app(MedicationSignalService::class)->emitError($error);
+            app(MedicationSignalService::class)->emitError($error);
+        });
 
         return redirect()->back()->with('success', 'Medication error reported successfully.');
     }

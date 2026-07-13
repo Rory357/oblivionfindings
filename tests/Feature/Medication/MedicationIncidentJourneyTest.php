@@ -146,6 +146,36 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
+    public function test_malformed_incident_claim_is_logged_rethrown_and_rolled_back(): void
+    {
+        Log::spy();
+        [, $client] = $this->medicationFixture();
+
+        try {
+            app(MedicationSignalService::class)->emit(
+                MedicationSignalService::TYPE_MISSED_DOSE,
+                $client->id,
+                'medium',
+                'Malformed incident ownership claim.',
+                ['incident_id' => 'not-a-canonical-incident-id'],
+            );
+            $this->fail('A malformed incident claim must fail closed to its owner.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('valid incident', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        Log::shouldHaveReceived('error')->withArgs(
+            fn (string $message, array $context): bool => $message === 'incident_journey_repair_required'
+                && $context['incident_id'] === 'not-a-canonical-incident-id'
+                && $context['incident_id_type'] === 'string'
+                && is_int($context['signal_id'])
+                && $context['signal_type'] === MedicationSignalService::TYPE_MISSED_DOSE
+                && $context['exception'] === \DomainException::class,
+        );
+    }
+
     public function test_internal_medication_source_can_attach_a_canonical_incident_claim(): void
     {
         [, $client] = $this->medicationFixture();
@@ -377,6 +407,23 @@ class MedicationIncidentJourneyTest extends TestCase
                 ->map(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'))
                 ->all(),
         );
+
+        $firstAlert = ControlRoomAlert::query()
+            ->where('context->incident_id', $first->id)
+            ->sole();
+        $first->forceFill([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ])->saveQuietly();
+        $actor = User::query()->findOrFail($first->reported_by);
+        $submittedJourney = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($first->fresh(), $actor);
+
+        $this->assertNotNull($submittedJourney->hsEvent);
+        $this->assertSame($firstAlert->id, $submittedJourney->incident->control_room_alert_id);
+        $this->assertSame($firstAlert->id, $submittedJourney->hsEvent->control_room_alert_id);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertDatabaseCount('control_room_alerts', 2);
     }
 
     public function test_refusal_escalation_reuses_the_exact_followup_incident_on_retry(): void
@@ -802,7 +849,7 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertNull($incident->fresh()->control_room_alert_id);
         $this->assertNull(data_get($first->fresh()->context, 'signal_id'));
         $this->assertNull(data_get($second->fresh()->context, 'signal_id'));
-        $this->assertSame('pending', Signal::query()->sole()->status);
+        $this->assertDatabaseCount('control_room_signals', 0);
         $this->assertDatabaseCount('control_room_alerts', 2);
     }
 
@@ -826,7 +873,7 @@ class MedicationIncidentJourneyTest extends TestCase
         }
 
         $this->assertNull($incident->fresh()->control_room_alert_id);
-        $this->assertSame('pending', Signal::query()->sole()->status);
+        $this->assertDatabaseCount('control_room_signals', 0);
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
