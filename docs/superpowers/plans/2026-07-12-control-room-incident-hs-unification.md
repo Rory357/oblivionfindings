@@ -517,6 +517,7 @@ git commit -m "feat(health-safety): accept incident handovers"
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomTaskController.php`
 - Modify: `app/Jobs/CheckControlRoomSlaBreaches.php`
 - Modify: `app/Jobs/AutoEscalateControlRoomQueues.php`
+- Modify: `routes/control-room.php`
 - Test: `tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php`
 - Test: `tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php`
 
@@ -526,7 +527,7 @@ Cover `open → ack → triaging → resolved → closed`, confirmed continuing 
 
 - [ ] **Step 2: Write failing open-task resolution test**
 
-An alert with `open`, `in_progress`, or `blocked` tasks must reject resolution. Completed/cancelled/transferred tasks permit it.
+An alert with `open`, `in_progress`, or `blocked` tasks must reject resolution. Completed/cancelled/transferred tasks permit it. Cancelling a task requires a non-empty reason and records that reason in the audit trail; a bare status flip is rejected.
 
 - [ ] **Step 3: Implement lifecycle API**
 
@@ -557,7 +558,7 @@ Run: `php artisan test tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTe
 - [ ] **Step 7: Commit**
 
 ```powershell
-git add app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Models/ControlRoomAlert.php app/Models/ControlRoom/AlertSla.php app/Http/Controllers/ControlRoom app/Jobs tests/Unit/ControlRoom tests/Feature/ControlRoom
+git add app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Models/ControlRoomAlert.php app/Models/ControlRoom/AlertSla.php app/Http/Controllers/ControlRoom app/Jobs routes/control-room.php tests/Unit/ControlRoom tests/Feature/ControlRoom
 git commit -m "fix(control-room): make lifecycle and sla truthful"
 ```
 
@@ -572,6 +573,7 @@ git commit -m "fix(control-room): make lifecycle and sla truthful"
 - Modify: `app/Services/HealthSafety/HsInvestigationService.php`
 - Modify: `app/Services/HealthSafety/HsEventService.php`
 - Modify: `app/Http/Controllers/HealthSafety/HsInvestigationController.php`
+- Modify: `database/seeders/RbacSeeder.php`
 - Modify: `routes/health-safety.php`
 - Modify: `resources/js/pages/health-safety/events/show.tsx`
 - Test: `tests/Feature/HealthSafety/HsRecommendationDispositionTest.php`
@@ -594,7 +596,7 @@ public function undispositionedRecommendationIndexes(HsInvestigation $investigat
 
 - [ ] **Step 4: Add all closure blockers**
 
-`HsEventService::closeBlockers()` returns blockers for unaccepted handover, pending WorkSafe, incomplete investigation, undispositioned recommendation, and unverified/open corrective action. Overrides remain explicitly permissioned and audited.
+`HsEventService::closeBlockers()` returns blockers for unaccepted handover, pending WorkSafe, incomplete investigation, undispositioned recommendation, and unverified/open corrective action. Add the explicit `healthSafety.overrideClosure` permission; a reason alone never authorises bypass. Every authorised override records actor, reason, and blockers in the audit trail.
 
 - [ ] **Step 5: Render disposition controls and blockers**
 
