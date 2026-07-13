@@ -65,7 +65,7 @@ Three focused components under `resources/js/components/hr/` wrap `HrHero`. They
 - Every functional change begins with a focused failing Pest or Vitest test and recorded RED/GREEN output in `docs/hr-outstanding-ui-ux-goal.md`.
 - Focused backend suites cover E-signature, approval federation, Wellbeing actor/tenant scope, and the existing Control Room boundary.
 - Frontend contract tests prove the three specialised heroes, duplicate-KPI removal, approval date helper/empty state, signature date helper, and accessible Wellbeing undo copy.
-- Final gates include PHP syntax, scoped Pint, scoped Prettier, zero-warning scoped ESLint, TypeScript, Vitest, focused and aggregate HR Pest, client build, SSR build, `git diff --check`, real local desktop/mobile browser checks, and process cleanup.
+- Final gates include PHP syntax, scoped Pint, scoped Prettier, zero-warning scoped ESLint, TypeScript, Vitest, focused and aggregate HR Pest, client build, SSR build, `git diff --check`, real local desktop-web browser checks, and process cleanup. Mobile-card and WebView support are explicitly outside this desktop application track.
 
 ## Explicit non-goals
 

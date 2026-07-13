@@ -226,3 +226,20 @@ Every grouped Chrome row had an empty console-error list. Nginx recorded zero `>
 | Closeout contained-gate notes | Several slices deferred the full suite/build | **Stale for that release.** Closeout C10 `9eaab3a5` ran the complete terminal release gates. This does not substitute for the deferred-backlog branch’s own final proof. |
 | Deferred-backlog Task 13 Step 5 | Browser proof for audit log, calendar, salary bands, offboarding, recruitment, leave chains, payroll, training, feedback, supervision, time refresh and licence requirements | **Still unverified.** The attempted browser pass was interrupted by a Codex crash. No URL/actor/action/visible-result/console/network matrix exists, so L1/release closeout must not be marked fully complete. |
 | Run 14 resolution of Task 13 Step 5 | Production Chrome proof on the changed HR surfaces plus exact cleanup and normal scheduled-interval observation | **Verified complete on 13 July 2026.** Application SHA `46acdd31`; Demo Admin plus the exact marker-scoped payroll persona; empty grouped console errors; zero Chrome-source Nginx `>=400`; exact marker counts zero; private attachment absent; production baseline restored. |
+
+## Separate approved outstanding UI/UX track — 2026-07-13
+
+This append-only addendum does not rewrite the historical L1 disposition or reopen the completed combined Client/HR live release. A separate user-approved HR track now owns four previously optional redesign ideas plus any current P0/P1 defect proven during re-audit.
+
+| Historical observation | New current-source evidence | Track status |
+|---|---|---|
+| Wellbeing actor-scoped undo clarity | Existing service already scopes by staff + actor and the controller enforces permission/tenant; no explicit regression or accessible explanation existed. Confidentiality and the no-Control-Room boundary remain unchanged. | **Implemented, verification in progress:** actor/tenant tests added; accessible bounded undo copy added. |
+| Generic chain item text, raw dates, bare all-empty experience | Native queues and their owning links remain canonical. Generic rows exposed raw model names and both collections rendered separate bare empty rows. | **Implemented, verification in progress:** friendly server label, ISO instants, shared en-NZ formatting, and combined empty state; no workflow migration. |
+| Sign/decline requester notices and raw signature dates | Re-audit also proved a more serious current defect: request/sender/signer paths did not consistently enforce the resolved HR tenant. | **Backend GREEN 13/51; broader verification in progress:** tenant guards, privacy-minimal same-tenant outcome notice, self/repeat suppression, and shared date formatting implemented. |
+| Analytics/Headcount/Succession specialised heroes | Analytics and Headcount repeated the same KPIs immediately below generic heroes; Succession kept useful stats/actions inline. | **Implemented, verification in progress:** dedicated HR heroes use existing server stats/actions; duplicate Analytics/Headcount KPI rows removed. |
+
+Approved boundaries remain absolute: native approvals remain canonical, HR/governance performance stays separate, H&S acknowledgements stay H&S-owned/read-only in HR, and confidential Wellbeing remains outside Control Room.
+
+### Separate-track verification closeout — 2026-07-13
+
+The later permission-resumed run closes the four `verification in progress` markers above without altering any historical L1 classification. This application is desktop-web only; mobile-card/WebView changes and acceptance claims were removed before commit. Final evidence: **38 focused HR tests / 300 assertions**, **10 desktop frontend contract tests**, scoped syntax/Pint/Prettier/ESLint/TypeScript green, standard client and SSR builds green, and compiled Playwright proof across **5 desktop surfaces**. Native approval ownership, Wellbeing confidentiality/no-Control-Room, and all approved D-7/D-10/D-11 boundaries remain unchanged.

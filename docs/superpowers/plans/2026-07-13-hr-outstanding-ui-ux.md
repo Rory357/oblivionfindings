@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Closeout status (2026-07-13):** Implemented and verified for the corrected desktop-web-only scope. The task checkboxes below are retained as the original execution recipe; exact RED/GREEN evidence and commits are recorded in `docs/hr-outstanding-ui-ux-goal.md`.
+
 **Goal:** Close the proven HR e-signature, approvals, Wellbeing clarity, and specialised-hero gaps without changing canonical workflow ownership.
 
 **Architecture:** Strengthen tenant guards and lifecycle notices at the existing e-signature controller/service boundary, enrich the existing approvals presenter, clarify the existing actor-scoped Wellbeing undo, and move three dashboards onto small dedicated `HrHero` components. Existing models, routes, state machines, and shared UI primitives remain authoritative.
@@ -96,6 +98,6 @@
 
 - [ ] **Step 1: Run the focused backend bundle for e-signatures, approvals, Wellbeing, Analytics, Headcount, and Succession and record exact counts.**
 - [ ] **Step 2: Run proportional aggregate HR tests, full relevant Vitest, PHP syntax, scoped Pint, scoped Prettier, zero-warning ESLint, TypeScript, client build, SSR build, and `git diff --check`; record exit codes and any baseline boundary.**
-- [ ] **Step 3: Start a worktree-bound local server/asset host, verify exact changed URLs at desktop and mobile widths with a non-production test actor, record visible results plus console/network state, and terminate every started process.**
+- [ ] **Step 3: Start a worktree-bound local server/asset host, verify exact changed URLs at desktop-web width with non-production synthetic props, record visible results plus console/network state, and terminate every started process. Mobile/WebView acceptance is out of scope.**
 - [ ] **Step 4: Review `git diff 4d3948c1...HEAD`, confirm no Client/generated/package-lock/broad formatting churn, and append factual final evidence to both ledgers.**
 - [ ] **Step 5: Commit final documentation, run a fresh clean-status and HEAD verification, and report exact branch/worktree/commits/tests/boundaries/processes.**
