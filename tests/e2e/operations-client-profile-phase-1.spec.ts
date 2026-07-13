@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-import { loginAsStaff, runLaravelPhp } from './helpers';
+import {
+    collectConsoleErrors,
+    expectNoConsoleErrors,
+    loginAsStaff,
+    runLaravelPhp,
+} from './helpers';
+
+const fixtureClientIds = new Set<number>();
+
+test.use({ viewport: { width: 1440, height: 900 } });
 
 function seedClientProfilePhaseOneFixture() {
     const output = runLaravelPhp(`
@@ -9,14 +18,154 @@ $client = \\App\\Models\\Client::factory()->create([
     'last_name' => 'Profile',
     'status' => 'active',
 ]);
+$recentClient = \\App\\Models\\Client::factory()->create([
+    'first_name' => 'Recent',
+    'last_name' => 'Playwright Client',
+    'status' => 'active',
+]);
 
-echo json_encode(['clientId' => $client->id]);
+echo json_encode([
+    'clientId' => $client->id,
+    'recentClientId' => $recentClient->id,
+]);
 `);
 
-    return JSON.parse(output) as { clientId: number };
+    const fixture = JSON.parse(output) as {
+        clientId: number;
+        recentClientId: number;
+    };
+
+    fixtureClientIds.add(fixture.clientId);
+    fixtureClientIds.add(fixture.recentClientId);
+
+    return fixture;
+}
+
+function cleanupClientProfilePhaseOneFixtures() {
+    if (fixtureClientIds.size === 0) {
+        return;
+    }
+
+    const ids = [...fixtureClientIds];
+    runLaravelPhp(`
+$ids = ${JSON.stringify(ids)};
+\\App\\Models\\Client::withoutEvents(function () use ($ids) {
+    foreach (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->get() as $client) {
+        $client->forceDelete();
+    }
+});
+\\Illuminate\\Support\\Facades\\DB::table('audit_logs')
+    ->where('auditable_type', 'client')
+    ->whereIn('auditable_id', $ids)
+    ->delete();
+if (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->exists()) {
+    throw new \\RuntimeException('Client profile fixture hard-delete did not remove every exact ID.');
+}
+`);
+    fixtureClientIds.clear();
 }
 
 test.describe('operations client profile phase 1', () => {
+    test.afterEach(() => {
+        cleanupClientProfilePhaseOneFixtures();
+    });
+
+    test('canonicalizes the legacy care plan tab without breaking Inertia history or dialog state', async ({
+        page,
+    }) => {
+        const { clientId, recentClientId } = seedClientProfilePhaseOneFixture();
+        const consoleErrors = collectConsoleErrors(page);
+        const failedTargetRequests: string[] = [];
+        page.on('response', (response) => {
+            if (
+                response.url().includes(`/operations/clients/${clientId}`) &&
+                response.status() >= 400
+            ) {
+                failedTargetRequests.push(
+                    `${response.status()} ${response.request().method()} ${response.url()}`,
+                );
+            }
+        });
+
+        await loginAsStaff(page);
+        await page.evaluate(
+            ({ id }) => {
+                window.localStorage.setItem(
+                    'recentClients',
+                    JSON.stringify([
+                        {
+                            id,
+                            name: 'Recent Playwright Client',
+                            photo: null,
+                            house: null,
+                        },
+                    ]),
+                );
+            },
+            { id: recentClientId },
+        );
+        const previousUrl = page.url();
+        const historyLength = await page.evaluate(() => window.history.length);
+
+        await page.goto(
+            `/operations/clients/${clientId}?tab=support_plan&dialog=quick_note&record=99&source=legacy`,
+        );
+
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        expect(await page.evaluate(() => window.history.length)).toBe(
+            historyLength + 1,
+        );
+        expect(new URL(page.url()).searchParams.get('dialog')).toBe(
+            'quick_note',
+        );
+        expect(new URL(page.url()).searchParams.get('record')).toBe('99');
+        expect(new URL(page.url()).searchParams.get('source')).toBe('legacy');
+        await expect(page.getByTestId('client-group-plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+        await expect(
+            page.getByTitle('Recent Playwright Client'),
+        ).toHaveAttribute(
+            'href',
+            `/operations/clients/${recentClientId}?tab=care_plans`,
+        );
+
+        await page.goBack();
+        await expect(page).toHaveURL(previousUrl);
+        await page.goForward();
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+
+        await page.reload();
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('tab'))
+            .toBe('care_plans');
+        await expect(
+            page.getByTestId('client-quick-note-dialog'),
+        ).toBeVisible();
+
+        expectNoConsoleErrors(consoleErrors);
+        expect(failedTargetRequests).toEqual([]);
+    });
+
     test('submits a quick note from the web profile hero and projects it to the timeline', async ({
         page,
     }) => {
@@ -27,11 +176,10 @@ test.describe('operations client profile phase 1', () => {
         await expect(
             page.getByRole('heading', { name: /Playwright Profile/i }),
         ).toBeVisible();
-        await expect(
-            page.getByTestId('client-profile-quick-note-button'),
-        ).toBeVisible();
+        await expect(page.getByTestId('client-profile-add-note')).toBeVisible();
 
-        await page.getByTestId('client-profile-quick-note-button').click();
+        await page.getByTestId('client-profile-add-note').click();
+        await page.getByRole('menuitem', { name: 'Quick note' }).click();
         await expect(
             page.getByTestId('client-quick-note-dialog'),
         ).toBeVisible();
@@ -75,9 +223,7 @@ echo json_encode([
         await loginAsStaff(page);
 
         await page.goto(`/operations/clients/${clientId}`);
-        await expect(
-            page.getByTestId('client-profile-quick-note-button'),
-        ).toBeVisible();
+        await expect(page.getByTestId('client-profile-add-note')).toBeVisible();
 
         await page.keyboard.press('n');
         await expect(
@@ -111,5 +257,68 @@ echo json_encode([
                 .getByTestId('client-daily-notes-tab')
                 .getByText('Review Queue'),
         ).toBeVisible();
+    });
+
+    test('resumes, saves and discards an author-owned daily note draft in profile', async ({
+        page,
+    }) => {
+        const { clientId } = seedClientProfilePhaseOneFixture();
+        runLaravelPhp(`
+$client = \\App\\Models\\Client::query()->findOrFail(${clientId});
+$author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
+\\App\\Models\\ClientNote::query()->create([
+    'client_id' => $client->id,
+    'organization_id' => $client->organization_id,
+    'user_id' => $author->id,
+    'type' => 'daily_note',
+    'category' => 'activity',
+    'subject' => 'Draft pool visit',
+    'body' => 'Draft detail from the morning shift.',
+    'occurred_at' => now(),
+    'visibility' => 'internal',
+    'is_draft' => true,
+]);
+`);
+        await loginAsStaff(page);
+
+        await page.goto(`/operations/clients/${clientId}?tab=progress_notes`);
+        await page
+            .getByRole('button', { name: 'Resume draft' })
+            .first()
+            .click();
+        await expect(
+            page.getByTestId('client-daily-note-dialog'),
+        ).toBeVisible();
+        await page.getByTestId('daily-note-next').click();
+        await expect(page.getByLabel('Short heading')).toHaveValue(
+            'Draft pool visit',
+        );
+        await expect(page.getByTestId('daily-note-body')).toHaveValue(
+            'Draft detail from the morning shift.',
+        );
+
+        await page.getByLabel('Short heading').fill('Updated pool visit');
+        await page
+            .getByTestId('daily-note-body')
+            .fill('Updated detail ready for the next worker.');
+        await page.getByRole('button', { name: 'Save Draft' }).click();
+        await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
+        await expect(
+            page.getByText('Updated pool visit').first(),
+        ).toBeVisible();
+
+        await page
+            .getByRole('button', { name: 'Resume draft' })
+            .first()
+            .click();
+        await page.getByRole('button', { name: 'Discard draft' }).click();
+        await expect(
+            page.getByRole('alertdialog', { name: 'Discard draft?' }),
+        ).toBeVisible();
+        await page.getByRole('button', { name: 'Discard draft' }).click();
+        await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
+        await expect(
+            page.getByRole('button', { name: 'Resume draft' }),
+        ).toHaveCount(0);
     });
 });

@@ -105,7 +105,13 @@ const BADGE_TONE: Record<HeroBadge['tone'], string> = {
 const GLASS =
     'border border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm';
 
-function HeroChip({ icon: Icon, children }: { icon?: IconType; children: ReactNode }) {
+function HeroChip({
+    icon: Icon,
+    children,
+}: {
+    icon?: IconType;
+    children: ReactNode;
+}) {
     return (
         <span
             className={cn(
@@ -144,7 +150,9 @@ function HeroBadgePill({ badge }: { badge: HeroBadge }) {
 
 function Trend({ dir }: { dir: HeroVital['trend'] }) {
     if (dir === 'flat')
-        return <Minus className="h-[13px] w-[13px] text-primary-foreground/60" />;
+        return (
+            <Minus className="h-[13px] w-[13px] text-primary-foreground/60" />
+        );
     if (dir === 'up')
         return <TrendingUp className="h-[13px] w-[13px] text-status-success" />;
     return <TrendingDown className="h-[13px] w-[13px] text-status-warning" />;
@@ -167,7 +175,15 @@ function VitalTile({ v }: { v: HeroVital }) {
     );
 }
 
-function StatTile({ icon: Icon, label, value }: { icon: IconType; label: string; value: string }) {
+function StatTile({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: IconType;
+    label: string;
+    value: string;
+}) {
     return (
         <div className={cn('rounded-xl px-3 py-2 text-center', GLASS)}>
             <div className="mb-0.5 flex items-center justify-center gap-1 text-[10px] font-semibold tracking-wide text-primary-foreground/65 uppercase">
@@ -179,40 +195,61 @@ function StatTile({ icon: Icon, label, value }: { icon: IconType; label: string;
     );
 }
 
-function ShiftDetailRow({ icon: Icon, label, value }: { icon: IconType; label: string; value: string }) {
+function ShiftDetailRow({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: IconType;
+    label: string;
+    value: string;
+}) {
     return (
         <div className="flex items-center gap-2">
             <Icon className="h-[13px] w-[13px] text-primary-foreground/60" />
-            <span className="text-[11px] text-primary-foreground/60">{label}</span>
+            <span className="text-[11px] text-primary-foreground/60">
+                {label}
+            </span>
             <span className="ml-auto text-[11px] font-semibold">{value}</span>
         </div>
     );
 }
 
-function NextShiftTile({ shift, onOpen }: { shift: HeroNextShift | null; onOpen: () => void }) {
+function NextShiftTile({
+    shift,
+    onOpen,
+}: {
+    shift: HeroNextShift | null;
+    onOpen?: () => void;
+}) {
     if (!shift) {
         return (
-            <div className={cn('flex items-center gap-3 rounded-xl px-3.5 py-2.5', GLASS)}>
+            <div
+                className={cn(
+                    'flex items-center gap-3 rounded-xl px-3.5 py-2.5',
+                    GLASS,
+                )}
+            >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/15">
                     <CalendarClock className="h-[17px] w-[17px]" />
                 </span>
                 <div className="min-w-0 leading-tight">
-                    <div className="text-[11px] text-primary-foreground/65">Next shift</div>
-                    <div className="text-sm font-semibold">Nothing rostered</div>
+                    <div className="text-[11px] text-primary-foreground/65">
+                        Next shift
+                    </div>
+                    <div className="text-sm font-semibold">
+                        Nothing rostered
+                    </div>
                 </div>
             </div>
         );
     }
-    const pct = shift.tasksTotal > 0 ? Math.round((shift.tasksDone / shift.tasksTotal) * 100) : 0;
-    return (
-        <button
-            type="button"
-            onClick={onOpen}
-            className={cn(
-                'group/shift cursor-pointer rounded-xl px-3.5 py-2.5 text-left transition-all',
-                GLASS,
-            )}
-        >
+    const pct =
+        shift.tasksTotal > 0
+            ? Math.round((shift.tasksDone / shift.tasksTotal) * 100)
+            : 0;
+    const content = (
+        <>
             <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/15">
                     <CalendarClock className="h-[17px] w-[17px]" />
@@ -226,12 +263,18 @@ function NextShiftTile({ shift, onOpen }: { shift: HeroNextShift | null; onOpen:
                             </span>
                         ) : null}
                     </div>
-                    <div className="truncate text-sm font-semibold">{shift.when}</div>
+                    <div className="truncate text-sm font-semibold">
+                        {shift.when}
+                    </div>
                     <div className="truncate text-[11px] text-primary-foreground/65">
-                        {[shift.staffName, shift.typeLabel].filter(Boolean).join(' · ')}
+                        {[shift.staffName, shift.typeLabel]
+                            .filter(Boolean)
+                            .join(' · ')}
                     </div>
                 </div>
-                <ChevronDown className="h-[15px] w-[15px] shrink-0 text-primary-foreground/60 transition-transform duration-300 group-hover/shift:rotate-180" />
+                {onOpen ? (
+                    <ChevronDown className="h-[15px] w-[15px] shrink-0 text-primary-foreground/60 transition-transform duration-300 group-hover/shift:rotate-180" />
+                ) : null}
             </div>
 
             <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 ease-out group-hover/shift:mt-2.5 group-hover/shift:grid-rows-[1fr] group-hover/shift:opacity-100 group-focus-visible/shift:mt-2.5 group-focus-visible/shift:grid-rows-[1fr] group-focus-visible/shift:opacity-100">
@@ -241,10 +284,12 @@ function NextShiftTile({ shift, onOpen }: { shift: HeroNextShift | null; onOpen:
                             <div>
                                 <div className="mb-1 flex items-center justify-between">
                                     <span className="flex items-center gap-1.5 text-[11px] text-primary-foreground/60">
-                                        <ListChecks className="h-[13px] w-[13px]" /> Shift tasks
+                                        <ListChecks className="h-[13px] w-[13px]" />{' '}
+                                        Shift tasks
                                     </span>
                                     <span className="text-[11px] font-semibold">
-                                        {shift.tasksDone}/{shift.tasksTotal} done
+                                        {shift.tasksDone}/{shift.tasksTotal}{' '}
+                                        done
                                     </span>
                                 </div>
                                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary-foreground/20">
@@ -256,18 +301,31 @@ function NextShiftTile({ shift, onOpen }: { shift: HeroNextShift | null; onOpen:
                             </div>
                         ) : null}
                         {shift.location ? (
-                            <ShiftDetailRow icon={Home} label="Location" value={shift.location} />
+                            <ShiftDetailRow
+                                icon={Home}
+                                label="Location"
+                                value={shift.location}
+                            />
                         ) : null}
                         {shift.breakLabel ? (
-                            <ShiftDetailRow icon={Coffee} label="Break" value={shift.breakLabel} />
+                            <ShiftDetailRow
+                                icon={Coffee}
+                                label="Break"
+                                value={shift.breakLabel}
+                            />
                         ) : null}
                         {shift.medsLabel ? (
-                            <ShiftDetailRow icon={Pill} label="Meds" value={shift.medsLabel} />
+                            <ShiftDetailRow
+                                icon={Pill}
+                                label="Meds"
+                                value={shift.medsLabel}
+                            />
                         ) : null}
                         {shift.handoverSnippet ? (
                             <div className="rounded-lg bg-primary-foreground/10 px-2.5 py-2 text-left">
                                 <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-primary-foreground/55 uppercase">
-                                    <MessageSquare className="h-[11px] w-[11px]" /> Pinned handover
+                                    <MessageSquare className="h-[11px] w-[11px]" />{' '}
+                                    Pinned handover
                                 </div>
                                 <p className="line-clamp-2 text-[11px] leading-snug text-primary-foreground/85">
                                     {shift.handoverSnippet}
@@ -277,29 +335,60 @@ function NextShiftTile({ shift, onOpen }: { shift: HeroNextShift | null; onOpen:
                     </div>
                 </div>
             </div>
+        </>
+    );
+
+    return onOpen ? (
+        <button
+            type="button"
+            onClick={onOpen}
+            className={cn(
+                'group/shift cursor-pointer rounded-xl px-3.5 py-2.5 text-left transition-all',
+                GLASS,
+            )}
+        >
+            {content}
         </button>
+    ) : (
+        <div
+            className={cn(
+                'group/shift rounded-xl px-3.5 py-2.5 text-left',
+                GLASS,
+            )}
+        >
+            {content}
+        </div>
     );
 }
 
-function SafetyStrip({ safety, onOpen }: { safety: HeroSafety; onOpen: () => void }) {
+function SafetyStrip({
+    safety,
+    onOpen,
+}: {
+    safety: HeroSafety;
+    onOpen?: () => void;
+}) {
     const others = safety.alerts.length;
     if (!safety.allergies.length && !others) {
         return (
-            <div className={cn('flex h-full items-center gap-3 rounded-xl px-3.5 py-2.5', GLASS)}>
+            <div
+                className={cn(
+                    'flex h-full items-center gap-3 rounded-xl px-3.5 py-2.5',
+                    GLASS,
+                )}
+            >
                 <Shield className="h-4 w-4 text-primary-foreground/80" />
-                <span className="text-xs font-bold tracking-wide uppercase">Safety information</span>
+                <span className="text-xs font-bold tracking-wide uppercase">
+                    Safety information
+                </span>
                 <span className="text-xs text-primary-foreground/70">
                     No allergies or active safety alerts recorded
                 </span>
             </div>
         );
     }
-    return (
-        <button
-            type="button"
-            onClick={onOpen}
-            className="flex h-full w-full cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-status-critical/45 bg-status-critical/15 px-3.5 py-2.5 text-left transition-all hover:bg-status-critical/20"
-        >
+    const content = (
+        <>
             <ShieldAlert className="h-4 w-4 text-primary-foreground" />
             <span className="text-xs font-bold tracking-wide text-primary-foreground uppercase">
                 Safety information
@@ -318,11 +407,26 @@ function SafetyStrip({ safety, onOpen }: { safety: HeroSafety; onOpen: () => voi
                 ))}
                 {others > 0 ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/10 px-2.5 py-1 text-xs font-medium text-primary-foreground/90">
-                        <Info className="h-3 w-3" /> +{others} other {others > 1 ? 'risks' : 'risk'}
+                        <Info className="h-3 w-3" /> +{others} other{' '}
+                        {others > 1 ? 'risks' : 'risk'}
                     </span>
                 ) : null}
             </span>
+        </>
+    );
+
+    return onOpen ? (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="flex h-full w-full cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-status-critical/45 bg-status-critical/15 px-3.5 py-2.5 text-left transition-all hover:bg-status-critical/20"
+        >
+            {content}
         </button>
+    ) : (
+        <div className="flex h-full w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-status-critical/45 bg-status-critical/15 px-3.5 py-2.5 text-left">
+            {content}
+        </div>
     );
 }
 
@@ -348,7 +452,7 @@ export function ClientProfileHero({
     nextShift,
     safety,
     stats,
-    canEdit,
+    noteCapabilities,
     chatBadge,
     onAddNote,
     onChat,
@@ -372,13 +476,19 @@ export function ClientProfileHero({
     nextShift: HeroNextShift | null;
     safety: HeroSafety;
     stats: { key: string; icon: IconType; label: string; value: string }[];
-    canEdit: boolean;
+    noteCapabilities: {
+        dailyNote: boolean;
+        quickNote: boolean;
+        communicationNote: boolean;
+    };
     chatBadge?: number;
-    onAddNote: (key: 'daily_note' | 'quick_note' | 'comm_note' | 'log_incident') => void;
-    onChat: () => void;
-    onEdit: () => void;
-    onOpenShift: () => void;
-    onOpenSafety: () => void;
+    onAddNote: (
+        key: 'daily_note' | 'quick_note' | 'comm_note' | 'log_incident',
+    ) => void;
+    onChat?: () => void;
+    onEdit?: () => void;
+    onOpenShift?: () => void;
+    onOpenSafety?: () => void;
     moreItems: MoreMenuItem[];
     footer?: ReactNode;
     backLabel?: string;
@@ -411,7 +521,9 @@ export function ClientProfileHero({
                     <div className="flex items-start gap-4">
                         <div className="relative shrink-0">
                             <Avatar className="h-[76px] w-[76px] border-4 border-primary-foreground/25">
-                                {photoUrl ? <AvatarImage src={photoUrl} alt={name} /> : null}
+                                {photoUrl ? (
+                                    <AvatarImage src={photoUrl} alt={name} />
+                                ) : null}
                                 <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
                                     {initials}
                                 </AvatarFallback>
@@ -433,7 +545,9 @@ export function ClientProfileHero({
 
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2.5">
-                                <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
+                                <h1 className="text-2xl font-bold tracking-tight">
+                                    {name}
+                                </h1>
                                 <HeroBadgePill
                                     badge={{
                                         key: 'status',
@@ -451,7 +565,10 @@ export function ClientProfileHero({
                             {chips.length ? (
                                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                                     {chips.map((chip) => (
-                                        <HeroChip key={chip.key} icon={chip.icon}>
+                                        <HeroChip
+                                            key={chip.key}
+                                            icon={chip.icon}
+                                        >
                                             {chip.label}
                                         </HeroChip>
                                     ))}
@@ -461,7 +578,10 @@ export function ClientProfileHero({
                             {badges.length ? (
                                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                                     {badges.map((badge) => (
-                                        <HeroBadgePill key={badge.key} badge={badge} />
+                                        <HeroBadgePill
+                                            key={badge.key}
+                                            badge={badge}
+                                        />
                                     ))}
                                 </div>
                             ) : null}
@@ -483,47 +603,80 @@ export function ClientProfileHero({
                                         <ChevronDown className="h-3.5 w-3.5 opacity-70" />
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuItem onSelect={() => onAddNote('daily_note')}>
-                                        <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
-                                        Daily note
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => onAddNote('quick_note')}>
-                                        <Zap className="mr-2 h-4 w-4 text-muted-foreground" />
-                                        Quick note
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => onAddNote('comm_note')}>
-                                        <MessageSquare className="mr-2 h-4 w-4 text-muted-foreground" />
-                                        Communication note
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onSelect={() => onAddNote('log_incident')}>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
+                                >
+                                    {noteCapabilities.dailyNote ? (
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                onAddNote('daily_note')
+                                            }
+                                        >
+                                            <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                            Daily note
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {noteCapabilities.quickNote ? (
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                onAddNote('quick_note')
+                                            }
+                                        >
+                                            <Zap className="mr-2 h-4 w-4 text-muted-foreground" />
+                                            Quick note
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {noteCapabilities.communicationNote ? (
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                onAddNote('comm_note')
+                                            }
+                                        >
+                                            <MessageSquare className="mr-2 h-4 w-4 text-muted-foreground" />
+                                            Communication note
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {noteCapabilities.dailyNote ||
+                                    noteCapabilities.quickNote ||
+                                    noteCapabilities.communicationNote ? (
+                                        <DropdownMenuSeparator />
+                                    ) : null}
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            onAddNote('log_incident')
+                                        }
+                                    >
                                         <AlertTriangle className="mr-2 h-4 w-4 text-status-critical" />
                                         Log incident
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            <button
-                                type="button"
-                                title="Chat with whānau"
-                                onClick={onChat}
-                                className={cn(
-                                    'relative inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all hover:bg-primary-foreground/20 active:scale-95',
-                                    GLASS,
-                                )}
-                                data-test="client-profile-chat"
-                            >
-                                <MessageCircle className="h-4 w-4" />
-                                <span className="hidden sm:inline">Chat</span>
-                                {chatBadge ? (
-                                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-status-success text-[9px] font-bold text-card ring-2 ring-primary">
-                                        {chatBadge}
+                            {onChat ? (
+                                <button
+                                    type="button"
+                                    title="Chat with whānau"
+                                    onClick={onChat}
+                                    className={cn(
+                                        'relative inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all hover:bg-primary-foreground/20 active:scale-95',
+                                        GLASS,
+                                    )}
+                                    data-test="client-profile-chat"
+                                >
+                                    <MessageCircle className="h-4 w-4" />
+                                    <span className="hidden sm:inline">
+                                        Chat
                                     </span>
-                                ) : null}
-                            </button>
+                                    {chatBadge ? (
+                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-status-success text-[9px] font-bold text-card ring-2 ring-primary">
+                                            {chatBadge}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            ) : null}
 
-                            {canEdit ? (
+                            {onEdit ? (
                                 <button
                                     type="button"
                                     title="Edit profile"
@@ -551,8 +704,13 @@ export function ClientProfileHero({
                                         <MoreHorizontal className="h-4 w-4" />
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-60">
-                                    <DropdownMenuLabel>More actions</DropdownMenuLabel>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-60"
+                                >
+                                    <DropdownMenuLabel>
+                                        More actions
+                                    </DropdownMenuLabel>
                                     {moreItems.map((item) => {
                                         const Icon = item.icon;
                                         return (
@@ -576,7 +734,12 @@ export function ClientProfileHero({
 
                         <div className="grid w-full grid-cols-3 gap-2 md:w-[300px]">
                             {stats.map((s) => (
-                                <StatTile key={s.key} icon={s.icon} label={s.label} value={s.value} />
+                                <StatTile
+                                    key={s.key}
+                                    icon={s.icon}
+                                    label={s.label}
+                                    value={s.value}
+                                />
                             ))}
                         </div>
                     </div>
@@ -632,7 +795,9 @@ export function AlertRibbon({ alerts }: { alerts: HeroAlert[] }) {
                     >
                         <Icon className="h-[13px] w-[13px]" />
                         {a.label}
-                        {a.detail ? <span className="opacity-60">· {a.detail}</span> : null}
+                        {a.detail ? (
+                            <span className="opacity-60">· {a.detail}</span>
+                        ) : null}
                         <ChevronRight className="h-[13px] w-[13px] opacity-0 transition-opacity group-hover:opacity-70" />
                     </button>
                 );

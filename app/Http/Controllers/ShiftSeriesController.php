@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -25,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ShiftSeriesController extends Controller
@@ -192,6 +194,9 @@ class ShiftSeriesController extends Controller
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
             'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'required_licence_class' => ['nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
+            'required_licence_endorsements' => ['nullable', 'array'],
+            'required_licence_endorsements.*' => ['string', Rule::in(HrDriverEligibility::LICENCE_ENDORSEMENTS)],
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'return_to' => ['nullable', 'string', 'max:2048'],
             'tasks' => ['sometimes', 'array'],
@@ -258,12 +263,15 @@ class ShiftSeriesController extends Controller
             try {
                 $assignee = User::findOrFail($data['user_id']);
                 $shiftTemplate = [
+                    'organization_id' => $auth->organization_id ?: 1,
                     'user_id' => $data['user_id'],
                     'site_id' => $data['site_id'] ?? null,
                     'shift_type' => $data['shift_type'] ?? 'standard',
                     'is_sleepover' => $data['is_sleepover'] ?? false,
                     'is_on_call' => $data['is_on_call'] ?? false,
                     'coverage_roles' => $data['coverage_roles'] ?? [],
+                    'required_licence_class' => $data['required_licence_class'] ?? null,
+                    'required_licence_endorsements' => $data['required_licence_endorsements'] ?? [],
                     'service_context_id' => $data['service_context_id'] ?? null,
                 ];
 
@@ -379,6 +387,8 @@ class ShiftSeriesController extends Controller
                         'is_lone_worker' => (bool) ($data['is_lone_worker'] ?? false),
                         'expected_break_minutes' => $data['expected_break_minutes'] ?? null,
                         'coverage_roles' => $data['coverage_roles'] ?? null,
+                        'required_licence_class' => $data['required_licence_class'] ?? null,
+                        'required_licence_endorsements' => $data['required_licence_endorsements'] ?? null,
                         'created_by' => $auth->id,
                     ]);
 

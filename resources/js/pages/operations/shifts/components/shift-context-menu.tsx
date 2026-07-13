@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type ContextMenuItem =
     | { type: 'header'; label: string }
@@ -89,7 +90,7 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                 const action = it;
                 const Icon = action.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={`${action.label}-${i}`}
                         type="button"
                         role="menuitem"
@@ -117,7 +118,7 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                                 {action.shortcut}
                             </span>
                         ) : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>

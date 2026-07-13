@@ -3,6 +3,7 @@ import {
     ArrowUpRight,
     Briefcase,
     CalendarClock,
+    Car,
     CheckCircle2,
     Clock,
     Coffee,
@@ -39,6 +40,7 @@ import {
     type ShiftRow,
 } from './shift-row-types';
 import { StaffAvatar } from './staff-avatar';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 type Props = {
     open: boolean;
@@ -155,14 +157,14 @@ export function ShiftDetailDialog({
                                 <ShiftStatusBadge
                                     status={effectiveStatus(shift)}
                                 />
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close"
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                 >
                                     <X className="h-4 w-4" />
-                                </button>
+                                </GuardrailButton>
                             </div>
                         </div>
                     </div>
@@ -195,13 +197,13 @@ export function ShiftDetailDialog({
                                         <span className="font-medium">
                                             Unassigned
                                         </span>
-                                        <button
+                                        <GuardrailButton unstyled
                                             type="button"
                                             onClick={() => onAct('assign')}
                                             className="text-xs font-medium text-primary hover:underline"
                                         >
                                             Find cover
-                                        </button>
+                                        </GuardrailButton>
                                     </span>
                                 )}
                             </SDRow>
@@ -211,6 +213,26 @@ export function ShiftDetailDialog({
                                     {type.label}
                                 </span>
                             </SDRow>
+                            {shift.required_licence_class ||
+                            shift.required_licence_endorsements?.length ? (
+                                <SDRow label="Driving" icon={Car}>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {shift.required_licence_class ? (
+                                            <Tag
+                                                label={`Class ${shift.required_licence_class}`}
+                                            />
+                                        ) : null}
+                                        {shift.required_licence_endorsements?.map(
+                                            (endorsement) => (
+                                                <Tag
+                                                    key={endorsement}
+                                                    label={`${endorsement} endorsement`}
+                                                />
+                                            ),
+                                        )}
+                                    </div>
+                                </SDRow>
+                            ) : null}
                         </SDSection>
 
                         <SDSection icon={Clock} title="Schedule">
@@ -275,21 +297,21 @@ export function ShiftDetailDialog({
                             Quick view · open the shift page for full detail
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={onClose}
                                 className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
                             >
                                 Close
-                            </button>
+                            </GuardrailButton>
                             {locked ? null : onEdit ? (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onEdit}
                                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
                                 >
                                     <Pencil className="h-4 w-4" /> Edit
-                                </button>
+                                </GuardrailButton>
                             ) : (
                                 <Link
                                     href={showShift.url(shift.id)}
@@ -299,14 +321,14 @@ export function ShiftDetailDialog({
                                 </Link>
                             )}
                             {primary ? (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onAct(primary.act)}
                                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:brightness-95"
                                 >
                                     <primary.icon className="h-4 w-4" />{' '}
                                     {primary.label}
-                                </button>
+                                </GuardrailButton>
                             ) : null}
                         </div>
                     </div>

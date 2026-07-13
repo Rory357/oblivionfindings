@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- Portal-positioned popover with custom
  * on-surface action buttons (mirrors the rostering context-menu pattern); these
  * are intentional raw <button>/<div> layout cases, token-coloured throughout. */
-import { CalendarClock, Copy, ExternalLink, MapPin, Pencil, Trash2, Users } from 'lucide-react';
+import { Archive, CalendarClock, Copy, ExternalLink, MapPin, Pencil, Users } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -44,7 +44,7 @@ function formatWhen(start: string | null, end: string | null, allDay: boolean): 
 /**
  * Detail popover for any calendar entry. Read-only layers show a deep-link to
  * their real editor; HR events (when the viewer can manage) show Edit / Duplicate
- * / Delete. Positioned at the click point, viewport-clamped, closes on Esc /
+ * / Archive. Positioned at the click point, viewport-clamped, closes on Esc /
  * outside-click — mirrors the rostering context menu.
  */
 export function CalendarDetailPopover({
@@ -53,7 +53,7 @@ export function CalendarDetailPopover({
     onClose,
     onEdit,
     onDuplicate,
-    onDelete,
+    onArchive,
     onDeepLink,
 }: {
     detail: EventDetail;
@@ -61,7 +61,7 @@ export function CalendarDetailPopover({
     onClose: () => void;
     onEdit: () => void;
     onDuplicate: () => void;
-    onDelete: () => void;
+    onArchive: () => void;
     onDeepLink: (href: string) => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
@@ -145,8 +145,8 @@ export function CalendarDetailPopover({
                         <button type="button" onClick={onDuplicate} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold hover:bg-muted">
                             <Copy className="h-3.5 w-3.5" /> Duplicate
                         </button>
-                        <button type="button" onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-status-critical hover:bg-status-critical-bg">
-                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                        <button type="button" onClick={onArchive} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-status-warning hover:bg-status-warning-bg">
+                            <Archive className="h-3.5 w-3.5" /> Archive
                         </button>
                     </>
                 ) : detail.deepLink ? (

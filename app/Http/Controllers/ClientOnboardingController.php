@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientOnboardingOverride;
 use App\Services\AuditLogger;
+use App\Services\Clients\ClientOnboardingAccess;
 use Illuminate\Http\Request;
 
 class ClientOnboardingController extends Controller
@@ -19,7 +20,11 @@ class ClientOnboardingController extends Controller
     {
         $this->authorize('view', $client);
 
-        abort_unless($request->user()?->canDo('clients.onboarding.manage') || $request->user()?->canDo('clients.update'), 403);
+        abort_unless(
+            $request->user()
+                && app(ClientOnboardingAccess::class)->canManageChecklist($request->user()),
+            403,
+        );
 
         $allowed = [
             'profile',

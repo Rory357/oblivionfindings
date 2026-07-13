@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 
 import { HoverPopover, useHoverPopover } from './hover-popover';
 import type { HoverPopoverContent, ShiftsPerDay, TopSite } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function pctOf(value: number, max: number): number {
     if (max <= 0) return 0;
@@ -39,7 +40,7 @@ function TooltipPortal({
     const diffColor = diff >= 0 ? 'var(--status-success)' : 'var(--status-warning)';
 
     return createPortal(
-        <div
+        <GuardrailCard unstyled
             ref={tipRef}
             className="pointer-events-none fixed z-40 rounded-lg border bg-card px-3 py-2 shadow-lg"
             style={{
@@ -79,7 +80,7 @@ function TooltipPortal({
             >
                 Click bar to open day
             </div>
-        </div>,
+        </GuardrailCard>,
         document.body,
     );
 }
@@ -161,7 +162,7 @@ export function ShiftsBarChart({
     const totalSiteHours = topSites.reduce((sum, s) => sum + s.hours, 0);
 
     return (
-        <div
+        <GuardrailCard unstyled
             className="rounded-xl border bg-card lg:col-span-3"
             style={{ borderColor: 'var(--border)' }}
         >
@@ -348,6 +349,6 @@ export function ShiftsBarChart({
             </div>
 
             {hover ? <TooltipPortal rect={hover.rect} payload={hover.day} /> : null}
-        </div>
+        </GuardrailCard>
     );
 }

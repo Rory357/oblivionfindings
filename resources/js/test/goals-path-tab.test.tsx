@@ -66,7 +66,7 @@ describe('GoalsPathTab (design card grid)', () => {
                 clientId={1}
                 clientName="Tane"
                 goals={goals}
-                canEdit
+                canManageGoals
                 onAddGoal={vi.fn()}
                 onManageGoal={vi.fn()}
                 onEditPlan={vi.fn()}
@@ -94,7 +94,7 @@ describe('GoalsPathTab (design card grid)', () => {
                 clientId={1}
                 clientName="Tane"
                 goals={goals}
-                canEdit
+                canManageGoals
                 onAddGoal={onAddGoal}
                 onManageGoal={onManageGoal}
                 onEditPlan={vi.fn()}
@@ -118,7 +118,7 @@ describe('GoalsPathTab (design card grid)', () => {
                 clientId={1}
                 clientName="Tane"
                 goals={[]}
-                canEdit
+                canManageGoals
                 onAddGoal={onAddGoal}
                 onManageGoal={vi.fn()}
                 onEditPlan={vi.fn()}

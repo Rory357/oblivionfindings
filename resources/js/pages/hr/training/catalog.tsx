@@ -4,15 +4,14 @@ import {
     type WizardLookups,
     type WizardType,
 } from '@/components/hr/training/training-wizard-dialog';
+import { TrainingHero } from '@/components/hr/training-hero';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Award,
     BookOpen,
-    Calendar,
     CheckSquare,
-    ChevronRight,
     ClipboardList,
     Download,
     ExternalLink,
@@ -24,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 /* ---------------------------------------------------------------- types -- */
 interface Summary {
@@ -139,7 +139,6 @@ const SOURCE_LABEL: Record<string, string> = {
     hs_requirement: 'H&S requirement',
 };
 
-const today = new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 function completionTone(pct: number) {
     return pct >= 88 ? 'success' : pct >= 75 ? 'warning' : 'critical';
@@ -375,15 +374,6 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
             ...(can.record || can.manage ? [{ label: 'Waive (reason…)', tone: 'danger' as const, onClick: () => waiveAssignment(a) }] : []),
         ]);
 
-    const heroStats: { label: string; value: string | number; tab?: Tab; amber?: boolean }[] = [
-        { label: 'Courses', value: summary.total_courses, tab: 'catalog' },
-        { label: 'Mandatory', value: summary.mandatory_courses, tab: 'catalog' },
-        { label: 'Enrolments', value: summary.total_enrollments.toLocaleString('en-NZ'), tab: 'assignments' },
-        { label: 'Completion', value: `${summary.completion_rate}%`, tab: 'dashboard' },
-        { label: 'Expiring ≤90d', value: summary.expiring_soon, tab: 'dashboard' },
-        { label: 'Overdue', value: summary.overdue_assignments, tab: 'assignments', amber: true },
-    ];
-
     const TABS: { id: Tab; label: string; icon: typeof BookOpen; badge?: string; tone: 'primary' | 'warning' }[] = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tone: 'primary' },
         { id: 'catalog', label: 'Catalog', icon: BookOpen, badge: String(courses.length), tone: 'primary' },
@@ -396,53 +386,15 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Training & development" />
             <div className="space-y-[18px] p-4 lg:p-6">
-                {/* ───────── HERO ───────── */}
-                <div className="relative overflow-hidden rounded-[24px] text-white shadow-[var(--shadow-hero,0_24px_60px_-22px_rgba(80,40,160,.45))]" style={{ background: 'linear-gradient(120deg,color-mix(in oklch,var(--primary) 72%,black 22%),var(--primary) 60%,color-mix(in oklch,var(--primary) 92%,white 6%))' }}>
-                    <div className="pointer-events-none absolute top-[-80px] right-[22%] h-[240px] w-[240px] rounded-full bg-white/5" />
-                    <div className="relative px-[34px] pt-[30px] pb-1">
-                        <div className="flex flex-wrap items-start justify-between gap-5">
-                            <div className="min-w-0">
-                                <h1 className="m-0 text-[27px] font-bold leading-[1.05] tracking-[-.5px]">Training &amp; development</h1>
-                                <p className="mt-[9px] flex flex-wrap items-center gap-x-[14px] gap-y-2 text-[13px] text-white/[.78]">
-                                    <span className="inline-flex items-center gap-[6px] font-semibold">
-                                        <Calendar className="h-[14px] w-[14px]" />
-                                        {today}
-                                    </span>
-                                    <span className="opacity-40">·</span>
-                                    <span>All sites</span>
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-[9px]">
-                                {can.manage && <HeroBtn icon={Plus} label="New course" onClick={() => openWizard('createCourse')} />}
-                                {can.enroll && <HeroBtn icon={UserPlus} label="Assign training" onClick={() => openWizard('assign')} />}
-                                {can.record && <HeroBtn icon={CheckSquare} label="Record completion" onClick={() => openWizard('record')} />}
-                                <HeroBtn icon={Download} label="Export" onClick={() => doExport('catalog')} />
-                            </div>
-                        </div>
-                        <div className="mt-[18px] mb-1 -ml-3 flex flex-wrap gap-[2px]">
-                            {heroStats.map((s) => (
-                                <button key={s.label} type="button" onClick={() => s.tab && setTab(s.tab)} className="flex flex-col items-start gap-[2px] rounded-[10px] px-[13px] py-2 text-left hover:bg-white/10">
-                                    <span className="text-[10px] font-bold tracking-[.09em] text-white/[.62] uppercase">{s.label}</span>
-                                    <span className="text-[21px] font-bold tabular-nums" style={s.amber ? { color: 'var(--hr-amber,oklch(0.86 0.13 90))' } : undefined}>
-                                        {s.value}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-white/15 bg-black/[.08] px-[22px] py-[11px]">
-                        <span className="text-[11.5px] text-white/70">
-                            Compliance: <strong className="text-white">{dashboard.mandatoryCurrentPct}%</strong> of mandatory training current
-                        </span>
-                        {summary.overdue_assignments > 0 && (
-                            <button type="button" onClick={() => setTab('assignments')} className="inline-flex items-center gap-2 rounded-[9px] border border-white/25 bg-white/15 px-[11px] py-[6px] text-[12px] font-bold text-white">
-                                <span className="h-[6px] w-[6px] rounded-full" style={{ background: 'var(--hr-amber,oklch(0.86 0.13 90))', boxShadow: '0 0 0 3px color-mix(in oklch,var(--hr-amber,oklch(0.86 0.13 90)) 32%,transparent)' }} />
-                                {summary.overdue_assignments} overdue renewals
-                                <ChevronRight className="h-3 w-3" />
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <TrainingHero
+                    summary={summary}
+                    mandatoryCurrentPct={dashboard.mandatoryCurrentPct}
+                    can={can}
+                    onCreate={() => openWizard('createCourse')}
+                    onAssign={() => openWizard('assign')}
+                    onRecord={() => openWizard('record')}
+                    onExport={() => doExport('catalog')}
+                />
 
                 {/* ───────── TAB STRIP ───────── */}
                 <div role="tablist" className="flex flex-wrap items-center gap-1 rounded-[14px] border border-border bg-card p-[6px] shadow-sm">
@@ -451,7 +403,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                         const toneVar = t.tone === 'warning' ? 'var(--status-warning)' : 'var(--primary)';
                         const Icon = t.icon;
                         return (
-                            <button
+                            <GuardrailButton unstyled
                                 key={t.id}
                                 type="button"
                                 role="tab"
@@ -477,7 +429,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                 )}
                                 {defaultTab === t.id && <span title="Default view" className="opacity-70">★</span>}
                                 {pinned.includes(t.id) && <span title="Pinned" className="opacity-70">📌</span>}
-                            </button>
+                            </GuardrailButton>
                         );
                     })}
                     <span className="ml-auto pr-[6px] text-[11px] text-muted-foreground">Right-click a tab to pin or set default</span>
@@ -496,9 +448,9 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                             <div className="overflow-hidden rounded-[14px] border border-border bg-card">
                                 <div className="flex items-center justify-between border-b border-border px-4 py-[14px]">
                                     <div className="text-sm font-semibold">Overdue &amp; due-soon renewals</div>
-                                    <button type="button" onClick={() => setTab('assignments')} className="text-[12px] font-semibold text-primary">
+                                    <GuardrailButton unstyled type="button" onClick={() => setTab('assignments')} className="text-[12px] font-semibold text-primary">
                                         View all →
-                                    </button>
+                                    </GuardrailButton>
                                 </div>
                                 {dashboard.renewals.length === 0 ? (
                                     <p className="px-4 py-10 text-center text-sm text-muted-foreground">No renewals due — everything is current.</p>
@@ -574,18 +526,18 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                 <option value="expiring">Sort: Expiring</option>
                             </select>
                             <div className="flex h-10 overflow-hidden rounded-[9px] border border-border">
-                                <button type="button" onClick={() => setView('cards')} className={`px-[11px] ${view === 'cards' ? 'bg-muted' : 'bg-card'}`} title="Cards">
+                                <GuardrailButton unstyled type="button" onClick={() => setView('cards')} className={`px-[11px] ${view === 'cards' ? 'bg-muted' : 'bg-card'}`} title="Cards">
                                     <GridIcon />
-                                </button>
-                                <button type="button" onClick={() => setView('table')} className={`border-l border-border px-[11px] ${view === 'table' ? 'bg-muted' : 'bg-card'}`} title="Table">
+                                </GuardrailButton>
+                                <GuardrailButton unstyled type="button" onClick={() => setView('table')} className={`border-l border-border px-[11px] ${view === 'table' ? 'bg-muted' : 'bg-card'}`} title="Table">
                                     <ListIcon />
-                                </button>
+                                </GuardrailButton>
                             </div>
                             {can.manage && (
-                                <button type="button" onClick={() => openWizard('createCourse')} className="inline-flex h-10 items-center gap-[7px] rounded-[9px] bg-primary px-[15px] text-[13px] font-semibold text-white">
+                                <GuardrailButton unstyled type="button" onClick={() => openWizard('createCourse')} className="inline-flex h-10 items-center gap-[7px] rounded-[9px] bg-primary px-[15px] text-[13px] font-semibold text-white">
                                     <Plus className="h-[15px] w-[15px]" />
                                     New course
-                                </button>
+                                </GuardrailButton>
                             )}
                         </div>
 
@@ -595,9 +547,9 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                 {can.enroll && <BulkBtn label="Assign to cohort" onClick={() => openWizard('assign')} />}
                                 <BulkBtn label="Export" onClick={() => doExport('catalog')} />
                                 {can.manage && <BulkBtn label="Archive" danger onClick={bulkArchive} />}
-                                <button type="button" onClick={() => setSelected([])} className="ml-auto text-[12.5px] text-muted-foreground">
+                                <GuardrailButton unstyled type="button" onClick={() => setSelected([])} className="ml-auto text-[12.5px] text-muted-foreground">
                                     Clear
-                                </button>
+                                </GuardrailButton>
                             </div>
                         )}
 
@@ -613,14 +565,14 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                     return (
                                         <div key={c.id} className="lift flex cursor-pointer flex-col gap-[11px] rounded-[14px] border border-border bg-card p-[15px]" onClick={() => setSheetId(c.id)} onContextMenu={(e) => courseCtx(c, e)}>
                                             <div className="flex items-start gap-[10px]">
-                                                <button
+                                                <GuardrailButton unstyled
                                                     type="button"
                                                     onClick={(e) => { e.stopPropagation(); setSelected((s) => (s.includes(c.id) ? s.filter((x) => x !== c.id) : [...s, c.id])); }}
                                                     className="mt-[2px] flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px] bg-card"
                                                     style={{ borderColor: selected.includes(c.id) ? 'var(--primary)' : 'var(--border)' }}
                                                 >
                                                     {selected.includes(c.id) && <CheckIcon />}
-                                                </button>
+                                                </GuardrailButton>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-[15px] font-semibold leading-[1.25]">{c.title}</div>
                                                     <div className="mt-[2px] text-[12px] text-muted-foreground">
@@ -628,9 +580,9 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                                         {c.provider ? ` · ${c.provider}` : ''}
                                                     </div>
                                                 </div>
-                                                <button type="button" onClick={(e) => courseCtx(c, e)} className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] text-muted-foreground hover:bg-muted">
+                                                <GuardrailButton unstyled type="button" onClick={(e) => courseCtx(c, e)} className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] text-muted-foreground hover:bg-muted">
                                                     <MoreVertical className="h-4 w-4" />
-                                                </button>
+                                                </GuardrailButton>
                                             </div>
                                             <div className="flex flex-wrap gap-[6px]">
                                                 <Pill tone={c.is_mandatory ? 'info' : 'neutral'}>{c.is_mandatory ? 'Mandatory' : 'Optional'}</Pill>
@@ -657,14 +609,14 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                                 <span className="text-[13px] font-bold">{fmtNzd(c.cost)}</span>
                                                 <div className="flex gap-[6px]">
                                                     {can.manage && (
-                                                        <button type="button" onClick={(e) => { e.stopPropagation(); openWizard('editCourse', c); }} className="rounded-[7px] border border-border bg-card px-[10px] py-[5px] text-[12px] font-semibold">
+                                                        <GuardrailButton unstyled type="button" onClick={(e) => { e.stopPropagation(); openWizard('editCourse', c); }} className="rounded-[7px] border border-border bg-card px-[10px] py-[5px] text-[12px] font-semibold">
                                                             Edit
-                                                        </button>
+                                                        </GuardrailButton>
                                                     )}
                                                     {can.enroll && (
-                                                        <button type="button" onClick={(e) => { e.stopPropagation(); openWizard('assign', c); }} className="rounded-[7px] bg-primary px-[10px] py-[5px] text-[12px] font-semibold text-white">
+                                                        <GuardrailButton unstyled type="button" onClick={(e) => { e.stopPropagation(); openWizard('assign', c); }} className="rounded-[7px] bg-primary px-[10px] py-[5px] text-[12px] font-semibold text-white">
                                                             Assign
-                                                        </button>
+                                                        </GuardrailButton>
                                                     )}
                                                 </div>
                                             </div>
@@ -716,15 +668,15 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                     <div className="space-y-4">
                         <div className="flex flex-wrap items-center gap-2">
                             {['all', 'assigned', 'in_progress', 'overdue', 'completed', 'waived'].map((s) => (
-                                <button key={s} type="button" onClick={() => setAsgStatus(s)} className="rounded-full px-[13px] py-[6px] text-[12.5px] font-semibold" style={asgStatus === s ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                                <GuardrailButton unstyled key={s} type="button" onClick={() => setAsgStatus(s)} className="rounded-full px-[13px] py-[6px] text-[12.5px] font-semibold" style={asgStatus === s ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                                     {s === 'all' ? 'All' : STATUS_LABEL[s]}
-                                </button>
+                                </GuardrailButton>
                             ))}
                             {can.enroll && (
-                                <button type="button" onClick={() => openWizard('assign')} className="ml-auto inline-flex items-center gap-[7px] rounded-[9px] bg-primary px-[14px] py-[7px] text-[13px] font-semibold text-white">
+                                <GuardrailButton unstyled type="button" onClick={() => openWizard('assign')} className="ml-auto inline-flex items-center gap-[7px] rounded-[9px] bg-primary px-[14px] py-[7px] text-[13px] font-semibold text-white">
                                     <Plus className="h-[15px] w-[15px]" />
                                     Assign training
-                                </button>
+                                </GuardrailButton>
                             )}
                         </div>
                         <div className="overflow-hidden rounded-[14px] border border-border bg-card">
@@ -756,9 +708,9 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                                 <td className="px-[14px] py-[11px] text-right tabular-nums">{r.score != null ? `${r.score}%` : '—'}</td>
                                                 {hasAsgActions && (
                                                     <td className="px-[14px] py-[11px] text-right">
-                                                        <button type="button" aria-label={`Actions for ${r.person}`} onClick={(e) => { e.stopPropagation(); asgCtx(r, e); }} className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground hover:bg-background">
+                                                        <GuardrailButton unstyled type="button" aria-label={`Actions for ${r.person}`} onClick={(e) => { e.stopPropagation(); asgCtx(r, e); }} className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground hover:bg-background">
                                                             <MoreVertical className="h-4 w-4" />
-                                                        </button>
+                                                        </GuardrailButton>
                                                     </td>
                                                 )}
                                             </tr>
@@ -861,10 +813,10 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
             {ctx && (
                 <div className="pop fixed z-[80] min-w-[222px] rounded-[11px] border border-border bg-popover p-[5px] shadow-2xl" style={{ left: ctx.x, top: ctx.y }} onClick={(e) => e.stopPropagation()}>
                     {ctx.items.map((it, i) => (
-                        <button key={i} type="button" onClick={() => { setCtx(null); it.onClick(); }} className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-2 text-left text-[13px] font-medium hover:bg-muted" style={{ color: it.tone === 'danger' ? 'var(--status-critical)' : it.tone === 'muted' ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
+                        <GuardrailButton unstyled key={i} type="button" onClick={() => { setCtx(null); it.onClick(); }} className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-2 text-left text-[13px] font-medium hover:bg-muted" style={{ color: it.tone === 'danger' ? 'var(--status-critical)' : it.tone === 'muted' ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
                             <span className="flex-1">{it.label}</span>
                             {it.kbd && <kbd className="rounded-[5px] border border-border bg-muted px-[5px] py-[1px] font-mono text-[10.5px] text-muted-foreground">{it.kbd}</kbd>}
-                        </button>
+                        </GuardrailButton>
                     ))}
                 </div>
             )}
@@ -875,9 +827,9 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                     <div className="ovl fixed inset-0 z-[70] bg-black/40" onClick={() => setSheetId(null)} />
                     <div className="slide thin fixed inset-y-0 right-0 z-[71] w-[min(560px,94vw)] overflow-y-auto bg-background shadow-2xl">
                         <div className="relative px-[26px] py-6 text-white" style={{ background: 'linear-gradient(120deg,color-mix(in oklch,var(--primary) 72%,black 18%),var(--primary))' }}>
-                            <button type="button" onClick={() => setSheetId(null)} className="absolute top-[18px] right-[18px] flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-white/[.18] text-[15px] text-white">
+                            <GuardrailButton unstyled type="button" onClick={() => setSheetId(null)} className="absolute top-[18px] right-[18px] flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-white/[.18] text-[15px] text-white">
                                 ✕
-                            </button>
+                            </GuardrailButton>
                             {sheet ? (
                                 <>
                                     <div className="text-[12px] font-semibold opacity-80">
@@ -969,10 +921,10 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
 /* ---------------------------------------------------------- subcomponents */
 function HeroBtn({ icon: Icon, label, onClick }: { icon: typeof Plus; label: string; onClick: () => void }) {
     return (
-        <button type="button" onClick={onClick} className="inline-flex items-center gap-[7px] rounded-[10px] border border-white/25 bg-white/[.16] px-[14px] py-[9px] text-[12.5px] font-semibold text-white hover:bg-white/25">
+        <GuardrailButton unstyled type="button" onClick={onClick} className="inline-flex items-center gap-[7px] rounded-[10px] border border-white/25 bg-white/[.16] px-[14px] py-[9px] text-[12.5px] font-semibold text-white hover:bg-white/25">
             <Icon className="h-[15px] w-[15px]" />
             {label}
-        </button>
+        </GuardrailButton>
     );
 }
 function KpiTile({ label, value, sub, tone, onClick }: { label: string; value: string | number; sub?: string; tone?: 'critical' | 'warning'; onClick?: () => void }) {
@@ -1005,9 +957,9 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: 'info' | 'n
 }
 function BulkBtn({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
     return (
-        <button type="button" onClick={onClick} className="rounded-[8px] border border-border bg-card px-[11px] py-[6px] text-[12.5px] font-semibold" style={danger ? { color: 'var(--status-critical)' } : undefined}>
+        <GuardrailButton unstyled type="button" onClick={onClick} className="rounded-[8px] border border-border bg-card px-[11px] py-[6px] text-[12.5px] font-semibold" style={danger ? { color: 'var(--status-critical)' } : undefined}>
             {label}
-        </button>
+        </GuardrailButton>
     );
 }
 function SheetChip({ children }: { children: React.ReactNode }) {
@@ -1015,9 +967,9 @@ function SheetChip({ children }: { children: React.ReactNode }) {
 }
 function SheetBtn({ label, onClick }: { label: string; onClick: () => void }) {
     return (
-        <button type="button" onClick={onClick} className="rounded-[8px] border border-border bg-card px-3 py-[7px] text-[12.5px] font-semibold">
+        <GuardrailButton unstyled type="button" onClick={onClick} className="rounded-[8px] border border-border bg-card px-3 py-[7px] text-[12.5px] font-semibold">
             {label}
-        </button>
+        </GuardrailButton>
     );
 }
 function MiniStat({ label, value, tone }: { label: string; value: string | number; tone?: 'warning' }) {

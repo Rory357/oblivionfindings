@@ -36,6 +36,7 @@ import {
 import { ComplianceHubHeader, type HeroPayload } from '@/pages/hr/compliance/components/compliance-hub-header';
 import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from '@/pages/hr/compliance/components/compliance-wizards';
 import type { PersonOption } from '@/components/hr/people-picker';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface Check {
     id: number;
@@ -146,7 +147,7 @@ export default function VettingIndex({ hero, checks, summary, wizard, filters, c
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                <GuardrailCard unstyled className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
                     <div className="relative min-w-[220px] flex-1">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -170,9 +171,9 @@ export default function VettingIndex({ hero, checks, summary, wizard, filters, c
                             <SelectItem value="renewal_due">Renewal due</SelectItem>
                         </SelectContent>
                     </Select>
-                </div>
+                </GuardrailCard>
 
-                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
                     <table className="w-full text-[13px]">
                         <thead>
                             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -212,9 +213,9 @@ export default function VettingIndex({ hero, checks, summary, wizard, filters, c
                                         </td>
                                         <td className="px-3 py-2.5 text-muted-foreground">{fmtDate(c.expires_at)}</td>
                                         <td className="px-3 py-2.5 text-right">
-                                            <button onClick={(e) => openCtx(e, rowMenu(c))} aria-label="Check actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+                                            <Button unstyled onClick={(e) => openCtx(e, rowMenu(c))} aria-label="Check actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
                                                 <MoreVertical className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))
@@ -225,7 +226,7 @@ export default function VettingIndex({ hero, checks, summary, wizard, filters, c
                         <span>Showing {checks.from ?? 0}–{checks.to ?? 0} of {checks.total}</span>
                         {checks.last_page > 1 && <LaravelPagination links={checks.links} />}
                     </div>
-                </div>
+                </GuardrailCard>
             </div>
 
             <ComplianceContextMenu ctx={ctx} onClose={closeCtx} />

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const MONTHS = [
     'January',
@@ -337,7 +338,7 @@ export function WeekPicker({
                     </div>
                     <div className="mt-0.5 text-[11px] opacity-80">
                         {isThisWeek ? (
-                            <span className="text-emerald-100">
+                                            <span className="text-primary-foreground/90">
                                 ● Current week
                             </span>
                         ) : (
@@ -354,25 +355,25 @@ export function WeekPicker({
             </div>
 
             <div className="mb-2.5 flex items-center justify-between">
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => goMonth(-1)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
                     aria-label="Previous month"
                 >
                     <ChevronLeft className="h-4 w-4" />
-                </button>
+                </GuardrailButton>
                 <div className="text-sm font-bold">
                     {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
                 </div>
-                <button
+                <GuardrailButton unstyled
                     type="button"
                     onClick={() => goMonth(+1)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
                     aria-label="Next month"
                 >
                     <ChevronRight className="h-4 w-4" />
-                </button>
+                </GuardrailButton>
             </div>
 
             <div className="mb-1 grid grid-cols-[32px_repeat(7,1fr)] text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground/70">
@@ -393,7 +394,7 @@ export function WeekPicker({
                         sameDay(d, today),
                     );
                     return (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             key={ymd(row.weekStart)}
                             className={cn(
@@ -441,7 +442,7 @@ export function WeekPicker({
                                     </span>
                                 );
                             })}
-                        </button>
+                        </GuardrailButton>
                     );
                 })}
             </div>
@@ -455,7 +456,7 @@ export function WeekPicker({
                     <span />
                 )}
                 <div className="flex items-center gap-2">
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => {
                             onSelect(startOfWeek(today));
@@ -464,14 +465,14 @@ export function WeekPicker({
                         className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent"
                     >
                         This week
-                    </button>
-                    <button
+                    </GuardrailButton>
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={onClose}
                         className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
                     >
                         Done
-                    </button>
+                    </GuardrailButton>
                 </div>
             </div>
 

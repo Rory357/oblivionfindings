@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\It\BusinessHours;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,7 +27,7 @@ class ItTicket extends Model
 
     public const STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 
-    public const SOURCES = ['portal', 'agent', 'system'];
+    public const SOURCES = ['portal', 'agent', 'system', 'email'];
 
     public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
@@ -42,11 +43,14 @@ class ItTicket extends Model
         'assigned_to_user_id',
         'asset_id',
         'provisioning_request_id',
+        'merged_into_ticket_id',
+        'merged_at',
         'category',
         'subcategory',
         'source',
         'priority',
         'status',
+        'requires_approval',
         'first_response_due_at',
         'resolution_due_at',
         'first_responded_at',
@@ -68,10 +72,12 @@ class ItTicket extends Model
         'waiting_since' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
+        'merged_at' => 'datetime',
         'csat_submitted_at' => 'datetime',
         'sla_paused_minutes' => 'integer',
         'reopened_count' => 'integer',
         'csat_score' => 'integer',
+        'requires_approval' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -154,6 +160,46 @@ class ItTicket extends Model
         return $this->belongsTo(ItProvisioningRequest::class, 'provisioning_request_id');
     }
 
+    /** The survivor this ticket was merged into (a duplicate points here). */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(ItTicket::class, 'merged_into_ticket_id');
+    }
+
+    /** Duplicate tickets folded into this one. */
+    public function mergedTickets(): HasMany
+    {
+        return $this->hasMany(ItTicket::class, 'merged_into_ticket_id');
+    }
+
+    /** True once this ticket has been folded into a survivor. */
+    public function isMerged(): bool
+    {
+        return $this->merged_into_ticket_id !== null;
+    }
+
+    /** Sign-off requests on this ticket (§P-S3), newest first. */
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(ItTicketApproval::class, 'it_ticket_id')->latest('id');
+    }
+
+    /** Whether a category is configured to need a manager's approval. */
+    public static function categoryNeedsApproval(?string $category): bool
+    {
+        return $category !== null
+            && in_array($category, (array) config('it.approval.categories', []), true);
+    }
+
+    /**
+     * The current approval verdict for the gate: 'approved' clears it,
+     * 'pending'/'rejected' blocks it, null when none has been requested.
+     */
+    public function approvalState(): ?string
+    {
+        return $this->approvals()->value('status');
+    }
+
     public function comments(): HasMany
     {
         return $this->hasMany(ItTicketComment::class, 'ticket_id');
@@ -193,9 +239,14 @@ class ItTicket extends Model
             (string) $this->priority,
         );
 
+        $calendar = ItSlaPolicy::calendarFor((int) $this->tenant_id, (string) $this->priority);
         $anchor = $this->created_at ?? now();
-        $this->first_response_due_at = $anchor->copy()->addMinutes($firstResponseMinutes);
-        $this->resolution_due_at = $anchor->copy()->addMinutes($resolutionMinutes);
+
+        // Working-time targets when the tenant set a business-hours calendar;
+        // a null calendar keeps the continuous 24/7 clock (unchanged). ->utc()
+        // so a worker-timezone result stores as the correct instant.
+        $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $firstResponseMinutes, $calendar)->utc();
+        $this->resolution_due_at = BusinessHours::addWorkingMinutes($anchor, $resolutionMinutes, $calendar)->utc();
     }
 
     /* ------------------------------------------------------------------ */

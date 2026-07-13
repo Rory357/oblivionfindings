@@ -6,6 +6,7 @@ import {
     Eye,
     EyeOff,
     Flag,
+    Pencil,
     Phone,
     UserRound,
     Users,
@@ -22,7 +23,9 @@ export type ClientDailyNote = {
     type?: string | null;
     category?: string | null;
     subject?: string | null;
+    goal?: string | null;
     body?: string | null;
+    shift_id?: number | null;
     occurred_at?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
@@ -41,8 +44,15 @@ export type ClientDailyNote = {
     contact_relationship?: string | null;
     contact_method?: string | null;
     appears_on_timeline?: boolean;
+    attachments?: Array<{ name: string; size: number }> | null;
     author?: { id: number; name: string } | null;
     user_id?: number | null;
+    can?: {
+        update?: boolean;
+        delete?: boolean;
+        flag?: boolean;
+        review?: boolean;
+    };
 };
 
 function dateLabel(value?: string | null) {
@@ -62,7 +72,10 @@ function categoryLabel(value?: string | null) {
 /** Note-type badge meta — progress notes & handovers carry their own tone so
  * the type reads at a glance in the Daily Notes feed. */
 const NOTE_TYPE_META: Record<string, { label: string; className: string }> = {
-    daily_note: { label: 'Daily note', className: 'bg-muted text-muted-foreground' },
+    daily_note: {
+        label: 'Daily note',
+        className: 'bg-muted text-muted-foreground',
+    },
     quick: { label: 'Quick note', className: 'bg-muted text-muted-foreground' },
     note: { label: 'Note', className: 'bg-muted text-muted-foreground' },
     progress_note: {
@@ -97,6 +110,7 @@ export type DailyNoteEntryProps = {
     canUpdate?: boolean;
     onMarkReviewed?: (noteId: number) => void;
     onClearFlag?: (noteId: number) => void;
+    onEdit?: (note: ClientDailyNote) => void;
     /** When true, render an extra communication header (contact, method). */
     showCommunicationContext?: boolean;
     /** Used to soften the styling for nested/right-rail surfaces. */
@@ -114,6 +128,7 @@ export function DailyNoteEntry({
     canUpdate = false,
     onMarkReviewed,
     onClearFlag,
+    onEdit,
     showCommunicationContext = false,
     compact = false,
 }: DailyNoteEntryProps) {
@@ -266,27 +281,45 @@ export function DailyNoteEntry({
                     <UserRound className="h-3.5 w-3.5" />
                     {note.author?.name ?? 'Unknown worker'}
                 </span>
-                {canReview && note.is_flagged && !note.reviewed_at ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => onMarkReviewed?.(note.id)}
-                        data-test={`daily-note-entry-${note.id}-mark-reviewed`}
-                    >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Mark Reviewed
-                    </Button>
-                ) : canUpdate && note.is_flagged && note.reviewed_at ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onClearFlag?.(note.id)}
-                        data-test={`daily-note-entry-${note.id}-clear-flag`}
-                    >
-                        Clear Flag
-                    </Button>
-                ) : null}
+                <span className="flex flex-wrap items-center gap-2">
+                    {(note.can?.update ?? canUpdate) && onEdit ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onEdit(note)}
+                            data-test={`daily-note-entry-${note.id}-edit`}
+                        >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            {note.is_draft ? 'Resume draft' : 'Edit note'}
+                        </Button>
+                    ) : null}
+                    {(note.can?.review ?? canReview) &&
+                    note.is_flagged &&
+                    !note.reviewed_at ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => onMarkReviewed?.(note.id)}
+                            data-test={`daily-note-entry-${note.id}-mark-reviewed`}
+                        >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Mark Reviewed
+                        </Button>
+                    ) : (note.can?.flag ?? canUpdate) &&
+                      note.is_flagged &&
+                      note.reviewed_at ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onClearFlag?.(note.id)}
+                            data-test={`daily-note-entry-${note.id}-clear-flag`}
+                        >
+                            Clear Flag
+                        </Button>
+                    ) : null}
+                </span>
             </div>
         </article>
     );

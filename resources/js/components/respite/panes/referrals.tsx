@@ -190,7 +190,7 @@ function ReferralCard({
 
 function ReferralMiniCard({ r, onView }: { r: RespiteReferralRow; onView: (row: RespiteReferralRow) => void }) {
     return (
-        <button
+        <Button unstyled
             type="button"
             onClick={() => onView(r)}
             className={cn('w-full overflow-hidden rounded-xl border border-l-[3px] border-border bg-card p-3 text-left transition-shadow hover:shadow-sm', urgencyAccent(r.urgency))}
@@ -205,6 +205,6 @@ function ReferralMiniCard({ r, onView }: { r: RespiteReferralRow; onView: (row: 
                 <span className="truncate">{r.referrer}</span>
                 <span className="shrink-0">{r.ref}</span>
             </div>
-        </button>
+        </Button>
     );
 }

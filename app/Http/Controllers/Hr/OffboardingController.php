@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Services\ExitInterviewService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\AssetAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class OffboardingController extends Controller
@@ -43,8 +44,7 @@ class OffboardingController extends Controller
                 'tasks as tasks_completed_count' => fn ($query) => $query->where('status', 'completed'),
             ])
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($search !== '', fn ($query) => $query->whereHas('employeeProfile.user', fn ($users) =>
-                $users->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($query) => $query->whereHas('employeeProfile.user', fn ($users) => $users->where('name', 'like', "%{$search}%")
             ))
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -111,7 +111,7 @@ class OffboardingController extends Controller
      * active-asset-return preview for the wizard. Assets are batch-loaded to
      * avoid an N+1 across the candidate list.
      */
-    private function eligibleEmployees(int $tenantId): \Illuminate\Support\Collection
+    private function eligibleEmployees(int $tenantId): Collection
     {
         $existingProfileIds = HrOffboardingChecklist::query()
             ->where('tenant_id', $tenantId)
@@ -154,7 +154,7 @@ class OffboardingController extends Controller
     /**
      * Users who can be recorded as exit-interview interviewers.
      */
-    private function interviewerOptions(int $tenantId, User $user): \Illuminate\Support\Collection
+    private function interviewerOptions(int $tenantId, User $user): Collection
     {
         $ids = HrEmployeeProfile::query()
             ->where('tenant_id', $tenantId)
@@ -248,6 +248,10 @@ class OffboardingController extends Controller
         // Optionally schedule the exit interview as part of the same flow, so the
         // checklist's "Exit interview" task is backed by a real HrExitInterview.
         if (($validated['schedule_exit_interview'] ?? false)) {
+            $exitInterviewTaskId = $checklist->tasks()
+                ->where('notes', 'like', '%workflow_key=exit_interview%')
+                ->value('id');
+
             $this->exitInterviewService->createExitInterview([
                 'tenant_id' => $tenantId,
                 'created_by' => $user->id,
@@ -255,6 +259,7 @@ class OffboardingController extends Controller
                 'interviewer_user_id' => (int) $validated['interviewer_user_id'],
                 'interview_date' => $validated['interview_date'],
                 'departure_reason' => $validated['departure_reason'],
+                'offboarding_task_id' => $exitInterviewTaskId,
             ]);
         }
 

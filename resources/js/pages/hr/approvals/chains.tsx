@@ -21,8 +21,8 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { GitBranch, Plus, Trash2 } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ArrowDown, ArrowUp, GitBranch, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Step = {
@@ -46,8 +46,22 @@ type Chain = {
     created_at: string;
 };
 
+type LeaveChain = {
+    id: number;
+    user_id: number;
+    user_name: string;
+    approver_user_id: number;
+    approver_name: string;
+    delegate_user_id: number | null;
+    delegate_name: string | null;
+    approval_level: number;
+    escalation_after_hours: number;
+    is_active: boolean;
+};
+
 type Props = {
     chains: Chain[];
+    leaveChains: LeaveChain[];
     processTypes: string[];
     roles: Array<{ id: number; name: string }>;
     users: Array<{ id: number; name: string }>;
@@ -61,11 +75,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function ApprovalChains({
     chains,
+    leaveChains,
     processTypes,
     roles,
     users,
 }: Props) {
     const [showForm, setShowForm] = useState(false);
+    const [editingLeaveId, setEditingLeaveId] = useState<number | null>(null);
     const [steps, setSteps] = useState<Step[]>([
         {
             step_order: 1,
@@ -82,6 +98,55 @@ export default function ApprovalChains({
         is_active: true,
         steps: steps,
     });
+    const leaveForm = useForm({
+        user_id: '',
+        approver_user_id: '',
+        delegate_user_id: '',
+        approval_level: 1,
+        escalation_after_hours: 48,
+        is_active: true,
+    });
+
+    const submitLeaveRoute = (e: React.FormEvent) => {
+        e.preventDefault();
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingLeaveId(null);
+                leaveForm.reset();
+            },
+        };
+        if (editingLeaveId) {
+            leaveForm.put(`/hr/approvals/leave-chains/${editingLeaveId}`, options);
+        } else {
+            leaveForm.post('/hr/approvals/leave-chains', options);
+        }
+    };
+
+    const editLeaveRoute = (chain: LeaveChain) => {
+        setEditingLeaveId(chain.id);
+        leaveForm.setData({
+            user_id: String(chain.user_id),
+            approver_user_id: String(chain.approver_user_id),
+            delegate_user_id: chain.delegate_user_id ? String(chain.delegate_user_id) : '',
+            approval_level: chain.approval_level,
+            escalation_after_hours: chain.escalation_after_hours,
+            is_active: chain.is_active,
+        });
+    };
+
+    const moveLeaveRoute = (chain: LeaveChain, delta: number) => {
+        const siblings = leaveChains.filter((item) => item.user_id === chain.user_id);
+        const index = siblings.findIndex((item) => item.id === chain.id);
+        const target = index + delta;
+        if (target < 0 || target >= siblings.length) return;
+        const ordered = siblings.map((item) => item.id);
+        [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+        router.post('/hr/approvals/leave-chains/reorder', {
+            user_id: chain.user_id,
+            ordered_ids: ordered,
+        }, { preserveScroll: true });
+    };
 
     const addStep = () => {
         const newSteps = [
@@ -377,7 +442,63 @@ export default function ApprovalChains({
                     </Card>
                 )}
 
-                {/* Chains Table */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Native leave approval routing</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Route each employee's leave request through ordered approvers. This remains separate from the generic workflow chains below.
+                        </p>
+                        <form onSubmit={submitLeaveRoute} className="grid gap-3 rounded-lg border p-3 md:grid-cols-6">
+                            <Select value={leaveForm.data.user_id} onValueChange={(value) => leaveForm.setData('user_id', value)} disabled={editingLeaveId !== null}>
+                                <SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger>
+                                <SelectContent>{users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Select value={leaveForm.data.approver_user_id} onValueChange={(value) => leaveForm.setData('approver_user_id', value)}>
+                                <SelectTrigger><SelectValue placeholder="Approver" /></SelectTrigger>
+                                <SelectContent>{users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Select value={leaveForm.data.delegate_user_id || 'none'} onValueChange={(value) => leaveForm.setData('delegate_user_id', value === 'none' ? '' : value)}>
+                                <SelectTrigger><SelectValue placeholder="Delegate" /></SelectTrigger>
+                                <SelectContent><SelectItem value="none">No delegate</SelectItem>{users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Input type="number" min={1} value={leaveForm.data.approval_level} disabled={editingLeaveId !== null} onChange={(event) => leaveForm.setData('approval_level', Number(event.target.value))} placeholder="Level" />
+                            <Input type="number" min={1} value={leaveForm.data.escalation_after_hours} onChange={(event) => leaveForm.setData('escalation_after_hours', Number(event.target.value))} placeholder="Escalate hours" />
+                            <div className="flex gap-2">
+                                <Button type="submit" disabled={leaveForm.processing}>{editingLeaveId ? 'Save' : 'Add route'}</Button>
+                                {editingLeaveId ? <Button type="button" variant="outline" onClick={() => { setEditingLeaveId(null); leaveForm.reset(); }}>Cancel</Button> : null}
+                            </div>
+                        </form>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Level</TableHead><TableHead>Approver</TableHead><TableHead>Delegate</TableHead><TableHead>Escalates</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {leaveChains.map((chain) => (
+                                        <TableRow key={chain.id}>
+                                            <TableCell className="font-medium">{chain.user_name}</TableCell>
+                                            <TableCell>{chain.approval_level}</TableCell>
+                                            <TableCell>{chain.approver_name}</TableCell>
+                                            <TableCell>{chain.delegate_name ?? '—'}</TableCell>
+                                            <TableCell>{chain.escalation_after_hours}h</TableCell>
+                                            <TableCell><Badge variant="outline">{chain.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
+                                            <TableCell><div className="flex min-h-11 justify-end gap-1">
+                                                <Button type="button" variant="ghost" size="icon" aria-label="Move approval level up" onClick={() => moveLeaveRoute(chain, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                                                <Button type="button" variant="ghost" size="icon" aria-label="Move approval level down" onClick={() => moveLeaveRoute(chain, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                                                <Button type="button" variant="ghost" size="icon" aria-label="Edit leave approval route" onClick={() => editLeaveRoute(chain)}><Pencil className="h-4 w-4" /></Button>
+                                                <Button type="button" variant="ghost" onClick={() => router.patch(`/hr/approvals/leave-chains/${chain.id}/active`, { is_active: !chain.is_active }, { preserveScroll: true })}>{chain.is_active ? 'Deactivate' : 'Activate'}</Button>
+                                                <Button type="button" variant="ghost" size="icon" aria-label="Remove leave approval route" onClick={() => router.delete(`/hr/approvals/leave-chains/${chain.id}`, { preserveScroll: true })}><Trash2 className="h-4 w-4 text-status-critical" /></Button>
+                                            </div></TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {leaveChains.length === 0 ? <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No employee leave routes configured.</TableCell></TableRow> : null}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Generic workflow chains table */}
                 <Card>
                     <CardContent className="p-0">
                         <Table>

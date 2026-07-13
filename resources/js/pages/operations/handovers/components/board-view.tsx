@@ -21,6 +21,8 @@ import {
     moodEmoji,
     relTime,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const COLUMNS: {
     status: 'draft' | 'submitted' | 'acknowledged';
@@ -48,7 +50,7 @@ function BoardCard({
 }: { h: Handover } & CardHandlers) {
     const c = cardCounts(h);
     return (
-        <div
+        <GuardrailCard unstyled
             role="button"
             tabIndex={0}
             onClick={() => onOpen(h)}
@@ -141,22 +143,22 @@ function BoardCard({
                     onClick={(e) => e.stopPropagation()}
                 >
                     {h.status === 'submitted' && h.can_acknowledge ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={() => onAcknowledge(h)}
                             className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                         >
                             <Check className="h-3 w-3" />
                             Ack
-                        </button>
+                        </GuardrailButton>
                     ) : h.status === 'draft' && h.can_submit ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={() => onSubmit(h)}
                             className="rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-accent"
                         >
                             Submit
-                        </button>
+                        </GuardrailButton>
                     ) : (
                         <span className="text-muted-foreground">
                             {h.status === 'acknowledged' && h.acknowledged_at
@@ -166,7 +168,7 @@ function BoardCard({
                     )}
                 </span>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 

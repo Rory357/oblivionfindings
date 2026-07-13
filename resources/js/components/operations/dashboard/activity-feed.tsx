@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 
 import { PulseDot } from './hover-popover';
 import type { ActivityItem } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type TypeStyle = {
     icon: LucideIcon;
@@ -194,7 +195,7 @@ type Props = {
 
 export function ActivityFeed({ items, totalEventsToday }: Props) {
     return (
-        <div
+        <GuardrailCard unstyled
             className="flex flex-col rounded-xl border bg-card lg:col-span-2"
             style={{ borderColor: 'var(--border)' }}
         >
@@ -273,6 +274,6 @@ export function ActivityFeed({ items, totalEventsToday }: Props) {
                     <Filter className="h-3 w-3" /> Filter
                 </button>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }

@@ -37,6 +37,8 @@ export type ShiftRow = {
     expected_break_minutes?: number | null;
     service_context_id?: number | null;
     coverage_roles?: string[] | null;
+    required_licence_class?: string | null;
+    required_licence_endorsements?: string[] | null;
     client: ShiftRowClient;
     staff: ShiftRowStaff | null;
     site?: ShiftRowSite | null;

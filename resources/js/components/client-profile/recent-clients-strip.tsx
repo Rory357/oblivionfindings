@@ -40,7 +40,10 @@ export default function RecentClientsStrip({ currentClient, currentTab }: Props)
 
     useEffect(() => {
         const existing = loadRecent().filter((c) => c.id !== currentClient.id);
-        const next = [currentClient, ...existing].slice(0, MAX_RECENT);
+        const next = [
+            { id: currentClient.id, name: currentClient.name },
+            ...existing,
+        ].slice(0, MAX_RECENT);
         setRecents(next);
         persistRecent(next);
     }, [currentClient.id, currentClient.name]);

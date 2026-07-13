@@ -2,6 +2,8 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrAsset as HrManagedAsset;
+use App\Domain\Hr\Models\HrAssetAssignment as HrManagedAssetAssignment;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDocument;
@@ -13,6 +15,7 @@ use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Notifications\OffboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingChecklistAssignedNotification;
+use App\Domain\Hr\Notifications\OnboardingChecklistCompletedNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
@@ -20,9 +23,12 @@ use App\Models\ItProvisioningRequest;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class OnboardingService
 {
@@ -457,7 +463,7 @@ class OnboardingService
     }
 
     /* ================================================================== */
-    /*  Cross-loop integrations (training · documents · assets)            */
+    /*  Cross-loop integrations (training · documents · assets) */
     /* ================================================================== */
 
     /**
@@ -584,7 +590,7 @@ class OnboardingService
     protected function storeEvidenceAsDocument(
         HrOnboardingTask $task,
         HrOnboardingChecklist $checklist,
-        \Illuminate\Http\UploadedFile $file,
+        UploadedFile $file,
         int $uploadedBy,
         ?int $signOffBy = null,
     ): int {
@@ -628,9 +634,9 @@ class OnboardingService
      * Active company assets the new hire could be issued, for the IT-provisioning
      * preview. (The inverse of the offboarding asset-return surface.)
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    public function previewItProvisioningTasks(HrOnboardingChecklist $checklist): \Illuminate\Support\Collection
+    public function previewItProvisioningTasks(HrOnboardingChecklist $checklist): Collection
     {
         return $checklist->tasks
             ->filter(fn (HrOnboardingTask $t) => ($t->category ?: '') === 'it' && $t->status !== 'completed')
@@ -754,7 +760,7 @@ class OnboardingService
             $checklist->update(['status' => 'in_progress']);
         }
 
-        $this->checkOffboardingChecklistCompletion($checklist);
+        $this->checkOffboardingChecklistCompletion($checklist, $completedBy);
 
         return $task->fresh();
     }
@@ -778,6 +784,29 @@ class OnboardingService
                 ->where('role', 'offboarding:'.$profile->position_role)
                 ->first();
 
+            $tasks = $offboardingTemplate?->tasks ?: $this->getDefaultOffboardingTasks();
+            $resolvedAssignees = [];
+            $unownedRequiredTasks = [];
+
+            foreach ($tasks as $index => $taskDef) {
+                $resolvedAssignees[$index] = $this->resolveOffboardingAssignee(
+                    $taskDef['assigned_to_user_id'] ?? null,
+                    $taskDef['assigned_to_role'] ?? null,
+                    $profile,
+                    $createdBy,
+                );
+
+                if (($taskDef['is_required'] ?? false) && ! $resolvedAssignees[$index]) {
+                    $unownedRequiredTasks[] = (string) ($taskDef['title'] ?? 'Untitled task');
+                }
+            }
+
+            if ($unownedRequiredTasks !== []) {
+                throw ValidationException::withMessages([
+                    'tasks' => 'Required offboarding tasks need an owner before the checklist can be created: '.implode(', ', $unownedRequiredTasks),
+                ]);
+            }
+
             $checklist = HrOffboardingChecklist::create([
                 'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
@@ -788,16 +817,11 @@ class OnboardingService
                 'created_by' => $createdBy,
             ]);
 
-            $tasks = $offboardingTemplate?->tasks ?: $this->getDefaultOffboardingTasks();
             $taskByIndex = [];
             $equipmentCollectionTaskId = null;
             $equipmentCollectionRole = 'hr_admin';
             foreach ($tasks as $index => $taskDef) {
-                $assigneeId = $this->resolveAssignee(
-                    $taskDef['assigned_to_user_id'] ?? null,
-                    $taskDef['assigned_to_role'] ?? null,
-                    $profile,
-                );
+                $assigneeId = $resolvedAssignees[$index];
                 $offsetDays = (int) ($taskDef['due_days_offset'] ?? 0);
                 $dueDate = Carbon::parse($endDate)->subDays(max($offsetDays, 0))->toDateString();
 
@@ -813,6 +837,9 @@ class OnboardingService
                     'sign_off_required' => $taskDef['sign_off_required'] ?? false,
                     'due_date' => $dueDate,
                     'status' => 'pending',
+                    'notes' => isset($taskDef['workflow_key'])
+                        ? 'workflow_key='.$taskDef['workflow_key']
+                        : null,
                 ]);
 
                 $taskByIndex[$index] = $task;
@@ -848,10 +875,11 @@ class OnboardingService
             $activeAssignments = $this->getActiveStaffAssetAssignments($profile);
             if ($activeAssignments->isNotEmpty()) {
                 $nextSortOrder = count($taskByIndex) + 1;
-                $assetTaskAssigneeId = $this->resolveAssignee(
+                $assetTaskAssigneeId = $this->resolveOffboardingAssignee(
                     null,
                     $equipmentCollectionRole !== '' ? $equipmentCollectionRole : 'hr_admin',
                     $profile,
+                    $createdBy,
                 );
 
                 foreach ($activeAssignments as $assignment) {
@@ -917,6 +945,86 @@ class OnboardingService
         }
 
         return $result;
+    }
+
+    /**
+     * Add the return task for an HR asset issued after offboarding started.
+     * Assignment identity in notes makes the write idempotent without relying
+     * on mutable asset names or task titles.
+     */
+    public function reconcileAssetReturnTask(
+        HrOffboardingChecklist $checklist,
+        HrManagedAsset $asset,
+        int $actorId,
+    ): ?HrOffboardingTask {
+        if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
+            return null;
+        }
+
+        $assignment = HrManagedAssetAssignment::query()
+            ->where('tenant_id', $checklist->tenant_id)
+            ->where('asset_id', $asset->id)
+            ->where('employee_profile_id', $checklist->employee_profile_id)
+            ->whereNull('returned_at')
+            ->latest('id')
+            ->first();
+
+        if (! $assignment) {
+            return null;
+        }
+
+        $stamp = "asset_assignment_id={$assignment->id};asset_id={$asset->id}";
+        $existing = $checklist->tasks()->where('notes', $stamp)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $profile = $checklist->employeeProfile;
+        $assigneeId = $this->resolveOffboardingAssignee(null, 'hr_admin', $profile, $actorId);
+        if (! $assigneeId) {
+            throw ValidationException::withMessages([
+                'assigned_to_user_id' => 'The asset return task needs an owner before it can be created.',
+            ]);
+        }
+
+        $dependencyId = $checklist->tasks()
+            ->where('notes', 'like', '%workflow_key=asset_collection%')
+            ->value('id');
+        $meta = collect([
+            $asset->asset_tag ? 'Tag '.$asset->asset_tag : null,
+            $asset->serial_number ? 'Serial '.$asset->serial_number : null,
+        ])->filter()->implode(', ');
+        $description = 'Recover this assigned asset as part of offboarding.';
+        if ($meta !== '') {
+            $description .= ' '.$meta.'.';
+        }
+
+        $task = HrOffboardingTask::query()->create([
+            'offboarding_checklist_id' => $checklist->id,
+            'category' => 'assets',
+            'title' => 'Return asset: '.trim((string) ($asset->name ?: 'Assigned asset')),
+            'description' => $description,
+            'is_required' => true,
+            'sort_order' => ((int) $checklist->tasks()->max('sort_order')) + 1,
+            'assigned_to_user_id' => $assigneeId,
+            'assigned_to_role' => 'hr_admin',
+            'status' => 'pending',
+            'due_date' => $checklist->due_date,
+            'dependency_task_ids' => $dependencyId ? [(int) $dependencyId] : null,
+            'sign_off_required' => true,
+            'notes' => $stamp,
+        ]);
+
+        try {
+            User::find($assigneeId)?->notify(new OffboardingTaskAssignedNotification($task));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to notify late asset-return task owner', [
+                'task_id' => $task->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return $task;
     }
 
     /**
@@ -1014,7 +1122,7 @@ class OnboardingService
             $owner = $checklist->created_by ? User::find($checklist->created_by) : null;
             if ($owner) {
                 try {
-                    $owner->notify(new \App\Domain\Hr\Notifications\OnboardingChecklistCompletedNotification(
+                    $owner->notify(new OnboardingChecklistCompletedNotification(
                         $checklist->loadMissing('employeeProfile.user')
                     ));
                 } catch (\Throwable $exception) {
@@ -1032,7 +1140,7 @@ class OnboardingService
     /**
      * Check if all required offboarding tasks are complete and close the checklist.
      */
-    protected function checkOffboardingChecklistCompletion(HrOffboardingChecklist $checklist): void
+    protected function checkOffboardingChecklistCompletion(HrOffboardingChecklist $checklist, int $actorId): void
     {
         $pendingRequired = $checklist->tasks()
             ->where('is_required', true)
@@ -1068,7 +1176,7 @@ class OnboardingService
             }
 
             if ($profile) {
-                $this->revokeSystemAccess($profile);
+                $this->revokeSystemAccess($profile, $actorId);
             }
         } elseif ($checklist->status !== 'in_progress') {
             $checklist->update(['status' => 'in_progress']);
@@ -1082,7 +1190,7 @@ class OnboardingService
      * live session on their next request. Never revokes the acting user's own
      * account mid-session.
      */
-    protected function revokeSystemAccess(HrEmployeeProfile $profile): void
+    protected function revokeSystemAccess(HrEmployeeProfile $profile, int $actorId): void
     {
         $user = $profile->user;
 
@@ -1090,8 +1198,9 @@ class OnboardingService
             return;
         }
 
-        if (auth()->id() === $user->id) {
+        if ($actorId === $user->id) {
             Log::warning('Skipped login revocation on offboarding completion: actor is the leaver.', [
+                'actor_id' => $actorId,
                 'user_id' => $user->id,
                 'employee_profile_id' => $profile->id,
             ]);
@@ -1103,6 +1212,14 @@ class OnboardingService
             'approved_at' => null,
             'remember_token' => null,
         ])->save();
+
+        // D-3: login revocation is a user write — audit it alongside the app log
+        // (User deliberately doesn't carry AuditableChanges).
+        AuditLogger::log('user.login_revoked', $user, [
+            'actor_id' => $actorId,
+            'employee_profile_id' => $profile->id,
+            'reason' => 'offboarding_completed',
+        ]);
 
         Log::info('Login access revoked on offboarding completion.', [
             'user_id' => $user->id,
@@ -1167,6 +1284,35 @@ class OnboardingService
     }
 
     /**
+     * Offboarding tasks must remain actionable even when a configured legacy
+     * role has no current holder: role, employee manager, then initiating HR.
+     */
+    protected function resolveOffboardingAssignee(
+        ?int $assignedToUserId,
+        ?string $assignedToRole,
+        HrEmployeeProfile $profile,
+        int $createdBy,
+    ): ?int {
+        if ($assignedToUserId && User::query()->whereKey($assignedToUserId)->exists()) {
+            return $assignedToUserId;
+        }
+
+        $roleOwner = $assignedToRole === 'manager'
+            ? null
+            : $this->resolveAssignee(null, $assignedToRole, $profile);
+
+        if ($roleOwner) {
+            return $roleOwner;
+        }
+
+        if ($profile->manager_user_id && User::query()->whereKey($profile->manager_user_id)->exists()) {
+            return (int) $profile->manager_user_id;
+        }
+
+        return User::query()->whereKey($createdBy)->value('id');
+    }
+
+    /**
      * Public view of the standard offboarding tasks, for previewing in the
      * offboarding wizard before a checklist is generated.
      *
@@ -1181,9 +1327,9 @@ class OnboardingService
      * Active company assets assigned to a staff member, surfaced for the
      * offboarding wizard's asset-return preview.
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    public function previewAssetReturns(HrEmployeeProfile $profile): \Illuminate\Support\Collection
+    public function previewAssetReturns(HrEmployeeProfile $profile): Collection
     {
         return $this->getActiveStaffAssetAssignments($profile)->map(fn ($assignment) => [
             'id' => $assignment->id,
@@ -1214,6 +1360,7 @@ class OnboardingService
                 'description' => 'Recover laptop, phone, keys, ID badge, and any other company property.',
                 'is_required' => true,
                 'assigned_to_role' => 'hr_admin',
+                'workflow_key' => 'asset_collection',
             ],
             [
                 'category' => 'payroll',
@@ -1229,6 +1376,7 @@ class OnboardingService
                 'description' => 'Schedule and conduct exit interview with departing employee.',
                 'is_required' => false,
                 'assigned_to_role' => 'hr_admin',
+                'workflow_key' => 'exit_interview',
             ],
             [
                 'category' => 'operations',

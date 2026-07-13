@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { toast } from 'sonner';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type ObligationOption = { id: number; title: string; framework: string; due_date?: string | null };
 
@@ -133,7 +134,7 @@ function DocumentDropzone({
     if (file) {
         const FileIcon = isImage(file) ? ImageIcon : FileText;
         return (
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3">
+            <GuardrailCard unstyled className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3">
                 <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary/10 text-primary">
                     {preview ? (
                         <img src={preview} alt="" className="h-full w-full object-cover" />
@@ -154,7 +155,7 @@ function DocumentDropzone({
                     >
                         Replace
                     </Button>
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={() => {
                             onClear();
@@ -164,7 +165,7 @@ function DocumentDropzone({
                         className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                     >
                         <Trash2 className="h-4 w-4" />
-                    </button>
+                    </Button>
                 </div>
                 <input
                     ref={inputRef}
@@ -173,7 +174,7 @@ function DocumentDropzone({
                     className="hidden"
                     onChange={(e) => accept(e.target.files?.[0])}
                 />
-            </div>
+            </GuardrailCard>
         );
     }
 

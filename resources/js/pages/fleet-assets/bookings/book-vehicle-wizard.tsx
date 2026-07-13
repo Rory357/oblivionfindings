@@ -37,6 +37,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type BookingConflict = {
     id: number;
@@ -545,7 +546,7 @@ export function BookVehicleWizard({
 
                         <div>
                             {form.data.asset_id ? (
-                                <div className="rounded-xl border border-border bg-card/70 p-4">
+                                <GuardrailCard unstyled className="rounded-xl border border-border bg-card/70 p-4">
                                     <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                                         <Calendar className="h-4 w-4 text-primary" />
                                         Vehicle Availability
@@ -568,12 +569,12 @@ export function BookVehicleWizard({
                                             ))}
                                         </div>
                                     )}
-                                </div>
+                                </GuardrailCard>
                             ) : (
-                                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card/70 py-12 text-center">
+                                <GuardrailCard unstyled className="flex flex-col items-center justify-center rounded-xl border border-border bg-card/70 py-12 text-center">
                                     <Calendar className="mb-3 h-10 w-10 text-muted-foreground/30" />
                                     <p className="px-4 text-sm text-muted-foreground">Select a vehicle and dates to check availability</p>
-                                </div>
+                                </GuardrailCard>
                             )}
                         </div>
                     </div>

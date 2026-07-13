@@ -33,7 +33,7 @@ import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { BulkRejectDialog } from '@/components/hr/recruitment/bulk-reject-dialog';
-import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
+import { TextPromptDialog } from '@/components/hr/text-prompt-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
@@ -206,6 +206,10 @@ export default function RecruitmentHub(props: Props) {
     const [scoreTarget, setScoreTarget] = useState<ScoreTarget | null>(null);
     const [dragId, setDragId] = useState<number | null>(null);
     const [dragOver, setDragOver] = useState<string | null>(null);
+    const [scorecardOverride, setScorecardOverride] = useState<{
+        candidate: HubCandidate;
+        targetStage: string;
+    } | null>(null);
 
     const flash = (page.props as { flash?: { error?: string; success?: string } }).flash;
 
@@ -241,6 +245,7 @@ export default function RecruitmentHub(props: Props) {
 
     const [tagPromptOpen, setTagPromptOpen] = useState(false);
     const [declineOfferId, setDeclineOfferId] = useState<number | null>(null);
+    const [expireOffer, setExpireOffer] = useState<OfferRow | null>(null);
 
     /* ---- actions ---- */
     const advance = (c: HubCandidate) => {
@@ -256,8 +261,12 @@ export default function RecruitmentHub(props: Props) {
                 preserveScroll: true,
                 onSuccess: (pg) => {
                     const f = (pg.props as { flash?: { error?: string } }).flash;
-                    if (f?.error) toast.error(f.error);
-                    else toast.success(`${c.first_name} → ${next ? stageLabel(next) : 'advanced'}`);
+                    if (f?.error) {
+                        toast.error(f.error);
+                        if (next && f.error.toLowerCase().includes('scorecard quorum')) {
+                            setScorecardOverride({ candidate: c, targetStage: next });
+                        }
+                    } else toast.success(`${c.first_name} → ${next ? stageLabel(next) : 'advanced'}`);
                 },
             },
         );
@@ -272,8 +281,12 @@ export default function RecruitmentHub(props: Props) {
                 preserveScroll: true,
                 onSuccess: (pg) => {
                     const f = (pg.props as { flash?: { error?: string } }).flash;
-                    if (f?.error) toast.error(f.error, { description: 'The card stayed where it was.' });
-                    else toast.success(`${c.first_name} moved to ${stageLabel(targetStage)}`);
+                    if (f?.error) {
+                        toast.error(f.error, { description: 'The card stayed where it was.' });
+                        if (f.error.toLowerCase().includes('scorecard quorum')) {
+                            setScorecardOverride({ candidate: c, targetStage });
+                        }
+                    } else toast.success(`${c.first_name} moved to ${stageLabel(targetStage)}`);
                 },
             },
         );
@@ -550,6 +563,7 @@ export default function RecruitmentHub(props: Props) {
                                 canManage={can.manage}
                                 onSend={(o) => sendOffer(o, false)}
                                 onResend={(o) => sendOffer(o, true)}
+                                onExpire={setExpireOffer}
                                 onConvert={(o) => openWizard('convert', { offerId: o.id, candidateName: o.candidate, role: o.role })}
                                 onAction={offerAction}
                             />
@@ -636,6 +650,28 @@ export default function RecruitmentHub(props: Props) {
                 submitLabel="Request changes"
                 required={false}
             />
+            <TextPromptDialog
+                open={expireOffer !== null}
+                onClose={() => setExpireOffer(null)}
+                onSubmit={submitOfferExpiry}
+                title={`Expire ${expireOffer?.candidate ?? 'this candidate'}'s offer?`}
+                description="This immediately invalidates the current portal link. The offer history is kept, and Resend link is the intentional way to revive it with a new token."
+                label="Reason"
+                placeholder="e.g. package is being revised at the candidate's request"
+                submitLabel="Expire offer"
+                required
+            />
+            <TextPromptDialog
+                open={scorecardOverride !== null}
+                onClose={() => setScorecardOverride(null)}
+                onSubmit={submitScorecardOverride}
+                title="Advance without every scorecard?"
+                description="Use only when the missing panel score cannot reasonably be obtained. The reason and missing interviewer IDs are added to the audit trail."
+                label="Override reason"
+                placeholder="e.g. panel member left the organisation before submitting"
+                submitLabel="Advance with override"
+                required
+            />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -650,6 +686,47 @@ export default function RecruitmentHub(props: Props) {
                 else toast.success(resend ? `Offer link resent to ${o.candidate}` : `Offer emailed to ${o.candidate}`);
             },
         });
+    }
+
+    function submitOfferExpiry(reason: string) {
+        if (!expireOffer) return;
+        router.post(
+            `/hr/recruitment/offers/${expireOffer.id}/expire`,
+            { reason },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else {
+                        toast.success(f?.success ?? 'Offer expired');
+                        setExpireOffer(null);
+                    }
+                },
+            },
+        );
+    }
+
+    function submitScorecardOverride(reason: string) {
+        if (!scorecardOverride?.candidate.application_id) return;
+        router.post(
+            `/hr/recruitment/applications/${scorecardOverride.candidate.application_id}/advance`,
+            {
+                target_stage: scorecardOverride.targetStage,
+                scorecard_override_reason: reason,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else {
+                        toast.success(f?.success ?? 'Candidate advanced with audited override');
+                        setScorecardOverride(null);
+                    }
+                },
+            },
+        );
     }
 
     function offerAction(offerId: number, action: 'submit' | 'approve' | 'decline') {
@@ -1274,6 +1351,7 @@ const OFFER_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'info' 
     changes_requested: 'warning',
     declined: 'critical',
     withdrawn: 'critical',
+    expired: 'critical',
     draft: 'neutral',
 };
 
@@ -1282,6 +1360,7 @@ function OffersTab({
     canManage,
     onSend,
     onResend,
+    onExpire,
     onConvert,
     onAction,
 }: {
@@ -1289,6 +1368,7 @@ function OffersTab({
     canManage: boolean;
     onSend: (o: OfferRow) => void;
     onResend: (o: OfferRow) => void;
+    onExpire: (o: OfferRow) => void;
     onConvert: (o: OfferRow) => void;
     onAction: (offerId: number, action: 'submit' | 'approve' | 'decline') => void;
 }) {
@@ -1331,6 +1411,11 @@ function OffersTab({
                                 ) : o.status === 'draft' || o.status === 'changes_requested' ? (
                                     <button type="button" onClick={() => onAction(o.id, 'submit')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Submit</button>
                                 ) : o.status === 'sent' ? (
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
+                                        <button type="button" onClick={() => onExpire(o)} className="h-[34px] rounded-[9px] border border-status-critical/40 bg-status-critical/10 px-3.5 text-[12.5px] font-semibold text-status-critical">Expire</button>
+                                    </div>
+                                ) : o.status === 'expired' ? (
                                     <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
                                 ) : (
                                     <span className="w-[60px]" />

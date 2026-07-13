@@ -69,7 +69,6 @@ class ConsentRequestPortalController extends Controller
     public function approve(Request $request, Client $client, ConsentRequest $consentRequest)
     {
         $this->authoriseRespondent($request, $client, $consentRequest);
-        abort_unless($consentRequest->isActionable(), 409);
 
         $data = $request->validate([
             'response_notes' => ['nullable', 'string', 'max:2000'],
@@ -91,7 +90,6 @@ class ConsentRequestPortalController extends Controller
     public function decline(Request $request, Client $client, ConsentRequest $consentRequest)
     {
         $this->authoriseRespondent($request, $client, $consentRequest);
-        abort_unless($consentRequest->isActionable(), 409);
 
         $data = $request->validate([
             'response_notes' => ['required', 'string', 'min:5', 'max:2000'],

@@ -28,6 +28,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatMoneyFromCents, type SiteInfo, type SiteSearchItem } from './_helpers';
 import { WeekPicker } from '@/components/rostering/week-picker';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type HeroStats = {
     mealsPlanned: number;
@@ -76,14 +78,14 @@ function HeroStat({ label, value, sub, emphasis, onClick, warning }: { label: st
         <>
             <div className="text-[22px] font-bold leading-none tabular-nums text-primary-foreground">{value}</div>
             <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary-foreground/70">{label}</div>
-            {sub && <div className={cn('mt-0.5 text-[10.5px]', warning ? 'text-amber-50' : 'text-primary-foreground/55')}>{sub}</div>}
+            {sub && <div className={cn('mt-0.5 text-[10.5px]', warning ? 'text-primary-foreground/90' : 'text-primary-foreground/55')}>{sub}</div>}
         </>
     );
     if (onClick) {
         return (
-            <button type="button" onClick={onClick} className={cn(cls, 'w-full')}>
+            <GuardrailButton unstyled type="button" onClick={onClick} className={cn(cls, 'w-full')}>
                 {inner}
-            </button>
+            </GuardrailButton>
         );
     }
     return (
@@ -109,9 +111,9 @@ function HeroBadge({ tone, icon: Icon, children, onClick }: { tone: 'success' | 
     );
     if (onClick) {
         return (
-            <button type="button" onClick={onClick} className={cls}>
+            <GuardrailButton unstyled type="button" onClick={onClick} className={cls}>
                 {inner}
-            </button>
+            </GuardrailButton>
         );
     }
     return <span className={cls}>{inner}</span>;
@@ -182,7 +184,7 @@ function HeroBell({ notifications, onClick, light, compact }: { notifications: H
     const toneDot: Record<string, string> = { critical: 'text-status-critical', warning: 'text-status-warning', info: 'text-primary' };
     return (
         <div ref={ref} className="relative" onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); close(); } }}>
-            <button
+            <GuardrailButton unstyled
                 ref={btnRef}
                 type="button"
                 onClick={() => setOpen((v) => !v)}
@@ -200,11 +202,11 @@ function HeroBell({ notifications, onClick, light, compact }: { notifications: H
             >
                 <Bell className="h-[17px] w-[17px]" aria-hidden="true" />
                 {count > 0 && (
-                    <span aria-hidden="true" className={cn('absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2', light ? 'ring-card' : 'ring-[var(--hero-base)]')}>
+                            <span aria-hidden="true" className={cn('absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white ring-2', light ? 'ring-card' : 'ring-[var(--hero-base)]')}>
                         {count}
                     </span>
                 )}
-            </button>
+            </GuardrailButton>
             {open && (
                 <div ref={menuRef} id={menuId} role="menu" aria-label="Notifications" onKeyDown={onMenuKeyDown} className="animate-pop absolute right-0 z-[120] mt-2 w-[290px] overflow-hidden rounded-xl border border-border bg-popover text-foreground shadow-float">
                     <div className="border-b border-border px-3.5 py-2.5 text-[13px] font-semibold">Notifications</div>
@@ -218,7 +220,7 @@ function HeroBell({ notifications, onClick, light, compact }: { notifications: H
                             {notifications.map((n) => {
                                 const NIcon = n.icon;
                                 return (
-                                    <button
+                                    <GuardrailButton unstyled
                                         key={n.id}
                                         type="button"
                                         role="menuitem"
@@ -234,7 +236,7 @@ function HeroBell({ notifications, onClick, light, compact }: { notifications: H
                                             {n.sub && <span className="block truncate text-[11px] text-muted-foreground">{n.sub}</span>}
                                         </span>
                                         <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-                                    </button>
+                                    </GuardrailButton>
                                 );
                             })}
                         </div>
@@ -332,7 +334,7 @@ function SiteSearch({
 
     return (
         <div className="relative">
-            <button
+            <GuardrailButton unstyled
                 ref={triggerRef}
                 type="button"
                 onClick={() => setOpen((v) => !v)}
@@ -344,7 +346,7 @@ function SiteSearch({
                     {current?.type}
                 </span>
                 <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-primary-foreground/60" />
-            </button>
+            </GuardrailButton>
 
             {open &&
                 rect &&
@@ -385,7 +387,7 @@ function SiteSearch({
                                             const isCurrent = s.id === currentSiteId;
                                             const isActive = idx === active;
                                             return (
-                                                <button
+                                                <GuardrailButton unstyled
                                                     key={s.id}
                                                     type="button"
                                                     onMouseEnter={() => setActive(idx)}
@@ -413,7 +415,7 @@ function SiteSearch({
                                                         </span>
                                                     </span>
                                                     {isCurrent && <Check className="h-4 w-4 shrink-0 text-sites-deep" />}
-                                                </button>
+                                                </GuardrailButton>
                                             );
                                         })}
                                     </div>
@@ -523,7 +525,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                                     {stats.overrides > 0 && (
                                         <>
                                             {' '}
-                                            · <span className="font-semibold text-amber-50">{stats.overrides} allergen override{stats.overrides === 1 ? '' : 's'}</span> on file
+                                · <span className="font-semibold text-primary-foreground/90">{stats.overrides} allergen override{stats.overrides === 1 ? '' : 's'}</span> on file
                                         </>
                                     )}{' '}
                                     · <span className="border-b-2 border-primary-foreground/40 pb-px">{rangeStart} → {rangeEnd}</span>
@@ -534,7 +536,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                                     {stats.lowStock > 0 && (
                                         <>
                                             {' '}
-                                            · <span className="font-semibold text-amber-50">{stats.lowStock} below par</span>
+                                · <span className="font-semibold text-primary-foreground/90">{stats.lowStock} below par</span>
                                         </>
                                     )}{' '}
                                     · <span className="border-b-2 border-primary-foreground/40 pb-px">{rangeStart} → {rangeEnd}</span>
@@ -566,35 +568,35 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                     <div className="flex w-full shrink-0 flex-col items-stretch gap-3.5 lg:w-auto lg:items-end">
                         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                             {props.canPlan && (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={props.onPlan}
                                     className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary-foreground px-4 text-sm font-semibold text-sites-deep shadow-sm transition hover:bg-primary-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1"
                                 >
                                     <Plus className="h-4 w-4" strokeWidth={2.5} />
                                     {isHouse ? 'Plan a meal' : 'Add a meal'}
-                                </button>
+                                </GuardrailButton>
                             )}
                             {props.canShop && (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={props.onBuildList}
                                     className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1"
                                 >
                                     <ShoppingCart className="h-4 w-4" />
                                     Build list
-                                </button>
+                                </GuardrailButton>
                             )}
                             <HeroBell notifications={props.notifications} onClick={props.onNotificationClick} />
                             {props.canShop && (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={props.onOpenSettings}
                                     aria-label="Meal planner settings"
                                     className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1"
                                 >
                                     <Settings className="h-[17px] w-[17px]" />
-                                </button>
+                                </GuardrailButton>
                             )}
                         </div>
 
@@ -616,14 +618,14 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                         <span className="flex-1 text-[12.5px] font-medium">
                             {stats.unresolved} planned meal{stats.unresolved === 1 ? '' : 's'} contain{stats.unresolved === 1 ? 's' : ''} allergens for current residents
                         </span>
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={props.onReviewConflicts}
                             aria-label={`Review ${stats.unresolved} allergen conflict${stats.unresolved === 1 ? '' : 's'} on the calendar`}
                             className="shrink-0 rounded-md bg-white px-2.5 py-1 text-[12px] font-semibold text-status-critical transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-status-critical"
                         >
                             Review
-                        </button>
+                        </GuardrailButton>
                     </div>
                 </div>
             )}
@@ -631,15 +633,15 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
             <div className="relative border-t border-primary-foreground/15 px-5 py-3 sm:px-7">
                 <div className="flex flex-col items-stretch gap-2.5 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={props.onPrevWeek}
                             aria-label="Previous week"
                             className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1"
                         >
                             <ChevronLeft className="h-3.5 w-3.5" /> Prev
-                        </button>
-                        <button
+                        </GuardrailButton>
+                        <GuardrailButton unstyled
                             ref={weekBtnRef}
                             type="button"
                             onClick={() => setWeekPickerOpen((v) => !v)}
@@ -654,7 +656,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                         >
                             <CalendarRange className="h-3.5 w-3.5" /> {weekLabel} · {rangeStart} → {rangeEnd}
                             <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-70" />
-                        </button>
+                        </GuardrailButton>
                         {weekPickerOpen && (
                             <WeekPicker
                                 selectedWeekStart={props.weekStart}
@@ -664,14 +666,14 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                                 showContextMenu={false}
                             />
                         )}
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             onClick={props.onNextWeek}
                             aria-label="Next week"
                             className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1"
                         >
                             Next <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
+                        </GuardrailButton>
                     </div>
 
                     {sites.length > 1 && (
@@ -725,9 +727,9 @@ function KpiChip({ label, value, onClick }: { label: string; value: ReactNode; o
     );
     if (onClick) {
         return (
-            <button type="button" onClick={onClick} className="flex shrink-0 flex-col items-start whitespace-nowrap rounded-md px-1 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <GuardrailButton unstyled type="button" onClick={onClick} className="flex shrink-0 flex-col items-start whitespace-nowrap rounded-md px-1 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 {inner}
-            </button>
+            </GuardrailButton>
         );
     }
     return <div className="flex shrink-0 flex-col whitespace-nowrap">{inner}</div>;
@@ -741,30 +743,30 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
     const actions = (
         <div className="flex items-center gap-2">
             {props.canPlan && (
-                <button type="button" onClick={props.onPlan} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <GuardrailButton unstyled type="button" onClick={props.onPlan} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Plus className="h-4 w-4" strokeWidth={2.5} /> {isHouse ? 'Plan a meal' : 'Add a meal'}
-                </button>
+                </GuardrailButton>
             )}
             {props.canShop && (
-                <button type="button" onClick={props.onBuildList} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <GuardrailButton unstyled type="button" onClick={props.onBuildList} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <ShoppingCart className="h-4 w-4" /> Build list
-                </button>
+                </GuardrailButton>
             )}
             <HeroBell light compact notifications={props.notifications} onClick={props.onNotificationClick} />
             {props.canShop && (
-                <button type="button" onClick={props.onOpenSettings} aria-label="Meal planner settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <GuardrailButton unstyled type="button" onClick={props.onOpenSettings} aria-label="Meal planner settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Settings className="h-[17px] w-[17px]" />
-                </button>
+                </GuardrailButton>
             )}
         </div>
     );
 
     const weekNav = (
         <div className="flex flex-wrap items-center gap-1.5">
-            <button type="button" onClick={props.onPrevWeek} aria-label="Previous week" className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <GuardrailButton unstyled type="button" onClick={props.onPrevWeek} aria-label="Previous week" className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <ChevronLeft className="h-3.5 w-3.5" /> Prev
-            </button>
-            <button
+            </GuardrailButton>
+            <GuardrailButton unstyled
                 ref={weekBtnRef}
                 type="button"
                 onClick={() => setWeekPickerOpen((v) => !v)}
@@ -774,17 +776,17 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
             >
                 <CalendarRange className="h-3.5 w-3.5" /> {props.weekLabel} · {props.rangeStart} → {props.rangeEnd}
                 <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-70" />
-            </button>
+            </GuardrailButton>
             {weekPickerOpen && (
                 <WeekPicker selectedWeekStart={props.weekStart} anchorRef={weekBtnRef} onSelect={(d) => props.onSelectWeek(d)} onClose={() => setWeekPickerOpen(false)} showContextMenu={false} />
             )}
-            <button type="button" onClick={props.onNextWeek} aria-label="Next week" className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <GuardrailButton unstyled type="button" onClick={props.onNextWeek} aria-label="Next week" className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 Next <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+            </GuardrailButton>
             {!props.isThisWeek && (
-                <button type="button" onClick={props.onThisWeek} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <GuardrailButton unstyled type="button" onClick={props.onThisWeek} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     Today
-                </button>
+                </GuardrailButton>
             )}
             {props.reloading && (
                 <span role="status" className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
@@ -805,7 +807,7 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
 
     return (
         <div className="space-y-2.5">
-            <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
+            <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 {/* md+: week-nav · KPIs · actions on one row. Narrow: week-nav+actions row, KPIs scroll below. */}
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center justify-between gap-2 md:contents">
@@ -815,7 +817,7 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
                     {kpis}
                     <div className="hidden md:block">{actions}</div>
                 </div>
-            </div>
+            </GuardrailCard>
 
             {isHouse && stats.unresolved > 0 && (
                 <div role="alert" aria-live="assertive" className="flex items-center gap-2.5 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2">
@@ -823,26 +825,26 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
                     <span className="flex-1 text-[12.5px] font-medium text-status-critical">
                         {stats.unresolved} planned meal{stats.unresolved === 1 ? '' : 's'} contain{stats.unresolved === 1 ? 's' : ''} allergens for current residents
                     </span>
-                    <button type="button" onClick={props.onReviewConflicts} aria-label={`Review ${stats.unresolved} allergen conflict${stats.unresolved === 1 ? '' : 's'} on the calendar`} className="shrink-0 rounded-md bg-status-critical px-2.5 py-1 text-[12px] font-semibold text-white transition hover:opacity-90">Review</button>
+                    <GuardrailButton unstyled type="button" onClick={props.onReviewConflicts} aria-label={`Review ${stats.unresolved} allergen conflict${stats.unresolved === 1 ? '' : 's'} on the calendar`} className="shrink-0 rounded-md bg-status-critical px-2.5 py-1 text-[12px] font-semibold text-white transition hover:opacity-90">Review</GuardrailButton>
                 </div>
             )}
 
             {isHouse && (stats.textureEntries > 0 || stats.softWarnings > 0 || stats.textureModified > 0 || stats.overrides > 0) && (
                 <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
                     {stats.overrides > 0 && (
-                        <button type="button" onClick={props.onOpenOverrides} className="inline-flex items-center gap-1 rounded-full border border-amberx/40 bg-amberx-bg/50 px-2 py-0.5 font-medium text-amberx transition-colors hover:bg-amberx-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <GuardrailButton unstyled type="button" onClick={props.onOpenOverrides} className="inline-flex items-center gap-1 rounded-full border border-amberx/40 bg-amberx-bg/50 px-2 py-0.5 font-medium text-amberx transition-colors hover:bg-amberx-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <ShieldAlert className="h-3 w-3" aria-hidden="true" /> {stats.overrides} override{stats.overrides === 1 ? '' : 's'}
-                        </button>
+                        </GuardrailButton>
                     )}
                     {stats.textureEntries > 0 && (
-                        <button type="button" onClick={props.onReviewConflicts} className="inline-flex items-center gap-1 rounded-full border border-status-warning/40 bg-status-warning-bg/50 px-2 py-0.5 font-medium text-status-warning transition-colors hover:bg-status-warning-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <GuardrailButton unstyled type="button" onClick={props.onReviewConflicts} className="inline-flex items-center gap-1 rounded-full border border-status-warning/40 bg-status-warning-bg/50 px-2 py-0.5 font-medium text-status-warning transition-colors hover:bg-status-warning-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <Soup className="h-3 w-3" aria-hidden="true" /> {stats.textureEntries} texture check{stats.textureEntries === 1 ? '' : 's'}
-                        </button>
+                        </GuardrailButton>
                     )}
                     {stats.softWarnings > 0 && (
-                        <button type="button" onClick={props.onReviewConflicts} className="inline-flex items-center gap-1 rounded-full border border-status-warning/40 bg-status-warning-bg/50 px-2 py-0.5 font-medium text-status-warning transition-colors hover:bg-status-warning-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <GuardrailButton unstyled type="button" onClick={props.onReviewConflicts} className="inline-flex items-center gap-1 rounded-full border border-status-warning/40 bg-status-warning-bg/50 px-2 py-0.5 font-medium text-status-warning transition-colors hover:bg-status-warning-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <TriangleAlert className="h-3 w-3" aria-hidden="true" /> {stats.softWarnings} soft warning{stats.softWarnings === 1 ? '' : 's'}
-                        </button>
+                        </GuardrailButton>
                     )}
                     {stats.textureModified > 0 && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 font-medium text-muted-foreground">

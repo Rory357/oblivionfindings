@@ -44,6 +44,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    Archive,
     BookOpen,
     CheckCircle,
     FileText,
@@ -51,7 +52,6 @@ import {
     Pencil,
     Plus,
     ShieldCheck,
-    Trash2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -426,8 +426,8 @@ export default function PoliciesIndex({
                                                                     setDeleting(policy)
                                                                 }
                                                             >
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                Delete policy
+                                                                <Archive className="mr-2 h-4 w-4" />
+                                                                Archive policy
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -472,11 +472,11 @@ export default function PoliciesIndex({
             >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Delete policy</DialogTitle>
+                        <DialogTitle>Archive policy</DialogTitle>
                         <DialogDescription>
-                            Deleting “{deleting?.title}” permanently removes the
-                            policy, every published version and its stored PDFs.
-                            This cannot be undone.
+                            Archive “{deleting?.title}”? It will leave the active
+                            library while every published version, attestation and
+                            stored PDF remains available for audit history.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -488,12 +488,11 @@ export default function PoliciesIndex({
                             Cancel
                         </Button>
                         <Button
-                            variant="destructive"
                             onClick={confirmDelete}
                             disabled={deleteBusy}
                         >
-                            <Trash2 className="mr-1.5 h-4 w-4" />
-                            {deleteBusy ? 'Deleting…' : 'Delete policy'}
+                            <Archive className="mr-1.5 h-4 w-4" />
+                            {deleteBusy ? 'Archiving…' : 'Archive policy'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

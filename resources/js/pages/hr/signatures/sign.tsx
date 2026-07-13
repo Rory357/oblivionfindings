@@ -1,10 +1,11 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FileText, PenTool, RotateCcw, X } from 'lucide-react';
@@ -169,7 +170,8 @@ export default function SignDocument({ signature, can }: Props) {
             <Head title={`Sign: ${signature.document_title}`} />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/signatures/pending"
                         title="Sign Document"
@@ -213,7 +215,9 @@ export default function SignDocument({ signature, can }: Props) {
                                 <span className="text-muted-foreground">
                                     Requested:{' '}
                                 </span>
-                                <span>{signature.requested_at}</span>
+                                <span>
+                                    {formatDateTimeLong(signature.requested_at)}
+                                </span>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -224,11 +228,7 @@ export default function SignDocument({ signature, can }: Props) {
                                 {config.label}
                             </Badge>
                             {signature.document_download_url && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                >
+                                <Button variant="outline" size="sm" asChild>
                                     <a
                                         href={signature.document_download_url}
                                         target="_blank"
@@ -242,7 +242,8 @@ export default function SignDocument({ signature, can }: Props) {
                         </div>
                         {signature.signed_at && (
                             <p className="text-sm text-status-success">
-                                Signed on {signature.signed_at}
+                                Signed on{' '}
+                                {formatDateTimeLong(signature.signed_at)}
                             </p>
                         )}
                         {signature.declined_reason && (

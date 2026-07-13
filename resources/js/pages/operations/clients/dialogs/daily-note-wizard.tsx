@@ -2,6 +2,8 @@
  * (the Add Client modal contract): 248px stepper rail, "Step x of y" header,
  * 3px progress strip and muted footer band. The flow, fields, validation and
  * submit payload are unchanged from the bespoke dialog it replaces. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import type { ClientDailyNote } from '@/components/daily-note-entry';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,6 +23,7 @@ import {
     WizardStepPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     defaultDailyNoteValues,
@@ -39,6 +42,7 @@ import {
     LayoutGrid,
     MessageSquare,
     Save,
+    Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -55,6 +59,7 @@ type DailyNoteWizardProps = {
     shiftOptions?: Array<{ id: number; label: string }>;
     goalOptions?: Array<{ id?: number | string; label: string }>;
     onSubmitted?: () => void;
+    note?: ClientDailyNote | null;
 };
 
 const STEPS: WizardStep[] = [
@@ -84,6 +89,45 @@ const splitTags = (value: string) =>
         .map((item) => item.trim())
         .filter(Boolean);
 
+export function dailyNoteValuesFromRecord(
+    note: ClientDailyNote,
+): DailyNoteFormValues {
+    const defaults = defaultDailyNoteValues(
+        note.type === 'quick' ||
+            note.type === 'communication' ||
+            note.type === 'note' ||
+            note.type === 'progress_note' ||
+            note.type === 'handover'
+            ? note.type
+            : 'daily_note',
+    );
+
+    return {
+        ...defaults,
+        type: defaults.type,
+        category: note.category ?? defaults.category,
+        subject: note.subject ?? '',
+        goal: note.goal ?? '',
+        body: note.body ?? '',
+        occurred_at: toDatetimeLocal(note.occurred_at),
+        shift_id: note.shift_id ? String(note.shift_id) : '',
+        mood_rating: note.mood_rating ?? '',
+        behaviour_tags: note.behaviour_tags ?? [],
+        concerns_flags: note.concerns_flags ?? [],
+        follow_up_action: note.follow_up_action ?? '',
+        follow_up_due_at: toDatetimeLocal(note.follow_up_due_at),
+        visibility: note.visibility === 'portal' ? 'portal' : 'internal',
+        appears_on_timeline: note.appears_on_timeline ?? true,
+        is_draft: Boolean(note.is_draft),
+        is_flagged: Boolean(note.is_flagged),
+        flagged_reason: note.flagged_reason ?? '',
+        contact_person: note.contact_person ?? '',
+        contact_relationship: note.contact_relationship ?? '',
+        contact_method: note.contact_method ?? '',
+        attachments: note.attachments ?? [],
+    };
+}
+
 export function DailyNoteWizard({
     clientId,
     open,
@@ -92,6 +136,7 @@ export function DailyNoteWizard({
     shiftOptions = [],
     goalOptions = [],
     onSubmitted,
+    note = null,
 }: DailyNoteWizardProps) {
     const form = useDailyNoteForm(
         mode === 'communication' ? 'communication' : 'daily_note',
@@ -105,10 +150,18 @@ export function DailyNoteWizard({
     const [tagText, setTagText] = useState('');
     const [concernText, setConcernText] = useState('');
     const [processing, setProcessing] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [discardOpen, setDiscardOpen] = useState(false);
     const openedAt = useRef<number | null>(null);
 
     const isCommunication = mode === 'communication';
-    const title = isCommunication ? 'Communication Note' : 'Daily Note';
+    const title = note
+        ? note.is_draft
+            ? `Resume ${isCommunication ? 'Communication' : 'Daily Note'} Draft`
+            : `Edit ${isCommunication ? 'Communication Note' : 'Daily Note'}`
+        : isCommunication
+          ? 'Communication Note'
+          : 'Daily Note';
     const showMoodFields = ['mood', 'concern'].includes(form.data.category);
     const showConcernFields = form.data.category === 'concern';
     const showGoalFields = form.data.category === 'goal_progress';
@@ -116,21 +169,28 @@ export function DailyNoteWizard({
     useEffect(() => {
         if (open) {
             openedAt.current = Date.now();
-            form.setData(
-                defaultDailyNoteValues(
-                    isCommunication ? 'communication' : 'daily_note',
-                ),
-            );
+            const values = note
+                ? dailyNoteValuesFromRecord(note)
+                : defaultDailyNoteValues(
+                      isCommunication ? 'communication' : 'daily_note',
+                  );
+            form.setData(values);
             setStep(0);
-            setNoteType('daily_note');
-            setTagText('');
-            setConcernText('');
+            setNoteType(
+                note?.type === 'progress_note' || note?.type === 'handover'
+                    ? note.type
+                    : 'daily_note',
+            );
+            setTagText(values.behaviour_tags.join(', '));
+            setConcernText(values.concerns_flags.join(', '));
             setProcessing(false);
+            setSubmitError(null);
+            setDiscardOpen(false);
         } else {
             openedAt.current = null;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, isCommunication]);
+    }, [open, isCommunication, note]);
 
     const selectedCategory = useMemo(
         () =>
@@ -158,6 +218,7 @@ export function DailyNoteWizard({
         if (!draft && !form.data.body.trim()) return;
 
         setProcessing(true);
+        setSubmitError(null);
         const behaviourTags = splitTags(tagText);
         const concernFlags = splitTags(concernText);
         const payload = {
@@ -179,7 +240,10 @@ export function DailyNoteWizard({
             occurred_at: form.data.occurred_at || null,
         };
 
-        router.post(`/operations/clients/${clientId}/daily-notes`, payload, {
+        const url = note
+            ? `/operations/clients/${clientId}/daily-notes/${note.id}`
+            : `/operations/clients/${clientId}/daily-notes`;
+        const options = {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
@@ -199,8 +263,20 @@ export function DailyNoteWizard({
                 onOpenChange(false);
                 onSubmitted?.();
             },
+            onError: (errors: Record<string, string>) => {
+                setSubmitError(
+                    Object.values(errors)[0] ??
+                        'The note could not be saved. Check the details and try again.',
+                );
+            },
             onFinish: () => setProcessing(false),
-        });
+        };
+
+        if (note) {
+            router.put(url, payload, options);
+        } else {
+            router.post(url, payload, options);
+        }
     };
 
     const footerStart = (
@@ -212,15 +288,29 @@ export function DailyNoteWizard({
             >
                 Cancel
             </Button>
-            <Button
-                type="button"
-                variant="outline"
-                onClick={() => submit(true)}
-                disabled={!form.data.body.trim() || processing}
-            >
-                <Save className="mr-2 h-4 w-4" />
-                Save Draft
-            </Button>
+            {!note || note.is_draft ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => submit(true)}
+                    disabled={!form.data.body.trim() || processing}
+                >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Draft
+                </Button>
+            ) : null}
+            {note?.is_draft && note.can?.delete ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setDiscardOpen(true)}
+                    disabled={processing}
+                    className="text-status-critical hover:text-status-critical"
+                >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Discard draft
+                </Button>
+            ) : null}
         </div>
     );
 
@@ -255,7 +345,7 @@ export function DailyNoteWizard({
                     data-test="daily-note-submit"
                 >
                     <Check className="mr-2 h-4 w-4" />
-                    Save Note
+                    {note?.is_draft ? 'Submit Note' : 'Save Note'}
                 </Button>
             )}
         </>
@@ -291,6 +381,14 @@ export function DailyNoteWizard({
                         : 'client-daily-note-dialog'
                 }
             >
+                {submitError ? (
+                    <div
+                        role="alert"
+                        className="mb-4 rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical"
+                    >
+                        {submitError}
+                    </div>
+                ) : null}
                 {step === 0 ? (
                     <WizardStepPane>
                         <div
@@ -420,21 +518,17 @@ export function DailyNoteWizard({
                                                     <SelectValue placeholder="Choose goal" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {goalOptions.map(
-                                                        (goal) => (
-                                                            <SelectItem
-                                                                key={String(
-                                                                    goal.id ??
-                                                                        goal.label,
-                                                                )}
-                                                                value={
-                                                                    goal.label
-                                                                }
-                                                            >
-                                                                {goal.label}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
+                                                    {goalOptions.map((goal) => (
+                                                        <SelectItem
+                                                            key={String(
+                                                                goal.id ??
+                                                                    goal.label,
+                                                            )}
+                                                            value={goal.label}
+                                                        >
+                                                            {goal.label}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                         ) : (
@@ -461,9 +555,7 @@ export function DailyNoteWizard({
                                             </Label>
                                             <Input
                                                 id="daily-note-contact"
-                                                value={
-                                                    form.data.contact_person
-                                                }
+                                                value={form.data.contact_person}
                                                 onChange={(event) =>
                                                     update(
                                                         'contact_person',
@@ -497,9 +589,7 @@ export function DailyNoteWizard({
                                                 Method
                                             </Label>
                                             <Select
-                                                value={
-                                                    form.data.contact_method
-                                                }
+                                                value={form.data.contact_method}
                                                 onValueChange={(value) =>
                                                     update(
                                                         'contact_method',
@@ -573,9 +663,7 @@ export function DailyNoteWizard({
                                                 {shiftOptions.map((shift) => (
                                                     <SelectItem
                                                         key={shift.id}
-                                                        value={String(
-                                                            shift.id,
-                                                        )}
+                                                        value={String(shift.id)}
                                                     >
                                                         {shift.label}
                                                     </SelectItem>
@@ -771,9 +859,7 @@ export function DailyNoteWizard({
                                         onCheckedChange={(checked) =>
                                             update(
                                                 'visibility',
-                                                checked
-                                                    ? 'portal'
-                                                    : 'internal',
+                                                checked ? 'portal' : 'internal',
                                             )
                                         }
                                     />
@@ -833,6 +919,35 @@ export function DailyNoteWizard({
                     </WizardStepPane>
                 ) : null}
             </div>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={() => {
+                    if (!note) return;
+                    setProcessing(true);
+                    setSubmitError(null);
+                    router.delete(
+                        `/operations/clients/${clientId}/daily-notes/${note.id}`,
+                        {
+                            preserveScroll: true,
+                            preserveState: true,
+                            onSuccess: () => {
+                                onOpenChange(false);
+                                onSubmitted?.();
+                            },
+                            onError: (errors: Record<string, string>) =>
+                                setSubmitError(
+                                    Object.values(errors)[0] ??
+                                        'The draft could not be discarded. Try again.',
+                                ),
+                            onFinish: () => setProcessing(false),
+                        },
+                    );
+                }}
+                title="Discard draft?"
+                description="This removes the draft from your working notes. This cannot be undone."
+                confirmText="Discard draft"
+            />
         </WizardShell>
     );
 }

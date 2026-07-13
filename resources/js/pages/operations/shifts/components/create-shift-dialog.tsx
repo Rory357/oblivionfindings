@@ -48,6 +48,8 @@ import {
 } from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Client = {
     id: number;
@@ -90,6 +92,19 @@ const WEEKDAY_LABEL: Record<Weekday, string> = {
     sun: 'Sun',
 };
 
+const LICENCE_CLASSES = ['1', '2', '3', '4', '5', '6'] as const;
+const LICENCE_ENDORSEMENTS = [
+    { value: 'P', label: 'Passenger' },
+    { value: 'V', label: 'Vehicle recovery' },
+    { value: 'I', label: 'Dangerous goods' },
+    { value: 'O', label: 'Tracks' },
+    { value: 'F', label: 'Forklift' },
+    { value: 'D', label: 'Driving instructor' },
+    { value: 'T', label: 'Testing officer' },
+    { value: 'R', label: 'Roller' },
+    { value: 'W', label: 'Wheels' },
+] as const;
+
 export type EditableShift = {
     id: number;
     starts_at: string;
@@ -107,6 +122,8 @@ export type EditableShift = {
     site?: { id: number; name: string } | null;
     service_context_id?: number | null;
     coverage_roles?: string[] | null;
+    required_licence_class?: string | null;
+    required_licence_endorsements?: string[] | null;
     tasks?: Array<{
         id: number;
         label: string;
@@ -252,7 +269,7 @@ export function CreateShiftDialog({
             if (found) return found;
         }
         return clients[0] ?? null;
-    }, [clients, defaultClientId, defaultSiteId]);
+    }, [clients, defaultClientId, defaultSiteId, initialShift?.client?.id]);
 
     // Every client lives at a site — the location field follows it (the
     // coordinator can still type a custom location for community shifts).
@@ -300,6 +317,10 @@ export function CreateShiftDialog({
         coverage_roles: (initialShift?.coverage_roles ??
             defaultCoverageRoles ??
             []) as string[],
+        required_licence_class:
+            initialShift?.required_licence_class ?? '',
+        required_licence_endorsements:
+            initialShift?.required_licence_endorsements ?? ([] as string[]),
         coverage_rule_id: (coverageRuleId ?? '') as number | string,
         coverage_reservation_token: (coverageReservationToken ?? '') as string,
         tasks: (initialShift?.tasks?.map((t) => ({
@@ -373,6 +394,8 @@ export function CreateShiftDialog({
             user_id: defaultUserId ?? '',
             location: siteNameFor(initialClient?.site_id),
             coverage_roles: defaultCoverageRoles ?? [],
+            required_licence_class: '',
+            required_licence_endorsements: [],
             coverage_rule_id: coverageRuleId ?? '',
             coverage_reservation_token: coverageReservationToken ?? '',
             starts_at:
@@ -411,6 +434,13 @@ export function CreateShiftDialog({
         if (set.has(d)) set.delete(d);
         else set.add(d);
         form.setData('repeat_by_weekday', Array.from(set) as Weekday[]);
+    }
+
+    function toggleLicenceEndorsement(endorsement: string) {
+        const selected = new Set(form.data.required_licence_endorsements);
+        if (selected.has(endorsement)) selected.delete(endorsement);
+        else selected.add(endorsement);
+        form.setData('required_licence_endorsements', Array.from(selected));
     }
 
     function addTask() {
@@ -579,6 +609,14 @@ export function CreateShiftDialog({
                 if (form.data.coverage_roles?.length) {
                     query.coverage_roles = form.data.coverage_roles;
                 }
+                if (form.data.required_licence_class) {
+                    query.required_licence_class =
+                        form.data.required_licence_class;
+                }
+                if (form.data.required_licence_endorsements.length) {
+                    query.required_licence_endorsements =
+                        form.data.required_licence_endorsements;
+                }
 
                 const res = await fetch(eligibilityPreview.url({ query }), {
                     signal: controller.signal,
@@ -603,6 +641,8 @@ export function CreateShiftDialog({
         form.data.ends_at,
         form.data.shift_type,
         form.data.coverage_roles,
+        form.data.required_licence_class,
+        form.data.required_licence_endorsements,
         selectedClient?.site_id,
         initialShift?.id,
         initialShift?.site?.id,
@@ -627,18 +667,36 @@ export function CreateShiftDialog({
         // stores the correct UTC instant. Otherwise the naive local time
         // is interpreted as UTC and the saved shift drifts by the user's
         // offset (e.g. NZST shifts get pushed 12 hours into the future).
-        form.transform((data) => ({
-            ...data,
-            starts_at:
-                localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
-            ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
-            return_to:
-                typeof window !== 'undefined'
-                    ? window.location.pathname + window.location.search
-                    : data.return_to,
-            override_acknowledged: Boolean(overrideReason),
-            override_reason: overrideReason ?? '',
-        }));
+        form.transform((data) => {
+            const payload = {
+                ...data,
+                starts_at:
+                    localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
+                ends_at:
+                    localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
+                return_to:
+                    typeof window !== 'undefined'
+                        ? window.location.pathname + window.location.search
+                        : data.return_to,
+                override_acknowledged: Boolean(overrideReason),
+                override_reason: overrideReason ?? '',
+            };
+
+            if (
+                !isEdit &&
+                !data.required_licence_class &&
+                data.required_licence_endorsements.length === 0
+            ) {
+                const {
+                    required_licence_class: _class,
+                    required_licence_endorsements: _endorsements,
+                    ...ordinaryShift
+                } = payload;
+                return ordinaryShift;
+            }
+
+            return payload;
+        });
         if (isEdit && initialShift) {
             // Edit mode: PUT to update; recurring options don't apply.
             form.put(updateShift.url(initialShift.id), {
@@ -683,6 +741,15 @@ export function CreateShiftDialog({
                 tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
                 coverage_rule_id: form.data.coverage_rule_id || undefined,
                 coverage_roles: form.data.coverage_roles,
+                ...(form.data.required_licence_class ||
+                form.data.required_licence_endorsements.length
+                    ? {
+                          required_licence_class:
+                              form.data.required_licence_class || null,
+                          required_licence_endorsements:
+                              form.data.required_licence_endorsements,
+                      }
+                    : {}),
                 coverage_reservation_token:
                     form.data.coverage_reservation_token || undefined,
                 return_to:
@@ -838,7 +905,7 @@ export function CreateShiftDialog({
                                 const active = i === stepIndex;
                                 const done = i < stepIndex;
                                 return (
-                                    <button
+                                    <GuardrailButton unstyled
                                         key={s.key}
                                         type="button"
                                         onClick={() => {
@@ -876,11 +943,11 @@ export function CreateShiftDialog({
                                                 {s.blurb}
                                             </span>
                                         </span>
-                                    </button>
+                                    </GuardrailButton>
                                 );
                             })}
                         </div>
-                        <div className="mt-3 rounded-lg border border-border bg-card p-3">
+                        <GuardrailCard unstyled className="mt-3 rounded-lg border border-border bg-card p-3">
                             <div className="flex items-center justify-between text-[11.5px] font-semibold">
                                 <span>Shift readiness</span>
                                 <span className="tabular-nums">
@@ -893,7 +960,7 @@ export function CreateShiftDialog({
                                     style={{ width: `${readinessPct}%` }}
                                 />
                             </div>
-                        </div>
+                        </GuardrailCard>
                     </aside>
 
                     {/* Main panel */}
@@ -917,14 +984,14 @@ export function CreateShiftDialog({
                                     </kbd>
                                     <span>to continue</span>
                                 </span>
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close dialog"
                                     className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                                 >
                                     <X className="h-4.5 w-4.5" />
-                                </button>
+                                </GuardrailButton>
                             </div>
                         </header>
                         <div className="h-[3px] shrink-0 bg-muted">
@@ -944,7 +1011,7 @@ export function CreateShiftDialog({
 
                             {(cur.key === 'people' || cur.key === 'review') &&
                             form.data.user_id ? (
-                                <div className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
+                                <GuardrailCard unstyled className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
                                             <div className="text-sm font-semibold text-foreground">
@@ -988,7 +1055,7 @@ export function CreateShiftDialog({
                                             title="Staff eligibility warnings"
                                         />
                                     ) : null}
-                                </div>
+                                </GuardrailCard>
                             ) : null}
 
                             {cur.key === 'type' ? (
@@ -1140,6 +1207,117 @@ export function CreateShiftDialog({
                                             message={form.errors.user_id}
                                         />
                                     </div>
+
+                                    <div className="sm:col-span-2 rounded-xl border border-border bg-muted/25 p-3">
+                                        <div className="mb-3">
+                                            <div className="text-xs font-semibold text-foreground">
+                                                Driving requirement
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Optional. Leave blank for an
+                                                ordinary shift.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+                                            <div>
+                                                <Label htmlFor="csd-licence-class">
+                                                    Required licence class
+                                                </Label>
+                                                <select
+                                                    id="csd-licence-class"
+                                                    className="select"
+                                                    value={
+                                                        form.data
+                                                            .required_licence_class
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'required_licence_class',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="">
+                                                        No class requirement
+                                                    </option>
+                                                    {LICENCE_CLASSES.map(
+                                                        (licenceClass) => (
+                                                            <option
+                                                                key={
+                                                                    licenceClass
+                                                                }
+                                                                value={
+                                                                    licenceClass
+                                                                }
+                                                            >
+                                                                Class{' '}
+                                                                {licenceClass}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <Label>
+                                                    Required endorsements
+                                                </Label>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {LICENCE_ENDORSEMENTS.map(
+                                                        (endorsement) => {
+                                                            const selected =
+                                                                form.data.required_licence_endorsements.includes(
+                                                                    endorsement.value,
+                                                                );
+                                                            return (
+                                                                <GuardrailButton
+                                                                    unstyled
+                                                                    key={
+                                                                        endorsement.value
+                                                                    }
+                                                                    type="button"
+                                                                    aria-label={`${endorsement.label} endorsement`}
+                                                                    aria-pressed={
+                                                                        selected
+                                                                    }
+                                                                    onClick={() =>
+                                                                        toggleLicenceEndorsement(
+                                                                            endorsement.value,
+                                                                        )
+                                                                    }
+                                                                    className={cn(
+                                                                        'min-h-9 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                        selected
+                                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                                            : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        endorsement.value
+                                                                    }{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        endorsement.label
+                                                                    }
+                                                                </GuardrailButton>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <FieldError
+                                            message={
+                                                form.errors
+                                                    .required_licence_class
+                                            }
+                                        />
+                                        <FieldError
+                                            message={
+                                                form.errors
+                                                    .required_licence_endorsements
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </Section>
                             ) : null}
@@ -1222,7 +1400,7 @@ export function CreateShiftDialog({
                                                                 d,
                                                             );
                                                         return (
-                                                            <button
+                                                            <GuardrailButton unstyled
                                                                 key={d}
                                                                 type="button"
                                                                 onClick={() =>
@@ -1242,7 +1420,7 @@ export function CreateShiftDialog({
                                                                         d
                                                                     ]
                                                                 }
-                                                            </button>
+                                                            </GuardrailButton>
                                                         );
                                                     })}
                                                 </div>
@@ -1312,18 +1490,18 @@ export function CreateShiftDialog({
                                                 </span>
                                             </label>
                                             {form.data.tasks.length > 0 ? (
-                                                <button
+                                                <GuardrailButton unstyled
                                                     type="button"
                                                     onClick={addTask}
                                                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
                                                 >
                                                     <Plus className="h-3.5 w-3.5" />{' '}
                                                     Add
-                                                </button>
+                                                </GuardrailButton>
                                             ) : null}
                                         </div>
                                         {form.data.tasks.length === 0 ? (
-                                            <button
+                                            <GuardrailButton unstyled
                                                 type="button"
                                                 onClick={addTask}
                                                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -1331,7 +1509,7 @@ export function CreateShiftDialog({
                                                 <Plus className="h-3.5 w-3.5" />
                                                 Add the first task — e.g.
                                                 “Morning medication round”
-                                            </button>
+                                            </GuardrailButton>
                                         ) : (
                                             <ul className="space-y-1.5">
                                                 {form.data.tasks.map((t, i) => (
@@ -1393,7 +1571,7 @@ export function CreateShiftDialog({
                                                                 }
                                                             />
                                                         ) : null}
-                                                        <button
+                                                        <GuardrailButton unstyled
                                                             type="button"
                                                             onClick={() =>
                                                                 removeTask(i)
@@ -1402,7 +1580,7 @@ export function CreateShiftDialog({
                                                             aria-label={`Remove task ${i + 1}`}
                                                         >
                                                             <Trash className="h-4 w-4" />
-                                                        </button>
+                                                        </GuardrailButton>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -1497,6 +1675,30 @@ export function CreateShiftDialog({
                                                 onEdit={() => jumpTo('people')}
                                             />
                                             <ReviewRow
+                                                label="Driving requirement"
+                                                value={
+                                                    form.data
+                                                        .required_licence_class ||
+                                                    form.data
+                                                        .required_licence_endorsements
+                                                        .length
+                                                        ? [
+                                                              form.data
+                                                                  .required_licence_class
+                                                                  ? `Class ${form.data.required_licence_class}`
+                                                                  : null,
+                                                              form.data.required_licence_endorsements
+                                                                  .length
+                                                                  ? `${form.data.required_licence_endorsements.join(', ')} endorsement${form.data.required_licence_endorsements.length === 1 ? '' : 's'}`
+                                                                  : null,
+                                                          ]
+                                                              .filter(Boolean)
+                                                              .join(' · ')
+                                                        : 'None'
+                                                }
+                                                onEdit={() => jumpTo('people')}
+                                            />
+                                            <ReviewRow
                                                 label="Location"
                                                 value={
                                                     form.data.location || '—'
@@ -1582,24 +1784,24 @@ export function CreateShiftDialog({
                         <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
                             <div>
                                 {stepIndex > 0 ? (
-                                    <button
+                                    <GuardrailButton unstyled
                                         type="button"
                                         onClick={goBack}
                                         className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                         Back
-                                    </button>
+                                    </GuardrailButton>
                                 ) : null}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={onClose}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Cancel
-                                </button>
+                                </GuardrailButton>
                                 {cur.key === 'review' ? (
                                     <button
                                         type="submit"
@@ -1729,13 +1931,13 @@ function ReviewRow({
                 </dt>
                 <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
             </div>
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 onClick={onEdit}
                 className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/5"
             >
                 Edit
-            </button>
+            </GuardrailButton>
         </div>
     );
 }
@@ -1754,7 +1956,7 @@ function ShiftTypePicker({
                 const accent = SHIFT_TYPE_ACCENT_CLASSES[t.accent];
                 const Icon = t.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -1784,7 +1986,7 @@ function ShiftTypePicker({
                                 <Check className="h-3 w-3" strokeWidth={3} />
                             </span>
                         ) : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -1894,7 +2096,7 @@ function StatusPicker({
                 const active = value === o.key;
                 const Icon = o.icon;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
@@ -1924,7 +2126,7 @@ function StatusPicker({
                                 {o.hint}
                             </span>
                         </span>
-                    </button>
+                    </GuardrailButton>
                 );
             })}
         </div>
@@ -1941,7 +2143,7 @@ function Toggle({
     ariaLabel?: string;
 }) {
     return (
-        <button
+        <GuardrailButton unstyled
             type="button"
             role="switch"
             aria-checked={value}
@@ -1958,7 +2160,7 @@ function Toggle({
                     value ? 'translate-x-4' : 'translate-x-0.5',
                 ].join(' ')}
             />
-        </button>
+        </GuardrailButton>
     );
 }
 

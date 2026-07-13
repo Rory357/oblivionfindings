@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Clock, MapPin, UserRound } from 'lucide-react';
+import { Car, Clock, MapPin, UserRound } from 'lucide-react';
 
 import StaffStatus from '@/components/staff-status';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateTime, formatTime } from '@/lib/datetime';
 
 import type { RosterShift } from './types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function ShiftDetail({ shift }: { shift: RosterShift }) {
     const completedTasks = shift.tasks.filter(
@@ -75,6 +76,34 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
                         </div>
                     </div>
                 ) : null}
+                {shift.required_licence_class ||
+                shift.required_licence_endorsements?.length ? (
+                    <div className="flex gap-2">
+                        <Car className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                        <div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {shift.required_licence_class ? (
+                                    <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium">
+                                        Class {shift.required_licence_class}
+                                    </span>
+                                ) : null}
+                                {shift.required_licence_endorsements?.map(
+                                    (endorsement) => (
+                                        <span
+                                            key={endorsement}
+                                            className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
+                                        >
+                                            {endorsement} endorsement
+                                        </span>
+                                    ),
+                                )}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                                Required driving licence
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             <div className="rounded-lg border bg-muted/30 p-3">
@@ -106,7 +135,7 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
             </div>
 
             {shift.timesheet ? (
-                <div className="rounded-lg border bg-card p-3 text-sm">
+                <GuardrailCard unstyled className="rounded-lg border bg-card p-3 text-sm">
                     <div className="font-medium">
                         Timesheet {shift.timesheet.status}
                     </div>
@@ -115,7 +144,7 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
                             {shift.timesheet.return_notes}
                         </p>
                     ) : null}
-                </div>
+                </GuardrailCard>
             ) : null}
 
             <Button asChild className="w-full">

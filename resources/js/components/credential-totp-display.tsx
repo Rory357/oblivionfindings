@@ -63,8 +63,10 @@ export function CredentialTotpDisplay({ siteId, credentialId, onCopy }: Props) {
         };
     }, [fetchCode]);
 
+    const activeCode = state?.code;
+
     useEffect(() => {
-        if (!state) return;
+        if (!activeCode) return;
         if (intervalRef.current !== null) {
             window.clearInterval(intervalRef.current);
         }
@@ -84,7 +86,7 @@ export function CredentialTotpDisplay({ siteId, credentialId, onCopy }: Props) {
                 window.clearInterval(intervalRef.current);
             }
         };
-    }, [state?.code, fetchCode]);
+    }, [activeCode, fetchCode]);
 
     const handleCopy = async () => {
         if (!state) return;

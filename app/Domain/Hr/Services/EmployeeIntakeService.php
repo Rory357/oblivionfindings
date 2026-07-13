@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -25,10 +26,58 @@ use Illuminate\Support\Str;
  */
 class EmployeeIntakeService
 {
+    /**
+     * External portal personas — never assignable through employee intake
+     * (they are not staff; their accounts are provisioned by the portal flows).
+     */
+    private const EXTERNAL_PERSONA_ROLES = ['client', 'next_of_kin'];
+
+    /**
+     * RBAC level at/above which a role is system-administrator grade
+     * (RbacSeeder: admin = 100; execs/board sit below).
+     */
+    private const ADMIN_LEVEL_THRESHOLD = 100;
+
     public function __construct(
         private readonly OnboardingService $onboarding,
         private readonly HrWebhookService $webhooks,
     ) {}
+
+    /**
+     * D-2 privilege-escalation guard for both intake doors: an admin-grade role
+     * can only be assigned by an actor who already holds admin, and external
+     * portal personas can never be minted as employees. Throws the same
+     * exception type the intake callers already surface as a flash.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertRoleAssignable(?string $roleName, int $actorId): void
+    {
+        if ($roleName === null || $roleName === '') {
+            return;
+        }
+
+        if (in_array($roleName, self::EXTERNAL_PERSONA_ROLES, true)) {
+            throw new \InvalidArgumentException(
+                "The '{$roleName}' role is an external portal persona and cannot be assigned through employee intake."
+            );
+        }
+
+        $role = Role::query()->where('name', $roleName)->first();
+        $isAdminGrade = $roleName === 'admin'
+            || ($role && (int) ($role->level ?? 0) >= self::ADMIN_LEVEL_THRESHOLD);
+
+        if (! $isAdminGrade) {
+            return;
+        }
+
+        $actor = User::find($actorId);
+        if (! $actor || ! ($actor->role === 'admin' || $actor->hasRole('admin'))) {
+            throw new \InvalidArgumentException(
+                'Only an administrator can assign an administrator-level role.'
+            );
+        }
+    }
 
     /**
      * Create (or link to) the user and upsert their single employee profile.
@@ -56,6 +105,8 @@ class EmployeeIntakeService
         bool $sendInvite = false,
         string $source = 'manual',
     ): HrEmployeeProfile {
+        $this->assertRoleAssignable($roleName, $actorId);
+
         /** @var array{user: User, profile: HrEmployeeProfile, linkedExisting: bool} $written */
         $written = DB::transaction(function () use (
             $name,
@@ -126,6 +177,18 @@ class EmployeeIntakeService
         $profile = $written['profile'];
 
         // --- Best-effort side-effects (post-commit; never block the hire) ---
+
+        // D-3: the USER write (account minted/linked, role set, login approved) is
+        // audited explicitly — User deliberately doesn't carry AuditableChanges
+        // (that would log every login-token touch). AuditLogger never throws,
+        // and uses actor_id when no HTTP request user exists.
+        AuditLogger::log('user.employee_intake', $user, [
+            'actor_id' => $actorId,
+            'source' => $source,
+            'linked_existing_user' => $written['linkedExisting'],
+            'role' => $roleName,
+            'approved' => (bool) $user->approved_at,
+        ]);
 
         // 3. Onboarding parity (toggle; idempotent).
         if ($startOnboarding) {
@@ -206,9 +269,17 @@ class EmployeeIntakeService
             throw new \InvalidArgumentException('A new start date is required to re-hire.');
         }
 
+        // Resolve once so validation, the RBAC write, and the audit record all
+        // describe the same role even when the legacy users.role value differs.
+        $roleName = $attributes['position_role'] ?? $profile->position_role ?? $profile->user?->role;
+
+        // Same D-2 guard as intake, on the role this re-hire would restore/attach
+        // (step 3 below re-syncs the RBAC pivot for the resolved role).
+        $this->assertRoleAssignable($roleName, $actorId);
+
         $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
 
-        $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart) {
+        $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart, $roleName) {
             // 0. Close out any leaver workflow still open from the previous
             //    stint — rehiring supersedes it, and leaving it open would
             //    strand a live checklist whose completion revokes the login
@@ -266,7 +337,6 @@ class EmployeeIntakeService
                     ])->save();
                 }
 
-                $roleName = $attributes['position_role'] ?? $profile->position_role ?? $user->role;
                 if ($roleName) {
                     if (! $user->role) {
                         $user->forceFill(['role' => $roleName])->save();
@@ -282,6 +352,17 @@ class EmployeeIntakeService
         });
 
         // --- Best-effort side-effects (post-commit; never block the re-hire) ---
+
+        // D-3: the login restore (approved_at + role pivot back on) is a user
+        // write — audit it like intake does.
+        if ($profile->user) {
+            AuditLogger::log('user.rehire_login_restored', $profile->user, [
+                'actor_id' => $actorId,
+                'employee_profile_id' => $profile->id,
+                'role' => $roleName,
+                'start_date' => $newStart->toDateString(),
+            ]);
+        }
 
         if ($startOnboarding) {
             $this->maybeGenerateOnboarding($profile, $actorId, $newStart);

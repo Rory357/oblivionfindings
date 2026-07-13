@@ -163,12 +163,15 @@ export default function RecordAdministrationDialog({
     const [scanMatchSource, setScanMatchSource] = useState<string | null>(null);
     const [verifyingScan, setVerifyingScan] = useState(false);
 
+    const medicationId = medication?.id;
+    const medicationDosage = medication?.dosage;
+
     useEffect(() => {
-        if (isOpen && medication) {
+        if (isOpen && medicationId != null) {
             setStatus('given');
             setReasonCode('');
             setReason('');
-            setDoseGiven(medication.dosage || '');
+            setDoseGiven(medicationDosage || '');
             setNotes('');
             setAdministeredAt(new Date().toISOString().slice(0, 16));
             setWitnessedBy('');
@@ -187,7 +190,7 @@ export default function RecordAdministrationDialog({
             setScanMessage('');
             setScanMatchSource(null);
         }
-    }, [isOpen, medication?.id, medication?.dosage]);
+    }, [isOpen, medicationId, medicationDosage]);
 
     const needsReason = useMemo(
         () => status !== 'given' || !!medication?.is_prn,
@@ -258,7 +261,6 @@ export default function RecordAdministrationDialog({
         bloodPressureDiastolic,
         bloodPressureSystolic,
         medication,
-        needsReason,
         needsScanVerification,
         needsWitness,
         pulseBpm,

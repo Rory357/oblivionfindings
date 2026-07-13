@@ -145,18 +145,28 @@ export function OverviewDesignGrid({
     keyWorkerId,
     keyWorkerName,
     riskLevelControl,
-    canEdit,
+    navigationCapabilities,
     onTab,
     onEditAbout,
     onRecordDose,
     onManageWorkers,
 }: {
     preferredName: string;
-    aboutTiles: { key: string; icon: IconType; title: string; body: string; tone: string }[];
+    aboutTiles: {
+        key: string;
+        icon: IconType;
+        title: string;
+        body: string;
+        tone: string;
+    }[];
     notes: ClientDailyNote[];
     goals: OverviewGoal[];
     risks: OverviewRisk[];
-    activePlan: { title?: string | null; reviewed_at?: string | null; next_review_at?: string | null } | null;
+    activePlan: {
+        title?: string | null;
+        reviewed_at?: string | null;
+        next_review_at?: string | null;
+    } | null;
     reviewDays: number | null;
     emarSummary: {
         active_medications_count?: number;
@@ -169,11 +179,17 @@ export function OverviewDesignGrid({
     keyWorkerName: string | null;
     /** The existing quick-update risk-level Select — preserved feature. */
     riskLevelControl?: ReactNode;
-    canEdit: boolean;
+    navigationCapabilities: {
+        dailyNotes: boolean;
+        goals: boolean;
+        risks: boolean;
+        mar: boolean;
+        calendar: boolean;
+    };
     onTab: (key: string) => void;
-    onEditAbout: () => void;
-    onRecordDose: () => void;
-    onManageWorkers: () => void;
+    onEditAbout?: () => void;
+    onRecordDose?: () => void;
+    onManageWorkers?: () => void;
 }) {
     const goalsDone = goals.filter((g) => g.status === 'completed').length;
     const goalsPct = goals.length
@@ -185,10 +201,26 @@ export function OverviewDesignGrid({
         activeRisks.filter((r) => (r.severity ?? '').toLowerCase() === sev)
             .length;
     const riskSegments = [
-        { label: 'Critical', value: riskCount('critical'), color: 'var(--status-critical)' },
-        { label: 'High', value: riskCount('high'), color: 'oklch(0.55 0.18 50)' },
-        { label: 'Medium', value: riskCount('medium'), color: 'var(--status-warning)' },
-        { label: 'Low', value: riskCount('low'), color: 'var(--status-success)' },
+        {
+            label: 'Critical',
+            value: riskCount('critical'),
+            color: 'var(--status-critical)',
+        },
+        {
+            label: 'High',
+            value: riskCount('high'),
+            color: 'oklch(0.55 0.18 50)',
+        },
+        {
+            label: 'Medium',
+            value: riskCount('medium'),
+            color: 'var(--status-warning)',
+        },
+        {
+            label: 'Low',
+            value: riskCount('low'),
+            color: 'var(--status-success)',
+        },
     ].filter((s) => s.value > 0);
     const overdueRisk = activeRisks.find(
         (r) => r.review_date && new Date(r.review_date).getTime() < Date.now(),
@@ -214,7 +246,7 @@ export function OverviewDesignGrid({
                         title={`About ${preferredName}`}
                         sub="Person-centred summary"
                         action={
-                            canEdit ? (
+                            onEditAbout ? (
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -271,9 +303,13 @@ export function OverviewDesignGrid({
                         title="Recent daily notes"
                         sub="Latest from the floor"
                         action={
-                            <GhostLink onClick={() => onTab('progress_notes')}>
-                                View all
-                            </GhostLink>
+                            navigationCapabilities.dailyNotes ? (
+                                <GhostLink
+                                    onClick={() => onTab('progress_notes')}
+                                >
+                                    View all
+                                </GhostLink>
+                            ) : null
                         }
                     />
                     <CardContent className="space-y-2.5 px-5 pt-3 pb-5">
@@ -289,8 +325,8 @@ export function OverviewDesignGrid({
                                 ))
                         ) : (
                             <p className="rounded-xl border border-dashed py-6 text-center text-sm text-muted-foreground">
-                                No daily notes yet — add the first from the
-                                hero or the Daily Notes tab.
+                                No daily notes yet — add the first from the hero
+                                or the Daily Notes tab.
                             </p>
                         )}
                     </CardContent>
@@ -307,9 +343,11 @@ export function OverviewDesignGrid({
                                 : 'No goals yet'
                         }
                         action={
-                            <GhostLink onClick={() => onTab('goals_path')}>
-                                Open
-                            </GhostLink>
+                            navigationCapabilities.goals ? (
+                                <GhostLink onClick={() => onTab('goals_path')}>
+                                    Open
+                                </GhostLink>
+                            ) : null
                         }
                     />
                     <CardContent className="space-y-3 px-5 pt-3 pb-5">
@@ -380,9 +418,7 @@ export function OverviewDesignGrid({
                                 <CheckCircle2
                                     className={`h-3.5 w-3.5 ${activePlan ? 'text-status-success' : 'text-muted-foreground'}`}
                                 />
-                                {activePlan
-                                    ? 'Plan active'
-                                    : 'No active plan'}
+                                {activePlan ? 'Plan active' : 'No active plan'}
                             </div>
                             <div className="flex items-center gap-2">
                                 <Flag className="h-3.5 w-3.5 text-primary" />
@@ -407,9 +443,13 @@ export function OverviewDesignGrid({
                         title="Risk register"
                         sub={`${activeRisks.length} active risk${activeRisks.length === 1 ? '' : 's'}`}
                         action={
-                            <GhostLink onClick={() => onTab('risk_management')}>
-                                Open
-                            </GhostLink>
+                            navigationCapabilities.risks ? (
+                                <GhostLink
+                                    onClick={() => onTab('risk_management')}
+                                >
+                                    Open
+                                </GhostLink>
+                            ) : null
                         }
                     />
                     <CardContent className="px-5 pt-3 pb-4">
@@ -453,8 +493,7 @@ export function OverviewDesignGrid({
                             <div className="mt-3 flex items-center gap-2 rounded-lg bg-status-critical-bg px-3 py-2 text-xs text-status-critical">
                                 <AlertOctagon className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate font-medium">
-                                    {overdueRisk.label ?? 'Risk'} review
-                                    overdue
+                                    {overdueRisk.label ?? 'Risk'} review overdue
                                 </span>
                             </div>
                         ) : null}
@@ -476,9 +515,11 @@ export function OverviewDesignGrid({
                         title="Medication"
                         sub="eMAR summary"
                         action={
-                            <GhostLink onClick={() => onTab('mar')}>
-                                MAR
-                            </GhostLink>
+                            navigationCapabilities.mar ? (
+                                <GhostLink onClick={() => onTab('mar')}>
+                                    MAR
+                                </GhostLink>
+                            ) : null
                         }
                     />
                     <CardContent className="px-5 pt-3 pb-5">
@@ -516,14 +557,16 @@ export function OverviewDesignGrid({
                                             : 'No open medication alerts'}
                                     </div>
                                 </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    className="ml-auto shrink-0"
-                                    onClick={onRecordDose}
-                                >
-                                    Sign
-                                </Button>
+                                {onRecordDose ? (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        className="ml-auto shrink-0"
+                                        onClick={onRecordDose}
+                                    >
+                                        Sign
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : (
                             <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">
@@ -540,9 +583,11 @@ export function OverviewDesignGrid({
                         title="Upcoming"
                         sub="Appointments & schedule"
                         action={
-                            <GhostLink onClick={() => onTab('calendar')}>
-                                All
-                            </GhostLink>
+                            navigationCapabilities.calendar ? (
+                                <GhostLink onClick={() => onTab('calendar')}>
+                                    All
+                                </GhostLink>
+                            ) : null
                         }
                     />
                     <CardContent className="space-y-2 px-5 pt-3 pb-5">
@@ -611,7 +656,7 @@ export function OverviewDesignGrid({
                         icon={Users}
                         title="Support team"
                         action={
-                            canEdit ? (
+                            onManageWorkers ? (
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -699,7 +744,13 @@ export function buildAboutTiles(
         strengths_abilities?: string | null;
         cognitive_needs?: string | null;
     },
-): { key: string; icon: IconType; title: string; body: string; tone: string }[] {
+): {
+    key: string;
+    icon: IconType;
+    title: string;
+    body: string;
+    tone: string;
+}[] {
     const str = (v: unknown) => String(v ?? '').trim();
     const tiles = [
         {

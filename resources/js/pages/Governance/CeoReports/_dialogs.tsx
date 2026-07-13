@@ -42,6 +42,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Report type tile picker (Send-Kudos style) ────────────────────────────
 
@@ -145,7 +146,7 @@ function ReportTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <button
+                    <Button unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -165,7 +166,7 @@ function ReportTypePicker({
                             <span className="block truncate text-sm font-medium">{t.label}</span>
                             <span className="block text-xs text-muted-foreground">{t.description}</span>
                         </span>
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -196,7 +197,7 @@ function DecisionsSoughtEditor({
                 </div>
             )}
             {rows.map((row, i) => (
-                <div key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
+                <GuardrailCard unstyled key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
                     <div className="flex items-start justify-between gap-2">
                         <Input
                             placeholder="Decision title (e.g. Approve FY27 budget)"
@@ -226,7 +227,7 @@ function DecisionsSoughtEditor({
                         value={row.recommendation}
                         onChange={(e) => update(i, { recommendation: e.target.value })}
                     />
-                </div>
+                </GuardrailCard>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={add}>
                 <Plus className="mr-1.5 h-4 w-4" />
@@ -258,7 +259,7 @@ function MattersArisingEditor({
                 </div>
             )}
             {rows.map((row, i) => (
-                <div key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
+                <GuardrailCard unstyled key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
                     <div className="flex items-start gap-2">
                         <Input
                             placeholder="Matter title (from previous report)"
@@ -292,7 +293,7 @@ function MattersArisingEditor({
                         value={row.update}
                         onChange={(e) => update(i, { update: e.target.value })}
                     />
-                </div>
+                </GuardrailCard>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={add}>
                 <Plus className="mr-1.5 h-4 w-4" />

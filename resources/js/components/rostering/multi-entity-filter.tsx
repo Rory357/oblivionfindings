@@ -17,6 +17,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type MultiEntityItem = {
     id: number;
@@ -120,7 +121,7 @@ export function MultiEntityFilter({
                         </button>
                     </PopoverTrigger>
                     {!allSelected ? (
-                        <button
+                        <GuardrailButton unstyled
                             type="button"
                             aria-label={`Clear ${label} filter`}
                             className={cn(
@@ -132,7 +133,7 @@ export function MultiEntityFilter({
                             onClick={clearAll}
                         >
                             <X className="h-3 w-3" />
-                        </button>
+                        </GuardrailButton>
                     ) : null}
                 </div>
             </PopoverAnchor>

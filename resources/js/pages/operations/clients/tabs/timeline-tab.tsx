@@ -21,6 +21,14 @@ type ClientTimelineTabProps = {
     clientId: number;
     events: Array<any>;
     handover: Array<any>;
+    summary?: {
+        total?: number;
+        loaded?: number;
+        has_more?: boolean;
+        pinned_handover_total?: number;
+        pinned_handover_loaded?: number;
+        pinned_handover_has_more?: boolean;
+    };
     canCreateNote: boolean;
     canPinHandover: boolean;
     auth?: unknown;
@@ -68,12 +76,16 @@ export function ClientTimelineTab({
     clientId,
     events,
     handover,
+    summary = {},
     canCreateNote,
     canPinHandover,
     auth,
 }: ClientTimelineTabProps) {
     const [timelineSearch, setTimelineSearch] = useState('');
     const [timelineTypeFilter, setTimelineTypeFilter] = useState('all');
+    const [expandedEvents, setExpandedEvents] = useState<Set<number>>(
+        () => new Set(),
+    );
 
     const noteForm = useForm<{
         type: string;
@@ -155,6 +167,20 @@ export function ClientTimelineTab({
                 </div>
             </CardHeader>
             <CardContent className="space-y-2">
+                {summary.has_more ? (
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Showing the latest {summary.loaded ?? events.length} of{' '}
+                        {summary.total ?? events.length} timeline events.
+                    </p>
+                ) : null}
+                {summary.pinned_handover_has_more ? (
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Showing{' '}
+                        {summary.pinned_handover_loaded ?? handover.length} of{' '}
+                        {summary.pinned_handover_total ?? handover.length}{' '}
+                        pinned handover items.
+                    </p>
+                ) : null}
                 {handover.length ? (
                     <div className="rounded-md border p-3">
                         <div className="text-sm font-medium">
@@ -386,6 +412,7 @@ export function ClientTimelineTab({
 
                         <div className="space-y-0">
                             {filteredEvents.map((e, idx) => {
+                                const detailExpanded = expandedEvents.has(e.id);
                                 const TYPE_STYLES: Record<
                                     string,
                                     {
@@ -550,14 +577,56 @@ export function ClientTimelineTab({
                                                     </span>
                                                 </div>
                                                 {e.body && (
-                                                    <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                                                        {e.body.length > 250
-                                                            ? e.body.slice(
-                                                                  0,
-                                                                  250,
-                                                              ) + '...'
-                                                            : e.body}
-                                                    </p>
+                                                    <>
+                                                        <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                                                            {e.body.length >
+                                                                250 &&
+                                                            !detailExpanded
+                                                                ? `${e.body.slice(0, 250)}...`
+                                                                : e.body}
+                                                        </p>
+                                                        {e.body.length > 250 ? (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="mt-1 h-8 px-2 text-xs"
+                                                                aria-expanded={
+                                                                    detailExpanded
+                                                                }
+                                                                onClick={() =>
+                                                                    setExpandedEvents(
+                                                                        (
+                                                                            current,
+                                                                        ) => {
+                                                                            const next =
+                                                                                new Set(
+                                                                                    current,
+                                                                                );
+                                                                            if (
+                                                                                next.has(
+                                                                                    e.id,
+                                                                                )
+                                                                            ) {
+                                                                                next.delete(
+                                                                                    e.id,
+                                                                                );
+                                                                            } else {
+                                                                                next.add(
+                                                                                    e.id,
+                                                                                );
+                                                                            }
+                                                                            return next;
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                {detailExpanded
+                                                                    ? 'Hide detail'
+                                                                    : 'Show full detail'}
+                                                            </Button>
+                                                        ) : null}
+                                                    </>
                                                 )}
                                                 {e.meta?.emotions &&
                                                     (

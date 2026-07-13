@@ -2,7 +2,6 @@ import {
     DailyNoteEntry,
     type ClientDailyNote,
 } from '@/components/daily-note-entry';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -37,9 +36,13 @@ export type { ClientDailyNote };
 
 export type DailyNotesSummary = {
     total?: number;
+    loaded?: number;
+    has_more?: boolean;
     flagged_open?: number;
     drafts?: number;
     communication?: number;
+    communication_loaded?: number;
+    communication_has_more?: boolean;
     open_follow_ups?: number;
 };
 
@@ -50,13 +53,13 @@ type DailyNotesTabProps = {
     canReview?: boolean;
     canUpdate?: boolean;
     currentUserId?: number;
-    onCreateDaily: () => void;
-    onCreateQuick: () => void;
+    onCreateDaily?: () => void;
+    onCreateQuick?: () => void;
+    onEditNote?: (note: ClientDailyNote) => void;
     filterPreset?: DailyNotesFilter;
     onFilterChange?: (filter: DailyNotesFilter) => void;
     onShowReviewQueue?: () => void;
     isLoading?: boolean;
-    legacyProgressNotes?: any[];
 };
 
 type DailyNotesFilter = 'all' | 'flagged' | 'follow_up' | 'drafts';
@@ -149,11 +152,11 @@ export function DailyNotesTab({
     currentUserId,
     onCreateDaily,
     onCreateQuick,
+    onEditNote,
     filterPreset,
     onFilterChange,
     onShowReviewQueue,
     isLoading = false,
-    legacyProgressNotes = [],
 }: DailyNotesTabProps) {
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<DailyNotesFilter>(
@@ -217,9 +220,7 @@ export function DailyNotesTab({
     const filteredNotes = useMemo(() => {
         const search = query.trim().toLowerCase();
         const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
-        const toTs = dateTo
-            ? new Date(`${dateTo}T23:59:59`).getTime()
-            : null;
+        const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
 
         return notes.filter((note) => {
             if (filter === 'flagged' && !note.is_flagged) return false;
@@ -290,7 +291,7 @@ export function DailyNotesTab({
     }, [notes]);
 
     const reviewQueue = notes.filter(
-        (note) => note.is_flagged && !note.reviewed_at,
+        (note) => !note.is_draft && note.is_flagged && !note.reviewed_at,
     );
     const draftNotes = notes.filter((note) => note.is_draft);
 
@@ -368,9 +369,7 @@ export function DailyNotesTab({
                                         {value}
                                     </p>
                                 </div>
-                                <span
-                                    className={`rounded-lg p-2 ${stat.tone}`}
-                                >
+                                <span className={`rounded-lg p-2 ${stat.tone}`}>
                                     <Icon className="h-5 w-5" />
                                 </span>
                             </div>
@@ -378,6 +377,13 @@ export function DailyNotesTab({
                     );
                 })}
             </div>
+
+            {summary.has_more ? (
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    Showing the latest {summary.loaded ?? notes.length} of{' '}
+                    {summary.total ?? notes.length} daily notes.
+                </p>
+            ) : null}
 
             <div className="space-y-3">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -435,27 +441,33 @@ export function DailyNotesTab({
                         </Select>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onCreateQuick}
-                            className="min-h-11"
-                            data-test="client-daily-notes-quick-note-button"
-                        >
-                            <MessageSquare className="mr-2 h-4 w-4" />
-                            Quick Note
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={onCreateDaily}
-                            className="min-h-11"
-                            data-test="client-daily-notes-daily-note-button"
-                        >
-                            <ClipboardList className="mr-2 h-4 w-4" />
-                            Daily Note
-                        </Button>
-                    </div>
+                    {onCreateQuick || onCreateDaily ? (
+                        <div className="flex flex-wrap gap-2">
+                            {onCreateQuick ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onCreateQuick}
+                                    className="min-h-11"
+                                    data-test="client-daily-notes-quick-note-button"
+                                >
+                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                    Quick Note
+                                </Button>
+                            ) : null}
+                            {onCreateDaily ? (
+                                <Button
+                                    type="button"
+                                    onClick={onCreateDaily}
+                                    className="min-h-11"
+                                    data-test="client-daily-notes-daily-note-button"
+                                >
+                                    <ClipboardList className="mr-2 h-4 w-4" />
+                                    Daily Note
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
 
                 {/* Note-type filter — progress notes & handovers are first-class
@@ -470,11 +482,7 @@ export function DailyNotesTab({
                                 'Progress notes',
                                 noteTypeCounts.progress,
                             ],
-                            [
-                                'handover',
-                                'Handovers',
-                                noteTypeCounts.handover,
-                            ],
+                            ['handover', 'Handovers', noteTypeCounts.handover],
                         ] as [NoteTypeFilter, string, number][]
                     ).map(([key, label, count]) => {
                         const active = noteType === key;
@@ -593,6 +601,7 @@ export function DailyNotesTab({
                                 canUpdate={canUpdate}
                                 onMarkReviewed={markReviewed}
                                 onClearFlag={clearFlag}
+                                onEdit={onEditNote}
                             />
                         ))
                     ) : (
@@ -649,7 +658,7 @@ export function DailyNotesTab({
                                                         note.occurred_at,
                                                 )}
                                             </span>
-                                            {canReview ? (
+                                            {(note.can?.review ?? canReview) ? (
                                                 <Button
                                                     size="sm"
                                                     onClick={() =>
@@ -699,16 +708,32 @@ export function DailyNotesTab({
                                                         note.occurred_at,
                                                 )}
                                             </span>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    handleFilterChange('drafts')
-                                                }
-                                            >
-                                                Show drafts
-                                            </Button>
+                                            {(note.can?.update ?? canUpdate) &&
+                                            onEditNote ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        onEditNote(note)
+                                                    }
+                                                >
+                                                    Resume draft
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        handleFilterChange(
+                                                            'drafts',
+                                                        )
+                                                    }
+                                                >
+                                                    Show drafts
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -719,37 +744,6 @@ export function DailyNotesTab({
                             )}
                         </CardContent>
                     </Card>
-
-                    {legacyProgressNotes.length > 0 ? (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Historical Progress Notes
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {legacyProgressNotes.slice(0, 5).map((note) => (
-                                    <div
-                                        key={note.id}
-                                        className="rounded-lg border p-3 text-sm"
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="font-medium">
-                                                {note.goal?.title ??
-                                                    'Progress note'}
-                                            </p>
-                                            <span className="text-xs text-muted-foreground">
-                                                {dateLabel(note.created_at)}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 line-clamp-3 text-muted-foreground">
-                                            {note.body ?? note.content}
-                                        </p>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    ) : null}
                 </aside>
             </div>
         </div>

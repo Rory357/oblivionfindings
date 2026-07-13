@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 
 import { MicroStats, type MicroStat } from './micro-stats';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type AnalyticsTrendPoint = { week: string; coverage: number };
 export type DailyCoveragePoint = {
@@ -87,7 +88,7 @@ export function AnalyticsPane({
                                 Filled vs. target (95%)
                             </div>
                         </div>
-                        <div className="inline-flex rounded-md border border-border bg-background p-0.5 text-[11px]">
+                        <GuardrailCard unstyled className="inline-flex rounded-md border border-border bg-background p-0.5 text-[11px]">
                             <button
                                 type="button"
                                 className="rounded-sm px-2 py-1 font-semibold text-muted-foreground hover:bg-accent"
@@ -106,7 +107,7 @@ export function AnalyticsPane({
                             >
                                 12w
                             </button>
-                        </div>
+                        </GuardrailCard>
                     </div>
                     <div className="w-full overflow-hidden">
                         <svg

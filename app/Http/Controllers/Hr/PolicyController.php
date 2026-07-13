@@ -349,7 +349,7 @@ class PolicyController extends Controller
     }
 
     /**
-     * Delete a policy and all its versions.
+     * Archive a policy while retaining its versions, attestations and files.
      */
     public function destroy(Request $request, HrPolicy $policy)
     {
@@ -358,16 +358,12 @@ class PolicyController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
-        // Delete associated files
-        foreach ($policy->versions as $version) {
-            if ($version->document_path) {
-                Storage::disk('private')->delete($version->document_path);
-            }
-        }
+        $policy->update([
+            'is_active' => false,
+            'updated_by' => $user->id,
+        ]);
 
-        $policy->delete();
-
-        return redirect()->route('hr.policies.index')->with('success', 'Policy deleted successfully.');
+        return redirect()->route('hr.policies.index')->with('success', 'Policy archived successfully.');
     }
 
     /**

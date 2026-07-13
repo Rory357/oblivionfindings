@@ -3168,7 +3168,7 @@ export function DeviceSettingsTab({
                         ) : (
                             <div className="max-h-[680px] space-y-3 overflow-y-auto pr-1">
                                 {recentCommands.map((command) => (
-                                    <div
+                                    <Card unstyled
                                         key={command.id}
                                         className="rounded-lg border bg-background p-3 shadow-xs"
                                     >
@@ -3274,7 +3274,7 @@ export function DeviceSettingsTab({
                                                 </Button>
                                             )}
                                         </div>
-                                    </div>
+                                    </Card>
                                 ))}
                             </div>
                         )}
@@ -3351,7 +3351,7 @@ function SettingsMetric({
     tone?: 'default' | 'success' | 'muted';
 }) {
     return (
-        <div className="rounded-lg border bg-background p-3 shadow-xs">
+        <Card unstyled className="rounded-lg border bg-background p-3 shadow-xs">
             <div
                 className={
                     tone === 'success'
@@ -3365,7 +3365,7 @@ function SettingsMetric({
             </div>
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="mt-0.5 truncate text-sm font-semibold">{value}</p>
-        </div>
+        </Card>
     );
 }
 
@@ -3860,7 +3860,7 @@ export function DebugConsoleTab({
                             />
                         </div>
                     </div>
-                    <div
+                    <Card unstyled
                         ref={containerRef}
                         className="h-[480px] overflow-y-auto rounded-md border bg-background font-mono text-xs"
                         onScroll={(e) => {
@@ -3884,7 +3884,7 @@ export function DebugConsoleTab({
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </CardContent>
             </Card>
 

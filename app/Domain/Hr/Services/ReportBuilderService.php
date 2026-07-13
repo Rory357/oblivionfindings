@@ -8,10 +8,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrSavedReport;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use Illuminate\Database\Eloquent\Builder;
 
 class ReportBuilderService
 {
+    use SanitizesCsvOutput;
+
     /**
      * Available report data sources with their queryable fields.
      */
@@ -167,7 +170,7 @@ class ReportBuilderService
 
         // Header row — use human-readable labels
         $headers = array_map(fn ($f) => ucwords(str_replace('_', ' ', $f)), $fields);
-        fputcsv($output, $headers);
+        $this->putCsv($output, $headers);
 
         // Data rows
         foreach ($data as $row) {
@@ -179,7 +182,7 @@ class ReportBuilderService
                 }
                 $line[] = $value;
             }
-            fputcsv($output, $line);
+            $this->putCsv($output, $line);
         }
 
         rewind($output);

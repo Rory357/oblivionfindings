@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Gate;
 
 class ClientDailyNoteResource extends JsonResource
 {
@@ -12,6 +13,8 @@ class ClientDailyNoteResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $gate = $request->user() ? Gate::forUser($request->user()) : null;
+
         return [
             'id' => $this->id,
             'client_id' => $this->client_id,
@@ -44,6 +47,12 @@ class ClientDailyNoteResource extends JsonResource
             'contact_method' => $this->contact_method,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'can' => [
+                'update' => $gate?->allows('update', $this->resource) ?? false,
+                'delete' => $gate?->allows('delete', $this->resource) ?? false,
+                'flag' => $gate?->allows('flag', $this->resource) ?? false,
+                'review' => $gate?->allows('review', $this->resource) ?? false,
+            ],
             'author' => $this->whenLoaded('author', fn () => [
                 'id' => $this->author?->id,
                 'name' => $this->author?->name,

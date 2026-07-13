@@ -42,7 +42,7 @@ test('an HR calendar event can be created via the events endpoint', function () 
     ]);
 });
 
-test('an HR calendar event can be updated and deleted', function () {
+test('an HR calendar event can be updated and archived', function () {
     $event = HrCalendarEvent::query()->create([
         'tenant_id' => 1,
         'created_by' => $this->hr->id,
@@ -69,5 +69,7 @@ test('an HR calendar event can be updated and deleted', function () {
         ->delete("/hr/calendar/events/{$event->id}")
         ->assertRedirect();
 
-    $this->assertDatabaseMissing('hr_calendar_events', ['id' => $event->id]);
+    $this->assertDatabaseHas('hr_calendar_events', ['id' => $event->id]);
+    expect($event->fresh()->archived_at)->not->toBeNull()
+        ->and((int) $event->fresh()->archived_by)->toBe($this->hr->id);
 });

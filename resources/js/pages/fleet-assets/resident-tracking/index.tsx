@@ -839,7 +839,7 @@ export default function ResidentTrackingIndex({
 
     const safeResidents = useMemo(() => residents ?? [], [residents]);
     const safeStats = stats ?? ({} as Props['stats']);
-    const safeAlerts = recent_alerts ?? [];
+    const safeAlerts = useMemo(() => recent_alerts ?? [], [recent_alerts]);
     const safeOutings = active_outings ?? [];
     const safeGeofences = useMemo(() => geofences ?? [], [geofences]);
 
@@ -1070,7 +1070,7 @@ export default function ResidentTrackingIndex({
                             },
                         ] as const
                     ).map((t) => (
-                        <button
+                        <Button unstyled
                             key={t.key}
                             type="button"
                             onClick={() => switchTab(t.key)}
@@ -1082,7 +1082,7 @@ export default function ResidentTrackingIndex({
                             )}
                         >
                             {t.label}
-                        </button>
+                        </Button>
                     ))}
                 </div>
 

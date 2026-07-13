@@ -2,21 +2,26 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Domain\Hr\Models\HrCalendarEventCategory;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrICalToken;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\CalendarEventInviteNotification;
 use App\Domain\Hr\Notifications\CalendarEventRsvpNotification;
 use App\Domain\Hr\Services\HrCalendarAggregator;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftCoverageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -61,15 +66,39 @@ class CalendarController extends Controller
             ->distinct()
             ->orderBy('team')
             ->pluck('team')
+            ->map(fn (string $team) => HrEmployeeProfile::normalizeTeam($team))
+            ->filter()
+            ->unique(fn (string $team) => mb_strtolower($team))
+            ->sort(fn (string $left, string $right) => strnatcasecmp($left, $right))
             ->values();
 
-        $icalToken = \App\Domain\Hr\Models\HrICalToken::query()
+        $icalToken = HrICalToken::query()
             ->where('user_id', $user->id)
             ->value('token');
 
         $categories = HrCalendarEventCategory::query()
             ->forTenant($tenantId)
             ->get(['id', 'key', 'label', 'icon', 'color_token']);
+
+        $canManage = $this->canManage($user);
+        $archivedEvents = $canManage
+            ? HrCalendarEvent::query()
+                ->forTenant($tenantId)
+                ->archived()
+                ->with('archiver:id,name')
+                ->orderByDesc('archived_at')
+                ->limit(50)
+                ->get(['id', 'title', 'starts_at', 'archived_at', 'archived_by', 'archive_reason'])
+                ->map(fn (HrCalendarEvent $event) => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'starts_at' => $event->starts_at?->toIso8601String(),
+                    'archived_at' => $event->archived_at?->toIso8601String(),
+                    'archived_by' => $event->archiver?->name,
+                    'archive_reason' => $event->archive_reason,
+                ])
+                ->values()
+            : collect();
 
         // Staff for the wizard's "invite people" picker (active employees).
         $staff = HrEmployeeProfile::query()
@@ -92,13 +121,14 @@ class CalendarController extends Controller
             'teams' => $teams,
             'categories' => $categories,
             'staff' => $staff,
+            'archivedEvents' => $archivedEvents,
             'stats' => $this->heroStats($tenantId, $user),
             'upNext' => $this->upNext($tenantId, $user),
             'ical' => [
                 'url' => $icalToken ? url('/hr/ical/'.$icalToken) : null,
             ],
             'can' => [
-                'manage' => $this->canManage($user),
+                'manage' => $canManage,
                 'manageRecurring' => (bool) $user->canDo('calendar.manage_recurring'),
                 'seeSensitive' => (bool) $user->canDo('hr.leave.manage'),
             ],
@@ -114,6 +144,7 @@ class CalendarController extends Controller
         $todayEnd = now()->endOfDay();
 
         $eventsThisWeek = HrCalendarEvent::forTenant($tenantId)
+            ->active()
             ->inRange($weekStart->toDateString(), $weekEnd->toDateString())
             ->count();
 
@@ -127,11 +158,11 @@ class CalendarController extends Controller
         $coverageGapsToday = 0;
         if ($user->canDo('rostering.viewAny')) {
             $coverageGapsToday = collect(
-                app(\App\Services\ShiftCoverageService::class)->buildRangeCoverage($today, $todayEnd, null)
+                app(ShiftCoverageService::class)->buildRangeCoverage($today, $todayEnd, null)
             )->filter(fn (array $w) => ! empty($w['has_actionable_gap']))->count();
         }
 
-        $renewalSoon = \App\Domain\Hr\Models\HrStaffComplianceStatus::query()
+        $renewalSoon = HrStaffComplianceStatus::query()
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$today, now()->copy()->addDays(30)])
             ->count();
@@ -243,7 +274,18 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_type' => ['nullable', 'in:org,site,department,team,people'],
+            'audience_team' => [
+                'exclude_unless:audience_type,team',
+                'required_if:audience_type,team',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
+                    if ($this->canonicalActiveTeamForTenant((string) $value, $tenantId) === null) {
+                        $fail('The selected team is not an active team in this organisation.');
+                    }
+                },
+            ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
@@ -252,9 +294,12 @@ class CalendarController extends Controller
         ]);
 
         $audienceType = $data['audience_type'] ?? null;
+        $audienceTeam = $audienceType === 'team'
+            ? $this->canonicalActiveTeamForTenant($data['audience_team'] ?? null, $tenantId)
+            : null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $reminders = $data['reminders'] ?? [];
-        unset($data['audience_type'], $data['audience_user_ids'], $data['reminders']);
+        unset($data['audience_type'], $data['audience_team'], $data['audience_user_ids'], $data['reminders']);
 
         $data['category_id'] = $this->resolveCategoryId($tenantId, $data['event_type'] ?? null);
 
@@ -264,7 +309,7 @@ class CalendarController extends Controller
             ...$data,
         ]);
 
-        $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
+        $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds, $audienceTeam);
         $this->syncReminders($event, $reminders);
         $this->notifyNewInvitees($event, $newInvitees);
 
@@ -283,6 +328,8 @@ class CalendarController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+        $this->assertEventIsActive($event);
+        $tenantId = (int) $event->tenant_id;
 
         $request->validate([
             'file' => ['required', 'file', 'max:10240', 'mimes:'.self::ATTACHMENT_MIMES],
@@ -310,6 +357,7 @@ class CalendarController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $attachment->tenant_id);
+        $this->assertEventIsActive($attachment->event()->firstOrFail());
 
         Storage::disk($attachment->disk ?: 'private')->delete($attachment->path);
         $attachment->delete();
@@ -351,7 +399,9 @@ class CalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $event->tenant_id);
+        $this->assertEventIsActive($event);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -366,7 +416,18 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_type' => ['nullable', 'in:org,site,department,team,people'],
+            'audience_team' => [
+                'exclude_unless:audience_type,team',
+                'required_if:audience_type,team',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
+                    if ($this->canonicalActiveTeamForTenant((string) $value, $tenantId) === null) {
+                        $fail('The selected team is not an active team in this organisation.');
+                    }
+                },
+            ],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
             'reminders' => ['nullable', 'array'],
@@ -380,12 +441,15 @@ class CalendarController extends Controller
         $scope = $data['scope'] ?? 'all';
         $occurrenceDate = $data['occurrence_date'] ?? null;
         $audienceType = $data['audience_type'] ?? null;
+        $audienceTeam = $audienceType === 'team'
+            ? $this->canonicalActiveTeamForTenant($data['audience_team'] ?? null, $tenantId)
+            : null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $audienceProvided = $request->has('audience_type');
         $reminders = $data['reminders'] ?? [];
         $remindersProvided = $request->has('reminders');
         unset(
-            $data['scope'], $data['occurrence_date'], $data['audience_type'],
+            $data['scope'], $data['occurrence_date'], $data['audience_type'], $data['audience_team'],
             $data['audience_user_ids'], $data['reminders'],
         );
 
@@ -414,7 +478,7 @@ class CalendarController extends Controller
         $event->update($data);
 
         if ($audienceProvided) {
-            $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds);
+            $newInvitees = $this->syncAttendees($event, $audienceType, $audienceUserIds, $audienceTeam);
             $this->notifyNewInvitees($event, $newInvitees);
         }
         if ($remindersProvided) {
@@ -461,8 +525,12 @@ class CalendarController extends Controller
      * @return array<int, int> User ids newly added to the invite list (so the
      *                         caller can notify them — re-syncs don't re-invite).
      */
-    private function syncAttendees(HrCalendarEvent $event, ?string $audienceType, array $userIds): array
-    {
+    private function syncAttendees(
+        HrCalendarEvent $event,
+        ?string $audienceType,
+        array $userIds,
+        ?string $audienceTeam = null,
+    ): array {
         if ($audienceType === null) {
             return [];
         }
@@ -472,6 +540,7 @@ class CalendarController extends Controller
             $ref = match ($audienceType) {
                 'site' => $event->site_id,
                 'department' => $event->department_id,
+                'team' => $audienceTeam,
                 default => null,
             };
             $event->attendees()->create([
@@ -540,6 +609,7 @@ class CalendarController extends Controller
         $user = $request->user();
         abort_unless($this->canView($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+        $this->assertEventIsActive($event);
 
         $data = $request->validate([
             'status' => ['required', 'in:yes,no,maybe'],
@@ -614,7 +684,7 @@ class CalendarController extends Controller
      */
     private function splitSeriesFrom(HrCalendarEvent $parent, string $occurrenceDate, array $data): void
     {
-        $splitDay = \Illuminate\Support\Carbon::parse($occurrenceDate)->startOfDay();
+        $splitDay = Carbon::parse($occurrenceDate)->startOfDay();
 
         $newStart = $splitDay->copy()->setTimeFromTimeString($parent->starts_at->format('H:i:s'));
         $durationSec = $parent->ends_at ? $parent->ends_at->getTimestamp() - $parent->starts_at->getTimestamp() : 0;
@@ -634,26 +704,50 @@ class CalendarController extends Controller
         $parent->update(['recurrence_until' => $splitDay->copy()->subDay()->endOfDay()]);
     }
 
-    /**
-     * Delete a calendar event.
-     */
+    /** Archive a calendar event while retaining its evidence graph and files. */
     public function destroy(Request $request, HrCalendarEvent $event)
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
         $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+        $this->assertEventIsActive($event);
 
-        // The FK cascade removes attachment ROWS but not their files — clean
-        // the storage first or every deleted event leaks its uploads on disk.
-        foreach ($event->attachments()->get() as $attachment) {
-            if ($attachment->path) {
-                Storage::disk($attachment->disk ?: 'private')->delete($attachment->path);
-            }
-        }
+        $data = $request->validate([
+            'archive_reason' => ['nullable', 'string', 'max:500'],
+        ]);
 
-        $event->delete();
+        DB::transaction(fn () => $event->update([
+            'archived_at' => now(),
+            'archived_by' => $user->id,
+            'archive_reason' => $data['archive_reason'] ?? null,
+        ]));
 
-        return redirect()->back()->with('success', 'Calendar event deleted.');
+        return redirect()->back()->with('success', 'Calendar event archived.');
+    }
+
+    /** Restore an archived calendar event to active feeds. */
+    public function restore(Request $request, HrCalendarEvent $event)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+
+        DB::transaction(fn () => $event->update([
+            'archived_at' => null,
+            'archived_by' => null,
+            'archive_reason' => null,
+        ]));
+
+        return redirect()->back()->with('success', 'Calendar event restored.');
+    }
+
+    private function assertEventIsActive(HrCalendarEvent $event): void
+    {
+        abort_if(
+            $event->archived_at !== null,
+            409,
+            'Restore the archived calendar event before changing it.',
+        );
     }
 
     private function canView($user): bool
@@ -693,5 +787,22 @@ class CalendarController extends Controller
             || $user->canDo('calendar.create')
             || $user->canDo('calendar.manage_recurring')
         );
+    }
+
+    private function canonicalActiveTeamForTenant(?string $team, int $tenantId): ?string
+    {
+        $normalised = HrEmployeeProfile::normalizeTeam($team);
+        if ($normalised === null) {
+            return null;
+        }
+
+        return HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('team')
+            ->pluck('team')
+            ->map(fn (string $existing) => HrEmployeeProfile::normalizeTeam($existing))
+            ->first(fn (?string $existing) => $existing !== null
+                && mb_strtolower($existing) === mb_strtolower($normalised));
     }
 }

@@ -23,6 +23,7 @@ interface Profile {
     employment_type: string;
     contract_type: string | null;
     department_id: number | null;
+    team: string | null;
     work_rights_status: string | null;
     visa_type: string | null;
     visa_expires_at: string | null;
@@ -75,6 +76,7 @@ export default function EmployeeEdit({
         department_id: profile.department_id
             ? String(profile.department_id)
             : '',
+        team: profile.team || '',
         is_active: profile.is_active,
         start_date: profile.start_date || '',
         end_date: profile.end_date || '',
@@ -437,6 +439,22 @@ export default function EmployeeEdit({
                                         <p className="mt-1 text-sm text-destructive">
                                             {form.errors.start_date}
                                         </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label htmlFor="team">Team</Label>
+                                    <Input
+                                        id="team"
+                                        value={form.data.team}
+                                        onChange={(e) => form.setData('team', e.target.value)}
+                                        placeholder="e.g. Community Support"
+                                        maxLength={255}
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Used by Calendar filters and team audiences. Clear this field to remove the assignment.
+                                    </p>
+                                    {form.errors.team && (
+                                        <p className="mt-1 text-sm text-destructive">{form.errors.team}</p>
                                     )}
                                 </div>
                                 <div>

@@ -8,8 +8,10 @@ use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Domain\Hr\Notifications\HrCaseUpdateNotification;
+use App\Models\ClientIncident;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class HrCaseController extends Controller
@@ -200,6 +202,9 @@ class HrCaseController extends Controller
                 : [],
             'caseTypes' => self::CASE_TYPE_OPTIONS,
             'severities' => self::SEVERITY_OPTIONS,
+            'incidents' => $canManage
+                ? $this->incidentSummariesForTenant($tenantId)
+                : [],
         ]);
     }
 
@@ -313,9 +318,17 @@ class HrCaseController extends Controller
         return Inertia::render('hr/cases/show', [
             'case' => $case,
             'timeline' => $timeline,
+            'linkedIncidents' => $this->incidentSummariesForTenant(
+                $tenantId,
+                (array) ($case->linked_incident_ids ?? []),
+            ),
             'can' => [
                 'manage' => $canManageCases,
                 'disciplinary' => $canManageDisciplinary,
+                // Assigned-only access is client-specific and cannot guarantee
+                // every linked incident will open; only emit a safe deep link
+                // for viewers with organisation-wide incident access.
+                'view_incidents' => $user->canDo('incidents.viewAny'),
             ],
             // Wizard data (Add event / Add disciplinary / Edit disciplinary).
             'staff' => $canRunWizards
@@ -356,7 +369,7 @@ class HrCaseController extends Controller
             'access_list' => ['nullable', 'array'],
             'access_list.*' => ['integer', 'exists:users,id'],
             'linked_incident_ids' => ['nullable', 'array'],
-            'linked_incident_ids.*' => ['integer'],
+            'linked_incident_ids.*' => ['integer', 'distinct', $this->sameTenantIncidentRule($tenantId)],
         ]);
 
         // hr_cases.description is NOT NULL with no default; a description-less case
@@ -401,7 +414,7 @@ class HrCaseController extends Controller
             'access_list' => ['nullable', 'array'],
             'access_list.*' => ['integer', 'exists:users,id'],
             'linked_incident_ids' => ['nullable', 'array'],
-            'linked_incident_ids.*' => ['integer'],
+            'linked_incident_ids.*' => ['integer', 'distinct', $this->sameTenantIncidentRule($tenantId)],
         ]);
 
         // Coerce a null description (empty field → null via ConvertEmptyStringsToNull)
@@ -477,6 +490,83 @@ class HrCaseController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'HR case closed.');
+    }
+
+    /**
+     * Minimal, read-only incident summaries for the HR case federation.
+     * ClientIncident remains H&S-owned; HR stores ids and never writes it.
+     *
+     * @param  array<int, int|string>|null  $incidentIds
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function incidentSummariesForTenant(int $tenantId, ?array $incidentIds = null): Collection
+    {
+        $ids = $incidentIds === null
+            ? null
+            : collect($incidentIds)
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+        if ($ids !== null && $ids->isEmpty()) {
+            return collect();
+        }
+
+        $incidents = ClientIncident::query()
+            ->whereHas('client', fn ($clients) => $clients->where('organization_id', $tenantId))
+            ->with('client:id,first_name,last_name')
+            ->select([
+                'id',
+                'client_id',
+                'reference_number',
+                'title',
+                'type',
+                'severity',
+                'status',
+                'occurred_at',
+            ])
+            ->when(
+                $ids !== null,
+                fn ($query) => $query->whereIn('id', $ids->all()),
+                fn ($query) => $query->orderByDesc('occurred_at')->limit(100),
+            )
+            ->get();
+
+        if ($ids !== null) {
+            $positions = $ids->flip();
+            $incidents = $incidents
+                ->sortBy(fn (ClientIncident $incident) => $positions->get($incident->id, PHP_INT_MAX))
+                ->values();
+        }
+
+        return $incidents->map(fn (ClientIncident $incident) => [
+            'id' => $incident->id,
+            'reference' => $incident->reference_number ?: 'Incident #'.$incident->id,
+            'title' => $incident->title ?: ucfirst(str_replace('_', ' ', (string) $incident->type)),
+            'type' => $incident->type,
+            'severity' => $incident->severity,
+            'status' => $incident->status,
+            'occurred_at' => $incident->occurred_at?->toIso8601String(),
+            'client' => $incident->client?->full_name,
+        ])->values();
+    }
+
+    /**
+     * Reject missing or cross-organisation incident ids on both create/update.
+     */
+    private function sameTenantIncidentRule(int $tenantId): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
+            $exists = is_numeric($value) && ClientIncident::query()
+                ->whereKey((int) $value)
+                ->whereHas('client', fn ($clients) => $clients->where('organization_id', $tenantId))
+                ->exists();
+
+            if (! $exists) {
+                $fail('The selected incident is not available to this organisation.');
+            }
+        };
     }
 
     /**

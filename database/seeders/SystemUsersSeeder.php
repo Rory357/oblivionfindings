@@ -157,7 +157,7 @@ class SystemUsersSeeder extends Seeder
 
     private function upsertHrEmployeeProfile(User $user, ?Staff $staff): void
     {
-        $employeeNumber = trim((string) (($staff?->employee_id) ?: 'EMP' . str_pad((string) $user->id, 4, '0', STR_PAD_LEFT)));
+        $employeeNumber = $this->employeeNumberFor($user, $staff);
         $positionTitle = trim((string) (($staff?->job_title) ?: $this->defaultJobTitleForRole($user->role)));
         $positionRole = trim((string) ($user->role ?: 'support_worker'));
         $startDate = $staff?->hire_date ? $staff->hire_date->toDateString() : now()->subMonths(6)->toDateString();
@@ -178,6 +178,24 @@ class SystemUsersSeeder extends Seeder
                 'created_by' => $user->id,
             ]
         );
+    }
+
+    private function employeeNumberFor(User $user, ?Staff $staff): string
+    {
+        if ($staff?->employee_id) {
+            return trim((string) $staff->employee_id);
+        }
+
+        $generated = 'EMP'.str_pad((string) $user->id, 4, '0', STR_PAD_LEFT);
+        $isOwnedByAnotherProfile = HrEmployeeProfile::query()
+            ->withTrashed()
+            ->where('employee_number', $generated)
+            ->where('user_id', '!=', $user->id)
+            ->exists();
+
+        return $isOwnedByAnotherProfile
+            ? 'EMP-U'.str_pad((string) $user->id, 4, '0', STR_PAD_LEFT)
+            : $generated;
     }
 
     private function defaultJobTitleForRole(?string $role): string

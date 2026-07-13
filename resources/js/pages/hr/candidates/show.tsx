@@ -1145,14 +1145,14 @@ export default function CandidateShow({
                                 <Badge key={tag} variant="secondary" className="gap-1">
                                     {tag}
                                     {can.manage ? (
-                                        <button
+                                        <Button unstyled
                                             type="button"
                                             aria-label={`Remove ${tag}`}
                                             onClick={() => removeTag(tag)}
                                             className="ml-0.5 rounded-full text-muted-foreground hover:text-foreground"
                                         >
                                             <X className="h-3 w-3" />
-                                        </button>
+                                        </Button>
                                     ) : null}
                                 </Badge>
                             ))

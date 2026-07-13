@@ -62,9 +62,34 @@ const entry = {
 };
 
 function mockFetch(data: unknown[], total = data.length) {
-    global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ data, current_page: 1, last_page: 1, total }),
+    global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+        const url =
+            typeof input === 'string'
+                ? input
+                : input instanceof URL
+                  ? input.toString()
+                  : input.url;
+
+        if (url.includes('/health-safety/restraints/clients/')) {
+            return {
+                ok: true,
+                json: async () => ({
+                    active_plan: null,
+                    recent_events: [],
+                    total_events: 0,
+                }),
+            };
+        }
+
+        return {
+            ok: true,
+            json: async () => ({
+                data,
+                current_page: 1,
+                last_page: 1,
+                total,
+            }),
+        };
     }) as unknown as typeof fetch;
 }
 

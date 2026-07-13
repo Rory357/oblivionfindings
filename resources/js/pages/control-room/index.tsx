@@ -1535,7 +1535,7 @@ export default function ControlRoomIndex({
                     <div className="divide-y">
                         {alerts.data.length ? (
                             alerts.data.map((alert, idx) => (
-                                <button
+                                <Button unstyled
                                     type="button"
                                     key={alert.id}
                                     onClick={() => openWorkspace(alert.id)}
@@ -1632,7 +1632,7 @@ export default function ControlRoomIndex({
                                             {alert.status}
                                         </Badge>
                                     </div>
-                                </button>
+                                </Button>
                             ))
                         ) : (
                             <div className="px-4 py-8 text-center text-sm text-muted-foreground">

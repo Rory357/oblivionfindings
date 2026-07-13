@@ -37,19 +37,19 @@ class AutoEscalateControlRoomQueues implements ShouldQueue
             ->whereNotNull('escalate_to_queue_id')
             ->whereNotNull('auto_escalate_after_minutes')
             ->with('escalateToQueue')
-            ->chunkById(50, function ($queues) use ($notificationService, &$escalatedCount) {
+            ->chunkById(50, function ($queues) use ($notificationService, $automationService, &$escalatedCount) {
                 foreach ($queues as $queue) {
                     $queue->alerts()
                         ->unresolved()
                         ->whereNotNull('queue_id')
-                        ->chunkById(100, function ($alerts) use ($queue, $notificationService, &$escalatedCount) {
+                        ->chunkById(100, function ($alerts) use ($queue, $notificationService, $automationService, &$escalatedCount) {
                             foreach ($alerts as $alert) {
-                                if (!$queue->shouldAutoEscalate($alert)) {
+                                if (! $queue->shouldAutoEscalate($alert)) {
                                     continue;
                                 }
 
                                 $nextQueue = $queue->escalateToQueue;
-                                if (!$nextQueue) {
+                                if (! $nextQueue) {
                                     continue;
                                 }
 

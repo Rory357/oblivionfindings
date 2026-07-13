@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrSalaryBand extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',
@@ -25,6 +25,9 @@ class HrSalaryBand extends Model
         'currency',
         'effective_from',
         'effective_to',
+        'is_active',
+        'deactivated_at',
+        'deactivated_by',
         'created_by',
     ];
 
@@ -36,10 +39,12 @@ class HrSalaryBand extends Model
         'max_hourly' => 'encrypted',
         'effective_from' => 'date',
         'effective_to' => 'date',
+        'is_active' => 'boolean',
+        'deactivated_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function creator(): BelongsTo
@@ -47,8 +52,13 @@ class HrSalaryBand extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function deactivatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deactivated_by');
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder
@@ -58,10 +68,16 @@ class HrSalaryBand extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('effective_from', '<=', now())
+        return $query->where('is_active', true)
+            ->where('effective_from', '<=', now())
             ->where(function (Builder $q) {
                 $q->whereNull('effective_to')
                     ->orWhere('effective_to', '>=', now());
             });
+    }
+
+    public function scopeInactive(Builder $query): Builder
+    {
+        return $query->where('is_active', false);
     }
 }

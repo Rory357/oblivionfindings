@@ -59,7 +59,8 @@ type GoalsPathTabProps = {
         plan_date?: string | null;
         next_review_at?: string | null;
     } | null;
-    canEdit?: boolean;
+    canManageGoals?: boolean;
+    canEditPath?: boolean;
     onAddGoal?: () => void;
     onManageGoal?: (goal: Goal) => void;
     onEditPlan?: () => void;
@@ -69,11 +70,31 @@ const STATUS_META: Record<
     string,
     { tone: string; label: string; icon: typeof Flag }
 > = {
-    completed: { tone: 'bg-status-success-bg text-status-success', label: 'Achieved', icon: CheckCircle2 },
-    in_progress: { tone: 'bg-status-info-bg text-status-info', label: 'In progress', icon: RouteIcon },
-    on_hold: { tone: 'bg-status-warning-bg text-status-warning', label: 'On hold', icon: PauseCircle },
-    cancelled: { tone: 'bg-muted text-muted-foreground', label: 'Cancelled', icon: Circle },
-    not_started: { tone: 'bg-muted text-muted-foreground', label: 'Not started', icon: Circle },
+    completed: {
+        tone: 'bg-status-success-bg text-status-success',
+        label: 'Achieved',
+        icon: CheckCircle2,
+    },
+    in_progress: {
+        tone: 'bg-status-info-bg text-status-info',
+        label: 'In progress',
+        icon: RouteIcon,
+    },
+    on_hold: {
+        tone: 'bg-status-warning-bg text-status-warning',
+        label: 'On hold',
+        icon: PauseCircle,
+    },
+    cancelled: {
+        tone: 'bg-muted text-muted-foreground',
+        label: 'Cancelled',
+        icon: Circle,
+    },
+    not_started: {
+        tone: 'bg-muted text-muted-foreground',
+        label: 'Not started',
+        icon: Circle,
+    },
 };
 
 function metaFor(status?: string | null) {
@@ -88,8 +109,12 @@ function GoalCardTile({ goal, onClick }: { goal: Goal; onClick?: () => void }) {
     const hurdles = goal.open_hurdles_count ?? 0;
     const subline = [
         goal.category ?? 'Goal',
-        stepsTotal > 0 ? `${goal.steps_done_count ?? 0}/${stepsTotal} steps` : null,
-        hurdles > 0 ? `${hurdles} open hurdle${hurdles === 1 ? '' : 's'}` : null,
+        stepsTotal > 0
+            ? `${goal.steps_done_count ?? 0}/${stepsTotal} steps`
+            : null,
+        hurdles > 0
+            ? `${hurdles} open hurdle${hurdles === 1 ? '' : 's'}`
+            : null,
     ]
         .filter(Boolean)
         .join(' · ');
@@ -109,18 +134,31 @@ function GoalCardTile({ goal, onClick }: { goal: Goal; onClick?: () => void }) {
             )}
         >
             <div className="flex items-start gap-3">
-                <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', meta.tone)}>
+                <span
+                    className={cn(
+                        'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                        meta.tone,
+                    )}
+                >
                     <Icon className="h-[18px] w-[18px]" />
                 </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-semibold">{goal.title ?? 'Untitled goal'}</span>
-                        <Badge className={cn(meta.tone, 'shrink-0')}>{meta.label}</Badge>
+                        <span className="truncate text-sm font-semibold">
+                            {goal.title ?? 'Untitled goal'}
+                        </span>
+                        <Badge className={cn(meta.tone, 'shrink-0')}>
+                            {meta.label}
+                        </Badge>
                     </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">{subline}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                        {subline}
+                    </div>
                     <div className="mt-2.5 flex items-center gap-2">
                         <Progress value={pct} className="h-2" />
-                        <span className="w-9 shrink-0 text-right text-xs font-medium text-muted-foreground">{pct}%</span>
+                        <span className="w-9 shrink-0 text-right text-xs font-medium text-muted-foreground">
+                            {pct}%
+                        </span>
                     </div>
                 </div>
             </div>
@@ -149,9 +187,13 @@ function StorySection({
                 <div className="min-w-0 flex-1">
                     <p className="font-medium">{label}</p>
                     {body?.trim() ? (
-                        <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">{body}</p>
+                        <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
+                            {body}
+                        </p>
                     ) : (
-                        <p className="mt-2 text-sm italic text-muted-foreground">{placeholder}</p>
+                        <p className="mt-2 text-sm text-muted-foreground italic">
+                            {placeholder}
+                        </p>
                     )}
                 </div>
             </div>
@@ -200,7 +242,9 @@ function PathPillar({
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm italic text-muted-foreground">{placeholder}</p>
+                    <p className="text-sm text-muted-foreground italic">
+                        {placeholder}
+                    </p>
                 )}
             </CardContent>
         </Card>
@@ -215,7 +259,8 @@ export function GoalsPathTab({
     strengthsAbilities,
     interestsHobbies,
     pathPlan,
-    canEdit = false,
+    canManageGoals = false,
+    canEditPath = false,
     onAddGoal,
     onManageGoal,
     onEditPlan,
@@ -238,13 +283,15 @@ export function GoalsPathTab({
                         <Flag className="h-[19px] w-[19px]" />
                     </span>
                     <div>
-                        <h2 className="text-lg font-semibold leading-tight">Goals path</h2>
+                        <h2 className="text-lg leading-tight font-semibold">
+                            Goals path
+                        </h2>
                         <p className="text-sm text-muted-foreground">
                             {achieved} achieved · {inProgress} in progress
                         </p>
                     </div>
                 </div>
-                {canEdit && onAddGoal ? (
+                {canManageGoals && onAddGoal ? (
                     <Button onClick={onAddGoal} data-test="goals-add-goal">
                         <Plus className="mr-1.5 h-4 w-4" />
                         Add goal
@@ -259,7 +306,7 @@ export function GoalsPathTab({
                             key={goal.id ?? idx}
                             goal={goal}
                             onClick={
-                                canEdit && onManageGoal
+                                canManageGoals && onManageGoal
                                     ? () => onManageGoal(goal)
                                     : undefined
                             }
@@ -272,7 +319,7 @@ export function GoalsPathTab({
                     title="No goals captured yet"
                     description="Add goals to the active care plan to make day-to-day support intentional."
                     action={
-                        canEdit && onAddGoal ? (
+                        canManageGoals && onAddGoal ? (
                             <Button onClick={onAddGoal}>
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Add the first goal
@@ -291,19 +338,29 @@ export function GoalsPathTab({
                             Person-centred planning for {clientName}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                            The whole-of-life story and PATH framework behind the goals above.
+                            The whole-of-life story and PATH framework behind
+                            the goals above.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {canEdit && onEditPlan ? (
-                            <Button size="sm" variant="outline" onClick={onEditPlan} data-test="goals-edit-plan">
+                        {canEditPath && onEditPlan ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={onEditPlan}
+                                data-test="goals-edit-plan"
+                            >
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                 Edit planning
                             </Button>
                         ) : null}
                         {activePlanId ? (
                             <Button asChild size="sm" variant="outline">
-                                <Link href={`/operations/care-plans/${activePlanId}`}>Open care plan</Link>
+                                <Link
+                                    href={`/operations/care-plans/${activePlanId}`}
+                                >
+                                    Open care plan
+                                </Link>
                             </Button>
                         ) : null}
                     </div>
@@ -312,7 +369,9 @@ export function GoalsPathTab({
                     <p className="mt-3 text-xs text-muted-foreground">
                         Next PATH review:{' '}
                         <span className="font-medium">
-                            {new Date(pathPlan.next_review_at).toLocaleDateString('en-NZ', {
+                            {new Date(
+                                pathPlan.next_review_at,
+                            ).toLocaleDateString('en-NZ', {
                                 day: 'numeric',
                                 month: 'long',
                                 year: 'numeric',
@@ -346,7 +405,9 @@ export function GoalsPathTab({
             <div>
                 <div className="mb-3 flex items-center gap-2">
                     <Compass className="h-4 w-4 text-primary" />
-                    <h3 className="text-base font-semibold">PATH planning framework</h3>
+                    <h3 className="text-base font-semibold">
+                        PATH planning framework
+                    </h3>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                     <PathPillar
@@ -386,7 +447,9 @@ export function GoalsPathTab({
                     <PathPillar
                         icon={Waves}
                         title="Community & belonging"
-                        items={pathPlan?.community ? [pathPlan.community] : null}
+                        items={
+                            pathPlan?.community ? [pathPlan.community] : null
+                        }
                         placeholder="Activities, groups, or relationships that build belonging."
                         tone="info"
                     />

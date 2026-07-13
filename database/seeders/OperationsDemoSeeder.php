@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\Client;
-use App\Models\ProgressNote;
+use App\Models\ClientNote;
 use App\Models\ServiceAgreement;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -15,8 +15,9 @@ class OperationsDemoSeeder extends Seeder
     public function run(): void
     {
         $user = User::where('role', 'admin')->first() ?? User::first();
-        if (!$user) {
-            $this->command->error("No users found - run SystemUsersSeeder first");
+        if (! $user) {
+            $this->command->error('No users found - run SystemUsersSeeder first');
+
             return;
         }
         $userId = $user->id;
@@ -26,6 +27,7 @@ class OperationsDemoSeeder extends Seeder
 
         if ($clients->isEmpty()) {
             $this->command->error('No clients found');
+
             return;
         }
 
@@ -66,7 +68,7 @@ class OperationsDemoSeeder extends Seeder
             $plan = CarePlan::create([
                 'organization_id' => null,
                 'client_id' => $client->id,
-                'title' => $client->first_name . "'s " . str_replace('_', ' ', ucwords($planType, '_')),
+                'title' => $client->first_name."'s ".str_replace('_', ' ', ucwords($planType, '_')),
                 'status' => $status,
                 'plan_type' => $planType,
                 'starts_at' => $startsAt,
@@ -126,18 +128,26 @@ class OperationsDemoSeeder extends Seeder
 
                 $numNotes = rand(1, 3);
                 for ($n = 0; $n < $numNotes; $n++) {
-                    ProgressNote::create([
+                    $category = ['general', 'goal_update', 'observation'][$n % 3];
+                    $occurredAt = now()->subDays(rand(1, 30));
+
+                    ClientNote::create([
                         'organization_id' => null,
                         'client_id' => $client->id,
                         'care_plan_goal_id' => $goal->id,
-                        'author_id' => $staffIds[array_rand($staffIds)],
-                        'note_type' => ['general', 'goal_update', 'observation'][$n % 3],
-                        'content' => $noteContents[($i + $g + $n) % count($noteContents)],
+                        'user_id' => $staffIds[array_rand($staffIds)],
+                        'type' => 'progress_note',
+                        'category' => $category,
+                        'subject' => ucfirst(str_replace('_', ' ', $category)),
+                        'goal' => $goal->title,
+                        'body' => $noteContents[($i + $g + $n) % count($noteContents)],
+                        'occurred_at' => $occurredAt,
                         'mood_rating' => rand(4, 10),
-                        'visibility' => ['staff_only', 'staff_only', 'include_family'][$n % 3],
+                        'visibility' => ['internal', 'internal', 'portal'][$n % 3],
+                        'is_private' => false,
                         'is_flagged' => $n === 0 && $g === 0 && $i === 0,
-                        'created_at' => now()->subDays(rand(1, 30)),
-                        'updated_at' => now()->subDays(rand(0, 15)),
+                        'appears_on_timeline' => true,
+                        'is_draft' => false,
                     ]);
                 }
             }
@@ -150,8 +160,8 @@ class OperationsDemoSeeder extends Seeder
             ServiceAgreement::create([
                 'organization_id' => null,
                 'client_id' => $client->id,
-                'title' => $client->first_name . "'s Funding Agreement " . now()->year,
-                'reference_number' => 'SA-' . now()->format('Ym') . '-' . str_pad($i + 1, 3, '0', STR_PAD_LEFT),
+                'title' => $client->first_name."'s Funding Agreement ".now()->year,
+                'reference_number' => 'SA-'.now()->format('Ym').'-'.str_pad($i + 1, 3, '0', STR_PAD_LEFT),
                 'agreement_type' => ['whaikaha', 'msd', 'private', 'carer_support', 'acc'][$i % 5],
                 'funding_body' => ['Whaikaha', 'MSD', 'Private', 'Whaikaha', 'ACC'][$i % 5],
                 'status' => $i < 3 ? 'active' : 'draft',
@@ -163,6 +173,6 @@ class OperationsDemoSeeder extends Seeder
             ]);
         }
 
-        $this->command->info('Done! Care plans: ' . CarePlan::count() . ', Goals: ' . CarePlanGoal::count() . ', Notes: ' . ProgressNote::count());
+        $this->command->info('Done! Care plans: '.CarePlan::count().', Goals: '.CarePlanGoal::count().', Notes: '.ClientNote::where('type', 'progress_note')->count());
     }
 }

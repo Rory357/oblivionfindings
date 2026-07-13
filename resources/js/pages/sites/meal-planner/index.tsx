@@ -33,6 +33,7 @@ import {
     type SiteInfo,
     type SiteSearchItem,
 } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const PlanEntryDialog = lazy(() => import('./_dialogs').then((m) => ({ default: m.PlanEntryDialog })));
 const AdjustInventoryDialog = lazy(() => import('./_dialogs').then((m) => ({ default: m.AdjustInventoryDialog })));
@@ -676,9 +677,9 @@ function ZeroResidentOnboarding({ siteId, onDismiss, onSetBudget, onPlanMeals }:
     const numClass = 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary';
     return (
         <div className="relative rounded-xl border border-primary/30 bg-primary/5 p-4 pr-9">
-            <button type="button" onClick={onDismiss} aria-label="Dismiss setup guide" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <Button unstyled type="button" onClick={onDismiss} aria-label="Dismiss setup guide" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                 <X className="h-4 w-4" />
-            </button>
+            </Button>
             <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Info className="h-5 w-5" /></span>
                 <div className="min-w-0 flex-1">
@@ -697,13 +698,13 @@ function ZeroResidentOnboarding({ siteId, onDismiss, onSetBudget, onPlanMeals }:
                         <li className={stepClass}>
                             <span className={numClass}>2</span>
                             <span className="min-w-0">
-                                <button type="button" onClick={onSetBudget} className="inline-flex items-center gap-1 font-medium text-primary hover:underline"><Wallet className="h-3.5 w-3.5" /> Set a weekly food budget</button>
+                                <Button unstyled type="button" onClick={onSetBudget} className="inline-flex items-center gap-1 font-medium text-primary hover:underline"><Wallet className="h-3.5 w-3.5" /> Set a weekly food budget</Button>
                             </span>
                         </li>
                         <li className={stepClass}>
                             <span className={numClass}>3</span>
                             <span className="min-w-0">
-                                <button type="button" onClick={onPlanMeals} className="inline-flex items-center gap-1 font-medium text-primary hover:underline"><CalendarDays className="h-3.5 w-3.5" /> Plan meals or apply a template</button>
+                                <Button unstyled type="button" onClick={onPlanMeals} className="inline-flex items-center gap-1 font-medium text-primary hover:underline"><CalendarDays className="h-3.5 w-3.5" /> Plan meals or apply a template</Button>
                             </span>
                         </li>
                     </ol>
@@ -718,7 +719,7 @@ function StaleStrip({ onRetry }: { onRetry: () => void }) {
         <div role="status" className="mb-2 flex items-center gap-2 rounded-lg border border-status-warning/40 bg-status-warning-bg/60 px-3 py-1.5 text-[12.5px] font-medium text-status-warning">
             <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="flex-1">Showing data from before your last action — it didn't refresh.</span>
-            <button type="button" onClick={onRetry} className="shrink-0 rounded-md border border-status-warning/50 px-2 py-0.5 text-[11.5px] font-semibold transition-colors hover:bg-status-warning/10">Retry</button>
+            <Button unstyled type="button" onClick={onRetry} className="shrink-0 rounded-md border border-status-warning/50 px-2 py-0.5 text-[11.5px] font-semibold transition-colors hover:bg-status-warning/10">Retry</Button>
         </div>
     );
 }
@@ -748,12 +749,12 @@ function SubTabs({ tab, onChange, isHouse }: { tab: SubTab; onChange: (t: SubTab
     }
 
     return (
-        <div role="tablist" aria-label="Meal planner sections" className="flex items-center gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
+        <GuardrailCard unstyled role="tablist" aria-label="Meal planner sections" className="flex items-center gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
             {ordered.map((it, i) => {
                 const active = it.value === tab;
                 const Icon = it.icon;
                 return (
-                    <button
+                    <Button unstyled
                         key={it.value}
                         ref={(el) => { btnRefs.current[i] = el; }}
                         type="button"
@@ -770,9 +771,9 @@ function SubTabs({ tab, onChange, isHouse }: { tab: SubTab; onChange: (t: SubTab
                         )}
                     >
                         <Icon className="h-[15px] w-[15px]" /> {it.label}
-                    </button>
+                    </Button>
                 );
             })}
-        </div>
+        </GuardrailCard>
     );
 }

@@ -26,6 +26,8 @@ import {
     relTime,
     ymd,
 } from './shared';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type CoverageGap = {
     shift: CatalogueShift;
@@ -149,7 +151,7 @@ export function NoteRail({
                 ) : (
                     <div className="mt-3 space-y-1">
                         {awaiting.map((n) => (
-                            <button
+                            <GuardrailButton unstyled
                                 key={n.id}
                                 type="button"
                                 onClick={() => onOpen(n)}
@@ -173,7 +175,7 @@ export function NoteRail({
                                     </span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            </button>
+                            </GuardrailButton>
                         ))}
                     </div>
                 )}
@@ -192,7 +194,7 @@ export function NoteRail({
                     {days.map((c) => {
                         const active = selectedDay === c.key;
                         return (
-                            <button
+                            <GuardrailButton unstyled
                                 key={c.key}
                                 type="button"
                                 onClick={() =>
@@ -225,7 +227,7 @@ export function NoteRail({
                                         c.n > 0 ? 'bg-primary' : 'bg-border',
                                     )}
                                 />
-                            </button>
+                            </GuardrailButton>
                         );
                     })}
                 </div>
@@ -281,7 +283,7 @@ export function NoteRail({
                 ) : (
                     <div className="mt-3 space-y-1.5">
                         {visibleGaps.map((g) => (
-                            <div
+                            <GuardrailCard unstyled
                                 key={g.shift.id}
                                 className="flex items-center gap-2.5 rounded-lg border border-border bg-background px-2.5 py-2"
                             >
@@ -302,15 +304,15 @@ export function NoteRail({
                                         written up
                                     </div>
                                 </div>
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onAddNoteForShift(g.shift)}
                                     className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-accent"
                                 >
                                     <Plus className="h-3 w-3" />
                                     Note
-                                </button>
-                            </div>
+                                </GuardrailButton>
+                            </GuardrailCard>
                         ))}
                     </div>
                 )}

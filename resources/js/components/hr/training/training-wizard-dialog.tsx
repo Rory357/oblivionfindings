@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { AlertTriangle, Check, Info, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type WizardType =
     | 'createCourse'
@@ -645,14 +646,14 @@ export function TrainingWizardDialog({
                         {(cfg.options ?? []).map((o) => {
                             const sel = val === o.value;
                             return (
-                                <button
+                                <GuardrailButton unstyled
                                     key={o.value}
                                     type="button"
                                     onClick={() => setF(cfg.key, o.value)}
                                     className={`border-r border-border px-[13px] py-2 text-[12.5px] font-semibold last:border-r-0 ${sel ? 'bg-primary text-white' : 'bg-card text-foreground'}`}
                                 >
                                     {o.label}
-                                </button>
+                                </GuardrailButton>
                             );
                         })}
                     </div>
@@ -662,7 +663,7 @@ export function TrainingWizardDialog({
                         {lookups.staff.map((p) => {
                             const sel = (val ?? []).includes(p.id);
                             return (
-                                <button
+                                <GuardrailButton unstyled
                                     key={p.id}
                                     type="button"
                                     onClick={() => toggleArr(cfg.key, p.id)}
@@ -672,7 +673,7 @@ export function TrainingWizardDialog({
                                         {p.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                                     </span>
                                     {p.name}
-                                </button>
+                                </GuardrailButton>
                             );
                         })}
                     </div>
@@ -682,20 +683,20 @@ export function TrainingWizardDialog({
                         {courses.map((c) => {
                             const sel = (val ?? []).includes(c.id);
                             return (
-                                <button
+                                <GuardrailButton unstyled
                                     key={c.id}
                                     type="button"
                                     onClick={() => toggleArr(cfg.key, c.id)}
                                     className={`rounded-full border px-3 py-[6px] text-[12.5px] font-semibold ${sel ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-foreground'}`}
                                 >
                                     {c.title}
-                                </button>
+                                </GuardrailButton>
                             );
                         })}
                     </div>
                 )}
                 {cfg.type === 'toggle' && (
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => setF(cfg.key, !val)}
                         className="flex w-full items-center justify-between rounded-[10px] border border-border bg-card px-[13px] py-[10px]"
@@ -704,7 +705,7 @@ export function TrainingWizardDialog({
                         <span className={`inline-flex h-[22px] w-[38px] rounded-full p-[2px] ${val ? 'justify-end bg-primary' : 'justify-start bg-border'}`}>
                             <span className="h-[18px] w-[18px] rounded-full bg-white" />
                         </span>
-                    </button>
+                    </GuardrailButton>
                 )}
                 {cfg.type === 'file' && (
                     <label className="flex cursor-pointer items-center gap-[10px] rounded-[10px] border border-dashed border-border p-4 text-[13px] text-muted-foreground">
@@ -743,7 +744,7 @@ export function TrainingWizardDialog({
                         <div className="text-[21px] font-bold">{SUCCESS_MSG[type]}</div>
                         <div className="max-w-[340px] text-[13.5px] text-muted-foreground">All set. You can add another or close this dialog.</div>
                         <div className="mt-1 flex gap-[10px]">
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => {
                                     // After editing a course, "add another" starts a fresh create;
@@ -754,10 +755,10 @@ export function TrainingWizardDialog({
                                 className="rounded-[9px] border border-border bg-card px-4 py-[9px] text-[13px] font-semibold"
                             >
                                 Save &amp; add another
-                            </button>
-                            <button type="button" onClick={onClose} className="rounded-[9px] bg-primary px-4 py-[9px] text-[13px] font-semibold text-white">
+                            </GuardrailButton>
+                            <GuardrailButton unstyled type="button" onClick={onClose} className="rounded-[9px] bg-primary px-4 py-[9px] text-[13px] font-semibold text-white">
                                 Done
-                            </button>
+                            </GuardrailButton>
                         </div>
                     </div>
                 ) : (
@@ -773,7 +774,7 @@ export function TrainingWizardDialog({
                                     const done = i < step;
                                     const current = i === step;
                                     return (
-                                        <button
+                                        <GuardrailButton unstyled
                                             key={s.key}
                                             type="button"
                                             onClick={() => i <= step && setStep(i)}
@@ -794,7 +795,7 @@ export function TrainingWizardDialog({
                                                 <span className="block text-[13px] font-semibold">{s.label}</span>
                                                 <span className="block text-[11px] text-muted-foreground">{s.blurb}</span>
                                             </span>
-                                        </button>
+                                        </GuardrailButton>
                                     );
                                 })}
                             </div>
@@ -847,9 +848,9 @@ export function TrainingWizardDialog({
                                                 <div className="mb-2 flex justify-between">
                                                     <span className="text-[11.5px] font-semibold text-muted-foreground">Item {i + 1}</span>
                                                     {items.length > 1 && (
-                                                        <button type="button" className="text-[11.5px] text-status-critical" onClick={() => setItems(items.filter((_, idx) => idx !== i))}>
+                                                        <GuardrailButton unstyled type="button" className="text-[11.5px] text-status-critical" onClick={() => setItems(items.filter((_, idx) => idx !== i))}>
                                                             Remove
-                                                        </button>
+                                                        </GuardrailButton>
                                                     )}
                                                 </div>
                                                 <div className="grid grid-cols-[1fr_110px_110px] items-end gap-[10px]">
@@ -877,9 +878,9 @@ export function TrainingWizardDialog({
                                             </div>
                                         ))}
                                         {errors._items && <div className="text-[11.5px] text-status-critical">{errors._items}</div>}
-                                        <button type="button" onClick={() => setItems([...items, { description: '', category: 'training', amount: '', expense_date: todayStr }])} className="self-start rounded-[9px] border border-dashed border-border bg-card px-[13px] py-2 text-[12.5px] font-semibold">
+                                        <GuardrailButton unstyled type="button" onClick={() => setItems([...items, { description: '', category: 'training', amount: '', expense_date: todayStr }])} className="self-start rounded-[9px] border border-dashed border-border bg-card px-[13px] py-2 text-[12.5px] font-semibold">
                                             + Add item
-                                        </button>
+                                        </GuardrailButton>
                                         <div className="flex justify-end border-t border-border pt-3 text-[14px] font-bold">Total: {fmtNzd(claimTotal)}</div>
                                     </div>
                                 ) : (
@@ -890,17 +891,17 @@ export function TrainingWizardDialog({
                             {/* FOOTER */}
                             <div className="flex items-center gap-[10px] border-t border-border p-[14px_22px]">
                                 {step > 0 && (
-                                    <button type="button" onClick={() => setStep(step - 1)} className="rounded-[9px] border border-border bg-card px-4 py-[9px] text-[13px] font-semibold">
+                                    <GuardrailButton unstyled type="button" onClick={() => setStep(step - 1)} className="rounded-[9px] border border-border bg-card px-4 py-[9px] text-[13px] font-semibold">
                                         Back
-                                    </button>
+                                    </GuardrailButton>
                                 )}
-                                <button type="button" onClick={onClose} className="border-0 bg-transparent text-[13px] font-semibold text-muted-foreground">
+                                <GuardrailButton unstyled type="button" onClick={onClose} className="border-0 bg-transparent text-[13px] font-semibold text-muted-foreground">
                                     Cancel
-                                </button>
+                                </GuardrailButton>
                                 <div className="ml-auto flex gap-[9px]">
-                                    <button type="button" disabled={submitting} onClick={next} className="rounded-[9px] bg-primary px-5 py-[9px] text-[13px] font-bold text-white disabled:opacity-60">
+                                    <GuardrailButton unstyled type="button" disabled={submitting} onClick={next} className="rounded-[9px] bg-primary px-5 py-[9px] text-[13px] font-bold text-white disabled:opacity-60">
                                         {step >= steps.length - 1 ? FINAL_LABEL[type] : 'Continue'}
-                                    </button>
+                                    </GuardrailButton>
                                 </div>
                             </div>
                         </div>

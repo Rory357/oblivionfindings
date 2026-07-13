@@ -4,9 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
-use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Services\ExitInterviewService;
-use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
@@ -123,6 +121,7 @@ class ExitInterviewController extends Controller
             'culture_feedback' => ['nullable', 'string', 'max:5000'],
             'additional_comments' => ['nullable', 'string', 'max:5000'],
             'is_confidential' => ['sometimes', 'boolean'],
+            'offboarding_task_id' => ['nullable', 'integer', 'exists:hr_offboarding_tasks,id'],
         ]);
 
         $this->exitInterviewService->createExitInterview([
@@ -131,21 +130,82 @@ class ExitInterviewController extends Controller
             ...$data,
         ]);
 
-        // Cross-loop seam: recording the interview ticks off the matching
-        // pending "Exit interview" task on the employee's open offboarding
-        // checklist, so the leaver workflow stays in sync automatically.
-        $this->completeOffboardingExitInterviewTask(
-            $tenantId,
-            (int) $data['employee_profile_id'],
-            (int) $user->id,
-        );
-
         // When recorded from an offboarding checklist, stay on that page.
         if ($request->boolean('from_offboarding')) {
             return redirect()->back()->with('success', 'Exit interview recorded.');
         }
 
         return redirect()->route('hr.exit-interviews.index')->with('success', 'Exit interview recorded.');
+    }
+
+    /**
+     * Persisted exit interviews are submitted records, not drafts. Keep the
+     * endpoint explicit so stale or future edit clients fail safely.
+     */
+    public function update(Request $request, HrExitInterview $exitInterview)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess(
+            $this->resolveHrTenantIdForUser($user),
+            $exitInterview->tenant_id,
+        );
+
+        $answerFields = [
+            'would_recommend',
+            'overall_satisfaction',
+            'what_went_well',
+            'what_could_improve',
+            'management_feedback',
+            'culture_feedback',
+            'additional_comments',
+        ];
+        $hasSubmittedAnswers = collect($answerFields)
+            ->contains(fn (string $field) => $exitInterview->{$field} !== null);
+        $unexpectedFields = collect($request->except('_token', '_method'))
+            ->keys()
+            ->diff(['interviewer_user_id', 'interview_date'])
+            ->isNotEmpty();
+
+        if ($hasSubmittedAnswers || $unexpectedFields) {
+            return redirect()->back()->with(
+                'error',
+                'Submitted exit interviews are locked. Add an addendum instead.',
+            );
+        }
+
+        $data = $request->validate([
+            'interviewer_user_id' => ['required', 'integer', 'exists:users,id'],
+            'interview_date' => ['required', 'date'],
+        ]);
+
+        $this->exitInterviewService->rescheduleInterview($exitInterview, $data);
+
+        return redirect()->back()->with('success', 'Exit interview schedule updated.');
+    }
+
+    /**
+     * Append an addendum while preserving every submitted answer.
+     */
+    public function storeAddendum(Request $request, HrExitInterview $exitInterview)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess(
+            $this->resolveHrTenantIdForUser($user),
+            $exitInterview->tenant_id,
+        );
+
+        $data = $request->validate([
+            'note' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $this->exitInterviewService->appendAddendum($exitInterview, $data['note'], $user);
+
+        return redirect()->back()->with(
+            'success',
+            'Addendum appended. The submitted interview remains unchanged.',
+        );
     }
 
     /**
@@ -195,38 +255,6 @@ class ExitInterviewController extends Controller
                 'to' => $toDate,
             ],
         ]);
-    }
-
-    /**
-     * Auto-complete the pending "Exit interview" task on the employee's open
-     * offboarding checklist (if any). Best-effort: tasks blocked by dependency
-     * or sign-off rules are left for manual completion.
-     */
-    private function completeOffboardingExitInterviewTask(?int $tenantId, int $employeeProfileId, int $completedBy): void
-    {
-        $task = HrOffboardingTask::query()
-            ->where('status', '!=', 'completed')
-            ->where('category', 'hr')
-            ->where('title', 'like', '%exit interview%')
-            ->whereHas('checklist', fn ($query) => $query
-                ->where('tenant_id', $tenantId)
-                ->where('employee_profile_id', $employeeProfileId)
-                ->whereIn('status', ['pending', 'in_progress']))
-            ->orderBy('sort_order')
-            ->first();
-
-        if (! $task) {
-            return;
-        }
-
-        try {
-            app(OnboardingService::class)->completeOffboardingTask($task, $completedBy, [
-                'notes' => trim(($task->notes ? $task->notes."\n" : '').'Auto-completed: exit interview recorded.'),
-            ]);
-        } catch (\LogicException) {
-            // Dependencies or sign-off requirements block auto-completion —
-            // leave the task for the checklist owner to complete manually.
-        }
     }
 
     /**

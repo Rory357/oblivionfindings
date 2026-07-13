@@ -77,7 +77,7 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                                     ) : q.type === 'choice' ? (
                                         <div className="flex flex-wrap gap-2">
                                             {(q.options ?? []).map((opt) => (
-                                                <button
+                                                <Button unstyled
                                                     key={opt}
                                                     type="button"
                                                     onClick={() => setAnswer(q.key, opt)}
@@ -89,13 +89,13 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                                                     )}
                                                 >
                                                     {opt}
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     ) : (
                                         <div className="flex gap-2">
                                             {[1, 2, 3, 4, 5].map((n) => (
-                                                <button
+                                                <Button unstyled
                                                     key={n}
                                                     type="button"
                                                     onClick={() => setAnswer(q.key, String(n))}
@@ -107,7 +107,7 @@ export default function ReferenceQuestionnaire({ token, refereeName, candidateNa
                                                     )}
                                                 >
                                                     {n}
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     )}

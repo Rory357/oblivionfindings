@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrOffer extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'application_id',
@@ -37,6 +37,8 @@ class HrOffer extends Model
         'sent_at',
         'candidate_portal_token',
         'portal_expires_at',
+        'expired_by',
+        'expiry_reason',
         'expiry_reminder_sent_at',
         'expired_notice_sent_at',
         'response',
@@ -69,7 +71,7 @@ class HrOffer extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function application(): BelongsTo
@@ -90,6 +92,11 @@ class HrOffer extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function expiredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'expired_by');
     }
 
     public function template(): BelongsTo

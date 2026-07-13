@@ -24,6 +24,7 @@ import {
     UserCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type BatteryState = {
     label: string;
@@ -356,7 +357,7 @@ export default function ResidentSidebar({
             </div>
 
             {/* Battery & power */}
-            <div className="rounded-lg border bg-card p-3">
+            <GuardrailCard unstyled className="rounded-lg border bg-card p-3">
                 <div className="mb-2 flex items-center justify-between">
                     <div className={`flex items-center gap-2 text-sm font-medium ${battery.textClass}`}>
                         <BatteryIcon className="h-4 w-4" />
@@ -387,11 +388,11 @@ export default function ResidentSidebar({
                             : '—',
                     )}
                 </div>
-            </div>
+            </GuardrailCard>
 
             {/* Current location row */}
             {hasLocation && (
-                <div className="rounded-lg border bg-card p-3">
+                <GuardrailCard unstyled className="rounded-lg border bg-card p-3">
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <MapPin className="h-4 w-4 text-primary" />
                         Current location
@@ -414,7 +415,7 @@ export default function ResidentSidebar({
                             <span>Satellites: {resident.satellites}</span>
                         )}
                     </div>
-                </div>
+                </GuardrailCard>
             )}
 
             {/* Device details collapsible */}

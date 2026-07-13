@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrCalendarEvent extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',
@@ -33,6 +34,9 @@ class HrCalendarEvent extends Model
         'category_id',
         'site_id',
         'created_by',
+        'archived_at',
+        'archived_by',
+        'archive_reason',
     ];
 
     protected $casts = [
@@ -42,10 +46,11 @@ class HrCalendarEvent extends Model
         'recurrence_until' => 'datetime',
         'is_exception' => 'boolean',
         'exception_date' => 'date',
+        'archived_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function site(): BelongsTo
@@ -56,6 +61,11 @@ class HrCalendarEvent extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function archiver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
     }
 
     /**
@@ -72,28 +82,38 @@ class HrCalendarEvent extends Model
         return $this->belongsTo(HrCalendarEventCategory::class, 'category_id');
     }
 
-    public function attendees(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function attendees(): HasMany
     {
         return $this->hasMany(HrCalendarEventAttendee::class, 'event_id');
     }
 
-    public function reminders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function reminders(): HasMany
     {
         return $this->hasMany(HrCalendarEventReminder::class, 'event_id');
     }
 
-    public function attachments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function attachments(): HasMany
     {
         return $this->hasMany(HrCalendarEventAttachment::class, 'event_id');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder
     {
         return $query->where('tenant_id', $tenantId);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->whereNotNull('archived_at');
     }
 
     public function scopeInRange(Builder $query, string $start, string $end): Builder

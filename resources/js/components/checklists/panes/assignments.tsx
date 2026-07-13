@@ -7,6 +7,7 @@ import { initials } from '../category';
 import { freqLabel, typeLabel, useChecklistConfig, type PaneCtx } from '../context';
 import { CategoryIcon, CountBadge, Dropdown, Empty, SectionHead, StatusBadge } from '../primitives';
 import type { ChecklistAssignment, SiteRef } from '../types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export function AssignmentsPane({ ctx }: { ctx: PaneCtx }) {
     const cfg = useChecklistConfig();
@@ -43,12 +44,12 @@ export function AssignmentsPane({ ctx }: { ctx: PaneCtx }) {
             </SectionHead>
 
             {grouped.length === 0 ? (
-                <div className="rounded-xl border border-border bg-card p-2 shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
                     <Empty title="No assignments match." />
-                </div>
+                </GuardrailCard>
             ) : (
                 grouped.map((g) => (
-                    <div key={g.site.id} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                    <GuardrailCard unstyled key={g.site.id} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -82,7 +83,7 @@ export function AssignmentsPane({ ctx }: { ctx: PaneCtx }) {
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </GuardrailCard>
                 ))
             )}
         </div>

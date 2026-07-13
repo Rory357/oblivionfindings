@@ -1,6 +1,12 @@
 <?php
 
+use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrApprovalChain;
+use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrJobRequisition;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Services\ApprovalWorkflowService;
 use App\Models\Role;
 use App\Models\User;
@@ -15,7 +21,8 @@ use Database\Seeders\SeedHrPermissionsSeeder;
  * `ApprovalWorkflowService::initiateApproval`, whose supported process types are
  * `leave` / `expense` / `timesheet` / `document` (the chain enum). These tests
  * prove the surface does what it claims — a pending instance of every claimed
- * type appears — and document the D-1 gap: recruitment approvals never reach it.
+ * type appears — and lock D-1's surface-only federation: real native approval
+ * queues appear without moving their state transitions onto the chain service.
  *
  * They also lock in F-78: `initiateApproval` used to stamp the instance with the
  * raw `$initiator->tenant_id` (always null — users are tenanted by
@@ -75,21 +82,88 @@ test('S14 seam: the approvals inbox surfaces a pending instance of every claimed
     expect(collect($data)->pluck('process_type')->sort()->values()->all())
         ->toBe(['document', 'expense', 'leave', 'timesheet']);
     expect(collect($data)->every(fn ($i) => $i['status'] === 'pending'))->toBeTrue();
+
+    $byType = collect($data)->keyBy('process_type');
+    expect($byType['leave']['item_label'])->toBe("Leave request #{$this->hr->id}")
+        ->and($byType['expense']['item_label'])->toBe("Expense claim #{$this->hr->id}")
+        ->and($byType['timesheet']['item_label'])->toBe("Timesheet #{$this->hr->id}")
+        ->and($byType['document']['item_label'])->toBe("Document #{$this->hr->id}")
+        ->and($byType->every(fn ($item) => str_contains($item['initiated_at'], 'T')))->toBeTrue();
 });
 
-test('S14 seam (D-1 gap): recruitment approvals live outside the spine and never reach the inbox', function () {
+test('S14 seam (D-1): real native approvables surface with tenant-safe links while staying off the spine', function () {
     // 'recruitment' is not a chain process type (the storeChain enum is
     // leave/expense/timesheet/document), so a recruitment approvable can never
     // create an HrApprovalInstance — initiating one throws.
     expect(fn () => app(ApprovalWorkflowService::class)->initiateApproval($this->hr, 'recruitment', $this->hr))
-        ->toThrow(\LogicException::class, "process type 'recruitment'");
+        ->toThrow(LogicException::class, "process type 'recruitment'");
 
-    // And the inbox — which reads only HrApprovalInstance — surfaces nothing for
-    // recruitment: offers awaiting approval (HrOffer.approval_status='pending')
-    // are handled by the recruitment-local notify flow, off the spine. D-1.
-    $data = $this->actingAs($this->hr)
-        ->get('/hr/approvals/pending')
-        ->inertiaProps('instances.data');
+    $requester = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
 
-    expect($data)->toBe([]);
+    $leave = HrLeaveRequest::factory()->create([
+        'tenant_id' => 1,
+        'user_id' => $requester->id,
+        'status' => 'pending',
+        'submitted_at' => now()->subMinutes(40),
+    ]);
+    $expense = HrExpenseClaim::factory()->create([
+        'tenant_id' => 1,
+        'user_id' => $requester->id,
+        'status' => 'submitted',
+        'submitted_at' => now()->subMinutes(30),
+    ]);
+    $candidate = HrCandidate::factory()->create([
+        'tenant_id' => 1,
+        'status' => 'offer_pending',
+        'created_by' => $this->hr->id,
+    ]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1,
+        'candidate_id' => $candidate->id,
+        'position_title' => 'Support Worker',
+    ]);
+    $offer = HrOffer::query()->create([
+        'application_id' => $application->id,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addMonth()->toDateString(),
+        'employment_type' => 'full_time',
+        'approval_status' => 'pending_approval',
+        'approval_requested_at' => now()->subMinutes(20),
+        'created_by' => $this->hr->id,
+    ]);
+    $requisition = HrJobRequisition::query()->create([
+        'tenant_id' => 1,
+        'title' => 'Team Leader',
+        'slug' => 'team-leader-approval',
+        'position_role' => 'team_lead',
+        'employment_type' => 'full_time',
+        'openings' => 1,
+        'requires_approval' => true,
+        'status' => 'pending_approval',
+        'created_by' => $this->hr->id,
+    ]);
+
+    // Foreign-tenant and already-completed records must not leak into the inbox.
+    HrLeaveRequest::factory()->create(['tenant_id' => 2, 'status' => 'pending']);
+    HrExpenseClaim::factory()->create(['tenant_id' => 1, 'status' => 'approved']);
+
+    $response = $this->actingAs($this->hr)->get('/hr/approvals/pending');
+    $response->assertOk();
+
+    $native = collect($response->inertiaProps('nativeApprovals'));
+    expect($native->pluck('type')->all())->toBe(['requisition', 'offer', 'expense', 'leave']);
+    expect($native->pluck('url', 'type')->all())->toBe([
+        'requisition' => '/hr/recruitment?tab=requisitions',
+        'offer' => '/hr/recruitment?tab=offers',
+        'expense' => "/hr/compensation/expenses/{$expense->id}",
+        'leave' => "/hr/leave/{$leave->id}",
+    ]);
+    expect($native->pluck('id', 'type')->all())->toBe([
+        'requisition' => $requisition->id,
+        'offer' => $offer->id,
+        'expense' => $expense->id,
+        'leave' => $leave->id,
+    ]);
+    expect($response->inertiaProps('instances.data'))->toBe([]);
 });

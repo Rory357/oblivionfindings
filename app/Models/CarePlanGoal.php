@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CarePlanGoal extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -49,7 +49,8 @@ class CarePlanGoal extends Model
 
     public function progressNotes()
     {
-        return $this->hasMany(ProgressNote::class, 'care_plan_goal_id');
+        return $this->hasMany(ClientNote::class, 'care_plan_goal_id')
+            ->where('type', 'progress_note');
     }
 
     public function steps()

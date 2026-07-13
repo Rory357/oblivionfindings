@@ -9,7 +9,10 @@
  * which now redirect back to the profile's Care & Support Plan tab. The whole
  * `content` object is sent on every save because update() overwrites content
  * wholesale. */
-import { CarePlanDomainsBuilder, type CarePlanDomainDraft } from '@/components/care-plan-domains-builder';
+import {
+    CarePlanDomainsBuilder,
+    type CarePlanDomainDraft,
+} from '@/components/care-plan-domains-builder';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,8 +21,8 @@ import {
     Field,
     InfoCard,
     Ring,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
     TilePicker,
     type IconType,
@@ -120,41 +123,67 @@ const TEMPLATES: TemplateDef[] = [
     {
         key: 'standard_support',
         label: 'Support Plan',
-        description: '4 support areas · quarterly review · independence & community focus',
+        description:
+            '4 support areas · quarterly review · independence & community focus',
         icon: ClipboardList,
         plan_type: 'support_plan',
-        support_needs: { daily_living: true, personal_care: true, community_access: true, social_participation: true },
-        support_strategies: 'Goals-based support focused on independence and community participation.',
+        support_needs: {
+            daily_living: true,
+            personal_care: true,
+            community_access: true,
+            social_participation: true,
+        },
+        support_strategies:
+            'Goals-based support focused on independence and community participation.',
         frequency_months: 3,
     },
     {
         key: 'behaviour_support',
         label: 'Behaviour Support Plan',
-        description: '3 support areas · quarterly review · positive behaviour support',
+        description:
+            '3 support areas · quarterly review · positive behaviour support',
         icon: Shield,
         plan_type: 'behaviour_plan',
-        support_needs: { behaviour_support: true, communication: true, health_management: true },
-        support_strategies: 'Positive behaviour support framework with proactive and reactive strategies.',
+        support_needs: {
+            behaviour_support: true,
+            communication: true,
+            health_management: true,
+        },
+        support_strategies:
+            'Positive behaviour support framework with proactive and reactive strategies.',
         frequency_months: 3,
     },
     {
         key: 'health_wellbeing',
         label: 'Health & Wellbeing Plan',
-        description: '3 support areas · 6-monthly review · allied-health coordination',
+        description:
+            '3 support areas · 6-monthly review · allied-health coordination',
         icon: Activity,
         plan_type: 'health_plan',
-        support_needs: { health_management: true, personal_care: true, daily_living: true },
-        support_strategies: 'Health monitoring and wellbeing support with allied health coordination.',
+        support_needs: {
+            health_management: true,
+            personal_care: true,
+            daily_living: true,
+        },
+        support_strategies:
+            'Health monitoring and wellbeing support with allied health coordination.',
         frequency_months: 6,
     },
     {
         key: 'transition',
         label: 'Transition Plan',
-        description: '4 support areas · monthly review · milestone-based independence',
+        description:
+            '4 support areas · monthly review · milestone-based independence',
         icon: Compass,
         plan_type: 'transition_plan',
-        support_needs: { daily_living: true, employment: true, education_training: true, community_access: true },
-        support_strategies: 'Structured transition support with milestone-based goals and gradual independence building.',
+        support_needs: {
+            daily_living: true,
+            employment: true,
+            education_training: true,
+            community_access: true,
+        },
+        support_strategies:
+            'Structured transition support with milestone-based goals and gradual independence building.',
         frequency_months: 1,
     },
     {
@@ -177,11 +206,19 @@ const SUPPORT_NEED_OPTIONS: { key: string; label: string; icon: IconType }[] = [
     { key: 'communication', label: 'Communication', icon: MessageSquare },
     { key: 'behaviour_support', label: 'Behaviour support', icon: Shield },
     { key: 'employment', label: 'Employment', icon: Briefcase },
-    { key: 'education_training', label: 'Education / training', icon: GraduationCap },
+    {
+        key: 'education_training',
+        label: 'Education / training',
+        icon: GraduationCap,
+    },
     { key: 'social_participation', label: 'Social participation', icon: Users },
     { key: 'cultural_needs', label: 'Cultural needs', icon: Globe },
     { key: 'spiritual_needs', label: 'Spiritual needs', icon: Sparkle },
-    { key: 'financial_management', label: 'Financial management', icon: Wallet },
+    {
+        key: 'financial_management',
+        label: 'Financial management',
+        icon: Wallet,
+    },
 ];
 
 const FREQUENCY_OPTIONS: SelectOption[] = [
@@ -202,34 +239,72 @@ const EGL_PRINCIPLES = [
     'Relationship building',
 ];
 
-const ABOUT_FIELDS: { key: keyof AboutMe; label: string; placeholder: string }[] = [
-    { key: 'dreams', label: 'My dreams & aspirations', placeholder: 'Big hopes and goals for the future…' },
-    { key: 'important_to_me', label: "What's important TO me", placeholder: 'Relationships, routines, interests, passions…' },
-    { key: 'important_for_me', label: "What's important FOR me", placeholder: 'Health, safety and wellbeing needs to maintain…' },
-    { key: 'ideal_day', label: 'My ideal day', placeholder: 'What a good day looks like — routines, activities, social time…' },
-    { key: 'likes', label: 'Things I like', placeholder: 'Favourite foods, activities, music, places, people…' },
-    { key: 'dislikes', label: "Things I don't like", placeholder: 'Things to avoid, triggers, dislikes…' },
-    { key: 'how_to_support', label: 'How to support me best', placeholder: 'Tips for support workers — communication style, motivation, boundaries…' },
+const ABOUT_FIELDS: {
+    key: keyof AboutMe;
+    label: string;
+    placeholder: string;
+}[] = [
+    {
+        key: 'dreams',
+        label: 'My dreams & aspirations',
+        placeholder: 'Big hopes and goals for the future…',
+    },
+    {
+        key: 'important_to_me',
+        label: "What's important TO me",
+        placeholder: 'Relationships, routines, interests, passions…',
+    },
+    {
+        key: 'important_for_me',
+        label: "What's important FOR me",
+        placeholder: 'Health, safety and wellbeing needs to maintain…',
+    },
+    {
+        key: 'ideal_day',
+        label: 'My ideal day',
+        placeholder:
+            'What a good day looks like — routines, activities, social time…',
+    },
+    {
+        key: 'likes',
+        label: 'Things I like',
+        placeholder: 'Favourite foods, activities, music, places, people…',
+    },
+    {
+        key: 'dislikes',
+        label: "Things I don't like",
+        placeholder: 'Things to avoid, triggers, dislikes…',
+    },
+    {
+        key: 'how_to_support',
+        label: 'How to support me best',
+        placeholder:
+            'Tips for support workers — communication style, motivation, boundaries…',
+    },
 ];
 
 const EMPTY_ABOUT: AboutMe = {
-    dreams: '', important_to_me: '', important_for_me: '', ideal_day: '', likes: '', dislikes: '', how_to_support: '',
+    dreams: '',
+    important_to_me: '',
+    important_for_me: '',
+    ideal_day: '',
+    likes: '',
+    dislikes: '',
+    how_to_support: '',
 };
 const EMPTY_FUNDING: FundingState = {
-    nasc_organisation: '', needs_assessment_ref: '', needs_assessment_date: '', service_agreement_id: '', allocated_hours: '', funding_notes: '',
+    nasc_organisation: '',
+    needs_assessment_ref: '',
+    needs_assessment_date: '',
+    service_agreement_id: '',
+    allocated_hours: '',
+    funding_notes: '',
 };
 
 const STATUS_CREATE: { value: string; label: string }[] = [
     { value: 'draft', label: 'Draft' },
     { value: 'active', label: 'Active' },
 ];
-const STATUS_EDIT: { value: string; label: string }[] = [
-    { value: 'draft', label: 'Draft' },
-    { value: 'active', label: 'Active' },
-    { value: 'review', label: 'In review' },
-    { value: 'archived', label: 'Archived' },
-];
-
 /* ------------------------------------------------------------------ helpers */
 
 const str = (v: unknown): string => String(v ?? '').trim();
@@ -238,7 +313,8 @@ const num = (v: unknown): number | undefined => {
     const p = parseFloat(String(v ?? '').replace(/[^0-9.-]/g, ''));
     return Number.isFinite(p) ? p : undefined;
 };
-const day = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 10) : '');
+const day = (v: unknown): string =>
+    typeof v === 'string' ? v.slice(0, 10) : '';
 
 /** Add months to a YYYY-MM-DD string without any timezone/DST drift. */
 function addMonths(dateStr: string, months: number): string {
@@ -275,10 +351,17 @@ function normaliseDomains(arr: unknown): CarePlanDomainDraft[] {
             return {
                 key: (d.key as string) || `domain_${i + 1}`,
                 label: (d.label as string) ?? '',
-                status: ((d.status as string) ?? 'active') as CarePlanDomainDraft['status'],
-                strategies: (strategies.length ? strategies : [{ text: '', owner: '' }]).map((s) => {
+                status: ((d.status as string) ??
+                    'active') as CarePlanDomainDraft['status'],
+                strategies: (strategies.length
+                    ? strategies
+                    : [{ text: '', owner: '' }]
+                ).map((s) => {
                     const strat = s as Record<string, unknown>;
-                    return { text: (strat.text as string) ?? '', owner: (strat.owner as string) ?? '' };
+                    return {
+                        text: (strat.text as string) ?? '',
+                        owner: (strat.owner as string) ?? '',
+                    };
                 }),
             };
         });
@@ -322,15 +405,32 @@ export function CarePlanWizardDialog({
     const [endsAt, setEndsAt] = useState('');
     const [nextReviewAt, setNextReviewAt] = useState('');
     const [aboutMe, setAboutMe] = useState<AboutMe>(EMPTY_ABOUT);
-    const [supportNeeds, setSupportNeeds] = useState<Record<string, boolean>>({});
+    const [supportNeeds, setSupportNeeds] = useState<Record<string, boolean>>(
+        {},
+    );
     const [riskFactors, setRiskFactors] = useState('');
     const [supportStrategies, setSupportStrategies] = useState('');
-    const [communicationPreferences, setCommunicationPreferences] = useState('');
+    const [communicationPreferences, setCommunicationPreferences] =
+        useState('');
     const [frequencyMonths, setFrequencyMonths] = useState(3);
     const [domains, setDomains] = useState<CarePlanDomainDraft[]>([]);
     const [eglVision, setEglVision] = useState('');
     const [eglPrinciples, setEglPrinciples] = useState<string[]>([]);
     const [funding, setFunding] = useState<FundingState>(EMPTY_FUNDING);
+    const statusOptions =
+        !managing || plan?.status === 'draft'
+            ? STATUS_CREATE
+            : [
+                  {
+                      value: plan?.status ?? 'draft',
+                      label:
+                          plan?.status === 'review'
+                              ? 'In review'
+                              : plan?.status === 'archived'
+                                ? 'Archived'
+                                : 'Active',
+                  },
+              ];
 
     // Re-seed whenever the dialog (re)opens.
     useEffect(() => {
@@ -348,21 +448,35 @@ export function CarePlanWizardDialog({
             setStartsAt(day(plan.starts_at));
             setEndsAt(day(plan.ends_at));
             setNextReviewAt(day(plan.next_review_at));
-            setAboutMe({ ...EMPTY_ABOUT, ...((c.about_me as Partial<AboutMe>) ?? {}) });
+            setAboutMe({
+                ...EMPTY_ABOUT,
+                ...((c.about_me as Partial<AboutMe>) ?? {}),
+            });
             setSupportNeeds((c.support_needs as Record<string, boolean>) ?? {});
             setRiskFactors((c.risk_factors as string) ?? '');
             setSupportStrategies((c.support_strategies as string) ?? '');
-            setCommunicationPreferences((c.communication_preferences as string) ?? '');
-            setFrequencyMonths(((c.review_schedule as { frequency_months?: number })?.frequency_months) ?? 3);
+            setCommunicationPreferences(
+                (c.communication_preferences as string) ?? '',
+            );
+            setFrequencyMonths(
+                (c.review_schedule as { frequency_months?: number })
+                    ?.frequency_months ?? 3,
+            );
             setDomains(normaliseDomains(c.domains));
-            setEglVision(((c.egl as { vision?: string })?.vision) ?? '');
-            setEglPrinciples(((c.egl as { principles?: string[] })?.principles) ?? []);
+            setEglVision((c.egl as { vision?: string })?.vision ?? '');
+            setEglPrinciples(
+                (c.egl as { principles?: string[] })?.principles ?? [],
+            );
             setFunding({
                 nasc_organisation: (f.nasc_organisation as string) ?? '',
                 needs_assessment_ref: (f.needs_assessment_ref as string) ?? '',
                 needs_assessment_date: day(f.needs_assessment_date),
-                service_agreement_id: f.service_agreement_id != null ? String(f.service_agreement_id) : '',
-                allocated_hours: f.allocated_hours != null ? String(f.allocated_hours) : '',
+                service_agreement_id:
+                    f.service_agreement_id != null
+                        ? String(f.service_agreement_id)
+                        : '',
+                allocated_hours:
+                    f.allocated_hours != null ? String(f.allocated_hours) : '',
                 funding_notes: (f.funding_notes as string) ?? '',
             });
         } else {
@@ -390,7 +504,10 @@ export function CarePlanWizardDialog({
         [staffOptions],
     );
     const agreementOptions = useMemo<SelectOption[]>(
-        () => [{ value: '__none', label: 'No linked agreement' }, ...serviceAgreementOptions],
+        () => [
+            { value: '__none', label: 'No linked agreement' },
+            ...serviceAgreementOptions,
+        ],
         [serviceAgreementOptions],
     );
 
@@ -398,15 +515,48 @@ export function CarePlanWizardDialog({
 
     const railSteps: WizardStep[] = useMemo(() => {
         const base: WizardStep[] = [
-            { key: 'basics', label: 'Plan basics', blurb: 'Type, dates & status', icon: ClipboardList },
-            { key: 'about_me', label: 'About me', blurb: "The person's voice", icon: Heart },
-            { key: 'needs', label: 'Needs & risks', blurb: 'Support areas', icon: LayoutGrid },
-            { key: 'domains', label: 'Domains', blurb: 'Strategies & owners', icon: Target },
-            { key: 'egl_funding', label: 'EGL & funding', blurb: 'Vision & NASC', icon: Compass },
+            {
+                key: 'basics',
+                label: 'Plan basics',
+                blurb: 'Type, dates & status',
+                icon: ClipboardList,
+            },
+            {
+                key: 'about_me',
+                label: 'About me',
+                blurb: "The person's voice",
+                icon: Heart,
+            },
+            {
+                key: 'needs',
+                label: 'Needs & risks',
+                blurb: 'Support areas',
+                icon: LayoutGrid,
+            },
+            {
+                key: 'domains',
+                label: 'Domains',
+                blurb: 'Strategies & owners',
+                icon: Target,
+            },
+            {
+                key: 'egl_funding',
+                label: 'EGL & funding',
+                blurb: 'Vision & NASC',
+                icon: Compass,
+            },
         ];
         return managing
             ? base
-            : [...base, { key: '__review', label: 'Review & save', blurb: 'Confirm and create', icon: CheckCircle2 }];
+            : [
+                  ...base,
+                  {
+                      key: '__review',
+                      label: 'Review & save',
+                      blurb: 'Confirm and create',
+                      icon: CheckCircle2,
+                  },
+              ];
     }, [managing]);
 
     const lastIndex = railSteps.length - 1;
@@ -417,12 +567,30 @@ export function CarePlanWizardDialog({
         const signals = [
             Boolean(str(title) && planType),
             Object.values(aboutMe).some((v) => str(v)),
-            Object.values(supportNeeds).some(Boolean) || Boolean(str(riskFactors)) || Boolean(str(supportStrategies)),
+            Object.values(supportNeeds).some(Boolean) ||
+                Boolean(str(riskFactors)) ||
+                Boolean(str(supportStrategies)),
             domains.some((d) => str(d.label)),
-            Boolean(str(eglVision)) || eglPrinciples.length > 0 || Boolean(str(funding.nasc_organisation)) || Boolean(funding.service_agreement_id),
+            Boolean(str(eglVision)) ||
+                eglPrinciples.length > 0 ||
+                Boolean(str(funding.nasc_organisation)) ||
+                Boolean(funding.service_agreement_id),
         ];
-        return Math.round((signals.filter(Boolean).length / signals.length) * 100);
-    }, [title, planType, aboutMe, supportNeeds, riskFactors, supportStrategies, domains, eglVision, eglPrinciples, funding]);
+        return Math.round(
+            (signals.filter(Boolean).length / signals.length) * 100,
+        );
+    }, [
+        title,
+        planType,
+        aboutMe,
+        supportNeeds,
+        riskFactors,
+        supportStrategies,
+        domains,
+        eglVision,
+        eglPrinciples,
+        funding,
+    ]);
 
     const basicsValid = Boolean(str(title) && planType);
 
@@ -433,7 +601,8 @@ export function CarePlanWizardDialog({
         const t = TEMPLATES.find((x) => x.key === key);
         if (!t || key === 'blank') return;
         setPlanType(t.plan_type);
-        if (!str(title)) setTitle(preferredName ? `${preferredName}'s ${t.label}` : t.label);
+        if (!str(title))
+            setTitle(preferredName ? `${preferredName}'s ${t.label}` : t.label);
         setSupportNeeds((prev) => ({ ...prev, ...t.support_needs }));
         setSupportStrategies((prev) => prev || t.support_strategies);
         setFrequencyMonths(t.frequency_months);
@@ -470,8 +639,13 @@ export function CarePlanWizardDialog({
             nasc_organisation: opt(funding.nasc_organisation),
             needs_assessment_ref: opt(funding.needs_assessment_ref),
             needs_assessment_date: opt(funding.needs_assessment_date),
-            service_agreement_id: funding.service_agreement_id ? Number(funding.service_agreement_id) : undefined,
-            allocated_hours: funding.allocated_hours !== '' ? num(funding.allocated_hours) : undefined,
+            service_agreement_id: funding.service_agreement_id
+                ? Number(funding.service_agreement_id)
+                : undefined,
+            allocated_hours:
+                funding.allocated_hours !== ''
+                    ? num(funding.allocated_hours)
+                    : undefined,
             funding_notes: opt(funding.funding_notes),
         },
     });
@@ -499,12 +673,15 @@ export function CarePlanWizardDialog({
             preserveScroll: true,
             onSuccess: (page: { props: Record<string, unknown> }) => {
                 setBusy(false);
-                const flash = (page.props as { flash?: { error?: string } }).flash;
+                const flash = (page.props as { flash?: { error?: string } })
+                    .flash;
                 if (flash?.error) {
                     toast.error(flash.error);
                     return;
                 }
-                toast.success(managing ? 'Care plan updated' : 'Care plan created');
+                toast.success(
+                    managing ? 'Care plan updated' : 'Care plan created',
+                );
                 onClose();
             },
             onError: (errs: Record<string, string>) => {
@@ -512,9 +689,18 @@ export function CarePlanWizardDialog({
                 setErrors(errs ?? {});
                 const first = Object.values(errs ?? {})[0];
                 if (first) toast.error(String(first));
-                if (Object.keys(errs ?? {}).some((k) => k.startsWith('content.domains'))) {
+                if (
+                    Object.keys(errs ?? {}).some((k) =>
+                        k.startsWith('content.domains'),
+                    )
+                ) {
                     if (domainsStepIndex >= 0) setStepIndex(domainsStepIndex);
-                } else if (errs?.title || errs?.plan_type || errs?.client_id || errs?.goals) {
+                } else if (
+                    errs?.title ||
+                    errs?.plan_type ||
+                    errs?.client_id ||
+                    errs?.goals
+                ) {
                     setStepIndex(0);
                 }
             },
@@ -534,7 +720,12 @@ export function CarePlanWizardDialog({
 
     const backBtn =
         stepIndex > 0 ? (
-            <Button type="button" variant="ghost" onClick={goBack} disabled={busy}>
+            <Button
+                type="button"
+                variant="ghost"
+                onClick={goBack}
+                disabled={busy}
+            >
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
             </Button>
         ) : null;
@@ -547,7 +738,12 @@ export function CarePlanWizardDialog({
             <div className="flex items-center gap-2">
                 {backBtn}
                 {stepIndex < lastIndex ? (
-                    <Button type="button" variant="ghost" onClick={goNext} disabled={busy}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={goNext}
+                        disabled={busy}
+                    >
                         Next <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                 ) : null}
@@ -555,11 +751,25 @@ export function CarePlanWizardDialog({
         );
         footerEnd = (
             <>
-                <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={busy}
+                >
                     Cancel
                 </Button>
-                <Button type="button" onClick={submit} disabled={busy || !basicsValid} data-test="careplan-save">
-                    {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+                <Button
+                    type="button"
+                    onClick={submit}
+                    disabled={busy || !basicsValid}
+                    data-test="careplan-save"
+                >
+                    {busy ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                        <Check className="mr-1.5 h-4 w-4" />
+                    )}
                     {busy ? 'Saving…' : 'Save changes'}
                 </Button>
             </>
@@ -568,12 +778,26 @@ export function CarePlanWizardDialog({
         const reviewing = stepIndex === lastIndex;
         footerEnd = (
             <>
-                <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={busy}
+                >
                     Cancel
                 </Button>
                 {reviewing ? (
-                    <Button type="button" onClick={submit} disabled={busy || !basicsValid} data-test="careplan-create-submit">
-                        {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+                    <Button
+                        type="button"
+                        onClick={submit}
+                        disabled={busy || !basicsValid}
+                        data-test="careplan-create-submit"
+                    >
+                        {busy ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Check className="mr-1.5 h-4 w-4" />
+                        )}
                         {busy ? 'Saving…' : 'Create care plan'}
                     </Button>
                 ) : (
@@ -597,9 +821,15 @@ export function CarePlanWizardDialog({
             open={open}
             onClose={() => !busy && onClose()}
             title={managing ? 'Edit care plan' : 'Create care plan'}
-            description={managing ? 'Update the support plan' : 'Create a new care & support plan'}
+            description={
+                managing
+                    ? 'Update the support plan'
+                    : 'Create a new care & support plan'
+            }
             railIcon={Target}
-            railTitle={managing ? (plan?.title ?? 'Care plan') : 'Create care plan'}
+            railTitle={
+                managing ? (plan?.title ?? 'Care plan') : 'Create care plan'
+            }
             railSub="Care & support plan"
             steps={railSteps}
             stepIndex={stepIndex}
@@ -620,7 +850,9 @@ export function CarePlanWizardDialog({
                     {clientLabel ? <ClientChip label={clientLabel} /> : null}
                     {!managing ? (
                         <>
-                            <p className="mb-1.5 text-sm font-medium">Start from a template</p>
+                            <p className="mb-1.5 text-sm font-medium">
+                                Start from a template
+                            </p>
                             <TilePicker
                                 value={template}
                                 onChange={applyTemplate}
@@ -635,18 +867,36 @@ export function CarePlanWizardDialog({
                         </>
                     ) : null}
                     <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Plan title" required span error={errors.title}>
+                        <Field
+                            label="Plan title"
+                            required
+                            span
+                            error={errors.title}
+                        >
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 placeholder="e.g. Tane's Support Plan 2026"
                             />
                         </Field>
-                        <Field label="Plan type" required error={errors.plan_type}>
-                            <SelectInput value={planType} onChange={setPlanType} placeholder="Select type…" options={PLAN_TYPE_OPTIONS} />
+                        <Field
+                            label="Plan type"
+                            required
+                            error={errors.plan_type}
+                        >
+                            <SelectInput
+                                value={planType}
+                                onChange={setPlanType}
+                                placeholder="Select type…"
+                                options={PLAN_TYPE_OPTIONS}
+                            />
                         </Field>
                         <Field label="Status">
-                            <Segmented value={status} onChange={setStatus} options={managing ? STATUS_EDIT : STATUS_CREATE} />
+                            <Segmented
+                                value={status}
+                                onChange={setStatus}
+                                options={statusOptions}
+                            />
                         </Field>
                         <Field label="Start date">
                             <Input
@@ -654,12 +904,22 @@ export function CarePlanWizardDialog({
                                 value={startsAt}
                                 onChange={(e) => {
                                     setStartsAt(e.target.value);
-                                    if (e.target.value && frequencyMonths) setNextReviewAt(addMonths(e.target.value, frequencyMonths));
+                                    if (e.target.value && frequencyMonths)
+                                        setNextReviewAt(
+                                            addMonths(
+                                                e.target.value,
+                                                frequencyMonths,
+                                            ),
+                                        );
                                 }}
                             />
                         </Field>
                         <Field label="End date" error={errors.ends_at}>
-                            <Input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+                            <Input
+                                type="date"
+                                value={endsAt}
+                                onChange={(e) => setEndsAt(e.target.value)}
+                            />
                         </Field>
                         <Field label="Review frequency">
                             <SelectInput
@@ -669,12 +929,23 @@ export function CarePlanWizardDialog({
                                 options={FREQUENCY_OPTIONS}
                             />
                         </Field>
-                        <Field label="Next review" hint="auto-set from start + frequency">
-                            <Input type="date" value={nextReviewAt} onChange={(e) => setNextReviewAt(e.target.value)} />
+                        <Field
+                            label="Next review"
+                            hint="auto-set from start + frequency"
+                        >
+                            <Input
+                                type="date"
+                                value={nextReviewAt}
+                                onChange={(e) =>
+                                    setNextReviewAt(e.target.value)
+                                }
+                            />
                         </Field>
                     </div>
                     <InfoCard icon={Compass} tone="info">
-                        This plan follows the <strong>Enabling Good Lives</strong> approach — keep the person's voice and choices at the centre.
+                        This plan follows the{' '}
+                        <strong>Enabling Good Lives</strong> approach — keep the
+                        person's voice and choices at the centre.
                     </InfoCard>
                 </WizardStepPane>
             ) : null}
@@ -689,11 +960,24 @@ export function CarePlanWizardDialog({
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
                         {ABOUT_FIELDS.map((f) => (
-                            <Field key={f.key} label={f.label} span={f.key === 'dreams' || f.key === 'ideal_day' || f.key === 'how_to_support'}>
+                            <Field
+                                key={f.key}
+                                label={f.label}
+                                span={
+                                    f.key === 'dreams' ||
+                                    f.key === 'ideal_day' ||
+                                    f.key === 'how_to_support'
+                                }
+                            >
                                 <Textarea
                                     value={aboutMe[f.key]}
                                     rows={3}
-                                    onChange={(e) => setAboutMe((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                                    onChange={(e) =>
+                                        setAboutMe((prev) => ({
+                                            ...prev,
+                                            [f.key]: e.target.value,
+                                        }))
+                                    }
                                     placeholder={f.placeholder}
                                 />
                             </Field>
@@ -737,10 +1021,16 @@ export function CarePlanWizardDialog({
                                     <span
                                         className={cn(
                                             'grid h-7 w-7 shrink-0 place-items-center rounded-full',
-                                            active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                                            active
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted text-muted-foreground',
                                         )}
                                     >
-                                        {active ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+                                        {active ? (
+                                            <Check className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <Icon className="h-3.5 w-3.5" />
+                                        )}
                                     </span>
                                     {need.label}
                                 </button>
@@ -760,7 +1050,9 @@ export function CarePlanWizardDialog({
                             <Textarea
                                 value={supportStrategies}
                                 rows={3}
-                                onChange={(e) => setSupportStrategies(e.target.value)}
+                                onChange={(e) =>
+                                    setSupportStrategies(e.target.value)
+                                }
                                 placeholder="The approaches, methods and frameworks used to deliver support…"
                             />
                         </Field>
@@ -768,7 +1060,9 @@ export function CarePlanWizardDialog({
                             <Textarea
                                 value={communicationPreferences}
                                 rows={3}
-                                onChange={(e) => setCommunicationPreferences(e.target.value)}
+                                onChange={(e) =>
+                                    setCommunicationPreferences(e.target.value)
+                                }
                                 placeholder="How to communicate effectively — methods, assistive tech, language…"
                             />
                         </Field>
@@ -784,7 +1078,12 @@ export function CarePlanWizardDialog({
                         title="Support domains & strategies"
                         blurb="Build the domain cards that appear on the plan — each with strategies and an owner."
                     />
-                    <CarePlanDomainsBuilder domains={domains} staff={staffList} errors={errors} onChange={setDomains} />
+                    <CarePlanDomainsBuilder
+                        domains={domains}
+                        staff={staffList}
+                        errors={errors}
+                        onChange={setDomains}
+                    />
                 </WizardStepPane>
             ) : null}
 
@@ -797,7 +1096,11 @@ export function CarePlanWizardDialog({
                         blurb="A vision statement and the principles that guide this plan, plus NASC / funding context."
                     />
                     <div className="grid gap-3.5">
-                        <Field label="Vision statement" span hint="a good life, in the person's words">
+                        <Field
+                            label="Vision statement"
+                            span
+                            hint="a good life, in the person's words"
+                        >
                             <Textarea
                                 value={eglVision}
                                 rows={3}
@@ -806,24 +1109,38 @@ export function CarePlanWizardDialog({
                             />
                         </Field>
                         <Field label="Guiding principles" span>
-                            <ChipMulti values={eglPrinciples} onChange={setEglPrinciples} options={EGL_PRINCIPLES} />
+                            <ChipMulti
+                                values={eglPrinciples}
+                                onChange={setEglPrinciples}
+                                options={EGL_PRINCIPLES}
+                            />
                         </Field>
                     </div>
-                    <div className="mt-5 mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <div className="mt-5 mb-2 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                         Funding & NASC
                     </div>
                     <div className="grid gap-3.5 sm:grid-cols-2">
                         <Field label="NASC organisation">
                             <Input
                                 value={funding.nasc_organisation}
-                                onChange={(e) => setFunding((p) => ({ ...p, nasc_organisation: e.target.value }))}
+                                onChange={(e) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        nasc_organisation: e.target.value,
+                                    }))
+                                }
                                 placeholder="e.g. NASC Wellington"
                             />
                         </Field>
                         <Field label="Needs assessment ref">
                             <Input
                                 value={funding.needs_assessment_ref}
-                                onChange={(e) => setFunding((p) => ({ ...p, needs_assessment_ref: e.target.value }))}
+                                onChange={(e) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        needs_assessment_ref: e.target.value,
+                                    }))
+                                }
                                 placeholder="Reference / package no."
                             />
                         </Field>
@@ -831,7 +1148,12 @@ export function CarePlanWizardDialog({
                             <Input
                                 type="date"
                                 value={funding.needs_assessment_date}
-                                onChange={(e) => setFunding((p) => ({ ...p, needs_assessment_date: e.target.value }))}
+                                onChange={(e) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        needs_assessment_date: e.target.value,
+                                    }))
+                                }
                             />
                         </Field>
                         <Field label="Allocated hours / week">
@@ -840,14 +1162,25 @@ export function CarePlanWizardDialog({
                                 min={0}
                                 step="0.5"
                                 value={funding.allocated_hours}
-                                onChange={(e) => setFunding((p) => ({ ...p, allocated_hours: e.target.value }))}
+                                onChange={(e) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        allocated_hours: e.target.value,
+                                    }))
+                                }
                                 placeholder="e.g. 20"
                             />
                         </Field>
                         <Field label="Linked service agreement" span>
                             <SelectInput
                                 value={funding.service_agreement_id || '__none'}
-                                onChange={(v) => setFunding((p) => ({ ...p, service_agreement_id: v === '__none' ? '' : v }))}
+                                onChange={(v) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        service_agreement_id:
+                                            v === '__none' ? '' : v,
+                                    }))
+                                }
                                 placeholder="Link a funding agreement…"
                                 options={agreementOptions}
                             />
@@ -856,7 +1189,12 @@ export function CarePlanWizardDialog({
                             <Textarea
                                 value={funding.funding_notes}
                                 rows={2}
-                                onChange={(e) => setFunding((p) => ({ ...p, funding_notes: e.target.value }))}
+                                onChange={(e) =>
+                                    setFunding((p) => ({
+                                        ...p,
+                                        funding_notes: e.target.value,
+                                    }))
+                                }
                                 placeholder="Anything else about funding or the needs assessment…"
                             />
                         </Field>
@@ -867,49 +1205,122 @@ export function CarePlanWizardDialog({
             {/* ----------------------------------------------------- review (create only) */}
             {stepKey === '__review' ? (
                 <WizardStepPane key="__review">
-                    <StepHead icon={CheckCircle2} title="Review & save" blurb="Check the plan — jump back to any step to edit." />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review & save"
+                        blurb="Check the plan — jump back to any step to edit."
+                    />
                     <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
                         <Ring pct={completeness} size={64} />
                         <div className="min-w-0">
-                            <div className="text-sm font-semibold">{str(title) || 'Untitled plan'}</div>
+                            <div className="text-sm font-semibold">
+                                {str(title) || 'Untitled plan'}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                {PLAN_TYPE_OPTIONS.find((o) => o.value === planType)?.label ?? planType} · {status}
+                                {PLAN_TYPE_OPTIONS.find(
+                                    (o) => o.value === planType,
+                                )?.label ?? planType}{' '}
+                                · {status}
                             </p>
                         </div>
                     </div>
                     <div className="space-y-3">
-                        <ReviewCard icon={ClipboardList} title="Plan basics" onEdit={() => setStepIndex(0)}>
-                            <ReviewRow label="Title" value={str(title) || undefined} />
-                            <ReviewRow label="Type" value={PLAN_TYPE_OPTIONS.find((o) => o.value === planType)?.label} />
-                            <ReviewRow label="Status" value={status} />
-                            <ReviewRow label="Dates" value={[opt(startsAt), opt(endsAt)].filter(Boolean).join(' → ') || undefined} />
-                            <ReviewRow label="Next review" value={opt(nextReviewAt)} />
-                        </ReviewCard>
-                        <ReviewCard icon={Heart} title="About me" onEdit={() => setStepIndex(1)}>
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Plan basics"
+                            onEdit={() => setStepIndex(0)}
+                        >
                             <ReviewRow
-                                label="Captured"
-                                value={ABOUT_FIELDS.filter((f) => str(aboutMe[f.key])).map((f) => f.label).join(' · ') || 'Nothing yet'}
+                                label="Title"
+                                value={str(title) || undefined}
+                            />
+                            <ReviewRow
+                                label="Type"
+                                value={
+                                    PLAN_TYPE_OPTIONS.find(
+                                        (o) => o.value === planType,
+                                    )?.label
+                                }
+                            />
+                            <ReviewRow label="Status" value={status} />
+                            <ReviewRow
+                                label="Dates"
+                                value={
+                                    [opt(startsAt), opt(endsAt)]
+                                        .filter(Boolean)
+                                        .join(' → ') || undefined
+                                }
+                            />
+                            <ReviewRow
+                                label="Next review"
+                                value={opt(nextReviewAt)}
                             />
                         </ReviewCard>
-                        <ReviewCard icon={LayoutGrid} title="Needs & risks" onEdit={() => setStepIndex(2)}>
+                        <ReviewCard
+                            icon={Heart}
+                            title="About me"
+                            onEdit={() => setStepIndex(1)}
+                        >
+                            <ReviewRow
+                                label="Captured"
+                                value={
+                                    ABOUT_FIELDS.filter((f) =>
+                                        str(aboutMe[f.key]),
+                                    )
+                                        .map((f) => f.label)
+                                        .join(' · ') || 'Nothing yet'
+                                }
+                            />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={LayoutGrid}
+                            title="Needs & risks"
+                            onEdit={() => setStepIndex(2)}
+                        >
                             <ReviewRow
                                 label="Support areas"
                                 value={
-                                    SUPPORT_NEED_OPTIONS.filter((o) => supportNeeds[o.key]).map((o) => o.label).join(', ') || undefined
+                                    SUPPORT_NEED_OPTIONS.filter(
+                                        (o) => supportNeeds[o.key],
+                                    )
+                                        .map((o) => o.label)
+                                        .join(', ') || undefined
                                 }
                             />
-                            <ReviewRow label="Risks noted" value={str(riskFactors) ? 'Yes' : undefined} />
-                        </ReviewCard>
-                        <ReviewCard icon={Target} title="Domains" onEdit={() => setStepIndex(3)}>
                             <ReviewRow
-                                label="Domains"
-                                value={domains.filter((d) => str(d.label)).map((d) => d.label).join(' · ') || 'None yet'}
+                                label="Risks noted"
+                                value={str(riskFactors) ? 'Yes' : undefined}
                             />
                         </ReviewCard>
-                        <ReviewCard icon={Compass} title="EGL & funding" onEdit={() => setStepIndex(4)}>
+                        <ReviewCard
+                            icon={Target}
+                            title="Domains"
+                            onEdit={() => setStepIndex(3)}
+                        >
+                            <ReviewRow
+                                label="Domains"
+                                value={
+                                    domains
+                                        .filter((d) => str(d.label))
+                                        .map((d) => d.label)
+                                        .join(' · ') || 'None yet'
+                                }
+                            />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={Compass}
+                            title="EGL & funding"
+                            onEdit={() => setStepIndex(4)}
+                        >
                             <ReviewRow label="Vision" value={opt(eglVision)} />
-                            <ReviewRow label="Principles" value={eglPrinciples.join(', ') || undefined} />
-                            <ReviewRow label="NASC" value={opt(funding.nasc_organisation)} />
+                            <ReviewRow
+                                label="Principles"
+                                value={eglPrinciples.join(', ') || undefined}
+                            />
+                            <ReviewRow
+                                label="NASC"
+                                value={opt(funding.nasc_organisation)}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>
@@ -926,7 +1337,9 @@ function ClientChip({ label }: { label: string }) {
             </span>
             <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{label}</div>
-                <div className="text-[11px] text-muted-foreground">Locked to the client you opened.</div>
+                <div className="text-[11px] text-muted-foreground">
+                    Locked to the client you opened.
+                </div>
             </div>
         </div>
     );

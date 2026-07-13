@@ -323,7 +323,7 @@ function RequestMiniCard({
     onView: (row: RespiteRequestRow) => void;
 }) {
     return (
-        <button
+        <Button unstyled
             type="button"
             onClick={() => onView(r)}
             className="w-full rounded-xl border border-border bg-card p-3 text-left transition-shadow hover:shadow-sm"
@@ -351,6 +351,6 @@ function RequestMiniCard({
                     {r.funding}
                 </div>
             ) : null}
-        </button>
+        </Button>
     );
 }

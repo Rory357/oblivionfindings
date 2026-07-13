@@ -7,6 +7,7 @@ import type { PaneCtx } from '../context';
 import { CountBadge, Empty, ViewToggle, type ChecklistView } from '../primitives';
 import { RunListRow, WorklistCard } from '../run-cards';
 import type { ChecklistRun } from '../types';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const GROUP_BG: Record<string, string> = {
     critical: 'bg-status-critical-bg text-status-critical',
@@ -62,9 +63,9 @@ export function DueNowPane({ ctx }: { ctx: PaneCtx }) {
                 <ViewToggle value={view} onChange={setView} />
             </div>
             {empty ? (
-                <div className="rounded-xl border border-border bg-card p-2 shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-2 shadow-sm">
                     <Empty Icon={Search} title="Nothing matches your search." sub="Try a different term or category." />
-                </div>
+                </GuardrailCard>
             ) : null}
             {groups.map((g) =>
                 g.items.length === 0 ? null : (
@@ -83,11 +84,11 @@ export function DueNowPane({ ctx }: { ctx: PaneCtx }) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                            <GuardrailCard unstyled className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                                 {g.items.map((r) => (
                                     <RunListRow key={r.id} run={r} />
                                 ))}
-                            </div>
+                            </GuardrailCard>
                         )}
                     </div>
                 ),

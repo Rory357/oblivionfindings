@@ -3,6 +3,7 @@ import {
     DisciplinaryCreateWizard,
     DisciplinaryEditWizard,
     type CaseOption,
+    type CaseIncidentOption,
     type CaseStaffOption,
     type DisciplinaryActionForm,
     type GoodFaithCheckOption,
@@ -29,12 +30,13 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Briefcase,
     Calendar,
     Clock,
+    ExternalLink,
     Plus,
     User,
     UserMinus,
@@ -90,7 +92,12 @@ type HrCasePayload = {
 type Props = {
     case: HrCasePayload;
     timeline: TimelineRow[];
-    can: { manage: boolean; disciplinary: boolean };
+    linkedIncidents: CaseIncidentOption[];
+    can: {
+        manage: boolean;
+        disciplinary: boolean;
+        view_incidents: boolean;
+    };
     staff: CaseStaffOption[];
     eventTypes: CaseOption[];
     actionTypes: CaseOption[];
@@ -228,6 +235,7 @@ const normalizeVisibility = (
 export default function HrCaseShow({
     case: hrCase,
     timeline,
+    linkedIncidents,
     can,
     staff,
     eventTypes,
@@ -534,6 +542,79 @@ export default function HrCaseShow({
                         </CardContent>
                     </Card>
                 </div>
+
+                {linkedIncidents.length > 0 ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <AlertTriangle className="h-5 w-5 text-status-warning" />
+                                Linked incidents
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                Read-only incident references. Health &amp;
+                                Safety remains the owner of these records.
+                            </p>
+                            <div className="divide-y rounded-lg border">
+                                {linkedIncidents.map((incident) => (
+                                    <div
+                                        key={incident.id}
+                                        className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-medium">
+                                                    {incident.reference}
+                                                </span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="capitalize"
+                                                >
+                                                    {incident.severity}
+                                                </Badge>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="capitalize"
+                                                >
+                                                    {incident.status.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                            </div>
+                                            <p className="mt-1 text-sm">
+                                                {incident.title}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {incident.client ??
+                                                    'Unknown client'}{' '}
+                                                ·{' '}
+                                                {formatDate(
+                                                    incident.occurred_at,
+                                                )}
+                                            </p>
+                                        </div>
+                                        {can.view_incidents ? (
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <Link
+                                                    href={`/incidents/${incident.id}`}
+                                                >
+                                                    Open in H&amp;S
+                                                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                                                </Link>
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 <Card>
                     <CardHeader>

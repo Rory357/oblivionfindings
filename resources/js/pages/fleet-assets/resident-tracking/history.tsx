@@ -230,7 +230,7 @@ export default function ResidentTrackingHistory({
     available_event_types,
     filters,
 }: Props) {
-    const safeLocations = locations ?? [];
+    const safeLocations = useMemo(() => locations ?? [], [locations]);
     const safeAvailableTypes = available_event_types ?? [];
     const availableSafetyTypes = SAFETY_EVENTS.filter((t) => safeAvailableTypes.includes(t));
 
@@ -444,7 +444,7 @@ export default function ResidentTrackingHistory({
                 />
 
                 {/* Header strip */}
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
+                <Card unstyled className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
                     <div className="flex items-center gap-3">
                         <img
                             src={client?.photo ?? '/images/avatar-placeholder.svg'}
@@ -512,7 +512,7 @@ export default function ResidentTrackingHistory({
                             </span>
                         </div>
                     )}
-                </div>
+                </Card>
 
                 {/* Summary line */}
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -598,13 +598,13 @@ export default function ResidentTrackingHistory({
                             <DropdownMenuLabel className="flex items-center justify-between">
                                 Event types
                                 {selectedEventTypes.length > 0 && (
-                                    <button
+                                    <Button unstyled
                                         type="button"
                                         onClick={handleClearEventTypes}
                                         className="text-[10px] text-muted-foreground hover:underline"
                                     >
                                         Clear
-                                    </button>
+                                    </Button>
                                 )}
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
@@ -638,7 +638,7 @@ export default function ResidentTrackingHistory({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <div className="flex flex-wrap items-center gap-1 rounded-md border bg-background p-1">
+                    <Card unstyled className="flex flex-wrap items-center gap-1 rounded-md border bg-background p-1">
                         <span className="px-2 text-xs font-medium text-muted-foreground">
                             Map pins
                         </span>
@@ -656,7 +656,7 @@ export default function ResidentTrackingHistory({
                                 {option.label}
                             </Button>
                         ))}
-                    </div>
+                    </Card>
 
                     <Button
                         variant="outline"
@@ -703,7 +703,7 @@ export default function ResidentTrackingHistory({
                                     onMarkerClick={handleMarkerClick}
                                 />
                             )}
-                            <button
+                            <Button unstyled
                                 type="button"
                                 onClick={() => setMapExpanded((v) => !v)}
                                 className="absolute right-3 top-3 z-[400] rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
@@ -714,7 +714,7 @@ export default function ResidentTrackingHistory({
                                 ) : (
                                     <Maximize2 className="h-3.5 w-3.5" />
                                 )}
-                            </button>
+                            </Button>
                         </CardContent>
                     </Card>
 
@@ -742,13 +742,13 @@ export default function ResidentTrackingHistory({
                                         <DropdownMenuLabel className="flex items-center justify-between">
                                             Timeline events
                                             {timelineEventTypes.length > 0 && (
-                                                <button
+                                                <Button unstyled
                                                     type="button"
                                                     onClick={handleTimelineClear}
                                                     className="text-[10px] text-muted-foreground hover:underline"
                                                 >
                                                     Clear
-                                                </button>
+                                                </Button>
                                             )}
                                         </DropdownMenuLabel>
                                         <DropdownMenuSeparator />
@@ -806,7 +806,7 @@ export default function ResidentTrackingHistory({
                                             const isLive = idx === 0;
                                             const isActive = activeLocationIdx === idx;
                                             return (
-                                                <button
+                                                <Button unstyled
                                                     key={`${location.timestamp}-${idx}`}
                                                     type="button"
                                                     data-location-idx={idx}
@@ -864,7 +864,7 @@ export default function ResidentTrackingHistory({
                                                             )}
                                                         </div>
                                                     </div>
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>

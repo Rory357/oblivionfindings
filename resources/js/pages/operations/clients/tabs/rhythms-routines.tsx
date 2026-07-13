@@ -18,6 +18,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type ClientRoutine = {
     id?: number;
@@ -154,7 +155,7 @@ export function RhythmsRoutinesTab({
 
     return (
         <div className="space-y-6">
-            <div className="rounded-lg border bg-card p-4">
+            <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 className="text-lg font-semibold">
@@ -169,7 +170,7 @@ export function RhythmsRoutinesTab({
                         {completed}/{blocks.length} complete
                     </Badge>
                 </div>
-            </div>
+            </GuardrailCard>
 
             <div className="grid gap-4 lg:grid-cols-2">
                 {blocks.map((block, index) => {

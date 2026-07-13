@@ -1,3 +1,5 @@
+import { router } from '@inertiajs/react';
+
 /**
  * Grouped two-tier navigation registry for the client profile redesign.
  *
@@ -89,13 +91,224 @@ export const CLIENT_TAB_GROUPS: ClientTabGroup[] = [
             'portal',
             'actions_reviews',
             'audit_history',
+            'privacy',
         ],
     },
 ];
 
+const CLIENT_TAB_ALIASES: Record<string, string> = {
+    support_plan: 'care_plans',
+};
+
+export function canonicalProfileTab(tabKey: string): string {
+    return CLIENT_TAB_ALIASES[tabKey] ?? tabKey;
+}
+
+export function updateClientProfileQuery(
+    values: Record<string, string | null>,
+    mode: 'push' | 'replace' = 'push',
+): void {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    Object.entries(values).forEach(([key, value]) => {
+        if (value === null) {
+            url.searchParams.delete(key);
+        } else {
+            url.searchParams.set(key, value);
+        }
+    });
+    const visit = {
+        url: `${url.pathname}${url.search}${url.hash}`,
+        preserveScroll: true,
+        preserveState: true,
+    };
+
+    if (mode === 'push') {
+        router.push(visit);
+    } else {
+        router.replace(visit);
+    }
+}
+
+export function resolveVisibleProfileTab(
+    requestedTab: string,
+    groups: Array<{ key: string; tabs: Array<{ key: string }> }>,
+): string {
+    const canonicalTab = canonicalProfileTab(requestedTab);
+    if (
+        groups.some((group) =>
+            group.tabs.some((tab) => tab.key === canonicalTab),
+        )
+    ) {
+        return canonicalTab;
+    }
+
+    const requestedGroup = groupForTab(canonicalTab);
+    return (
+        groups.find((group) => group.key === requestedGroup)?.tabs[0]?.key ??
+        groups[0]?.tabs[0]?.key ??
+        'profile'
+    );
+}
+
+export function profileDialogFromSearch(search: string): {
+    key: string;
+    ctx?: Record<string, unknown>;
+} | null {
+    const params = new URLSearchParams(search);
+    const key = params.get('dialog')?.trim();
+    if (!key) return null;
+
+    const record = params.get('record');
+    if (!record) return { key };
+
+    const recordId = Number(record);
+    return Number.isSafeInteger(recordId) && recordId > 0
+        ? { key, ctx: { recordId } }
+        : { key };
+}
+
+type ProfileDialogRecord = Record<string, unknown> & {
+    id: string | number;
+};
+
+export type ProfileDialogRecordSources = {
+    carePlans?: ProfileDialogRecord[];
+    dailyNotes?: ProfileDialogRecord[];
+    goals?: ProfileDialogRecord[];
+    risks?: ProfileDialogRecord[];
+    carePlanContext?: Record<string, unknown>;
+};
+
+function recordWithId(
+    records: ProfileDialogRecord[] | undefined,
+    recordId: number,
+): ProfileDialogRecord | undefined {
+    return records?.find((record) => Number(record.id) === recordId);
+}
+
+/**
+ * Turn a shareable `dialog` + `record` URL into the context expected by the
+ * matching in-profile dialog. Goal and ABC dialogs fetch their full detail
+ * from an id stub; collection-backed edit dialogs must resolve a record before
+ * opening so a stale link can never fall through into create mode.
+ */
+export function profileDialogStateFromSearch(
+    search: string,
+    sources: ProfileDialogRecordSources = {},
+): {
+    key: string;
+    ctx?: Record<string, unknown>;
+} | null {
+    const dialog = profileDialogFromSearch(search);
+    const recordId = dialog?.ctx?.recordId;
+    if (!dialog || typeof recordId !== 'number') return dialog;
+
+    if (dialog.key === 'goal') {
+        return {
+            ...dialog,
+            ctx: {
+                ...dialog.ctx,
+                goal: recordWithId(sources.goals, recordId) ?? {
+                    id: recordId,
+                },
+            },
+        };
+    }
+
+    if (dialog.key === 'abc') {
+        return {
+            ...dialog,
+            ctx: { ...dialog.ctx, entry: { id: recordId } },
+        };
+    }
+
+    if (dialog.key === 'emar') {
+        return {
+            ...dialog,
+            ctx: { ...dialog.ctx, medicationId: recordId },
+        };
+    }
+
+    if (dialog.key === 'care_plan') {
+        const plan = recordWithId(sources.carePlans, recordId);
+        if (!plan) return null;
+
+        return {
+            ...dialog,
+            ctx: {
+                ...dialog.ctx,
+                plan,
+                ...sources.carePlanContext,
+            },
+        };
+    }
+
+    if (dialog.key === 'daily_note' || dialog.key === 'comm_note') {
+        const note = recordWithId(sources.dailyNotes, recordId);
+        if (!note) return null;
+
+        return {
+            ...dialog,
+            ctx: { ...dialog.ctx, note },
+        };
+    }
+
+    if (dialog.key === 'edit_risk') {
+        const risk = recordWithId(sources.risks, recordId);
+        if (!risk) return null;
+
+        return {
+            ...dialog,
+            ctx: { ...dialog.ctx, risk },
+        };
+    }
+
+    return dialog;
+}
+
+export function profileDialogQuery(
+    key: string,
+    context?: Record<string, unknown>,
+): Record<string, string | null> {
+    const directId = context?.recordId ?? context?.id ?? context?.medicationId;
+    const nestedId = [
+        'record',
+        'goal',
+        'entry',
+        'plan',
+        'risk',
+        'asset',
+        'appointment',
+        'document',
+        'note',
+        'item',
+    ]
+        .map((name) => context?.[name])
+        .find(
+            (value): value is { id: string | number } =>
+                typeof value === 'object' &&
+                value !== null &&
+                'id' in value &&
+                ['string', 'number'].includes(typeof value.id),
+        )?.id;
+    const recordId = directId ?? nestedId;
+
+    return {
+        dialog: key,
+        record:
+            typeof recordId === 'string' || typeof recordId === 'number'
+                ? String(recordId)
+                : null,
+    };
+}
+
 export function groupForTab(tabKey: string): ClientTabGroupKey {
+    const canonicalTabKey = canonicalProfileTab(tabKey);
+
     for (const group of CLIENT_TAB_GROUPS) {
-        if (group.tabKeys.includes(tabKey)) {
+        if (group.tabKeys.includes(canonicalTabKey)) {
             return group.key;
         }
     }

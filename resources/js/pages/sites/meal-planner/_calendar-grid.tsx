@@ -73,6 +73,7 @@ import {
     type Resident,
     type WeekTemplate,
 } from './_helpers';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -262,9 +263,9 @@ function MealContextMenu({ entry, recipes, pos, onClose, onAction }: { entry: Pl
                 'sep' in it ? (
                     <div key={i} className="my-1 h-px bg-border" />
                 ) : (
-                    <button key={it.key} type="button" role="menuitem" onClick={() => { onAction(it.key, entry); onClose(); }} className={cn('flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-accent', it.danger ? 'text-status-critical hover:bg-status-critical-bg/60 focus-visible:bg-status-critical-bg/60' : 'text-foreground hover:bg-accent')}>
+                    <Button unstyled key={it.key} type="button" role="menuitem" onClick={() => { onAction(it.key, entry); onClose(); }} className={cn('flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-accent', it.danger ? 'text-status-critical hover:bg-status-critical-bg/60 focus-visible:bg-status-critical-bg/60' : 'text-foreground hover:bg-accent')}>
                         <it.icon className={cn('h-[15px] w-[15px]', it.danger ? 'text-status-critical' : 'text-muted-foreground')} aria-hidden="true" /> {it.label}
-                    </button>
+                    </Button>
                 ),
             )}
         </div>,
@@ -335,7 +336,7 @@ function MealCard({ entry, residents, recipes, focusResident, slot, dayLabel, on
 
     return (
         <div className="group/card relative">
-            <button
+            <Button unstyled
                 ref={cardRef}
                 type="button"
                 aria-label={cardLabel}
@@ -387,20 +388,20 @@ function MealCard({ entry, residents, recipes, focusResident, slot, dayLabel, on
                         {adHocAllergenAssignees.length > 0 && !unresolved && <span className="inline-flex items-center gap-0.5 rounded-full border border-status-warning/50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-status-warning"><ShieldAlert className="h-2.5 w-2.5" aria-hidden="true" />Check allergens</span>}
                     </div>
                 )}
-            </button>
+            </Button>
 
             {/* Quick-serve + overflow actions — siblings of the card button (no nested buttons). */}
             {canPlan && (
                 <div className={cn('absolute right-1 top-1 z-20 flex items-center gap-0.5 transition-opacity', served ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover/card:pointer-events-auto group-hover/card:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100')}>
-                    <button
+                    <Button unstyled
                         type="button"
                         aria-label={served ? `Mark ${name} not served` : `Mark ${name} served`}
                         onClick={(e) => { e.stopPropagation(); onAction('toggle-served', entry); }}
                         className={cn('flex h-6 w-6 items-center justify-center rounded-full border shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', served ? 'border-status-success bg-status-success text-white hover:opacity-90' : 'border-border bg-card text-muted-foreground hover:border-status-success hover:text-status-success')}
                     >
                         {served ? <RotateCcw className="h-3.5 w-3.5" /> : <CircleCheck className="h-3.5 w-3.5" />}
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                         type="button"
                         aria-label={`Actions for ${name}`}
                         aria-haspopup="menu"
@@ -408,7 +409,7 @@ function MealCard({ entry, residents, recipes, focusResident, slot, dayLabel, on
                         className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <MoreVertical className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                 </div>
             )}
             {hover && !menu && hoverRect && <MealHoverCard entry={entry} residents={residents} recipes={recipes} anchorRect={hoverRect} />}
@@ -493,7 +494,7 @@ function ResidentChip({ resident, entries, recipes, selected, dimmed, onToggle, 
 
     return (
         <div ref={ref} onMouseEnter={open} onMouseLeave={close} className={cn('group relative inline-flex items-center gap-1 rounded-full border py-1 pl-1 pr-2 transition-all', selected ? 'border-sites bg-sites-bg ring-1 ring-sites/40' : 'border-border bg-card hover:border-sites/50 hover:bg-sites-bg/40', dimmed && 'opacity-55')}>
-            <button
+            <Button unstyled
                 type="button"
                 onClick={onToggle}
                 aria-pressed={selected}
@@ -516,11 +517,11 @@ function ResidentChip({ resident, entries, recipes, selected, dimmed, onToggle, 
                         <span className="mt-0.5 flex items-center gap-1 text-[10px] leading-tight text-primary"><Soup className="h-2.5 w-2.5" /> IDDSI {r.texture.level}</span>
                     )}
                 </span>
-            </button>
+            </Button>
             {canEdit && (
-                <button type="button" onClick={(e) => { e.stopPropagation(); close(); onEdit(); }} aria-label={`Edit ${r.name}'s dietary profile`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-70 transition-all hover:bg-card hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100">
+                <Button unstyled type="button" onClick={(e) => { e.stopPropagation(); close(); onEdit(); }} aria-label={`Edit ${r.name}'s dietary profile`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-70 transition-all hover:bg-card hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100">
                     <Pencil className="h-3.5 w-3.5" />
-                </button>
+                </Button>
             )}
             {hover && hoverRect && <ResidentHoverCard resident={r} entries={entries} recipes={recipes} anchorRect={hoverRect} />}
         </div>
@@ -580,9 +581,9 @@ function ResidentEditDialog({ siteId, resident, dietaryTags, iddsiLevels, onClos
                             {allergenTags.map((a) => {
                                 const sel = tagIds.includes(a.id);
                                 return (
-                                    <button key={a.id} type="button" onClick={() => toggle(a.id)} className={cn('rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors', sel ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border bg-card text-muted-foreground hover:bg-accent')}>
+                                    <Button unstyled key={a.id} type="button" onClick={() => toggle(a.id)} className={cn('rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors', sel ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border bg-card text-muted-foreground hover:bg-accent')}>
                                         {sel && <Check className="mr-0.5 inline h-3 w-3" />}{a.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                             {allergenTags.length === 0 && <span className="text-xs text-muted-foreground">No allergen tags configured.</span>}
@@ -594,9 +595,9 @@ function ResidentEditDialog({ siteId, resident, dietaryTags, iddsiLevels, onClos
                             {dietaryTagOpts.map((d) => {
                                 const sel = tagIds.includes(d.id);
                                 return (
-                                    <button key={d.id} type="button" onClick={() => toggle(d.id)} className={cn('rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors', sel ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent')}>
+                                    <Button unstyled key={d.id} type="button" onClick={() => toggle(d.id)} className={cn('rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors', sel ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent')}>
                                         {sel && <Check className="mr-0.5 inline h-3 w-3" />}{d.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -673,29 +674,29 @@ function WeekActionsMenu({ templates, onRepeatLast, onCopyNext, onApplyTemplate,
             </Button>
             {open && (
                 <div ref={menuRef} role="menu" aria-label="Plan week actions" onKeyDown={onMenuKeyDown} className="animate-pop absolute left-0 z-50 mt-1.5 w-[248px] overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-float">
-                    <button type="button" role="menuitem" onClick={() => { onRepeatLast(); close(false); }} className={item}><History className="h-[15px] w-[15px] text-muted-foreground" /> Repeat last week</button>
-                    <button type="button" role="menuitem" onClick={() => { onCopyNext(); close(false); }} className={item}><ArrowRightToLine className="h-[15px] w-[15px] text-muted-foreground" /> Copy to next week</button>
+                    <Button unstyled type="button" role="menuitem" onClick={() => { onRepeatLast(); close(false); }} className={item}><History className="h-[15px] w-[15px] text-muted-foreground" /> Repeat last week</Button>
+                    <Button unstyled type="button" role="menuitem" onClick={() => { onCopyNext(); close(false); }} className={item}><ArrowRightToLine className="h-[15px] w-[15px] text-muted-foreground" /> Copy to next week</Button>
                     <div className="relative">
-                        <button type="button" role="menuitem" aria-expanded={sub} onClick={() => setSub((v) => !v)} className="flex w-full items-center justify-between gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none">
+                        <Button unstyled type="button" role="menuitem" aria-expanded={sub} onClick={() => setSub((v) => !v)} className="flex w-full items-center justify-between gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none">
                             <span className="flex items-center gap-2.5"><LayoutTemplate className="h-[15px] w-[15px] text-muted-foreground" /> Apply a template</span>
                             {sub ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                        </button>
+                        </Button>
                         {sub && (
                             <div className="ml-3 border-l border-border pl-1">
                                 {templates.length === 0 && <div className="px-2.5 py-1.5 text-[11.5px] text-muted-foreground">No templates yet.</div>}
                                 {templates.map((t) => (
-                                    <button key={t.id} type="button" role="menuitem" onClick={() => { onApplyTemplate(t); close(false); }} className="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none">
+                                    <Button unstyled key={t.id} type="button" role="menuitem" onClick={() => { onApplyTemplate(t); close(false); }} className="flex w-full flex-col rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none">
                                         <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
                                         {t.description && <span className="text-[10.5px] text-muted-foreground">{t.description}</span>}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         )}
                     </div>
                     <div className="my-1 h-px bg-border" />
-                    <button type="button" role="menuitem" onClick={() => { onManage(); close(false); }} className={item}><LayoutTemplate className="h-[15px] w-[15px] text-muted-foreground" /> Manage templates &amp; budget…</button>
+                    <Button unstyled type="button" role="menuitem" onClick={() => { onManage(); close(false); }} className={item}><LayoutTemplate className="h-[15px] w-[15px] text-muted-foreground" /> Manage templates &amp; budget…</Button>
                     <div className="my-1 h-px bg-border" />
-                    <button type="button" role="menuitem" onClick={() => { onClear(); close(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium text-status-critical transition-colors hover:bg-status-critical-bg/60 focus-visible:bg-status-critical-bg/60 focus-visible:outline-none"><Eraser className="h-[15px] w-[15px]" /> Clear this week</button>
+                    <Button unstyled type="button" role="menuitem" onClick={() => { onClear(); close(false); }} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium text-status-critical transition-colors hover:bg-status-critical-bg/60 focus-visible:bg-status-critical-bg/60 focus-visible:outline-none"><Eraser className="h-[15px] w-[15px]" /> Clear this week</Button>
                 </div>
             )}
         </div>
@@ -788,7 +789,7 @@ export function OverridesDialog({ entries, residents, recipes, onOpenEntry, onCl
                         const { hard } = conflictsFor(e, residents, recipes);
                         const dateLabel = new Date(e.plan_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
                         return (
-                            <button key={e.id} type="button" onClick={() => { onOpenEntry(e); onClose(); }} className="w-full rounded-lg border border-amberx/30 bg-amberx-bg/40 p-3 text-left transition-colors hover:bg-amberx-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <Button unstyled key={e.id} type="button" onClick={() => { onOpenEntry(e); onClose(); }} className="w-full rounded-lg border border-amberx/30 bg-amberx-bg/40 p-3 text-left transition-colors hover:bg-amberx-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="text-[13.5px] font-semibold text-foreground">{entryDisplayName(e, recipes)}</span>
                                     <span className="shrink-0 text-[11.5px] text-muted-foreground">{dateLabel} · {SLOT_LABEL[e.meal_slot]}</span>
@@ -796,7 +797,7 @@ export function OverridesDialog({ entries, residents, recipes, onOpenEntry, onCl
                                 {hard.length > 0 && <div className="mt-0.5 text-[11.5px] font-medium text-status-critical">{hard.map((h) => `${firstName(h.resident.name)} (${h.matches.join(', ')})`).join('; ')}</div>}
                                 {e.allergen_override_reason && <div className="mt-1 text-[12px] italic text-foreground">&ldquo;{e.allergen_override_reason}&rdquo;</div>}
                                 {e.allergen_override_by && e.allergen_override_at && <div className="mt-0.5 text-[11px] text-muted-foreground">Approved by {e.allergen_override_by.name} · {new Date(e.allergen_override_at).toLocaleString('en-NZ')}</div>}
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>
@@ -1134,7 +1135,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
-                <div className="flex items-center gap-5 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                <GuardrailCard unstyled className="flex items-center gap-5 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                     <div className="shrink-0">
                         <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plan completeness</div>
                         <div className="mt-0.5 flex items-baseline gap-1.5">
@@ -1156,8 +1157,8 @@ export default function CalendarGrid(props: CalendarGridProps) {
                             );
                         })}
                     </div>
-                </div>
-                <div className="flex min-w-[280px] flex-col justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                </GuardrailCard>
+                <GuardrailCard unstyled className="flex min-w-[280px] flex-col justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><DollarSign className="h-3.5 w-3.5" /> Food budget</span>
                         {budgetCents != null && <span className={cn('text-[11px] font-semibold', budgetText)}>{budgetPct}% used</span>}
@@ -1168,9 +1169,9 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                 <span className="text-2xl font-bold tabular-nums text-foreground">{money(weekTotal)}</span>
                                 <span className="text-[12px] text-muted-foreground">planned this week</span>
                             </div>
-                            <button type="button" onClick={props.onOpenSettings} className="inline-flex w-fit items-center gap-1.5 rounded-md border border-dashed border-border px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <Button unstyled type="button" onClick={props.onOpenSettings} className="inline-flex w-fit items-center gap-1.5 rounded-md border border-dashed border-border px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <Info className="h-3.5 w-3.5" /> Set a weekly budget
-                            </button>
+                            </Button>
                         </>
                     ) : (
                         <>
@@ -1190,18 +1191,18 @@ export default function CalendarGrid(props: CalendarGridProps) {
                     {(props.cookCostCents > 0 || props.takeawayCostCents > 0) && (
                         <div className="text-[11.5px] text-muted-foreground">{money(props.cookCostCents)} cooked · {money(props.takeawayCostCents)} takeaway</div>
                     )}
-                </div>
+                </GuardrailCard>
             </div>
 
             {residents.length > 0 && (
-                <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                <GuardrailCard unstyled className="flex flex-col gap-2.5 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             <Users className="h-3.5 w-3.5" /> Residents
                             <span className="font-normal normal-case tracking-normal text-muted-foreground/80">— tap to spotlight their meals</span>
                         </span>
                         {focusResident && (
-                            <button type="button" onClick={() => setFocusId(null)} className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:bg-accent"><X className="h-3 w-3" /> Clear spotlight</button>
+                            <Button unstyled type="button" onClick={() => setFocusId(null)} className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:bg-accent"><X className="h-3 w-3" /> Clear spotlight</Button>
                         )}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1220,7 +1221,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
                             )}
                         </div>
                     )}
-                </div>
+                </GuardrailCard>
             )}
 
             {residents.length === 0 && (
@@ -1231,7 +1232,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
             )}
 
             {!weekHasMeals && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center">
+                <GuardrailCard unstyled className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center">
                     <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sites-bg text-sites-deep"><CalendarPlus className="h-7 w-7" /></span>
                     <div>
                         <div className="text-[15px] font-semibold text-foreground">No meals planned this week</div>
@@ -1243,10 +1244,10 @@ export default function CalendarGrid(props: CalendarGridProps) {
                             <Button size="sm" variant="outline" onClick={() => copyWeek(-7, 0)}><History className="mr-1.5 h-[15px] w-[15px]" /> Repeat last week</Button>
                         </div>
                     )}
-                </div>
+                </GuardrailCard>
             )}
 
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 <div className="nice-scroll overflow-x-auto">
                     <div className="min-w-[940px]">
                         <div className="grid grid-cols-[132px_repeat(7,1fr)] border-b border-border bg-muted/40">
@@ -1312,9 +1313,9 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                                     ))}
                                                 </div>
                                                 {canPlan && (
-                                                    <button type="button" onClick={() => props.onCellClick(di, slot)} aria-label={`Add ${SLOT_LABEL[slot]} for ${DAY_FULL[di2]} ${d.getDate()}/${d.getMonth() + 1}`} className={cn('mt-1.5 flex min-h-6 w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-1 text-[11px] font-medium text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', cellEntries.length === 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}>
+                                                    <Button unstyled type="button" onClick={() => props.onCellClick(di, slot)} aria-label={`Add ${SLOT_LABEL[slot]} for ${DAY_FULL[di2]} ${d.getDate()}/${d.getMonth() + 1}`} className={cn('mt-1.5 flex min-h-6 w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-1 text-[11px] font-medium text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', cellEntries.length === 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}>
                                                         <Plus className="h-3 w-3" /> Add
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         );
@@ -1324,7 +1325,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
                         })}
                     </div>
                 </div>
-            </div>
+            </GuardrailCard>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11.5px] text-muted-foreground">
                 <span className="font-medium text-foreground">Legend</span>

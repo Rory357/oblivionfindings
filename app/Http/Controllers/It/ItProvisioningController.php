@@ -19,6 +19,7 @@ use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
+use App\Support\It\BusinessHours;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -86,6 +87,7 @@ class ItProvisioningController extends Controller
             // wizard reads them for its live "resolution due …" preview. Only
             // editing them is admin-gated (can.edit_sla drives the editor button).
             'slaPolicies' => $this->slaPolicyGrid($tenantId),
+            'slaCalendar' => $this->slaCalendar($tenantId),
             'overview' => $this->overview($tenantId),
             'kbArticles' => $this->kbArticles($tenantId),
         ] : [];
@@ -116,17 +118,50 @@ class ItProvisioningController extends Controller
         $user = $request->user();
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        // Build the tenant-wide calendar once (null = 24/7) and stamp it onto
+        // every priority row — "apply to all policies".
+        [$businessHours, $holidayDates] = $this->calendarFromRequest($request);
+
         foreach (ItTicket::PRIORITIES as $priority) {
             ItSlaPolicy::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'priority' => $priority],
                 [
                     'first_response_minutes' => (int) $request->validated("{$priority}.first_response_minutes"),
                     'resolution_minutes' => (int) $request->validated("{$priority}.resolution_minutes"),
+                    'business_hours' => $businessHours,
+                    'holiday_dates' => $holidayDates,
                 ],
             );
         }
 
         return redirect()->back()->with('success', 'SLA targets updated — new tickets pick them up immediately.');
+    }
+
+    /**
+     * Turn the editor's calendar fields into a [business_hours, holiday_dates]
+     * pair — a per-weekday window map + holiday list — or [null, null] for the
+     * 24/7 clock.
+     *
+     * @return array{0: array<string, array<int, array{0: string, 1: string}>>|null, 1: array<int, string>|null}
+     */
+    private function calendarFromRequest(UpdateSlaPoliciesRequest $request): array
+    {
+        if (! $request->boolean('business_hours_enabled')) {
+            return [null, null];
+        }
+
+        $window = [[(string) $request->validated('open_time'), (string) $request->validated('close_time')]];
+        $days = (array) $request->validated('working_days');
+        $businessHours = [];
+        foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $day) {
+            $businessHours[$day] = in_array($day, $days, true) ? $window : [];
+        }
+
+        $holidayDates = array_values(array_unique(array_filter(
+            (array) ($request->validated('holiday_dates') ?? []),
+        )));
+
+        return [$businessHours, $holidayDates];
     }
 
     /**
@@ -154,6 +189,54 @@ class ItProvisioningController extends Controller
         }
 
         return $grid;
+    }
+
+    /**
+     * The current tenant calendar for the editor, flattened to the single-
+     * window/working-days view the UI edits. Falls back to disabled (Mon–Fri
+     * 08:00–17:00 presets) when the tenant runs 24/7.
+     *
+     * @return array{enabled: bool, open_time: string, close_time: string, working_days: array<int, string>, holiday_dates: array<int, string>}
+     */
+    private function slaCalendar(int $tenantId): array
+    {
+        $row = ItSlaPolicy::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('business_hours')
+            ->first();
+
+        $fallback = [
+            'enabled' => false,
+            'open_time' => '08:00',
+            'close_time' => '17:00',
+            'working_days' => ['mon', 'tue', 'wed', 'thu', 'fri'],
+            'holiday_dates' => [],
+        ];
+
+        if (! $row || ! BusinessHours::hasWindows(['business_hours' => $row->business_hours])) {
+            return $fallback;
+        }
+
+        $hours = $row->business_hours;
+        $workingDays = [];
+        $open = $fallback['open_time'];
+        $close = $fallback['close_time'];
+        foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $day) {
+            $windows = $hours[$day] ?? [];
+            if (! empty($windows) && isset($windows[0][0], $windows[0][1])) {
+                $workingDays[] = $day;
+                $open = (string) $windows[0][0];
+                $close = (string) $windows[0][1];
+            }
+        }
+
+        return [
+            'enabled' => true,
+            'open_time' => $open,
+            'close_time' => $close,
+            'working_days' => $workingDays,
+            'holiday_dates' => array_values((array) ($row->holiday_dates ?? [])),
+        ];
     }
 
     /* ================================================================== */
@@ -602,6 +685,7 @@ class ItProvisioningController extends Controller
             'asset_id' => $assetId,
             'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
+            'requires_approval' => ItTicket::categoryNeedsApproval($validated['category']),
             'subcategory' => $subcategory,
             'priority' => $validated['priority'],
             'source' => $isAgent ? 'agent' : 'portal',
@@ -661,6 +745,12 @@ class ItProvisioningController extends Controller
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
         ]);
+
+        // §P-S3: block a status→resolved move until approval is signed off.
+        if (($validated['status'] ?? null) === 'resolved'
+            && $ticket->requires_approval && $ticket->approvalState() !== 'approved') {
+            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
+        }
 
         $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
         $update = $validated;
@@ -724,6 +814,11 @@ class ItProvisioningController extends Controller
 
         if (in_array($ticket->status, ['resolved', 'closed'], true)) {
             return redirect()->back()->with('error', 'This ticket is already resolved.');
+        }
+
+        // §P-S3: an approval-category ticket can't be resolved until signed off.
+        if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
+            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
         }
 
         // The resolution note is the final PUBLIC reply — "what fixed it"

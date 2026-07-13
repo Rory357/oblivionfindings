@@ -3,10 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Domain\It\ItStaffDirectory;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketSlaNotification;
+use App\Support\It\BusinessHours;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -140,11 +142,21 @@ class CheckItSlaStates extends Command
             return ['breached', $clock, $due];
         }
 
-        // Timestamp arithmetic on purpose — Carbon diff signs have bitten
-        // this codebase before; seconds don't lie.
-        $windowSeconds = $due->getTimestamp() - $ticket->created_at->getTimestamp();
-        $remainingSeconds = $due->getTimestamp() - $now->getTimestamp();
-        if ($windowSeconds > 0 && $remainingSeconds <= $windowSeconds * self::AT_RISK_THRESHOLD) {
+        // At-risk fires once the SLA window is ~75% spent. With a business-
+        // hours calendar we measure the WORKING slice of the window (else a
+        // Friday ticket trips at-risk over the weekend when nobody is on
+        // shift); without one it stays wall-clock seconds — the unchanged
+        // 24/7 path. Timestamp/working-minute arithmetic on purpose: Carbon
+        // diff signs have bitten this codebase before.
+        $calendar = ItSlaPolicy::calendarFor((int) $ticket->tenant_id, (string) $ticket->priority);
+        if ($calendar !== null) {
+            $window = BusinessHours::workingMinutesBetween($ticket->created_at, $due, $calendar);
+            $remaining = BusinessHours::workingMinutesBetween($now, $due, $calendar);
+        } else {
+            $window = $due->getTimestamp() - $ticket->created_at->getTimestamp();
+            $remaining = $due->getTimestamp() - $now->getTimestamp();
+        }
+        if ($window > 0 && $remaining <= $window * self::AT_RISK_THRESHOLD) {
             return ['at_risk', $clock, $due];
         }
 

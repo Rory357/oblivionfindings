@@ -8,19 +8,21 @@ use App\Http\Controllers\Controller;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Services\Client\BehaviourAbcService;
+use App\Services\Clients\ClientProfileSectionAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
  * Structured ABC (Antecedent–Behaviour–Consequence) records for the client
- * profile Behaviour / ABC tab. Reads are gated by the client `view` policy;
- * writes reuse the existing `clinical.events.record` permission (no new
- * permission ⇒ no seeder run on deploy).
+ * profile Behaviour / ABC tab. Reads require the client `view` policy plus
+ * canonical behaviour access. Creation uses `clinical.events.record`, while
+ * corrections and removal use `clinical.observations.correct`.
  */
 class BehaviourAbcController extends Controller
 {
     public function __construct(
         protected BehaviourAbcService $service,
+        protected ClientProfileSectionAccess $sectionAccess,
     ) {}
 
     /**
@@ -29,6 +31,7 @@ class BehaviourAbcController extends Controller
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+        $this->ensureCanView($request, $client);
 
         $entries = BehaviourAbcEntry::query()
             ->forClient($client->id)
@@ -67,6 +70,7 @@ class BehaviourAbcController extends Controller
     public function show(Request $request, Client $client, BehaviourAbcEntry $abc)
     {
         $this->authorize('view', $client);
+        $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
 
         $abc->load(['recorder:id,name', 'carePlan:id,title', 'followupCompleter:id,name']);
@@ -77,8 +81,9 @@ class BehaviourAbcController extends Controller
     public function update(Request $request, Client $client, BehaviourAbcEntry $abc)
     {
         $this->authorize('view', $client);
+        $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
-        $this->ensureCanRecord($request);
+        $this->ensureCanCorrect($request);
 
         $validated = $this->validatePayload($request, $client, isUpdate: true);
 
@@ -94,8 +99,9 @@ class BehaviourAbcController extends Controller
     public function destroy(Request $request, Client $client, BehaviourAbcEntry $abc)
     {
         $this->authorize('view', $client);
+        $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
-        $this->ensureCanRecord($request);
+        $this->ensureCanCorrect($request);
 
         $abc->delete();
 
@@ -111,6 +117,23 @@ class BehaviourAbcController extends Controller
     private function ensureCanRecord(Request $request): void
     {
         abort_unless((bool) $request->user()?->canDo('clinical.events.record'), 403);
+    }
+
+    private function ensureCanView(Request $request, Client $client): void
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && $this->sectionAccess->canViewBehaviour($user, $client),
+            403,
+        );
+    }
+
+    private function ensureCanCorrect(Request $request): void
+    {
+        abort_unless(
+            (bool) $request->user()?->canDo('clinical.observations.correct'),
+            403,
+        );
     }
 
     /**

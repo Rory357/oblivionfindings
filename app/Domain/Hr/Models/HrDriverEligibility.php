@@ -11,9 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrDriverEligibility extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $table = 'hr_driver_eligibility';
+
+    public const LICENCE_CLASSES = ['1', '2', '3', '4', '5', '6'];
+
+    public const LICENCE_ENDORSEMENTS = ['P', 'V', 'I', 'O', 'F', 'D', 'T', 'R', 'W'];
 
     protected $fillable = [
         'tenant_id',
@@ -22,6 +26,7 @@ class HrDriverEligibility extends Model
         'licence_class',
         'licence_endorsements',
         'licence_expires_at',
+        'licence_expiry_reminder_sent_at',
         'licence_document_path',
         'can_drive_clients',
         'can_drive_clients_approved_by',
@@ -39,6 +44,7 @@ class HrDriverEligibility extends Model
     protected $casts = [
         'licence_endorsements' => 'array',
         'licence_expires_at' => 'date',
+        'licence_expiry_reminder_sent_at' => 'datetime',
         'can_drive_clients' => 'boolean',
         'can_drive_clients_approved_at' => 'datetime',
         'incident_free_since' => 'date',
@@ -47,7 +53,7 @@ class HrDriverEligibility extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -61,7 +67,7 @@ class HrDriverEligibility extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

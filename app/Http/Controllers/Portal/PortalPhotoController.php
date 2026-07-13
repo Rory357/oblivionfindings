@@ -6,34 +6,45 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientPhoto;
 use App\Models\FamilyPortalSetting;
-use App\Models\TimelineEvent;
 use App\Services\AuditLogger;
+use App\Services\Clients\ClientPhotoMediaUrls;
+use App\Services\Clients\ClientPhotoStorage;
+use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class PortalPhotoController extends Controller
 {
+    public function __construct(
+        private readonly ClientPhotoMediaUrls $mediaUrls,
+        private readonly ClientPhotoStorage $photoStorage,
+    ) {}
+
     public function index(Request $request, Client $client)
     {
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $canViewSharedPhotos = app(PortalClientSectionAccess::class)
+            ->for($user, $client)['has_family_information_consent'];
 
         $photos = ClientPhoto::where('client_id', $client->id)
             ->approved()
             ->visibleToFamily()
+            ->when(! $canViewSharedPhotos, fn ($query) => $query->where('uploaded_by_user_id', $user->id))
             ->with('uploadedBy:id,name')
             ->orderByDesc('created_at')
             ->paginate(24)
-            ->through(fn ($photo) => [
-                'id' => $photo->id,
-                'url' => $photo->storage_path ? Storage::disk('public')->url($photo->storage_path) : null,
-                'thumbnail_url' => $photo->thumbnail_path ? Storage::disk('public')->url($photo->thumbnail_path) : null,
-                'caption' => $photo->caption,
-                'tags' => $photo->tags,
-                'created_at' => $photo->created_at?->toISOString(),
-                'uploaded_by_name' => $photo->uploadedBy?->name,
-            ]);
+            ->through(function (ClientPhoto $photo): array {
+                return [
+                    'id' => $photo->id,
+                    ...$this->mediaUrls->portal($photo),
+                    'caption' => $photo->caption,
+                    'tags' => $photo->tags,
+                    'created_at' => $photo->created_at?->toISOString(),
+                    'uploaded_by_name' => $photo->uploadedBy?->name,
+                ];
+            });
 
         $portalSettings = FamilyPortalSetting::where('client_id', $client->id)->first();
 
@@ -62,74 +73,13 @@ class PortalPhotoController extends Controller
         abort_unless($uploadsAllowed, 403, 'Photo uploads are not enabled for this client.');
 
         $validated = $request->validate([
-            'photo' => 'required|image|max:10240',
-            'caption' => 'nullable|string|max:500',
-            'tags' => 'nullable|array',
+            'photo' => ['required', 'file', 'max:10240', 'mimes:jpg,jpeg,png,gif,webp'],
+            'caption' => ['nullable', 'string', 'max:500'],
+            'tags' => ['nullable', 'array'],
         ]);
 
         $file = $request->file('photo');
-        $directory = "client-photos/{$client->id}";
-        $thumbDirectory = "client-photos/{$client->id}/thumbs";
-
-        // Store the original photo
-        $storagePath = $file->store($directory, 'public');
-
-        // Create thumbnail using GD
-        $thumbnailPath = null;
-        $fullPath = Storage::disk('public')->path($storagePath);
-
-        if (file_exists($fullPath)) {
-            $imageInfo = getimagesize($fullPath);
-
-            if ($imageInfo !== false) {
-                $sourceImage = match ($imageInfo[2]) {
-                    IMAGETYPE_JPEG => imagecreatefromjpeg($fullPath),
-                    IMAGETYPE_PNG => imagecreatefrompng($fullPath),
-                    IMAGETYPE_GIF => imagecreatefromgif($fullPath),
-                    IMAGETYPE_WEBP => imagecreatefromwebp($fullPath),
-                    default => null,
-                };
-
-                if ($sourceImage) {
-                    $origWidth = imagesx($sourceImage);
-                    $origHeight = imagesy($sourceImage);
-                    $maxDim = 400;
-
-                    if ($origWidth > $maxDim || $origHeight > $maxDim) {
-                        $ratio = min($maxDim / $origWidth, $maxDim / $origHeight);
-                        $newWidth = (int) round($origWidth * $ratio);
-                        $newHeight = (int) round($origHeight * $ratio);
-                    } else {
-                        $newWidth = $origWidth;
-                        $newHeight = $origHeight;
-                    }
-
-                    $thumbnail = imagecreatetruecolor($newWidth, $newHeight);
-
-                    // Preserve transparency for PNG/GIF
-                    if (in_array($imageInfo[2], [IMAGETYPE_PNG, IMAGETYPE_GIF], true)) {
-                        imagealphablending($thumbnail, false);
-                        imagesavealpha($thumbnail, true);
-                        $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
-                        imagefilledrectangle($thumbnail, 0, 0, $newWidth, $newHeight, $transparent);
-                    }
-
-                    imagecopyresampled($thumbnail, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
-
-                    // Ensure thumbs directory exists
-                    Storage::disk('public')->makeDirectory($thumbDirectory);
-
-                    $thumbFilename = pathinfo($storagePath, PATHINFO_FILENAME) . '_thumb.jpg';
-                    $thumbnailPath = "{$thumbDirectory}/{$thumbFilename}";
-                    $thumbFullPath = Storage::disk('public')->path($thumbnailPath);
-
-                    imagejpeg($thumbnail, $thumbFullPath, 85);
-
-                    imagedestroy($sourceImage);
-                    imagedestroy($thumbnail);
-                }
-            }
-        }
+        $stored = $this->photoStorage->store($file, $client);
 
         $requiresApproval = $portalSettings ? $portalSettings->require_photo_approval : false;
         $status = $requiresApproval ? 'pending_approval' : 'approved';
@@ -137,8 +87,7 @@ class PortalPhotoController extends Controller
         $photo = ClientPhoto::create([
             'client_id' => $client->id,
             'uploaded_by_user_id' => $user->id,
-            'storage_path' => $storagePath,
-            'thumbnail_path' => $thumbnailPath,
+            ...$stored,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
             'size_bytes' => $file->getSize(),
@@ -148,7 +97,7 @@ class PortalPhotoController extends Controller
             'status' => $status,
         ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => ClientPhoto::class,
             'source_id' => $photo->id,
             'occurred_at' => now(),

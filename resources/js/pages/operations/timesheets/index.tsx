@@ -54,6 +54,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -160,7 +161,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
 
     return (
         <div className="pointer-events-none fixed z-40" style={{ left, top, width: W }}>
-            <div className="pointer-events-auto overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-black/5">
+            <GuardrailCard unstyled className="pointer-events-auto overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-black/5">
                 <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                     <div className="min-w-0">
                         <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Timesheet #{t.id}</div>
@@ -220,7 +221,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                    className={cn('h-full rounded-full', taskPct === 100 ? 'bg-status-success' : 'bg-primary')}
                                     style={{ width: taskPct + '%' }}
                                 />
                             </div>
@@ -233,7 +234,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
                         </div>
                     </div>
                     {t.status === 'returned' && t.returned_notes ? (
-                        <div className="flex items-start gap-1.5 rounded-md bg-rose-50 px-2 py-1.5 text-[11.5px] text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                                <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-[11.5px] text-status-critical">
                             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                             <span>{t.returned_notes}</span>
                         </div>
@@ -242,7 +243,7 @@ function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } |
                 <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-[10.5px] text-muted-foreground">
                     Click to open · right-click for actions
                 </div>
-            </div>
+            </GuardrailCard>
         </div>
     );
 }
@@ -344,7 +345,7 @@ function ContextMenu({
     };
 
     return (
-        <div
+        <GuardrailCard unstyled
             ref={ref}
             role="menu"
             className="fixed z-[60] w-[260px] overflow-hidden rounded-xl border border-border bg-card py-1.5 shadow-2xl ring-1 ring-black/5"
@@ -367,7 +368,7 @@ function ContextMenu({
                 if (it.separator) return <div key={'s' + i} className="my-1 h-px bg-border" />;
                 const Ic = it.icon;
                 return (
-                    <button
+                    <Button unstyled
                         key={i}
                         onClick={() => {
                             if (it.id) onAction(it.id, row);
@@ -381,10 +382,10 @@ function ContextMenu({
                     >
                         {Ic ? <Ic className="h-3.5 w-3.5 opacity-80" /> : null}
                         <span className="flex-1 truncate">{it.label}</span>
-                    </button>
+                    </Button>
                 );
             })}
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -741,7 +742,7 @@ export default function TimesheetsIndex({
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                             <div
-                                                                className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                                                className={cn('h-full rounded-full', taskPct === 100 ? 'bg-status-success' : 'bg-primary')}
                                                                 style={{ width: taskPct + '%' }}
                                                             />
                                                         </div>
@@ -758,15 +759,15 @@ export default function TimesheetsIndex({
                                             </td>
                                             <td className="py-3 pr-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="inline-flex items-center gap-1">
-                                                    <button
+                                                    <Button unstyled
                                                         onClick={() => setViewing(t)}
                                                         aria-label="View timesheet"
                                                         title="View timesheet"
                                                         className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button unstyled
                                                         onClick={(e) => {
                                                             const r = e.currentTarget.getBoundingClientRect();
                                                             setMenu({ x: r.right, y: r.bottom, row: t });
@@ -776,7 +777,7 @@ export default function TimesheetsIndex({
                                                         className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                                     >
                                                         <MoreHorizontal className="h-3.5 w-3.5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -786,7 +787,7 @@ export default function TimesheetsIndex({
                         </table>
                         {rows.length === 0 ? (
                             <div className="grid place-items-center px-6 py-14 text-center text-muted-foreground">
-                                <Sun className="mb-2 h-8 w-8 text-amber-400" />
+                                    <Sun className="mb-2 h-8 w-8 text-status-warning" />
                                 <div className="text-sm font-medium text-foreground">No timesheets in this tab</div>
                                 <div className="text-xs">Try switching to another status or clear filters.</div>
                             </div>

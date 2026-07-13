@@ -6,16 +6,20 @@ use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientNote extends Model implements EmitsToTimeline
 {
     use AuditableChanges;
+    use SoftDeletes;
 
     protected $table = 'client_notes';
 
     protected $fillable = [
+        'legacy_progress_note_id',
         'client_id',
         'shift_id',
+        'care_plan_goal_id',
         'user_id',
         'type',
         'subject',
@@ -26,6 +30,7 @@ class ClientNote extends Model implements EmitsToTimeline
         'is_pinned',
         'is_flagged',
         'flagged_reason',
+        'ai_summary',
         'reviewed_at',
         'reviewed_by',
         'edited_at',
@@ -48,6 +53,8 @@ class ClientNote extends Model implements EmitsToTimeline
     ];
 
     protected $casts = [
+        'legacy_progress_note_id' => 'integer',
+        'care_plan_goal_id' => 'integer',
         'occurred_at' => 'datetime',
         'is_pinned' => 'boolean',
         'is_flagged' => 'boolean',
@@ -93,6 +100,11 @@ class ClientNote extends Model implements EmitsToTimeline
         return $this->belongsTo(Shift::class);
     }
 
+    public function carePlanGoal(): BelongsTo
+    {
+        return $this->belongsTo(CarePlanGoal::class);
+    }
+
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
@@ -120,7 +132,18 @@ class ClientNote extends Model implements EmitsToTimeline
 
     public function scopeReviewQueue($query)
     {
-        return $query->where('is_flagged', true)->whereNull('reviewed_at');
+        return $query
+            ->dailyNotes()
+            ->submitted()
+            ->where('is_flagged', true)
+            ->whereNull('reviewed_at');
+    }
+
+    public function scopeSubmitted($query)
+    {
+        return $query->where(function ($submitted) {
+            $submitted->whereNull('is_draft')->orWhere('is_draft', false);
+        });
     }
 
     public function scopeForUser($query, ?User $user)
@@ -131,7 +154,17 @@ class ClientNote extends Model implements EmitsToTimeline
             });
         }
 
-        return $query;
+        return $query->where(function ($visibility) use ($user) {
+            $visibility
+                ->where(function ($submitted) {
+                    $submitted->whereNull('is_draft')->orWhere('is_draft', false);
+                })
+                ->orWhere(function ($draft) use ($user) {
+                    $draft
+                        ->where('is_draft', true)
+                        ->where('user_id', $user?->id ?? 0);
+                });
+        });
     }
 
     public function scopeShiftLinked($query)

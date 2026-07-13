@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class ShiftTaskProvider implements TaskProvider, HasModelClass
+class ShiftTaskProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -38,14 +38,15 @@ class ShiftTaskProvider implements TaskProvider, HasModelClass
         $query = ShiftTask::query()
             ->with([
                 'shift:id,user_id,client_id,site_id,starts_at,status',
-                'shift.user:id,name',
+                'shift.staff:id,name',
                 'shift.client:id,first_name,last_name',
                 'shift.site:id,name',
             ])
             ->whereHas('shift', function ($q) use ($user) {
                 // Today/future plus the recent past week — ancient shift tasks
                 // are noise, not actionable work.
-                $q->where('starts_at', '>=', now()->subDays(7))
+                $q->where('organization_id', $user->organization_id)
+                    ->where('starts_at', '>=', now()->subDays(7))
                     ->where('status', '!=', 'cancelled');
 
                 // Schedulers (shifts.manageAny) see every shift's tasks; other
@@ -75,8 +76,8 @@ class ShiftTaskProvider implements TaskProvider, HasModelClass
                 bucket: $task->is_completed ? TaskItem::BUCKET_DONE : TaskItem::BUCKET_OPEN,
                 severity: 'low',
                 // The shift's rostered worker owns its tasks.
-                assignee: $shift?->user
-                    ? ['id' => $shift->user->id, 'name' => (string) $shift->user->name]
+                assignee: $shift?->staff
+                    ? ['id' => $shift->staff->id, 'name' => (string) $shift->staff->name]
                     : null,
                 client: $client
                     ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]

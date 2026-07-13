@@ -6,6 +6,7 @@
  * Writes go through Inertia (router.post/put/delete → back()), so the page's
  * behaviour_patterns analytics refresh; the tab's lazy-fetched ABC log refreshes
  * on close. Endpoints: BehaviourAbcController. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -155,6 +156,7 @@ export function AbcEntryDialog({
 
     const [stepIndex, setStepIndex] = useState(0);
     const [busy, setBusy] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
     /* form state (shared by create + edit) */
@@ -336,7 +338,6 @@ export function AbcEntryDialog({
 
     const remove = () => {
         if (!entry) return;
-        if (!window.confirm('Remove this ABC entry? This cannot be undone.')) return;
         mutate('delete', `${base}/${entry.id}`, {}, { okToast: 'ABC entry removed', close: true });
     };
 
@@ -361,7 +362,7 @@ export function AbcEntryDialog({
                 <Button
                     type="button"
                     variant="ghost"
-                    onClick={remove}
+                    onClick={() => setDeleteOpen(true)}
                     disabled={busy}
                     className="text-status-critical hover:text-status-critical"
                     data-test="abc-delete"
@@ -409,6 +410,7 @@ export function AbcEntryDialog({
     const fnLabel = FUNCTIONS.find((f) => f.key === behaviourFunction)?.label;
 
     return (
+        <>
         <WizardShell
             open={open}
             onClose={() => !busy && onClose()}
@@ -671,6 +673,15 @@ export function AbcEntryDialog({
                 </WizardStepPane>
             )}
         </WizardShell>
+        <ConfirmDialog
+            open={deleteOpen}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={remove}
+            title="Remove ABC entry?"
+            description="This permanently removes the ABC entry. This action cannot be undone."
+            confirmText="Remove entry"
+        />
+        </>
     );
 }
 

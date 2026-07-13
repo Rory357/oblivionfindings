@@ -23,7 +23,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, Sparkles, Star, Trash2, Users, X } from 'lucide-react';
+import { Archive, Pencil, Plus, Sparkles, Star, Trash2, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -131,7 +131,7 @@ export default function SuccessionShow({
 
     const confirmDeletePlan = () => {
         router.delete(`/hr/succession/${plan.id}`, {
-            onSuccess: () => toast.success('Succession plan deleted.'),
+            onSuccess: () => toast.success('Succession plan archived.'),
         });
     };
 
@@ -396,12 +396,12 @@ export default function SuccessionShow({
                 <Dialog open={deletingPlan} onOpenChange={setDeletingPlan}>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Delete succession plan?</DialogTitle>
+                            <DialogTitle>Archive succession plan?</DialogTitle>
                             <DialogDescription>
-                                “{plan.role_title}” and its{' '}
+                                “{plan.role_title}” will leave the active pipeline.
+                                Its{' '}
                                 {plan.candidates.length} candidate assessment
-                                {plan.candidates.length === 1 ? '' : 's'} will be
-                                removed. This can’t be undone.
+                                {plan.candidates.length === 1 ? '' : 's'} will be retained.
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>
@@ -411,11 +411,9 @@ export default function SuccessionShow({
                             >
                                 Cancel
                             </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={confirmDeletePlan}
-                            >
-                                Delete plan
+                            <Button onClick={confirmDeletePlan}>
+                                <Archive className="mr-1.5 h-4 w-4" />
+                                Archive plan
                             </Button>
                         </DialogFooter>
                     </DialogContent>

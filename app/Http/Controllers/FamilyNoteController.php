@@ -6,16 +6,23 @@ use App\Models\Client;
 use App\Models\FamilyNote;
 use App\Models\Shift;
 use App\Models\ShiftTask;
-use App\Models\TimelineEvent;
+use App\Services\Clients\ClientFamilyCommunicationAccess;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class FamilyNoteController extends Controller
 {
+    public function __construct(
+        private readonly ClientFamilyCommunicationAccess $familyCommunicationAccess,
+    ) {}
+
     public function respond(Request $request, Client $client, FamilyNote $familyNote)
     {
         $this->authorize('view', $client);
+        abort_unless($this->familyCommunicationAccess->canManage($request->user(), $client), 403);
         abort_unless($familyNote->client_id === $client->id, 404);
+        $this->ensureActionable($familyNote);
 
         $data = $request->validate([
             'staff_response' => 'required|string|max:2000',
@@ -33,11 +40,14 @@ class FamilyNoteController extends Controller
     public function updateStatus(Request $request, Client $client, FamilyNote $familyNote)
     {
         $this->authorize('view', $client);
+        abort_unless($this->familyCommunicationAccess->canManage($request->user(), $client), 403);
         abort_unless($familyNote->client_id === $client->id, 404);
 
         $data = $request->validate([
             'status' => 'required|string|in:open,in_progress,completed,cancelled',
         ]);
+
+        $this->ensureValidStatusTransition($familyNote, $data['status']);
 
         $updates = ['status' => $data['status']];
 
@@ -45,7 +55,7 @@ class FamilyNoteController extends Controller
             $updates['completed_at'] = now();
             $updates['completed_by'] = $request->user()->id;
 
-            app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            app(TimelineEmitter::class)->record([
                 'source_type' => FamilyNote::class,
                 'source_id' => $familyNote->id,
                 'occurred_at' => now(),
@@ -53,7 +63,7 @@ class FamilyNoteController extends Controller
                 'actor_user_id' => $request->user()->id,
                 'client_id' => $client->id,
                 'site_id' => $client->site_id,
-                'subject' => 'Family note completed: ' . $familyNote->title,
+                'subject' => 'Family note completed: '.$familyNote->title,
                 'body' => null,
                 'visibility' => 'portal',
                 'is_pinned' => false,
@@ -69,14 +79,24 @@ class FamilyNoteController extends Controller
     public function assignToShift(Request $request, Client $client, FamilyNote $familyNote)
     {
         $this->authorize('view', $client);
+        abort_unless($this->familyCommunicationAccess->canManage($request->user(), $client), 403);
         abort_unless($familyNote->client_id === $client->id, 404);
+        $this->ensureActionable($familyNote);
 
         $data = $request->validate([
-            'shift_id' => 'required|integer|exists:shifts,id',
+            'shift_id' => 'required|integer',
         ]);
 
-        $shift = Shift::query()->findOrFail($data['shift_id']);
-        abort_unless($shift->client_id === $client->id, 422);
+        $shift = Shift::query()
+            ->whereKey($data['shift_id'])
+            ->where('client_id', $client->id)
+            ->where('organization_id', $client->organization_id)
+            ->firstOrFail();
+
+        if ($familyNote->assigned_to_shift_id !== null
+            && (int) $familyNote->assigned_to_shift_id === $shift->id) {
+            return redirect()->back()->with('success', 'Added to shift checklist.');
+        }
 
         if (in_array($shift->status, ['completed', 'cancelled'], true)) {
             throw ValidationException::withMessages([
@@ -84,7 +104,7 @@ class FamilyNoteController extends Controller
             ]);
         }
 
-        $taskLabel = 'Family note: ' . $familyNote->title;
+        $taskLabel = 'Family note: '.$familyNote->title;
 
         if (! ShiftTask::where('shift_id', $shift->id)->where('label', $taskLabel)->exists()) {
             ShiftTask::create([
@@ -100,7 +120,7 @@ class FamilyNoteController extends Controller
             'status' => $familyNote->status === 'open' ? 'in_progress' : $familyNote->status,
         ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => FamilyNote::class,
             'source_id' => $familyNote->id,
             'occurred_at' => now(),
@@ -108,7 +128,7 @@ class FamilyNoteController extends Controller
             'actor_user_id' => $request->user()->id,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'subject' => 'Family note assigned to shift: ' . $familyNote->title,
+            'subject' => 'Family note assigned to shift: '.$familyNote->title,
             'body' => null,
             'meta' => [
                 'shift_id' => $shift->id,
@@ -121,5 +141,34 @@ class FamilyNoteController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Added to shift checklist.');
+    }
+
+    private function ensureActionable(FamilyNote $familyNote): void
+    {
+        if (in_array($familyNote->status, ['open', 'in_progress'], true)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'family_note' => 'Completed or cancelled family notes can no longer be changed.',
+        ]);
+    }
+
+    private function ensureValidStatusTransition(FamilyNote $familyNote, string $nextStatus): void
+    {
+        $allowedTransitions = [
+            'open' => ['in_progress', 'completed', 'cancelled'],
+            'in_progress' => ['completed', 'cancelled'],
+            'completed' => [],
+            'cancelled' => [],
+        ];
+
+        if (in_array($nextStatus, $allowedTransitions[$familyNote->status] ?? [], true)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'status' => 'That family note status change is not allowed.',
+        ]);
     }
 }

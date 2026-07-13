@@ -37,6 +37,8 @@ import {
 import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 const ICON_MAP: Record<string, LucideIcon> = {
     users: Users,
@@ -133,7 +135,7 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
     if (!open || !menu || typeof window === 'undefined') return null;
 
     return createPortal(
-        <div
+        <GuardrailCard unstyled
             ref={ref}
             role="menu"
             className="fixed z-[60] min-w-[240px] select-none rounded-lg border bg-card py-1 shadow-xl"
@@ -162,7 +164,7 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                 const it = item as Exclude<CtxMenuItem, { divider: true }>;
                 const Icon = ICON_MAP[it.icon] ?? Settings2;
                 return (
-                    <button
+                    <GuardrailButton unstyled
                         key={idx}
                         type="button"
                         role="menuitem"
@@ -192,10 +194,10 @@ export function ContextMenu({ open, x, y, menu, onClose }: ContextMenuProps) {
                                 {it.shortcut}
                             </span>
                         ) : null}
-                    </button>
+                    </GuardrailButton>
                 );
             })}
-        </div>,
+        </GuardrailCard>,
         document.body,
     );
 }

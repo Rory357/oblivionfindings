@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { cn } from '@/lib/utils';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type DonutSegment = {
     key: string;
@@ -44,7 +45,7 @@ function InteractiveDonut({
     const centerSub = activeSeg ? activeSeg.label : centerLabel;
 
     return (
-        <div className="rounded-xl border bg-card p-4" style={{ borderColor: 'var(--border)' }}>
+        <GuardrailCard unstyled className="rounded-xl border bg-card p-4" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
                 <h3 className="text-[13px] font-semibold">{title}</h3>
                 <Link
@@ -119,7 +120,7 @@ function InteractiveDonut({
                     ))}
                 </div>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 

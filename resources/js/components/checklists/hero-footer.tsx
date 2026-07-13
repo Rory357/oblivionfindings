@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { Dropdown, type DropdownOption } from './primitives';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 export interface WeekInfo {
     label: string;
@@ -80,15 +81,15 @@ export function HeroFooter({
             <div className="flex flex-col items-stretch gap-2.5 md:flex-row md:items-center md:justify-between">
                 {/* Week stepper */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={onPrevWeek}
                         className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                     >
                         <ChevronLeft className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">{week.prevLabel}</span>
-                    </button>
-                    <button
+                    </GuardrailButton>
+                    <GuardrailButton unstyled
                         ref={weekBtnRef}
                         type="button"
                         onClick={() => setPickerOpen((v) => !v)}
@@ -102,15 +103,15 @@ export function HeroFooter({
                             <span className="text-primary-foreground/60"> · {week.range}</span>
                         </span>
                         <ChevronDown className="h-3 w-3 text-primary-foreground/70" />
-                    </button>
-                    <button
+                    </GuardrailButton>
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={onNextWeek}
                         className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                     >
                         <span className="hidden sm:inline">{week.nextLabel}</span>
                         <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                    </GuardrailButton>
                     {pickerOpen ? (
                         <WeekPicker
                             selectedWeekStart={selectedWeekStart}
@@ -137,13 +138,13 @@ export function HeroFooter({
                             className={cn(onDarkInput, 'w-full pl-8 pr-8 md:w-56')}
                         />
                         {query ? (
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => onQuery('')}
                                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-foreground/60 hover:text-primary-foreground"
                             >
                                 <X className="h-3.5 w-3.5" />
-                            </button>
+                            </GuardrailButton>
                         ) : null}
                     </div>
 

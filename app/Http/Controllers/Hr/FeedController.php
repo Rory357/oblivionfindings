@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrFeedReaction;
 use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Notifications\AnnouncementReplyNotification;
 use App\Domain\Hr\Services\FeedService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
@@ -31,7 +32,7 @@ class FeedController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — community & recognition feed                               */
+    /*  Index — community & recognition feed */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -85,7 +86,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — create a feed post (update)                                */
+    /*  Store — create a feed post (update) */
     /* ------------------------------------------------------------------ */
 
     public function store(Request $request)
@@ -117,7 +118,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Send Kudos — recognition to one or more colleagues                 */
+    /*  Send Kudos — recognition to one or more colleagues */
     /* ------------------------------------------------------------------ */
 
     public function sendKudos(Request $request)
@@ -158,7 +159,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  React / Reply — feed-scoped aliases onto the shared kudos path     */
+    /*  React / Reply — feed-scoped aliases onto the shared kudos path */
     /* ------------------------------------------------------------------ */
 
     public function react(Request $request, HrKudos $kudos)
@@ -197,7 +198,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  React / Reply — polymorphic wall items (announcements + posts)      */
+    /*  React / Reply — polymorphic wall items (announcements + posts) */
     /* ------------------------------------------------------------------ */
 
     public function reactFeed(Request $request)
@@ -245,11 +246,23 @@ class FeedController extends Controller
             $validated['body'],
         );
 
+        if ($validated['subject_type'] === 'announcement') {
+            $announcement = HrAnnouncement::query()
+                ->with('creator:id,name,organization_id')
+                ->findOrFail((int) $validated['subject_id']);
+            $author = $announcement->creator;
+            $authorTenantId = $author?->organization_id;
+
+            if ($author && $author->id !== $user->id && (int) $authorTenantId === $tenantId) {
+                $author->notify(new AnnouncementReplyNotification($announcement, $user, $validated['body']));
+            }
+        }
+
         return redirect()->back()->with('success', 'Reply posted.');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Moderation — remove an inappropriate post or kudos                 */
+    /*  Moderation — remove an inappropriate post or kudos */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -368,7 +381,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Attachment download — hardened private-disk stream                 */
+    /*  Attachment download — hardened private-disk stream */
     /* ------------------------------------------------------------------ */
 
     public function downloadAttachment(Request $request, HrFeedAttachment $attachment)
@@ -399,7 +412,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function transformPost($post, int $viewerId, array $postReactions = [], array $postReplies = []): array

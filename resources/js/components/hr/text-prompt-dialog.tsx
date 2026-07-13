@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- Single-input prompt dialog: native
+/* eslint-disable no-restricted-syntax -- Shared single-input prompt dialog: native
  * footer buttons mirror BulkRejectDialog's composition; semantic tokens. */
 import { useEffect, useState } from 'react';
 

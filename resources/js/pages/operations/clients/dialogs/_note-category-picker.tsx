@@ -124,7 +124,7 @@ export function NoteCategoryPicker({
                 const active = value === category.key;
 
                 return (
-                    <button
+                    <Button unstyled
                         key={category.key}
                         type="button"
                         onClick={() => onChange(category.key)}
@@ -147,7 +147,7 @@ export function NoteCategoryPicker({
                                 {category.description}
                             </span>
                         </span>
-                    </button>
+                    </Button>
                 );
             })}
         </div>

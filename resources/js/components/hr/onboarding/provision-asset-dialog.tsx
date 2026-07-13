@@ -121,7 +121,7 @@ export function ProvisionAssetDialog({
                             filtered.map((a) => {
                                 const active = assetId === a.id;
                                 return (
-                                    <button
+                                    <Button unstyled
                                         key={a.id}
                                         type="button"
                                         onClick={() => setAssetId(a.id)}
@@ -140,7 +140,7 @@ export function ProvisionAssetDialog({
                                                 </span>
                                             )}
                                         </span>
-                                    </button>
+                                    </Button>
                                 );
                             })
                         )}

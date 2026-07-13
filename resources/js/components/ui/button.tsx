@@ -40,17 +40,24 @@ function Button({
   variant,
   size,
   asChild = false,
+  unstyled = false,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    unstyled?: boolean
   }) {
   const Comp = asChild ? Slot : "button"
 
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        unstyled
+          ? "disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          : buttonVariants({ variant, size }),
+        className
+      )}
       {...props}
     />
   )

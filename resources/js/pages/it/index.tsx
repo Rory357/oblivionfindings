@@ -13,6 +13,7 @@ import {
     type ItModal,
     type KbRow,
     type RequestRow,
+    type SlaCalendar,
     type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
@@ -188,6 +189,8 @@ interface Props {
     overview?: OverviewPayload;
     /** Effective SLA grid — present only for admins (the policy editor). */
     slaPolicies?: SlaPolicyGrid | null;
+    /** The tenant business-hours calendar for the SLA editor (admins). */
+    slaCalendar?: SlaCalendar | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
     /** Published KB articles for a requester's browse tab (§I). */
@@ -285,6 +288,7 @@ export default function ItIndex({
     filters,
     overview,
     slaPolicies,
+    slaCalendar,
     myTickets,
     kbPublished = [],
     summary,
@@ -868,6 +872,7 @@ export default function ItIndex({
                 employeeOptions={employeeOptions}
                 assetOptions={assetOptions}
                 slaPolicies={slaPolicies}
+                slaCalendar={slaCalendar}
                 kbSuggestions={kbPublished}
                 onOpenArticle={(id) => {
                     const a = kbPublished.find((x) => x.id === id);

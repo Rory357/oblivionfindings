@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -42,5 +43,22 @@ class AssetGeofence extends Model
     {
         return $this->belongsToMany(Asset::class, 'asset_geofence_assignments')
             ->withTimestamps();
+    }
+
+    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
+    {
+        if ($organizationId === null) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($organizationId) {
+            $query->whereHas(
+                'site',
+                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
+            )->orWhereHas(
+                'asset.site',
+                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
+            );
+        });
     }
 }

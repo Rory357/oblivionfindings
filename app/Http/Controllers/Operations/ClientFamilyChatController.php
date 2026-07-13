@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\OpsConversation;
 use App\Models\OpsConversationParticipant;
 use App\Models\OpsMessage;
+use App\Services\Clients\ClientFamilyCommunicationAccess;
 use Illuminate\Http\Request;
 
 /**
@@ -17,12 +18,17 @@ use Illuminate\Http\Request;
  */
 class ClientFamilyChatController extends Controller
 {
+    public function __construct(
+        private readonly ClientFamilyCommunicationAccess $familyCommunicationAccess,
+    ) {}
+
     public function show(Request $request, Client $client)
     {
         $this->authorize('view', $client);
         $user = $request->user();
+        abort_unless($this->familyCommunicationAccess->canView($user, $client), 403);
 
-        $conversation = $this->resolveConversation($client, $user->id, createIfMissing: false);
+        $conversation = $this->resolveConversation($client, createIfMissing: false);
 
         $portalUsers = $client->portalUsers()->get(['users.id', 'users.name']);
 
@@ -30,17 +36,23 @@ class ClientFamilyChatController extends Controller
             return response()->json([
                 'conversation' => null,
                 'messages' => [],
+                'meta' => [
+                    'total' => 0,
+                    'loaded' => 0,
+                    'has_more' => false,
+                ],
                 'portal_users' => $portalUsers->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
             ]);
         }
 
-        // Joining staff become participants so portal-side queries include them.
-        OpsConversationParticipant::firstOrCreate([
-            'conversation_id' => $conversation->id,
-            'user_id' => $user->id,
-        ]);
-
-        $messages = $conversation->messages()
+        $messagesBase = $conversation->messages()
+            ->where('client_id', $client->id)
+            ->where(function ($query) use ($client): void {
+                $query->where('organization_id', $client->organization_id)
+                    ->orWhereNull('organization_id');
+            });
+        $messagesTotal = (clone $messagesBase)->count();
+        $messages = (clone $messagesBase)
             ->with('sender:id,name')
             ->orderByDesc('created_at')
             ->limit(100)
@@ -67,6 +79,11 @@ class ClientFamilyChatController extends Controller
                     ->values(),
             ],
             'messages' => $messages,
+            'meta' => [
+                'total' => $messagesTotal,
+                'loaded' => $messages->count(),
+                'has_more' => $messagesTotal > $messages->count(),
+            ],
             'portal_users' => $portalUsers->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
         ]);
     }
@@ -75,12 +92,13 @@ class ClientFamilyChatController extends Controller
     {
         $this->authorize('view', $client);
         $user = $request->user();
+        abort_unless($this->familyCommunicationAccess->canManage($user, $client), 403);
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
         ]);
 
-        $conversation = $this->resolveConversation($client, $user->id, createIfMissing: true);
+        $conversation = $this->resolveConversation($client, createIfMissing: true);
 
         OpsConversationParticipant::firstOrCreate([
             'conversation_id' => $conversation->id,
@@ -88,7 +106,7 @@ class ClientFamilyChatController extends Controller
         ]);
 
         OpsMessage::create([
-            'organization_id' => $user->organization_id,
+            'organization_id' => $client->organization_id,
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
             'sender_type' => 'user',
@@ -106,11 +124,15 @@ class ClientFamilyChatController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function resolveConversation(Client $client, int $userId, bool $createIfMissing): ?OpsConversation
+    private function resolveConversation(Client $client, bool $createIfMissing): ?OpsConversation
     {
         $conversation = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
             ->where('is_archived', false)
+            ->where(function ($query) use ($client): void {
+                $query->where('organization_id', $client->organization_id)
+                    ->orWhereNull('organization_id');
+            })
             ->with('participants.user:id,name')
             ->orderByDesc('updated_at')
             ->first();

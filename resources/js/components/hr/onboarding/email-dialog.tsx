@@ -152,14 +152,14 @@ export function EmailDialog({
                             <Label className="text-xs text-muted-foreground">Insert merge token</Label>
                             <div className="flex flex-wrap gap-1.5">
                                 {TOKENS.map((t) => (
-                                    <button
+                                    <Button unstyled
                                         key={t}
                                         type="button"
                                         onClick={() => insertToken(t)}
                                         className="rounded-md bg-accent px-2 py-1 font-mono text-[11px] font-semibold text-primary"
                                     >
                                         {t}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>

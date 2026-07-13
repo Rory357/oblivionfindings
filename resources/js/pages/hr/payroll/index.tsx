@@ -5,7 +5,12 @@ import {
     type ExportFieldOption,
     type PayrollExportProfile,
 } from '@/components/hr/payroll-wizards';
-import { PageHero, PageLayout } from '@/components/page';
+import { PayrollHero } from '@/components/hr/payroll-hero';
+import {
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/hr/row-context-menu';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +25,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Banknote, Download, Plus } from 'lucide-react';
+import { CircleDollarSign, Download, LockKeyhole, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 interface PayrollRun {
@@ -127,6 +132,8 @@ export default function PayrollIndex({
         Record<number, string>
     >({});
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
+    const { open: openRunContext, element: runContextElement } =
+        useRowContextMenu();
 
     const lockError = page.props?.errors?.lock;
     const exportError = page.props?.errors?.export;
@@ -152,21 +159,58 @@ export default function PayrollIndex({
         );
     }
 
+    function renderMobileRunActions(run: PayrollRun) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                {run.status === 'draft' && can.manage ? (
+                    <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/lock`, {}, { preserveScroll: true })}>Lock</Button>
+                ) : null}
+                {can.manage && run.gl_posted_at && !run.net_paid_at ? (
+                    <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/pay`, {}, { preserveScroll: true })}>Pay net</Button>
+                ) : null}
+                {run.net_paid_at ? <span className="rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">Paid</span> : null}
+                {run.gl_error && !run.gl_posted_at ? (
+                    <>
+                        <span className="rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical" title={run.gl_error}>GL failed</span>
+                        {can.manage ? <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/retry-gl`, {}, { preserveScroll: true })}>Retry GL</Button> : null}
+                    </>
+                ) : null}
+                {can.export_data && run.net_paid_at ? (
+                    <Button variant="outline" size="sm" asChild><a href={`/hr/payroll/runs/${run.id}/net-pay-file`}><Download className="mr-1 h-3 w-3" />Bank file</a></Button>
+                ) : null}
+                {can.export_data && run.status === 'locked' ? (
+                    <>
+                        {profiles.length > 0 ? (
+                            <Select value={selectedProfileByRun[run.id] || (defaultProfile ? String(defaultProfile.id) : undefined)} onValueChange={(value) => setSelectedProfileByRun((previous) => ({ ...previous, [run.id]: value }))}>
+                                <SelectTrigger className="h-8 min-w-[160px] flex-1"><SelectValue placeholder="Default mapping" /></SelectTrigger>
+                                <SelectContent>{profiles.map((profile) => <SelectItem key={profile.id} value={String(profile.id)}>{profile.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                        ) : null}
+                        <Button variant="outline" size="sm" onClick={() => handleExport(run.id)}><Download className="mr-1 h-3 w-3" />Export</Button>
+                    </>
+                ) : null}
+            </div>
+        );
+    }
+
+    function runContextItems(run: PayrollRun): RowCtxItem[] {
+        const items: RowCtxItem[] = [];
+        if (run.status === 'draft' && can.manage) items.push({ kind: 'item', label: 'Lock run', icon: LockKeyhole, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/lock`, {}, { preserveScroll: true }) });
+        if (can.manage && run.gl_posted_at && !run.net_paid_at) items.push({ kind: 'item', label: 'Pay net', icon: CircleDollarSign, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/pay`, {}, { preserveScroll: true }) });
+        if (can.manage && run.gl_error && !run.gl_posted_at) items.push({ kind: 'item', label: 'Retry GL', icon: RefreshCw, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/retry-gl`, {}, { preserveScroll: true }) });
+        if (can.export_data && run.status === 'locked') items.push({ kind: 'item', label: 'Export run', icon: Download, onSelect: () => handleExport(run.id) });
+        if (can.export_data && run.net_paid_at) items.push({ kind: 'item', label: 'Download bank file', icon: Download, onSelect: () => { window.location.href = `/hr/payroll/runs/${run.id}/net-pay-file`; } });
+        return items;
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payroll" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        icon={Banknote}
-                        title="Payroll Runs"
-                        description="Manage payroll periods, lock runs, and export to your payroll provider."
-                        stats={[
-                            { label: 'Total runs', value: statusCounts.total, href: '/hr/payroll' },
-                            { label: 'Drafts', value: statusCounts.draft, href: '/hr/payroll?status=draft' },
-                            { label: 'Locked', value: statusCounts.locked, href: '/hr/payroll?status=locked' },
-                            { label: 'Exported', value: statusCounts.exported, href: '/hr/payroll?status=exported' },
-                        ]}
+                    <PayrollHero
+                        surface="runs"
+                        counts={statusCounts}
                         actions={
                             can.manage ? (
                                 <Button onClick={() => setRunWizardOpen(true)}>
@@ -307,6 +351,7 @@ export default function PayrollIndex({
                 {/* Table */}
                 <Card>
                     <CardContent className="p-0">
+                        <div data-payroll-desktop className="hidden md:block">
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
@@ -342,6 +387,7 @@ export default function PayrollIndex({
                                         <tr
                                             key={run.id}
                                             className="hover:bg-muted/30"
+                                            onContextMenu={openRunContext(runContextItems(run))}
                                         >
                                             <td className="px-4 py-3">
                                                 <span className="font-medium">
@@ -562,6 +608,27 @@ export default function PayrollIndex({
                                 )}
                             </tbody>
                         </table>
+                        </div>
+                        <div data-payroll-mobile className="divide-y md:hidden">
+                            {runs.data.map((run) => {
+                                const config = statusConfig[run.status] || statusConfig.draft;
+                                return (
+                                    <article key={run.id} className="space-y-3 p-4" onContextMenu={openRunContext(runContextItems(run))}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold">{formatDate(run.period_start)} - {formatDate(run.period_end)}</p>
+                                                <p className="text-xs text-muted-foreground">{run.total_hours.toFixed(1)}h · {run.items_count} items · {formatDate(run.created_at)}</p>
+                                            </div>
+                                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                                        </div>
+                                        <p className="text-lg font-semibold">{formatCurrency(run.total_gross)}</p>
+                                        {run.validation_errors?.length ? <p className="text-xs text-status-critical">{run.validation_errors[0]}</p> : null}
+                                        {renderMobileRunActions(run)}
+                                    </article>
+                                );
+                            })}
+                            {runs.data.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No payroll runs found.</p> : null}
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -581,6 +648,7 @@ export default function PayrollIndex({
                     </div>
                 )}
             </PageLayout>
+            {runContextElement}
         </AppLayout>
     );
 }

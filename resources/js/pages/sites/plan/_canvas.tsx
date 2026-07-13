@@ -59,6 +59,7 @@ import {
     type Interaction,
     type LayerKey,
 } from './_use-plan-editor';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     layout: PlanLayout;
@@ -1585,8 +1586,6 @@ export default function PlanCanvas(props: Props) {
     const cursor = isSelectMode(activeKind)
         ? 'cursor-default'
         : 'cursor-crosshair';
-    const pendingRefs =
-        interaction.mode === 'marquee' ? interaction.pendingRefs : [];
     const groupBounds = groupDragging
         ? selectionBounds(layout, pins, selection)
         : null;
@@ -1603,8 +1602,9 @@ export default function PlanCanvas(props: Props) {
     );
     const hasPendingRef = useCallback(
         (ref: SelectionRef) =>
-            pendingRefs.some((pending) => sameRef(pending, ref)),
-        [pendingRefs],
+            interaction.mode === 'marquee' &&
+            interaction.pendingRefs.some((pending) => sameRef(pending, ref)),
+        [interaction],
     );
 
     function renderSnapPair(
@@ -1642,7 +1642,7 @@ export default function PlanCanvas(props: Props) {
     }
 
     return (
-        <div
+        <GuardrailCard unstyled
             className="relative h-full min-h-[420px] overflow-hidden rounded-md border bg-white"
             data-test="site-plan-canvas"
         >
@@ -1818,7 +1818,7 @@ export default function PlanCanvas(props: Props) {
                                                     });
                                                 }
                                             }}
-                                            className="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-sm text-slate-900 outline-none"
+                                            className="w-full rounded border border-primary bg-background px-1.5 py-0.5 text-sm text-foreground outline-none"
                                         />
                                     </foreignObject>
                                 ) : (
@@ -2375,7 +2375,7 @@ export default function PlanCanvas(props: Props) {
                                                 dispatch({ type: 'end_edit' });
                                             }
                                         }}
-                                        className="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-sm text-slate-900 outline-none"
+                                        className="w-full rounded border border-primary bg-background px-1.5 py-0.5 text-sm text-foreground outline-none"
                                     />
                                 </foreignObject>
                             );
@@ -2628,7 +2628,7 @@ export default function PlanCanvas(props: Props) {
                                                 dispatch({ type: 'end_edit' });
                                             }
                                         }}
-                                        className="w-full rounded border border-blue-400 bg-white px-1 py-0.5 text-xs text-slate-900 outline-none"
+                                        className="w-full rounded border border-primary bg-background px-1 py-0.5 text-xs text-foreground outline-none"
                                     />
                                 </foreignObject>
                             ) : (
@@ -2925,7 +2925,7 @@ export default function PlanCanvas(props: Props) {
             </svg>
 
             <div className="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
-                <div className="rounded-md border bg-white/90 px-2 py-1 text-xs text-slate-600 shadow-sm">
+                <GuardrailCard unstyled className="rounded-md border bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
                     Scale: 1 m ≈ {(1 / mpu).toFixed(0)} units · grid{' '}
                     {layout.grid?.size ?? 10}
                     {layout.grid?.snap === false
@@ -2934,10 +2934,10 @@ export default function PlanCanvas(props: Props) {
                           ? ' · Alt unsnapped'
                           : ''}
                     {selection.length > 1 && ` · ${selection.length} selected`}
-                </div>
+                </GuardrailCard>
                 {selection.length > 1 && (
                     <div
-                        className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm"
+                        className="rounded-md border bg-status-info-bg px-2 py-1 text-xs text-status-info shadow-sm"
                         data-test="site-plan-marquee-count"
                     >
                         {selection.length} items selected - drag any selected
@@ -2946,7 +2946,7 @@ export default function PlanCanvas(props: Props) {
                 )}
                 {!isSelectMode(activeKind) && activeKind && (
                     <div
-                        className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm"
+                        className="rounded-md border bg-status-info-bg px-2 py-1 text-xs text-status-info shadow-sm"
                         data-test="site-plan-tool-hint"
                     >
                         Tool:{' '}
@@ -2963,7 +2963,7 @@ export default function PlanCanvas(props: Props) {
                     </div>
                 )}
                 {isSelectMode(activeKind) && selection.length === 0 && (
-                    <div className="rounded-md border bg-slate-50 px-2 py-1 text-xs text-slate-700 shadow-sm">
+                    <div className="rounded-md border bg-muted/50 px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         Drag on empty canvas to select multiple items ·
                         Shift-click to add · Double-click to edit text
                     </div>
@@ -2992,7 +2992,7 @@ export default function PlanCanvas(props: Props) {
                         align="start"
                         data-test="site-plan-context-menu"
                     >
-                        <DropdownMenuLabel className="text-[10px] tracking-wider text-slate-500 uppercase">
+                            <DropdownMenuLabel className="text-[10px] tracking-wider text-muted-foreground uppercase">
                             {contextMenu.ref.type === 'pin'
                                 ? 'Pin'
                                 : contextMenu.ref.type.charAt(0).toUpperCase() +
@@ -3057,13 +3057,13 @@ export default function PlanCanvas(props: Props) {
                                 setContextMenu(null);
                             }}
                         >
-                            <Lucide.Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                                    <Lucide.Trash2 className="mr-2 h-4 w-4 text-status-critical" />
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
-        </div>
+        </GuardrailCard>
     );
 }
 

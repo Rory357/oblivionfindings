@@ -7,6 +7,7 @@
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Archive,
     Award,
     Bell,
     Check,
@@ -43,7 +44,7 @@ import { toast } from 'sonner';
 import { DOC_CATEGORY_ICON } from '@/components/hr/document-library-kit';
 import { DocumentsHero, type DocsHeroNeed } from '@/components/hr/documents-hero';
 import { useLeaveContextMenu, type LeaveCtxItem } from '@/components/hr/leave-context-menu';
-import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
+import { TextPromptDialog } from '@/components/hr/text-prompt-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -744,7 +745,7 @@ function LibraryTab({
                     <BulkBtn icon={Download} label="Download" onClick={() => { window.location.href = `/hr/documents/bulk-download?` + selected.map((id) => `ids[]=${id}`).join('&'); }} />
                     <BulkBtn icon={Folder} label="Move" onClick={() => setMoveOpen(true)} />
                     <BulkBtn icon={PenLine} label="Send" onClick={() => onSend(filteredDocs.find((d) => d.id === selected[0]) ?? filteredDocs[0])} />
-                    <BulkBtn icon={Trash2} label="Delete" tone="critical" onClick={() => setConfirmState({ title: 'Delete documents?', body: `Permanently delete ${selected.length} document(s)? This can't be undone.`, confirmLabel: 'Delete', onConfirm: () => bulkPost('/hr/documents/bulk-delete', {}, 'Deleted') })} />
+                    <BulkBtn icon={Archive} label="Archive" onClick={() => setConfirmState({ title: 'Archive documents?', body: `Move ${selected.length} document(s) to the Archive folder while retaining their files and history?`, confirmLabel: 'Archive', onConfirm: () => bulkPost('/hr/documents/bulk-delete', {}, 'Archived') })} />
                     <div className="flex-1" />
                     <button type="button" onClick={() => setSelected([])} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
                 </div>
@@ -880,7 +881,7 @@ function buildRowMenu(
     items.push({ kind: 'item', label: 'Copy link', icon: Copy, onSelect: () => { navigator.clipboard?.writeText(`${window.location.origin}/hr/documents/${d.id}/download`); toast.success('Link copied'); } });
     if (canManage) {
         items.push({ kind: 'divider' });
-        items.push({ kind: 'item', label: 'Delete', icon: Trash2, tone: 'critical', onSelect: () => requestConfirm({ title: 'Delete document?', body: `Delete "${d.title}"? This can't be undone.`, confirmLabel: 'Delete', onConfirm: () => router.delete(`/hr/documents/${d.id}`, { preserveScroll: true }) }) });
+        items.push({ kind: 'item', label: 'Archive', icon: Archive, onSelect: () => requestConfirm({ title: 'Archive document?', body: `Move "${d.title}" to the Archive folder while retaining its file and history?`, confirmLabel: 'Archive', onConfirm: () => router.delete(`/hr/documents/${d.id}`, { preserveScroll: true }) }) });
     }
     return items;
 }

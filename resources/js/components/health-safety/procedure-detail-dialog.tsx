@@ -47,6 +47,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Shared types + token maps (imported by the register + wizard)      */
@@ -364,10 +365,10 @@ function OptBtn({
               ? 'border-status-critical/40 text-status-critical hover:bg-status-critical-bg'
               : 'border-border text-foreground hover:bg-muted';
     return (
-        <button type="button" onClick={onClick} className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors', cls)}>
+        <Button unstyled type="button" onClick={onClick} className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors', cls)}>
             <Icon className="h-4 w-4" />
             {children}
-        </button>
+        </Button>
     );
 }
 
@@ -572,7 +573,7 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
             {detail.attachments.length ? (
                 <div className="flex flex-col gap-2">
                     {detail.attachments.map((a) => (
-                        <div key={a.id} className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3">
+                        <GuardrailCard unstyled key={a.id} className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3">
                             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                                 <FileText className="h-5 w-5" />
                             </span>
@@ -592,7 +593,7 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                                 <Download className="h-4 w-4" />
                             </a>
                             {canManage ? (
-                                <button
+                                <Button unstyled
                                     type="button"
                                     onClick={() => router.delete(`${PROCEDURES_URL}/${detail.id}/attachments/${a.id}`, { preserveScroll: true, preserveState: true })}
                                     className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-status-critical-bg hover:text-status-critical"
@@ -600,9 +601,9 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                                     aria-label={`Remove ${a.original_name}`}
                                 >
                                     <Trash2 className="h-4 w-4" />
-                                </button>
+                                </Button>
                             ) : null}
-                        </div>
+                        </GuardrailCard>
                     ))}
                 </div>
             ) : (

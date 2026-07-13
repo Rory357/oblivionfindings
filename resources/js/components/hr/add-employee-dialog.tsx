@@ -103,6 +103,7 @@ export function AddEmployeeDialog({
         position_id: '',
         employment_type: 'full_time',
         department: '',
+        team: '',
         primary_site_id: '',
         manager_user_id: '',
         start_date: '',
@@ -410,6 +411,14 @@ export function AddEmployeeDialog({
                                 }))}
                             />
                         </Field>
+                        <Field label="Team" hint="optional" error={form.errors.team}>
+                            <Input
+                                value={form.data.team}
+                                onChange={(e) => form.setData('team', e.target.value)}
+                                placeholder="e.g. Community Support"
+                                maxLength={255}
+                            />
+                        </Field>
                         <Field
                             label="Start date"
                             hint="optional"
@@ -627,6 +636,7 @@ export function AddEmployeeDialog({
                                 label="Department"
                                 value={departmentLabel}
                             />
+                            <ReviewRow label="Team" value={form.data.team} />
                             <ReviewRow label="Site" value={siteLabel} />
                             <ReviewRow
                                 label="Start date"

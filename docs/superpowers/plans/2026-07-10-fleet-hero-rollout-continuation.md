@@ -532,3 +532,12 @@ Expected: the worktree is clean; the three Fleet rollout commits are visible; th
 - Per the user's recovery instruction, no Chrome session, local preview, browser route, interaction, theme, viewport, console check, automated test, static check, or build was run in this checkpoint. Task 4 Steps 2 and 3 therefore remain unverified; no Fleet URL was visited and no new browser evidence is claimed.
 - No source code or preview configuration was changed. The only change from the verified checkpoint is this uncommitted ledger entry.
 - Port `8001` was checked after the deferred browser pass and was not listening. No temporary preview process required shutdown.
+
+## Main merge and live verification — 2026-07-12
+
+- Committed the recovery checkpoint on `claude/frosty-leavitt-f99798` as `de5d13af`, merged that branch into `main` as `ab7f3636` (`Merge Fleet hero rollout`), and pushed `main` to `origin`.
+- Fresh merged-main verification passed: scoped Fleet Pest/Unit matrix 35 tests and 342 assertions; focused Vitest 2 files and 10 tests; TypeScript exit 0; targeted ESLint exit 0 with no diagnostics; PHP syntax clean for the changed Fleet controllers/contracts; client build 4,944 modules in 4m 1s; SSR build 1,596 modules in 1m 8s; final worktree and diff clean.
+- The deployed root `/var/www/oblivionfindings` was clean at `ab7f3636187b4da267c878d51273a36fc3cc4bcc`, aligned with `origin/main`. The deployed manifest contained the Fleet dashboard and Reports entries. This rollout has no migration or permission-seeder requirement, so no live maintenance mutation was run.
+- Chrome used one fresh tab and the existing authenticated Demo Admin session. `https://oblivionfindings.com/fleet-assets` rendered the new Fleet command hero in light theme with no console errors.
+- **Blocking live defect:** `https://oblivionfindings.com/fleet-assets/daily-check` rendered the Daily Vehicle Checks hero and its Vehicles, Checked today, Not checked, and Completion metrics, but no canonical WOF, Rego, CoF, Insurance, or Control Room compliance badges were present in either the visible hero or DOM. The page produced no console errors.
+- Browser verification stopped immediately at that defect as required. Work Orders, Mileage, Incidents, Reports, Vehicles, Maintenance Dashboard, dark-theme coverage, narrow-viewport coverage, CSV download behavior, and remaining interactions were not tested in this pass.

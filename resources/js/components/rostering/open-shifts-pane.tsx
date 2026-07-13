@@ -308,7 +308,7 @@ export function OpenShiftsPane({
                                             i === 0 && !isBlocked && !isWarning;
 
                                         return (
-                                            <button
+                                            <Button unstyled
                                                 key={nm.id}
                                                 type="button"
                                                 aria-label={
@@ -380,7 +380,7 @@ export function OpenShiftsPane({
                                                         best
                                                     </span>
                                                 ) : null}
-                                            </button>
+                                            </Button>
                                         );
                                     })
                                 )}

@@ -10,6 +10,8 @@ import {
     shiftStartTime,
     type ShiftRow,
 } from './shift-row-types';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     shifts: ShiftRow[];
@@ -48,7 +50,7 @@ export function ShiftCalendarView({
     }
 
     return (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>
                     Week of{' '}
@@ -105,19 +107,19 @@ export function ShiftCalendarView({
                                 />
                             ))}
                             {list.length === 0 && onCreateOnDay ? (
-                                <button
+                                <GuardrailButton unstyled
                                     type="button"
                                     onClick={() => onCreateOnDay(d)}
                                     className="flex h-full min-h-[80px] w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent text-center text-[11px] text-muted-foreground opacity-0 transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/col:opacity-100"
                                 >
                                     <Plus className="h-3 w-3" /> Add shift
-                                </button>
+                                </GuardrailButton>
                             ) : null}
                         </div>
                     );
                 })}
             </div>
-        </div>
+        </GuardrailCard>
     );
 }
 
@@ -196,7 +198,7 @@ function CalendarShiftBlock({
                     </span>
                 )}
             </div>
-            <button
+            <GuardrailButton unstyled
                 type="button"
                 aria-label="Shift actions"
                 onClick={(e) => {
@@ -207,7 +209,7 @@ function CalendarShiftBlock({
                 className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background/80 text-foreground opacity-0 shadow-sm transition hover:bg-background group-hover/blk:opacity-100"
             >
                 <MoreVertical className="h-3 w-3" />
-            </button>
+            </GuardrailButton>
         </div>
     );
 }

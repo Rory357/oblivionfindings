@@ -27,6 +27,7 @@ class BreakGlassController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
+        $this->authorize('breakGlass', $client);
 
         $policy = BreakGlassPolicy::forOrganization($user->organization_id);
 
@@ -70,6 +71,7 @@ class BreakGlassController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
+        $this->authorize('manageBreakGlass', $client);
         abort_unless((int) $access->client_id === (int) $client->id, 404);
         abort_unless($this->canManage($user, $access), 403);
 
@@ -97,6 +99,7 @@ class BreakGlassController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.audit.view'), 403);
+        $this->authorize('reviewBreakGlass', $client);
 
         // Reviews apply to completed activations, which may be expired or revoked
         // (soft-deleted) — resolve including trashed so the audit log's Review
@@ -181,6 +184,7 @@ class BreakGlassController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
+        $this->authorize('manageBreakGlass', $client);
 
         abort_unless((int) $access->client_id === (int) $client->id, 404);
         abort_unless($this->canManage($user, $access), 403);

@@ -6,9 +6,11 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\FamilyPortalSetting;
+use App\Models\NextOfKin;
 use App\Models\RespiteBooking;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +26,7 @@ class RespitePortalVisibilityTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->portalUser = User::factory()->create([
             'role' => 'next_of_kin',
@@ -34,10 +36,17 @@ class RespitePortalVisibilityTest extends TestCase
 
         $this->client = Client::factory()->create();
         $this->client->portalUsers()->attach($this->portalUser->id, ['relation' => 'guardian']);
+        NextOfKin::query()->create([
+            'client_id' => $this->client->id,
+            'user_id' => $this->portalUser->id,
+            'relationship' => 'guardian',
+        ]);
     }
 
-    public function test_respite_bookings_are_visible_in_portal_schedule_calendar_and_dashboard_by_default(): void
+    public function test_respite_bookings_are_visible_with_active_family_information_consent_and_default_settings(): void
     {
+        $this->grantFamilyInformationConsent();
+
         $booking = RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
             'status' => 'confirmed',
@@ -74,6 +83,8 @@ class RespitePortalVisibilityTest extends TestCase
 
     public function test_show_respite_false_hides_portal_respite_surfaces(): void
     {
+        $this->grantFamilyInformationConsent();
+
         RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
             'status' => 'confirmed',
@@ -151,5 +162,24 @@ class RespitePortalVisibilityTest extends TestCase
         $this->assertFalse($setting->show_care_notes);
         $this->assertFalse($setting->show_incidents);
         $this->assertTrue($setting->show_shift_schedule);
+    }
+
+    private function grantFamilyInformationConsent(): ClientConsent
+    {
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Information Sharing with Whānau / Family',
+            'category' => 'communication',
+        ]);
+
+        return ClientConsent::create([
+            'client_id' => $this->client->id,
+            'consent_type_id' => $consentType->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_method' => 'written',
+            'given_by_relationship' => 'guardian',
+            'given_by_user_id' => $this->portalUser->id,
+        ]);
     }
 }

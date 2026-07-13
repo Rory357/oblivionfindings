@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Client;
 use App\Models\SiteHouseRoom;
+use App\Services\Clients\ClientWorkerEligibility;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -21,16 +22,16 @@ class StoreClientRequest extends FormRequest
             // site_id / service_context_id / date_of_birth are required by the
             // Add Client wizard client-side, but kept nullable server-side so the
             // legacy create flow and API stay backward-compatible.
-            'site_id'    => ['nullable', 'integer', 'exists:sites,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'room_id' => ['nullable', 'integer', 'exists:site_house_rooms,id'],
             'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name'  => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'string', 'max:50'],
             'preferred_pronouns' => ['nullable', 'string', 'max:50'],
-            'status'     => ['required', 'in:active,inactive,onboarding'],
+            'status' => ['required', 'in:active,inactive,onboarding'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255', 'required_if:create_client_portal_user,1,true'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
@@ -187,6 +188,25 @@ class StoreClientRequest extends FormRequest
 
             if (! $belongsToSite) {
                 $validator->errors()->add('room_id', 'Selected room does not belong to the chosen site.');
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
+            $workerId = $this->input('key_worker_id');
+            if (blank($workerId) || $validator->errors()->has('key_worker_id')) {
+                return;
+            }
+
+            $eligible = app(ClientWorkerEligibility::class)
+                ->queryForOrganization($this->user()?->organization_id)
+                ->whereKey((int) $workerId)
+                ->exists();
+
+            if (! $eligible) {
+                $validator->errors()->add(
+                    'key_worker_id',
+                    'Choose an eligible key worker from this organisation.',
+                );
             }
         });
     }

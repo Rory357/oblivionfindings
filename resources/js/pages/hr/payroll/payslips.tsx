@@ -1,5 +1,10 @@
 import { PayrollTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import { PayrollHero } from '@/components/hr/payroll-hero';
+import {
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/hr/row-context-menu';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +21,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, FileText, Plus, Receipt } from 'lucide-react';
+import { Download, FileText, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 interface Payslip {
@@ -110,6 +115,8 @@ export default function PayslipsIndex({
         period_end: '',
         employee_profile_id: '',
     });
+    const { open: openPayslipContext, element: payslipContextElement } =
+        useRowContextMenu();
 
     function applyFilters(key: string, value: string) {
         router.get(
@@ -129,20 +136,19 @@ export default function PayslipsIndex({
         });
     }
 
+    const payslipContextItems = (payslip: Payslip): RowCtxItem[] => [
+        { kind: 'item', label: 'View payslip', icon: FileText, onSelect: () => router.visit(`/hr/payroll/payslips/${payslip.id}`) },
+        { kind: 'item', label: 'Download payslip', icon: Download, onSelect: () => { window.location.href = `/hr/payroll/payslips/${payslip.id}/download`; } },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payslips" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        icon={Receipt}
-                        title="Payslips"
-                        description="Generate, review, and distribute employee payslips."
-                        stats={[
-                            { label: 'Total', value: statusCounts.total, href: '/hr/payroll/payslips' },
-                            { label: 'Drafts', value: statusCounts.draft, href: '/hr/payroll/payslips?status=draft' },
-                            { label: 'Paid', value: statusCounts.paid, href: '/hr/payroll/payslips?status=paid' },
-                        ]}
+                    <PayrollHero
+                        surface="payslips"
+                        counts={statusCounts}
                         actions={
                             can.generate ? (
                                 <Button onClick={() => setShowGenerate(!showGenerate)}>
@@ -289,6 +295,7 @@ export default function PayslipsIndex({
                 {/* Table */}
                 <Card>
                     <CardContent className="p-0">
+                        <div data-payroll-desktop className="hidden md:block">
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
@@ -324,6 +331,7 @@ export default function PayslipsIndex({
                                         <tr
                                             key={payslip.id}
                                             className="hover:bg-muted/30"
+                                            onContextMenu={openPayslipContext(payslipContextItems(payslip))}
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">
@@ -401,6 +409,33 @@ export default function PayslipsIndex({
                                 )}
                             </tbody>
                         </table>
+                        </div>
+                        <div data-payroll-mobile className="divide-y md:hidden">
+                            {payslips.data.map((payslip) => {
+                                const config = statusConfig[payslip.status] || statusConfig.draft;
+                                return (
+                                    <article key={payslip.id} className="space-y-3 p-4" onContextMenu={openPayslipContext(payslipContextItems(payslip))}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold">{payslip.user?.name ?? '-'}</p>
+                                                <p className="text-xs text-muted-foreground">{payslip.pay_period_start} — {payslip.pay_period_end}</p>
+                                            </div>
+                                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                                        </div>
+                                        <dl className="grid grid-cols-3 gap-2 text-sm">
+                                            <div><dt className="text-xs text-muted-foreground">Gross</dt><dd className="font-medium">{formatCurrency(payslip.gross_pay)}</dd></div>
+                                            <div><dt className="text-xs text-muted-foreground">PAYE</dt><dd>{formatCurrency(payslip.paye)}</dd></div>
+                                            <div><dt className="text-xs text-muted-foreground">Net</dt><dd className="font-medium">{formatCurrency(payslip.net_pay)}</dd></div>
+                                        </dl>
+                                        <div className="flex justify-end gap-2">
+                                            <Button variant="ghost" size="sm" asChild><Link href={`/hr/payroll/payslips/${payslip.id}`}><FileText className="mr-1 h-3 w-3" />View</Link></Button>
+                                            <Button variant="outline" size="sm" asChild><Link href={`/hr/payroll/payslips/${payslip.id}/download`}><Download className="mr-1 h-3 w-3" />Download</Link></Button>
+                                        </div>
+                                    </article>
+                                );
+                            })}
+                            {payslips.data.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No payslips found.</p> : null}
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -422,6 +457,7 @@ export default function PayslipsIndex({
                     </div>
                 )}
             </PageLayout>
+            {payslipContextElement}
         </AppLayout>
     );
 }

@@ -14,6 +14,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { FileText, Paperclip } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 interface RadarPoint {
     competency: string;
@@ -421,7 +422,7 @@ function AssessmentEvidence({
             )}
             {canManage && (
                 <>
-                    <button
+                    <GuardrailButton unstyled
                         type="button"
                         onClick={() => inputRef.current?.click()}
                         disabled={uploading}
@@ -430,7 +431,7 @@ function AssessmentEvidence({
                     >
                         <Paperclip className="h-3 w-3" />
                         {uploading ? '…' : assessment.has_evidence ? 'Replace' : 'Attach'}
-                    </button>
+                    </GuardrailButton>
                     <input
                         ref={inputRef}
                         type="file"

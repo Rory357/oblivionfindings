@@ -73,7 +73,7 @@ function monthLabel(year: number, month: number): string {
  * the next 5 upcoming events.
  */
 export function GovernanceCalendar({ events }: GovernanceCalendarProps) {
-    const today = new Date();
+    const today = useMemo(() => new Date(), []);
     const [cursor, setCursor] = useState(() => ({
         year: today.getFullYear(),
         month: today.getMonth(),

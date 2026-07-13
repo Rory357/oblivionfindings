@@ -82,7 +82,11 @@ export function ProfileDialogs({
                 preferredName={flowContext.preferredName}
                 plan={(dialog.ctx?.plan as CarePlanForEdit | undefined) ?? null}
                 staffOptions={flowContext.staffOptions}
-                serviceAgreementOptions={(dialog.ctx?.serviceAgreementOptions as SelectOption[] | undefined) ?? []}
+                serviceAgreementOptions={
+                    (dialog.ctx?.serviceAgreementOptions as
+                        | SelectOption[]
+                        | undefined) ?? []
+                }
                 fromOnboarding={Boolean(dialog.ctx?.fromOnboarding)}
             />
         );
@@ -113,6 +117,7 @@ export function ProfileDialogs({
                 onClose={onClose}
                 clientId={flowContext.clientId}
                 clientName={flowContext.preferredName}
+                canSend={flowContext.canSendFamilyChat}
             />
         );
     }

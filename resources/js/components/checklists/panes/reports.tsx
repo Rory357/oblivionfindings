@@ -5,6 +5,7 @@ import { useChecklistConfig, type PaneCtx } from '../context';
 import { Donut } from '../charts';
 import { CategoryDot, StatusBadge } from '../primitives';
 import type { HeroStats } from '../hero';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 function legend(color: string, label: string) {
     return (
@@ -47,7 +48,7 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
                 </div>
             ) : null}
             <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
                     <div className="border-b border-border px-5 py-3.5">
                         <h3 className="text-base font-semibold">Completed vs overdue</h3>
                         <p className="text-sm text-muted-foreground">Checklist runs over the last 8 weeks</p>
@@ -85,9 +86,9 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
                             {legend('var(--status-critical)', 'Overdue')}
                         </div>
                     </div>
-                </div>
+                </GuardrailCard>
 
-                <div className="rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm">
                     <div className="border-b border-border px-5 py-3.5">
                         <h3 className="text-base font-semibold">Network on-track</h3>
                         <p className="text-sm text-muted-foreground">Weighted across all categories</p>
@@ -101,11 +102,11 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
                             {miniStat(hazardsRaised, 'Failures → hazards', 'info')}
                         </div>
                     </div>
-                </div>
+                </GuardrailCard>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm">
                     <div className="border-b border-border px-5 py-3.5">
                         <h3 className="text-base font-semibold">On-track by category</h3>
                     </div>
@@ -128,9 +129,9 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
                             </div>
                         ))}
                     </div>
-                </div>
+                </GuardrailCard>
 
-                <div className="rounded-xl border border-border bg-card shadow-sm">
+                <GuardrailCard unstyled className="rounded-xl border border-border bg-card shadow-sm">
                     <div className="border-b border-border px-5 py-3.5">
                         <h3 className="text-base font-semibold">Top failing items</h3>
                         <p className="text-sm text-muted-foreground">Most-failed checks and hazards raised</p>
@@ -159,7 +160,7 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
                             ))}
                         </div>
                     )}
-                </div>
+                </GuardrailCard>
             </div>
         </div>
     );

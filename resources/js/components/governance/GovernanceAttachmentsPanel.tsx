@@ -246,14 +246,14 @@ export function GovernanceAttachmentsPanel({
             {error && (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                     <span>{error}</span>
-                    <button
+                    <Button unstyled
                         type="button"
                         onClick={() => setError(null)}
                         aria-label="Dismiss error"
                         className="shrink-0"
                     >
                         <X className="h-4 w-4" />
-                    </button>
+                    </Button>
                 </div>
             )}
 

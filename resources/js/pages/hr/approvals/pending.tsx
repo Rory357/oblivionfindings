@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Table,
@@ -13,9 +19,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Check, CheckCircle2, Settings } from 'lucide-react';
+import { Check, CheckCircle2, ExternalLink, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 type ApprovalInstance = {
@@ -24,6 +31,7 @@ type ApprovalInstance = {
     chain_name: string;
     approvable_type: string;
     approvable_id: number;
+    item_label: string;
     current_step: number;
     total_steps: number;
     status: string;
@@ -32,12 +40,24 @@ type ApprovalInstance = {
     actions_count: number;
 };
 
+type NativeApproval = {
+    id: number;
+    type: 'leave' | 'expense' | 'offer' | 'requisition';
+    title: string;
+    requester: string;
+    summary: string;
+    status: string;
+    submitted_at: string | null;
+    url: string;
+};
+
 type Props = {
     instances: {
         data: ApprovalInstance[];
         total: number;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
+    nativeApprovals: NativeApproval[];
     can: { manage: boolean };
 };
 
@@ -60,9 +80,20 @@ const processTypeConfig: Record<string, { className: string }> = {
         className:
             'border-status-warning/30 text-status-warning bg-status-warning-bg',
     },
+    offer: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    },
+    requisition: {
+        className: 'border-primary/30 text-primary bg-primary/10',
+    },
 };
 
-export default function PendingApprovals({ instances, can }: Props) {
+export default function PendingApprovals({
+    instances,
+    nativeApprovals,
+    can,
+}: Props) {
     const [actionInstanceId, setActionInstanceId] = useState<number | null>(
         null,
     );
@@ -97,7 +128,11 @@ export default function PendingApprovals({ instances, can }: Props) {
                         title="Pending Approvals"
                         description="Review and action pending approval requests."
                         stats={[
-                            { label: 'Pending', value: instances.total },
+                            {
+                                label: 'Pending',
+                                value: instances.total + nativeApprovals.length,
+                            },
+                            { label: 'Native queues', value: nativeApprovals.length },
                         ]}
                         actions={
                             can.manage ? (
@@ -117,7 +152,111 @@ export default function PendingApprovals({ instances, can }: Props) {
                     />
                 }
             >
+                {instances.data.length === 0 && nativeApprovals.length === 0 ? (
+                    <Card data-approvals-empty>
+                        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                            <CheckCircle2 className="h-10 w-10 text-status-success" />
+                            <div>
+                                <h2 className="font-semibold">
+                                    No approvals need your attention
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    New requests from native HR workflows or
+                                    configured approval chains will appear here.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
                 <Card>
+                    <CardHeader>
+                        <CardTitle>Native workflow approvals</CardTitle>
+                        <CardDescription>
+                            These requests keep their existing approval flow.
+                            Open the owning HR area to review and action them.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Request</TableHead>
+                                    <TableHead>Requested by</TableHead>
+                                    <TableHead>Details</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="w-36">Review</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {nativeApprovals.map((approval) => {
+                                    const typeConfig =
+                                        processTypeConfig[approval.type] ||
+                                        processTypeConfig.leave;
+
+                                    return (
+                                        <TableRow
+                                            key={`${approval.type}-${approval.id}`}
+                                        >
+                                            <TableCell>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`capitalize ${typeConfig.className}`}
+                                                >
+                                                    {approval.type}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {approval.title}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {approval.requester}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {approval.summary}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {formatDateTimeLong(approval.submitted_at)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <Link href={approval.url}>
+                                                        Review
+                                                        <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {nativeApprovals.length === 0 && (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={6}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No native workflow approvals.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Approval chains</CardTitle>
+                        <CardDescription>
+                            Requests managed by the configured approval chain
+                            service.
+                        </CardDescription>
+                    </CardHeader>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader>
@@ -153,8 +292,7 @@ export default function PendingApprovals({ instances, can }: Props) {
                                                 {instance.chain_name}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {instance.approvable_type} #
-                                                {instance.approvable_id}
+                                                {instance.item_label}
                                             </TableCell>
                                             <TableCell>
                                                 <span className="text-sm">
@@ -166,7 +304,7 @@ export default function PendingApprovals({ instances, can }: Props) {
                                                 {instance.initiated_by}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {instance.initiated_at}
+                                                {formatDateTimeLong(instance.initiated_at)}
                                             </TableCell>
                                             <TableCell>
                                                 {actionInstanceId ===
@@ -247,7 +385,7 @@ export default function PendingApprovals({ instances, can }: Props) {
                                             colSpan={7}
                                             className="py-8 text-center text-muted-foreground"
                                         >
-                                            No pending approvals.
+                                            No pending chain approvals.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -255,6 +393,8 @@ export default function PendingApprovals({ instances, can }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
+                    </>
+                )}
 
                 {/* Pagination */}
                 {instances.links?.length > 3 && (

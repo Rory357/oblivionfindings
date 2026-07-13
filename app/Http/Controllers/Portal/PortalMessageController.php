@@ -11,12 +11,23 @@ use App\Models\OpsConversationParticipant;
 use App\Models\OpsMessage;
 use App\Models\OpsMessageReaction;
 use App\Models\Shift;
-use App\Models\TimelineEvent;
+use App\Models\User;
+use App\Services\Clients\ClientPhotoMediaUrls;
+use App\Services\Clients\ClientPhotoStorage;
+use App\Services\Clients\ClientWorkerEligibility;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class PortalMessageController extends Controller
 {
+    public function __construct(
+        private readonly ClientPhotoMediaUrls $mediaUrls,
+        private readonly ClientPhotoStorage $photoStorage,
+        private readonly ClientWorkerEligibility $workerEligibility,
+    ) {}
+
     public function index(Request $request, Client $client)
     {
         $user = $request->user();
@@ -25,8 +36,18 @@ class PortalMessageController extends Controller
 
         $conversations = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['latestMessage', 'participants.user:id,name,last_seen_at,presence_status'])
+            ->with([
+                'latestMessage' => fn ($query) => $query
+                    ->where('client_id', $client->id)
+                    ->where(fn ($query) => $query
+                        ->where('organization_id', $client->organization_id)
+                        ->orWhereNull('organization_id')),
+                'participants.user:id,name,last_seen_at,presence_status',
+            ])
             ->orderByDesc('updated_at')
             ->get()
             ->map(fn ($convo) => [
@@ -42,10 +63,16 @@ class PortalMessageController extends Controller
                 ] : null,
                 'participants' => $convo->participants->map(function ($p) {
                     $u = $p->user;
-                    if (!$u) return null;
+                    if (! $u) {
+                        return null;
+                    }
                     $presence = 'offline';
-                    if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
-                    elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                    if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) {
+                        $presence = 'online';
+                    } elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) {
+                        $presence = 'away';
+                    }
+
                     return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
                 })->filter()->values(),
             ]);
@@ -76,51 +103,68 @@ class PortalMessageController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        // Verify user is a participant of this conversation
-        $isParticipant = $conversation->participants()
-            ->where('user_id', $user->id)
-            ->exists();
-        abort_unless($isParticipant, 403);
+        $this->assertConversationAccess($user, $client, $conversation);
 
-        // Verify conversation belongs to the client
-        abort_unless($conversation->client_id === $client->id, 403);
-
-        $messages = $conversation->messages()->withTrashed()
+        $messageRecords = $conversation->messages()->withTrashed()
+            ->where('client_id', $client->id)
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->with(['sender:id,name,profile_photo_path', 'reactions.user:id,name'])
             ->orderBy('created_at')
+            ->get();
+        $messagePhotos = ClientPhoto::query()
+            ->where('client_id', $client->id)
+            ->whereIn(
+                'id',
+                $messageRecords
+                    ->flatMap(fn (OpsMessage $message) => collect($message->attachments ?? [])
+                        ->pluck('photo_id'))
+                    ->filter()
+                    ->unique()
+                    ->values(),
+            )
             ->get()
-            ->map(fn ($msg) => [
-                'id' => $msg->id,
-                'content' => $msg->content,
-                'sender_id' => $msg->sender_id,
-                'sender_type' => $msg->sender_type,
-                'message_type' => $msg->message_type,
-                'attachments' => $msg->attachments,
-                'is_pinned' => (bool) $msg->is_pinned,
-                'is_read' => (bool) $msg->is_read,
-                'read_at' => $msg->read_at?->toISOString(),
-                'shift_id' => $msg->shift_id,
-                'is_deleted' => $msg->trashed(),
-                'reactions' => $msg->reactions
-                    ->groupBy('emoji')
-                    ->map(fn ($group, $emoji) => [
-                        'emoji' => $emoji,
-                        'count' => $group->count(),
-                        'user_ids' => $group->pluck('user_id')->all(),
-                        'user_names' => $group->map(fn ($r) => $r->user?->name)->filter()->values()->all(),
-                    ])
-                    ->values()
-                    ->all(),
-                'sender' => $msg->sender ? [
-                    'id' => $msg->sender->id,
-                    'name' => $msg->sender->name,
-                    'avatar' => $msg->sender->avatar,
-                ] : null,
-                'created_at' => $msg->created_at?->toISOString(),
-            ]);
+            ->keyBy('id');
+        $messages = $messageRecords->map(fn ($msg) => [
+            'id' => $msg->id,
+            'content' => $msg->content,
+            'sender_id' => $msg->sender_id,
+            'sender_type' => $msg->sender_type,
+            'message_type' => $msg->message_type,
+            'attachments' => $this->portalAttachmentPayload(
+                $msg->attachments,
+                $messagePhotos,
+            ),
+            'is_pinned' => (bool) $msg->is_pinned,
+            'is_read' => (bool) $msg->is_read,
+            'read_at' => $msg->read_at?->toISOString(),
+            'shift_id' => $msg->shift_id,
+            'is_deleted' => $msg->trashed(),
+            'reactions' => $msg->reactions
+                ->groupBy('emoji')
+                ->map(fn ($group, $emoji) => [
+                    'emoji' => $emoji,
+                    'count' => $group->count(),
+                    'user_ids' => $group->pluck('user_id')->all(),
+                    'user_names' => $group->map(fn ($r) => $r->user?->name)->filter()->values()->all(),
+                ])
+                ->values()
+                ->all(),
+            'sender' => $msg->sender ? [
+                'id' => $msg->sender->id,
+                'name' => $msg->sender->name,
+                'avatar' => $msg->sender->avatar,
+            ] : null,
+            'created_at' => $msg->created_at?->toISOString(),
+        ]);
 
         // Pinned messages
         $pinnedMessages = $conversation->messages()
+            ->where('client_id', $client->id)
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->where('is_pinned', true)
             ->with('sender:id,name')
             ->orderByDesc('created_at')
@@ -135,6 +179,10 @@ class PortalMessageController extends Controller
 
         // Mark unread messages as read
         $conversation->messages()
+            ->where('client_id', $client->id)
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->where('sender_id', '!=', $user->id)
             ->whereNull('read_at')
             ->update(['read_at' => now(), 'is_read' => true]);
@@ -144,10 +192,16 @@ class PortalMessageController extends Controller
             ->get()
             ->map(function ($p) {
                 $u = $p->user;
-                if (!$u) return null;
+                if (! $u) {
+                    return null;
+                }
                 $presence = 'offline';
-                if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
-                elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) {
+                    $presence = 'online';
+                } elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) {
+                    $presence = 'away';
+                }
+
                 return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
             })
             ->filter()
@@ -156,8 +210,18 @@ class PortalMessageController extends Controller
         // Re-fetch conversations for sidebar (same as index)
         $allConversations = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['latestMessage', 'participants.user:id,name,last_seen_at,presence_status'])
+            ->with([
+                'latestMessage' => fn ($query) => $query
+                    ->where('client_id', $client->id)
+                    ->where(fn ($query) => $query
+                        ->where('organization_id', $client->organization_id)
+                        ->orWhereNull('organization_id')),
+                'participants.user:id,name,last_seen_at,presence_status',
+            ])
             ->orderByDesc('updated_at')
             ->get()
             ->map(function ($convo) {
@@ -172,10 +236,16 @@ class PortalMessageController extends Controller
                     ] : null,
                     'participants' => $convo->participants->map(function ($p) {
                         $u = $p->user;
-                        if (!$u) return null;
+                        if (! $u) {
+                            return null;
+                        }
                         $presence = 'offline';
-                        if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
-                        elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                        if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) {
+                            $presence = 'online';
+                        } elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) {
+                            $presence = 'away';
+                        }
+
                         return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
                     })->filter()->values(),
                 ];
@@ -207,6 +277,7 @@ class PortalMessageController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $this->assertMessageAccess($user, $client, $message);
 
         $validated = $request->validate([
             'emoji' => ['required', 'string', 'max:10'],
@@ -235,8 +306,9 @@ class PortalMessageController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $this->assertMessageAccess($user, $client, $message);
 
-        $message->update(['is_pinned' => !$message->is_pinned]);
+        $message->update(['is_pinned' => ! $message->is_pinned]);
 
         return redirect()->back();
     }
@@ -246,6 +318,7 @@ class PortalMessageController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $this->assertMessageAccess($user, $client, $message);
         abort_unless($message->sender_id === $user->id, 403);
 
         // Soft delete — data preserved for auditing
@@ -261,14 +334,23 @@ class PortalMessageController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $q = $request->query('q', '');
-        if (strlen($q) < 2) return response()->json([]);
+        if (strlen($q) < 2) {
+            return response()->json([]);
+        }
 
         $conversationIds = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->whereHas('participants', fn ($qb) => $qb->where('user_id', $user->id))
             ->pluck('id');
 
         $results = OpsMessage::whereIn('conversation_id', $conversationIds)
+            ->where('client_id', $client->id)
+            ->where(fn ($query) => $query
+                ->where('organization_id', $client->organization_id)
+                ->orWhereNull('organization_id'))
             ->where('content', 'like', "%{$q}%")
             ->with('sender:id,name')
             ->orderByDesc('created_at')
@@ -291,15 +373,16 @@ class PortalMessageController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        $isParticipant = $conversation->participants()
-            ->where('user_id', $user->id)
-            ->exists();
-        abort_unless($isParticipant, 403);
-        abort_unless($conversation->client_id === $client->id, 403);
+        $this->assertConversationAccess($user, $client, $conversation);
 
         $request->validate([
-            'content' => 'nullable|string|max:5000',
-            'attachment' => 'nullable|file|max:20480',
+            'content' => ['nullable', 'string', 'max:5000'],
+            'attachment' => [
+                'nullable',
+                'file',
+                'max:20480',
+                'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,csv,txt,rtf',
+            ],
         ]);
 
         $content = $request->input('content', '');
@@ -309,56 +392,19 @@ class PortalMessageController extends Controller
         // Handle file attachment
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $isImage = str_starts_with($file->getMimeType(), 'image/');
+            $isImage = in_array(
+                strtolower((string) $file->getMimeType()),
+                ClientPhotoStorage::SAFE_IMAGE_MIME_TYPES,
+                true,
+            );
 
             if ($isImage) {
-                // Store as photo (same pattern as PortalPhotoController)
-                $directory = "client-photos/{$client->id}";
-                $storagePath = $file->store($directory, 'public');
-                $thumbnailPath = null;
-
-                // Generate thumbnail
-                $fullPath = Storage::disk('public')->path($storagePath);
-                if (file_exists($fullPath)) {
-                    $imageInfo = @getimagesize($fullPath);
-                    if ($imageInfo !== false) {
-                        $sourceImage = match ($imageInfo[2]) {
-                            IMAGETYPE_JPEG => @imagecreatefromjpeg($fullPath),
-                            IMAGETYPE_PNG => @imagecreatefrompng($fullPath),
-                            IMAGETYPE_GIF => @imagecreatefromgif($fullPath),
-                            IMAGETYPE_WEBP => @imagecreatefromwebp($fullPath),
-                            default => null,
-                        };
-                        if ($sourceImage) {
-                            $origW = imagesx($sourceImage);
-                            $origH = imagesy($sourceImage);
-                            $maxDim = 400;
-                            $ratio = min($maxDim / max($origW, 1), $maxDim / max($origH, 1), 1);
-                            $newW = (int) round($origW * $ratio);
-                            $newH = (int) round($origH * $ratio);
-                            $thumb = imagecreatetruecolor($newW, $newH);
-                            if (in_array($imageInfo[2], [IMAGETYPE_PNG, IMAGETYPE_GIF], true)) {
-                                imagealphablending($thumb, false);
-                                imagesavealpha($thumb, true);
-                                imagefilledrectangle($thumb, 0, 0, $newW, $newH, imagecolorallocatealpha($thumb, 0, 0, 0, 127));
-                            }
-                            imagecopyresampled($thumb, $sourceImage, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
-                            $thumbDir = "client-photos/{$client->id}/thumbs";
-                            Storage::disk('public')->makeDirectory($thumbDir);
-                            $thumbFile = pathinfo($storagePath, PATHINFO_FILENAME) . '_thumb.jpg';
-                            $thumbnailPath = "{$thumbDir}/{$thumbFile}";
-                            imagejpeg($thumb, Storage::disk('public')->path($thumbnailPath), 85);
-                            imagedestroy($sourceImage);
-                            imagedestroy($thumb);
-                        }
-                    }
-                }
+                $stored = $this->photoStorage->store($file, $client);
 
                 $photo = ClientPhoto::create([
                     'client_id' => $client->id,
                     'uploaded_by_user_id' => $user->id,
-                    'storage_path' => $storagePath,
-                    'thumbnail_path' => $thumbnailPath,
+                    ...$stored,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                     'size_bytes' => $file->getSize(),
@@ -367,7 +413,7 @@ class PortalMessageController extends Controller
                     'status' => 'approved',
                 ]);
 
-                app(\App\Services\Timeline\TimelineEmitter::class)->record([
+                app(TimelineEmitter::class)->record([
                     'source_type' => ClientPhoto::class,
                     'source_id' => $photo->id,
                     'occurred_at' => now(),
@@ -384,13 +430,9 @@ class PortalMessageController extends Controller
                 $attachments = [[
                     'type' => 'photo',
                     'name' => $file->getClientOriginalName(),
-                    'path' => $storagePath,
-                    'thumbnail_path' => $thumbnailPath,
                     'size' => $file->getSize(),
                     'mime_type' => $file->getMimeType(),
                     'photo_id' => $photo->id,
-                    'url' => Storage::disk('public')->url($storagePath),
-                    'thumbnail_url' => $thumbnailPath ? Storage::disk('public')->url($thumbnailPath) : null,
                 ]];
                 $content = $content ?: '📸 Shared a photo';
                 $messageType = 'attachment';
@@ -414,7 +456,7 @@ class PortalMessageController extends Controller
                     'portal_visible' => true,
                 ]);
 
-                app(\App\Services\Timeline\TimelineEmitter::class)->record([
+                app(TimelineEmitter::class)->record([
                     'source_type' => ClientDocument::class,
                     'source_id' => $doc->id,
                     'occurred_at' => now(),
@@ -422,7 +464,7 @@ class PortalMessageController extends Controller
                     'actor_user_id' => $user->id,
                     'client_id' => $client->id,
                     'site_id' => $client->site_id,
-                    'subject' => 'Document shared in chat: ' . $file->getClientOriginalName(),
+                    'subject' => 'Document shared in chat: '.$file->getClientOriginalName(),
                     'visibility' => 'portal',
                     'is_pinned' => false,
                     'created_by' => $user->id,
@@ -431,21 +473,21 @@ class PortalMessageController extends Controller
                 $attachments = [[
                     'type' => 'document',
                     'name' => $file->getClientOriginalName(),
-                    'path' => $path,
                     'size' => $file->getSize(),
                     'mime_type' => $file->getMimeType(),
                     'document_id' => $doc->id,
                 ]];
-                $content = $content ?: '📎 ' . $file->getClientOriginalName();
+                $content = $content ?: '📎 '.$file->getClientOriginalName();
                 $messageType = 'attachment';
             }
         }
 
-        if (!$content && !$attachments) {
+        if (! $content && ! $attachments) {
             return redirect()->back();
         }
 
         OpsMessage::create([
+            'organization_id' => $client->organization_id,
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
             'sender_type' => 'family',
@@ -467,18 +509,31 @@ class PortalMessageController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
+        $careTeamWorkers = $this->portalWorkersForClient($client);
         $validated = $request->validate([
-            'title' => 'nullable|string|max:200',
-            'content' => 'required|string|max:5000',
-            'worker_id' => 'nullable|integer|exists:users,id',
+            'title' => ['nullable', 'string', 'max:200'],
+            'content' => ['required', 'string', 'max:5000'],
+            'worker_id' => [
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($careTeamWorkers): void {
+                    if (! $careTeamWorkers->contains('id', (int) $value)) {
+                        $fail('Choose a worker from this client\'s care team.');
+                    }
+                },
+            ],
         ]);
 
-        $workerId = $validated['worker_id'] ?? $client->key_worker_id;
+        $workerId = $validated['worker_id']
+            ?? $careTeamWorkers->firstWhere('id', $client->key_worker_id)?->id;
 
         // Check if a family conversation already exists between this user and worker for this client
         if ($workerId) {
             $existing = OpsConversation::where('client_id', $client->id)
                 ->where('conversation_type', 'family')
+                ->where(fn ($query) => $query
+                    ->where('organization_id', $client->organization_id)
+                    ->orWhereNull('organization_id'))
                 ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
                 ->whereHas('participants', fn ($q) => $q->where('user_id', $workerId))
                 ->first();
@@ -486,6 +541,7 @@ class PortalMessageController extends Controller
             if ($existing) {
                 // Add message to existing conversation
                 OpsMessage::create([
+                    'organization_id' => $client->organization_id,
                     'conversation_id' => $existing->id,
                     'sender_id' => $user->id,
                     'sender_type' => 'family',
@@ -500,33 +556,47 @@ class PortalMessageController extends Controller
         }
 
         // Create new conversation
-        $workerName = $workerId ? \App\Models\User::find($workerId)?->name : null;
-        $conversation = OpsConversation::create([
-            'title' => $workerName ? "Chat with {$workerName}" : ($validated['title'] ?? 'Family Message'),
-            'conversation_type' => 'family',
-            'client_id' => $client->id,
-        ]);
+        $workerName = $workerId ? User::find($workerId)?->name : null;
+        $conversation = DB::transaction(function () use (
+            $client,
+            $user,
+            $workerId,
+            $workerName,
+            $validated,
+        ): OpsConversation {
+            $conversation = OpsConversation::create([
+                'organization_id' => $client->organization_id,
+                'title' => $workerName ? "Chat with {$workerName}" : ($validated['title'] ?? 'Family Message'),
+                'conversation_type' => 'family',
+                'client_id' => $client->id,
+            ]);
 
-        OpsConversationParticipant::create([
-            'conversation_id' => $conversation->id,
-            'user_id' => $user->id,
-        ]);
-
-        if ($workerId) {
             OpsConversationParticipant::create([
                 'conversation_id' => $conversation->id,
-                'user_id' => $workerId,
+                'user_id' => $user->id,
+                'role' => 'family',
             ]);
-        }
 
-        OpsMessage::create([
-            'conversation_id' => $conversation->id,
-            'sender_id' => $user->id,
-            'sender_type' => 'family',
-            'content' => $validated['content'],
-            'message_type' => 'text',
-            'client_id' => $client->id,
-        ]);
+            if ($workerId) {
+                OpsConversationParticipant::create([
+                    'conversation_id' => $conversation->id,
+                    'user_id' => $workerId,
+                    'role' => 'staff',
+                ]);
+            }
+
+            OpsMessage::create([
+                'organization_id' => $client->organization_id,
+                'conversation_id' => $conversation->id,
+                'sender_id' => $user->id,
+                'sender_type' => 'family',
+                'content' => $validated['content'],
+                'message_type' => 'text',
+                'client_id' => $client->id,
+            ]);
+
+            return $conversation;
+        });
 
         return redirect("/portal/clients/{$client->id}/messages/{$conversation->id}");
     }
@@ -534,8 +604,8 @@ class PortalMessageController extends Controller
     private function portalWorkersForClient(Client $client)
     {
         $client->load([
-            'supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status',
-            'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status',
+            'supportWorkers:id,organization_id,role,name,profile_photo_path,last_seen_at,presence_status',
+            'keyWorker:id,organization_id,role,name,profile_photo_path,last_seen_at,presence_status',
         ]);
 
         $workers = collect();
@@ -555,7 +625,7 @@ class PortalMessageController extends Controller
             ->where('client_id', $client->id)
             ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
             ->where('ends_at', '>=', now()->subDays(7))
-            ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+            ->with('staff:id,organization_id,role,name,profile_photo_path,last_seen_at,presence_status')
             ->orderByDesc('starts_at')
             ->get()
             ->pluck('staff')
@@ -565,7 +635,90 @@ class PortalMessageController extends Controller
             $pushWorker($worker);
         }
 
-        return $workers->values();
+        return $workers
+            ->filter(fn (User $worker) => $this->workerEligibility
+                ->isEligible($client, $worker))
+            ->values();
+    }
+
+    private function assertConversationAccess(
+        User $user,
+        Client $client,
+        OpsConversation $conversation,
+    ): void {
+        abort_unless(
+            (int) $conversation->client_id === (int) $client->id
+                && $conversation->conversation_type === 'family'
+                && (
+                    $conversation->organization_id === null
+                    || $client->organization_id === null
+                    || (int) $conversation->organization_id === (int) $client->organization_id
+                )
+                && $conversation->participants()
+                    ->where('user_id', $user->id)
+                    ->exists(),
+            403,
+        );
+    }
+
+    private function assertMessageAccess(
+        User $user,
+        Client $client,
+        OpsMessage $message,
+    ): void {
+        $conversation = $message->conversation()->first();
+        abort_unless(
+            $conversation
+                && (int) $message->client_id === (int) $client->id
+                && (int) $message->conversation_id === (int) $conversation->id,
+            403,
+        );
+        $this->assertConversationAccess($user, $client, $conversation);
+    }
+
+    /**
+     * Never replay stored paths or historical public URLs. Attachment rows
+     * retain only identifiers and display metadata; fresh, client-bound URLs
+     * are minted for photos after the conversation is authorized.
+     *
+     * @param  array<int, array<string, mixed>>|null  $attachments
+     * @param  Collection<int, ClientPhoto>  $photos
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function portalAttachmentPayload(
+        ?array $attachments,
+        Collection $photos,
+    ): ?array {
+        if ($attachments === null) {
+            return null;
+        }
+
+        return collect($attachments)
+            ->map(function (array $attachment) use ($photos): array {
+                $payload = [
+                    'type' => $attachment['type'] ?? 'document',
+                    'name' => $attachment['name'] ?? 'Attachment',
+                    'size' => (int) ($attachment['size'] ?? 0),
+                    'mime_type' => $attachment['mime_type'] ?? null,
+                ];
+
+                if (($attachment['type'] ?? null) === 'photo') {
+                    $photo = $photos->get((int) ($attachment['photo_id'] ?? 0));
+                    if ($photo) {
+                        $payload['photo_id'] = $photo->id;
+                        $payload = [
+                            ...$payload,
+                            ...$this->mediaUrls->portal($photo),
+                        ];
+                    }
+                } elseif (isset($attachment['document_id'])) {
+                    $payload['document_id'] = (int) $attachment['document_id'];
+                }
+
+                return $payload;
+            })
+            ->values()
+            ->all();
     }
 
     private function derivePresence($user): string

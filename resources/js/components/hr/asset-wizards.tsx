@@ -50,6 +50,7 @@ import {
     type CategoryOption,
     type StaffOption,
 } from './asset-parts';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Public types                                                      */
@@ -513,7 +514,7 @@ function NewAssetWizard({
                         blurb="A QR label staff can scan to open this record and log a scan event."
                     />
                     <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed border-border bg-muted/40 p-5 sm:flex-row sm:items-center">
-                        <div className="grid h-[120px] w-[120px] flex-none place-items-center rounded-xl border border-border bg-card">
+                        <GuardrailCard unstyled className="grid h-[120px] w-[120px] flex-none place-items-center rounded-xl border border-border bg-card">
                             {isEdit && asset?.qr_token ? (
                                 <img
                                     src={`/hr/assets/${asset.id}/qr.svg`}
@@ -523,7 +524,7 @@ function NewAssetWizard({
                             ) : (
                                 <QrCode className="h-12 w-12 text-muted-foreground" />
                             )}
-                        </div>
+                        </GuardrailCard>
                         <div className="min-w-0">
                             <div className="text-sm font-bold">
                                 {isEdit ? 'QR token ready' : 'QR token generated on save'}
@@ -658,7 +659,7 @@ function FleetLinkPanel({
                     </div>
 
                     {picked ? (
-                        <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
+                        <GuardrailCard unstyled className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
                             <Truck className="h-4 w-4 flex-none" style={{ color: 'var(--category-fleet)' }} />
                             <div className="min-w-0 flex-1">
                                 <div className="truncate text-[13px] font-semibold">{picked.name}</div>
@@ -669,7 +670,7 @@ function FleetLinkPanel({
                             <Button variant="ghost" size="sm" onClick={onUnlink}>
                                 Change
                             </Button>
-                        </div>
+                        </GuardrailCard>
                     ) : (
                         <>
                             <div className="relative mt-3">
@@ -688,7 +689,7 @@ function FleetLinkPanel({
                                     </div>
                                 ) : (
                                     results.map((m) => (
-                                        <button
+                                        <Button unstyled
                                             key={m.id}
                                             type="button"
                                             onClick={() => onPick(m)}
@@ -702,7 +703,7 @@ function FleetLinkPanel({
                                                 </div>
                                             </div>
                                             <span className="text-[11px] text-muted-foreground capitalize">{m.status}</span>
-                                        </button>
+                                        </Button>
                                     ))
                                 )}
                             </div>
@@ -842,7 +843,7 @@ function AssignWizard({
                         {filtered.map((s) => {
                             const active = String(s.id) === form.data.employee_profile_id;
                             return (
-                                <button
+                                <Button unstyled
                                     key={s.id}
                                     type="button"
                                     onClick={() => form.setData('employee_profile_id', String(s.id))}
@@ -858,7 +859,7 @@ function AssignWizard({
                                         </div>
                                     </div>
                                     {active ? <CheckCircle2 className="h-5 w-5 text-primary" /> : null}
-                                </button>
+                                </Button>
                             );
                         })}
                         {filtered.length === 0 ? (

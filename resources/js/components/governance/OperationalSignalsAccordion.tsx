@@ -47,7 +47,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 function SignalCard({ card }: { card: CockpitCard }) {
     return (
-        <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <Card unstyled className="space-y-3 rounded-lg border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="text-sm font-semibold text-foreground">{card.title}</p>
@@ -73,7 +73,7 @@ function SignalCard({ card }: { card: CockpitCard }) {
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
             </Button>
-        </div>
+        </Card>
     );
 }
 

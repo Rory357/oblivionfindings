@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrSupervisionNote extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',
@@ -42,8 +42,20 @@ class HrSupervisionNote extends Model
         'is_visible_to_employee' => 'boolean',
     ];
 
+    public static function sessionTypeOptions(): array
+    {
+        return [
+            ['value' => 'one_to_one', 'label' => 'One-to-One'],
+            ['value' => 'supervision', 'label' => 'Supervision'],
+            ['value' => 'review', 'label' => 'Review'],
+            ['value' => 'check_in', 'label' => 'Check-in'],
+            ['value' => 'probation', 'label' => 'Probation Review'],
+            ['value' => 'other', 'label' => 'Other'],
+        ];
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employee(): BelongsTo
@@ -57,7 +69,7 @@ class HrSupervisionNote extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

@@ -567,7 +567,7 @@ export default function DevicesIndex({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
+                        <Button unstyled
                             type="button"
                             onClick={() => {
                                 setPairStepIndex(0);
@@ -577,7 +577,7 @@ export default function DevicesIndex({
                         >
                             <Plus className="h-[15px] w-[15px]" />
                             Pair device
-                        </button>
+                        </Button>
                         <FleetHeroAction
                             href="/fleet-assets/devices?export=csv"
                             icon={Download}
@@ -599,7 +599,7 @@ export default function DevicesIndex({
                             },
                         ] as const
                     ).map((t) => (
-                        <button
+                        <Button unstyled
                             key={t.key}
                             type="button"
                             onClick={() => switchTab(t.key)}
@@ -611,7 +611,7 @@ export default function DevicesIndex({
                             )}
                         >
                             {t.label}
-                        </button>
+                        </Button>
                     ))}
                 </div>
 

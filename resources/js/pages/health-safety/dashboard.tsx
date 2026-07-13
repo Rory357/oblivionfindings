@@ -23,6 +23,7 @@ import { SubstanceWizardDialog } from '@/components/health-safety/substance-wiza
 import { ReportLauncher } from './components/report-launcher';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
     kpis: Record<string, number>;
@@ -351,7 +352,7 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
     };
 
     return (
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
                 <div>
                     <h3 className="text-sm font-semibold text-foreground">Restraint &amp; behaviour support</h3>
@@ -418,6 +419,6 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                     No restraint events awaiting review.
                 </p>
             )}
-        </div>
+        </GuardrailCard>
     );
 }

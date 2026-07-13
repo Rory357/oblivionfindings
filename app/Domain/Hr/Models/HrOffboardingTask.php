@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrOffboardingTask extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'offboarding_checklist_id',
+        'exit_interview_id',
         'category',
         'title',
         'description',
@@ -48,6 +49,11 @@ class HrOffboardingTask extends Model
         return $this->belongsTo(HrOffboardingChecklist::class, 'offboarding_checklist_id');
     }
 
+    public function exitInterview(): BelongsTo
+    {
+        return $this->belongsTo(HrExitInterview::class, 'exit_interview_id');
+    }
+
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
@@ -58,4 +64,3 @@ class HrOffboardingTask extends Model
         return $this->belongsTo(User::class, 'completed_by');
     }
 }
-

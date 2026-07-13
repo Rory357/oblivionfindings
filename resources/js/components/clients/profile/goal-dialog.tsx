@@ -7,6 +7,7 @@
  * goal has no sub-goals. Sub-goals and hurdles mutate immediately (so the page
  * props — and the card grid — stay in sync); progress and details are explicit
  * saves. See CarePlanGoalController for the endpoints. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -167,6 +168,7 @@ export function GoalWizardDialog({
 
     const [stepIndex, setStepIndex] = useState(0);
     const [busy, setBusy] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
 
     /* create-mode form */
     const [template, setTemplate] = useState('custom');
@@ -443,8 +445,6 @@ export function GoalWizardDialog({
 
     const deleteGoal = () => {
         if (!base || !goal) return;
-        if (!window.confirm('Remove this goal from the path? This cannot be undone.'))
-            return;
         mutate('delete', `${base}/${goal.id}`, {}, {
             okToast: 'Goal removed',
             close: true,
@@ -533,7 +533,7 @@ export function GoalWizardDialog({
             <Button
                 type="button"
                 variant="ghost"
-                onClick={deleteGoal}
+                onClick={() => setDeleteOpen(true)}
                 disabled={busy}
                 className="text-status-critical hover:text-status-critical"
             >
@@ -549,6 +549,7 @@ export function GoalWizardDialog({
     const stepKey = railSteps[stepIndex]?.key;
 
     return (
+        <>
         <WizardShell
             open={open}
             onClose={() => !busy && onClose()}
@@ -816,6 +817,15 @@ export function GoalWizardDialog({
                 </WizardStepPane>
             ) : null}
         </WizardShell>
+        <ConfirmDialog
+            open={deleteOpen}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={deleteGoal}
+            title="Remove goal?"
+            description={`Remove “${goal?.title ?? 'this goal'}” from the path? This action cannot be undone.`}
+            confirmText="Remove goal"
+        />
+        </>
     );
 }
 

@@ -13,6 +13,7 @@ import {
     CalendarSync,
     Database,
     FileText,
+    Inbox,
     Key,
     Languages,
     Lock,
@@ -99,6 +100,7 @@ const navSections: NavSection[] = [
         label: 'Integrations',
         items: [
             { icon: CalendarSync, title: 'Calendar Sync', href: '/settings/calendar-sync', permission: 'integrations.manageTenantSecrets' },
+            { icon: Inbox, title: 'Support Mailbox', href: '/settings/it-mailbox', permission: 'integrations.manageTenantSecrets' },
             { icon: Plug, title: 'Device Integrations', href: '/security-devices/integrations', permission: 'securityDevices.integrationsView' },
             { icon: Key, title: 'Outbound API & Webhooks', href: '/settings/api', permission: 'integrations.view' },
         ],

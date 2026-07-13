@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -187,6 +188,7 @@ export default function ClientDocuments({
     const [categoryFilter, setCategoryFilter] = useState('');
     const [showUpload, setShowUpload] = useState(false);
     const [editingDoc, setEditingDoc] = useState<any>(null);
+    const [documentToDelete, setDocumentToDelete] = useState<any>(null);
     const [currentFolder, setCurrentFolder] = useState<string | null>(null);
     const [showNewFolder, setShowNewFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
@@ -679,19 +681,7 @@ export default function ClientDocuments({
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 aria-label="Delete document"
-                                                                onClick={() => {
-                                                                    if (
-                                                                        confirm(
-                                                                            'Delete this document?',
-                                                                        )
-                                                                    )
-                                                                        uploadForm.delete(
-                                                                            `/operations/clients/${client.id}/documents/${d.id}`,
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        );
-                                                                }}
+                                                                onClick={() => setDocumentToDelete(d)}
                                                                 className="h-7 w-7 rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg"
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -902,19 +892,7 @@ export default function ClientDocuments({
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     aria-label="Delete document"
-                                                                    onClick={() => {
-                                                                        if (
-                                                                            confirm(
-                                                                                'Delete?',
-                                                                            )
-                                                                        )
-                                                                            uploadForm.delete(
-                                                                                `/operations/clients/${client.id}/documents/${d.id}`,
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            );
-                                                                    }}
+                                                                    onClick={() => setDocumentToDelete(d)}
                                                                     className="h-7 w-7 rounded-lg hover:bg-status-critical-bg"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5 text-status-critical" />
@@ -1331,6 +1309,21 @@ export default function ClientDocuments({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={documentToDelete !== null}
+                onClose={() => setDocumentToDelete(null)}
+                onConfirm={() => {
+                    if (documentToDelete) {
+                        uploadForm.delete(
+                            `/operations/clients/${client.id}/documents/${documentToDelete.id}`,
+                            { preserveScroll: true },
+                        );
+                    }
+                }}
+                title="Delete document?"
+                description={`Permanently delete “${documentToDelete?.title ?? documentToDelete?.name ?? 'this document'}”? This action cannot be undone.`}
+                confirmText="Delete document"
+            />
         </AppLayout>
     );
 }

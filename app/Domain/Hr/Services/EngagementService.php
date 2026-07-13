@@ -315,15 +315,20 @@ class EngagementService
     }
 
     /**
-     * Delete a draft survey (and its questions via cascade).
+     * Archive a draft survey without discarding its questions or history.
      */
-    public function deleteSurvey(HrEngagementSurvey $survey): void
+    public function archiveDraftSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
     {
         if ($survey->status !== 'draft') {
-            throw new \InvalidArgumentException('Only draft surveys can be deleted.');
+            throw new \InvalidArgumentException('Only draft surveys can be archived through this action.');
         }
 
-        $survey->delete();
+        $survey->update([
+            'status' => 'archived',
+            'updated_by' => $actor->id,
+        ]);
+
+        return $survey->fresh();
     }
 
     /**

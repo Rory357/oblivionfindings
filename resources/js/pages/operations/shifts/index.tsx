@@ -45,6 +45,8 @@ import {
     type ShiftRow,
 } from './components/shift-row-types';
 import { ShiftsHero } from './components/shifts-hero';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Filters = {
     from: string;
@@ -692,7 +694,7 @@ export default function ShiftsIndex({
                     />
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
                     <div className="flex items-center justify-between px-2">
                         <TabStrip
                             value={tab}
@@ -738,7 +740,7 @@ export default function ShiftsIndex({
                             ]}
                         />
                         <div className="ml-2 hidden items-center gap-1 border-l border-border pl-2 pr-2 md:flex">
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => setViewMode('list')}
                                 className={[
@@ -750,8 +752,8 @@ export default function ShiftsIndex({
                                 aria-label="List view"
                             >
                                 <List className="h-4 w-4" /> List
-                            </button>
-                            <button
+                            </GuardrailButton>
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => setViewMode('calendar')}
                                 className={[
@@ -763,7 +765,7 @@ export default function ShiftsIndex({
                                 aria-label="Calendar view"
                             >
                                 <Calendar className="h-4 w-4" /> Calendar
-                            </button>
+                            </GuardrailButton>
                         </div>
                     </div>
 
@@ -813,17 +815,17 @@ export default function ShiftsIndex({
                                     {dense ? 'Compact' : 'Comfortable'}
                                 </span>
                             </span>
-                            <button
+                            <GuardrailButton unstyled
                                 type="button"
                                 onClick={() => setDense((x) => !x)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                 aria-label="Toggle density"
                             >
                                 <Rotate3D className="h-3 w-3" />
-                            </button>
+                            </GuardrailButton>
                         </div>
                     </div>
-                </div>
+                </GuardrailCard>
 
                 {contextMenu ? (
                     <ShiftContextMenu

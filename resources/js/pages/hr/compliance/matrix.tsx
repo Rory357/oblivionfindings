@@ -26,6 +26,7 @@ import {
 import { ComplianceHubHeader, type HeroPayload } from './components/compliance-hub-header';
 import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from './components/compliance-wizards';
 import type { PersonOption } from '@/components/hr/people-picker';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface Requirement {
     id: number;
@@ -134,7 +135,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                     )}
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
                     <table className="w-full text-[13px]">
                         <thead>
                             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -174,9 +175,9 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                                                 {q.hard_stop ? <StatusBadge variant="critical">Hard-stop</StatusBadge> : <StatusBadge variant="neutral">Soft</StatusBadge>}
                                             </td>
                                             <td className="px-3 py-2.5 text-right">
-                                                <button onClick={(e) => openCtx(e, reqMenu(q))} aria-label="Requirement actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+                                                <Button unstyled onClick={(e) => openCtx(e, reqMenu(q))} aria-label="Requirement actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
                                                     <MoreVertical className="h-4 w-4" />
-                                                </button>
+                                                </Button>
                                             </td>
                                         </tr>
                                     );
@@ -184,7 +185,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                             )}
                         </tbody>
                     </table>
-                </div>
+                </GuardrailCard>
 
                 {/* Role × requirement grid */}
                 <div>
@@ -192,11 +193,11 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                     <p className="mt-0.5 text-[12.5px] text-muted-foreground">Click a cell to cycle: none → assigned → mandatory.</p>
                 </div>
                 {roles.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                    <GuardrailCard unstyled className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         No role assignments yet. Use <span className="font-semibold text-foreground">Bulk assign</span> to map requirements to roles.
-                    </div>
+                    </GuardrailCard>
                 ) : (
-                    <div className="overflow-auto rounded-xl border border-border bg-card">
+                    <GuardrailCard unstyled className="overflow-auto rounded-xl border border-border bg-card">
                         <table className="w-full min-w-[760px] text-[12.5px]">
                             <thead>
                                 <tr className="bg-muted">
@@ -216,7 +217,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                                             const level = cellLevel(q.id, role);
                                             return (
                                                 <td key={role} className="p-1.5 text-center">
-                                                    <button
+                                                    <Button unstyled
                                                         type="button"
                                                         disabled={!can.manage}
                                                         onClick={() => cycleCell(q.id, role)}
@@ -230,7 +231,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                                                         }`}
                                                     >
                                                         {level > 0 ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
-                                                    </button>
+                                                    </Button>
                                                 </td>
                                             );
                                         })}
@@ -238,7 +239,7 @@ export default function ComplianceMatrix({ hero, requirements, matrixEntries, ro
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                    </GuardrailCard>
                 )}
                 <div className="flex gap-4 text-xs text-muted-foreground">
                     <Legend className="border border-border" label="None" />

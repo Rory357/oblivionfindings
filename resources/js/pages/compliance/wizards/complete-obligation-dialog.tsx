@@ -204,13 +204,13 @@ export function CompleteObligationDialog({
                         {obligation && onRecordEvidence ? (
                             <InfoCard icon={Paperclip}>
                                 Good practice: attach the evidence that satisfies this obligation.{' '}
-                                <button
+                                <Button unstyled
                                     type="button"
                                     onClick={() => onRecordEvidence(obligation.id)}
                                     className="font-semibold text-primary hover:underline"
                                 >
                                     Record evidence instead
-                                </button>
+                                </Button>
                                 .
                             </InfoCard>
                         ) : null}

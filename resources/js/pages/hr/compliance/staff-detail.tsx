@@ -10,6 +10,8 @@ import { DriverChip, VettingChip } from './components/compliance-bits';
 import { CompactHeroBand, HeroGhostButton, HeroInitials, HeroSolidButton } from './components/compliance-hero';
 import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from './components/compliance-wizards';
 import type { PersonOption } from '@/components/hr/people-picker';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface ComplianceStatus {
     id: number;
@@ -123,12 +125,12 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
                         </div>
                         {can.manage && (
                             <div className="flex gap-2">
-                                <button onClick={() => record()} className="rounded-lg bg-status-critical px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                                <GuardrailButton unstyled onClick={() => record()} className="rounded-lg bg-status-critical px-3 py-1.5 text-[12.5px] font-semibold text-white">
                                     Resolve
-                                </button>
-                                <button onClick={() => waive()} className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold">
+                                </GuardrailButton>
+                                <GuardrailButton unstyled onClick={() => waive()} className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold">
                                     Waive
-                                </button>
+                                </GuardrailButton>
                             </div>
                         )}
                     </div>
@@ -141,7 +143,7 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
                             const items = complianceStatuses.filter((s) => s.status === g.key);
                             if (items.length === 0) return null;
                             return (
-                                <div key={g.key} className="overflow-hidden rounded-xl border border-border bg-card">
+                                <GuardrailCard unstyled key={g.key} className="overflow-hidden rounded-xl border border-border bg-card">
                                     <div className="flex items-center gap-2 border-b border-border px-3.5 py-3">
                                         <g.icon className={`h-4 w-4 ${g.color}`} />
                                         <span className="font-bold">{g.label}</span>
@@ -167,30 +169,30 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
                                             <StatusBadge variant={it.is_mandatory ? 'info' : 'neutral'}>{it.is_mandatory ? 'Required' : 'Optional'}</StatusBadge>
                                             {can.manage && (
                                                 <div className="flex gap-1.5">
-                                                    <button
+                                                    <GuardrailButton unstyled
                                                         onClick={() => record({ requirement: it.requirement_id, status: it.status })}
                                                         className="rounded-md bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
                                                     >
                                                         Record
-                                                    </button>
-                                                    <button
+                                                    </GuardrailButton>
+                                                    <GuardrailButton unstyled
                                                         onClick={() => waive({ requirement: it.requirement_id })}
                                                         className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold"
                                                     >
                                                         Waive
-                                                    </button>
+                                                    </GuardrailButton>
                                                 </div>
                                             )}
                                         </div>
                                     ))}
-                                </div>
+                                </GuardrailCard>
                             );
                         })}
                         {complianceStatuses.length === 0 && (
-                            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
+                            <GuardrailCard unstyled className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
                                 <ShieldCheck className="mx-auto mb-2 h-8 w-8 opacity-40" />
                                 No requirements tracked for this person yet.
-                            </div>
+                            </GuardrailCard>
                         )}
                     </div>
 
@@ -254,16 +256,16 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
 
 function SidePanel({ title, onView, children }: { title: string; onView?: () => void; children: React.ReactNode }) {
     return (
-        <div className="rounded-xl border border-border bg-card p-3.5">
+        <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-3.5">
             <div className="flex items-center justify-between">
                 <span className="text-[13px] font-bold">{title}</span>
                 {onView ? (
-                    <button onClick={onView} className="text-[11.5px] font-semibold text-primary hover:underline">
+                    <GuardrailButton unstyled onClick={onView} className="text-[11.5px] font-semibold text-primary hover:underline">
                         View
-                    </button>
+                    </GuardrailButton>
                 ) : null}
             </div>
             <div className="mt-2.5">{children}</div>
-        </div>
+        </GuardrailCard>
     );
 }

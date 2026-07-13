@@ -3,8 +3,8 @@
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\Client;
+use App\Models\ClientNote;
 use App\Models\Permission;
-use App\Models\ProgressNote;
 use App\Models\Role;
 use App\Models\User;
 
@@ -127,9 +127,9 @@ it('logs and resolves hurdles as goal-linked progress notes', function () {
         ['content' => 'Transport keeps falling through'],
     )->assertRedirect();
 
-    $note = ProgressNote::query()
+    $note = ClientNote::query()
         ->where('care_plan_goal_id', $goal->id)
-        ->where('note_type', 'goal_hurdle')
+        ->where('category', 'goal_hurdle')
         ->firstOrFail();
     expect((bool) $note->is_flagged)->toBeTrue();
 

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { type Entity, LONE_WORKER_ROUTE, type Options, type ShiftOption } from './lone-worker-types';
+import { Button as GuardrailButton } from '@/components/ui/button';
 
 const STEPS: WizardStep[] = [
     { key: 'shift', label: 'Choose the shift', blurb: 'Worker, site & location', icon: Calendar },
@@ -216,38 +217,38 @@ export function LoneWorkerWizard({
 
     const footerEnd = isReview ? (
         <div className="flex items-center gap-2">
-            <button type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Cancel
-            </button>
-            <button
+            </GuardrailButton>
+            <GuardrailButton unstyled
                 type="button"
                 onClick={() => submit(true)}
                 disabled={form.processing}
                 className="rounded-lg border border-primary/40 px-3.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
             >
                 Save & add another
-            </button>
-            <button
+            </GuardrailButton>
+            <GuardrailButton unstyled
                 type="button"
                 onClick={() => submit(false)}
                 disabled={form.processing}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
             >
                 <Radio className="h-4 w-4" /> Start session
-            </button>
+            </GuardrailButton>
         </div>
     ) : (
         <div className="flex items-center gap-2">
-            <button type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Cancel
-            </button>
-            <button
+            </GuardrailButton>
+            <GuardrailButton unstyled
                 type="button"
                 onClick={next}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
                 Continue <ChevronRight className="h-4 w-4" />
-            </button>
+            </GuardrailButton>
         </div>
     );
 
@@ -265,9 +266,9 @@ export function LoneWorkerWizard({
             onStepClick={(i) => setStepIndex(i)}
             pct={pct}
             footerStart={stepIndex > 0 && !done ? (
-                <button type="button" onClick={back} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                <GuardrailButton unstyled type="button" onClick={back} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                     <ChevronLeft className="h-4 w-4" /> Back
-                </button>
+                </GuardrailButton>
             ) : null}
             footerEnd={done ? null : footerEnd}
             success={
@@ -277,12 +278,12 @@ export function LoneWorkerWizard({
                         blurb={`${nameOf(options.staff, d.user_id)} is now being monitored. Overdue check-ins will surface here and in the Control Room automatically.`}
                         actions={
                             <>
-                                <button type="button" onClick={() => { setDone(false); reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                                <GuardrailButton unstyled type="button" onClick={() => { setDone(false); reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
                                     Start another
-                                </button>
-                                <button type="button" onClick={close} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                                </GuardrailButton>
+                                <GuardrailButton unstyled type="button" onClick={close} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
                                     Done
-                                </button>
+                                </GuardrailButton>
                             </>
                         }
                     />
@@ -320,7 +321,7 @@ export function LoneWorkerWizard({
                                         {options.shifts.map((s) => {
                                             const selected = d.shift_id === String(s.id);
                                             return (
-                                                <button
+                                                <GuardrailButton unstyled
                                                     key={s.id}
                                                     type="button"
                                                     onClick={() => selectShift(s)}
@@ -349,7 +350,7 @@ export function LoneWorkerWizard({
                                                         </span>
                                                     </span>
                                                     {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
-                                                </button>
+                                                </GuardrailButton>
                                             );
                                         })}
                                     </div>

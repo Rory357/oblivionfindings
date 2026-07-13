@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,8 @@ export type ClientActionReview = {
 
 export type ClientActionsReviewsSummary = {
     open?: number;
+    loaded?: number;
+    has_more?: boolean;
     critical?: number;
     warning?: number;
 };
@@ -158,24 +161,38 @@ export function ActionsReviewsTab({
         <div className="space-y-6">
             <div className="grid gap-3 md:grid-cols-3">
                 <Metric
-                    label="Open actions"
-                    value={summary.open ?? items.length}
+                    label={
+                        summary.has_more ? 'Open actions shown' : 'Open actions'
+                    }
+                    value={
+                        summary.has_more
+                            ? `${summary.loaded ?? items.length}+`
+                            : (summary.open ?? items.length)
+                    }
                     icon={ListChecks}
                     tone="bg-primary/10 text-primary"
                 />
                 <Metric
-                    label="Critical"
+                    label={summary.has_more ? 'Critical shown' : 'Critical'}
                     value={summary.critical ?? 0}
                     icon={AlertTriangle}
                     tone="bg-status-critical-bg text-status-critical"
                 />
                 <Metric
-                    label="Review"
+                    label={summary.has_more ? 'Review shown' : 'Review'}
                     value={summary.warning ?? 0}
                     icon={FileWarning}
                     tone="bg-status-warning-bg text-status-warning"
                 />
             </div>
+
+            {summary.has_more ? (
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    Additional open actions exist beyond this bounded profile
+                    view. Open the owning profile tabs to review the full
+                    queues.
+                </p>
+            ) : null}
 
             {items.length === 0 ? (
                 <EmptyState
@@ -287,12 +304,12 @@ function Metric({
     tone,
 }: {
     label: string;
-    value: number;
+    value: number | string;
     icon: typeof ListChecks;
     tone: string;
 }) {
     return (
-        <div className="rounded-lg border bg-card p-4">
+        <GuardrailCard unstyled className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between gap-3">
                 <div>
                     <p className="text-xs text-muted-foreground">{label}</p>
@@ -302,6 +319,6 @@ function Metric({
                     <Icon className="h-5 w-5" />
                 </span>
             </div>
-        </div>
+        </GuardrailCard>
     );
 }

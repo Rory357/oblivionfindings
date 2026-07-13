@@ -3,7 +3,12 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrExitInterview;
+use App\Domain\Hr\Models\HrOffboardingTask;
+use App\Domain\Hr\Notifications\ExitInterviewScheduledNotification;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ExitInterviewService
 {
@@ -12,8 +17,10 @@ class ExitInterviewService
      */
     public function createExitInterview(array $data): HrExitInterview
     {
-        return DB::transaction(function () use ($data) {
-            return HrExitInterview::create([
+        $interview = DB::transaction(function () use ($data) {
+            $task = $this->resolveOffboardingTask($data);
+
+            $interview = HrExitInterview::create([
                 'tenant_id' => $data['tenant_id'],
                 'employee_profile_id' => $data['employee_profile_id'],
                 'interviewer_user_id' => $data['interviewer_user_id'],
@@ -29,6 +36,137 @@ class ExitInterviewService
                 'is_confidential' => $data['is_confidential'] ?? true,
                 'created_by' => $data['created_by'],
             ]);
+
+            if ($task) {
+                $task->update(['exit_interview_id' => $interview->id]);
+
+                try {
+                    app(OnboardingService::class)->completeOffboardingTask($task, (int) $data['created_by'], [
+                        'notes' => trim(($task->notes ? $task->notes."\n" : '').'Auto-completed: exit interview recorded.'),
+                    ]);
+                } catch (\LogicException) {
+                    // Keep the explicit relationship even when dependencies or
+                    // sign-off rules intentionally require manual completion.
+                }
+            }
+
+            return $interview->load('offboardingTask');
+        });
+
+        $this->notifyScheduledInterviewer($interview);
+
+        return $interview;
+    }
+
+    /**
+     * Change scheduling metadata only; submitted answers remain immutable.
+     */
+    public function rescheduleInterview(HrExitInterview $interview, array $data): HrExitInterview
+    {
+        $nextInterviewer = (int) $data['interviewer_user_id'];
+        $nextDate = (string) $data['interview_date'];
+        $materiallyChanged = $interview->interviewer_user_id !== $nextInterviewer
+            || $interview->interview_date?->toDateString() !== $nextDate;
+
+        if (! $materiallyChanged) {
+            return $interview;
+        }
+
+        $interview->update([
+            'interviewer_user_id' => $nextInterviewer,
+            'interview_date' => $nextDate,
+        ]);
+
+        $interview = $interview->fresh(['employeeProfile.user']);
+        $this->notifyScheduledInterviewer($interview);
+
+        return $interview;
+    }
+
+    /**
+     * Resolve only durable identity seams. Historical title matching is
+     * confined to the migration and never participates in new writes.
+     */
+    private function resolveOffboardingTask(array $data): ?HrOffboardingTask
+    {
+        $query = HrOffboardingTask::query()
+            ->whereNull('exit_interview_id')
+            ->where('status', '!=', 'completed')
+            ->whereHas('checklist', fn ($checklists) => $checklists
+                ->where('tenant_id', $data['tenant_id'])
+                ->where('employee_profile_id', $data['employee_profile_id'])
+                ->whereIn('status', ['pending', 'in_progress']));
+
+        if (! empty($data['offboarding_task_id'])) {
+            $task = (clone $query)
+                ->whereKey((int) $data['offboarding_task_id'])
+                ->where('notes', 'like', '%workflow_key=exit_interview%')
+                ->first();
+
+            if (! $task) {
+                throw ValidationException::withMessages([
+                    'offboarding_task_id' => 'The selected exit-interview task is not open for this employee.',
+                ]);
+            }
+
+            return $task;
+        }
+
+        $candidates = $query
+            ->where('notes', 'like', '%workflow_key=exit_interview%')
+            ->orderBy('id')
+            ->limit(2)
+            ->get();
+
+        return $candidates->count() === 1 ? $candidates->first() : null;
+    }
+
+    private function notifyScheduledInterviewer(HrExitInterview $interview): void
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $date = $interview->interview_date?->copy()->timezone($timezone)->startOfDay();
+
+        if (! $date || ! $date->isAfter(now($timezone)->startOfDay())) {
+            return;
+        }
+
+        $interviewer = User::find($interview->interviewer_user_id);
+        if (! $interviewer) {
+            return;
+        }
+
+        try {
+            $interviewer->notify(new ExitInterviewScheduledNotification(
+                $interview->loadMissing('employeeProfile.user'),
+            ));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to notify scheduled exit-interview owner', [
+                'exit_interview_id' => $interview->id,
+                'interviewer_user_id' => $interviewer->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Append a correction without rewriting the submitted interview answers.
+     */
+    public function appendAddendum(HrExitInterview $exitInterview, string $note, User $actor): HrExitInterview
+    {
+        return DB::transaction(function () use ($exitInterview, $note, $actor) {
+            $submittedComments = trim((string) $exitInterview->additional_comments);
+            $recordedAt = now()
+                ->timezone(config('app.worker_timezone', 'Pacific/Auckland'))
+                ->format('d M Y H:i');
+            $addendum = "[Addendum — {$recordedAt} — {$actor->name}]\n".trim($note);
+
+            $exitInterview->update([
+                'additional_comments' => $submittedComments === ''
+                    ? $addendum
+                    : $submittedComments."\n\n".$addendum,
+            ]);
+
+            return $exitInterview->refresh();
         });
     }
 

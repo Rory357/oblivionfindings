@@ -370,6 +370,7 @@ it('upserts routines and returns a schema-aware actions and reviews list', funct
         'risks.viewAny',
         'care_plans.viewAny',
         'consents.viewAny',
+        'clinical.assessments.viewAny',
     ]);
 
     $this->actingAs($user)

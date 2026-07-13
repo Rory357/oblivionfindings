@@ -173,7 +173,7 @@ export function KpiCards({ metrics }: Props) {
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live
+                                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" /> Live
                     </span>
                     <span>·</span>
                     <span>vs last week</span>
