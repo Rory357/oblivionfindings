@@ -24,11 +24,11 @@ class VehicleBookingController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $all = (clone $query)->latest()->limit(5000)->get();
-            return response()->streamDownload(function () use ($all) {
+            $exportQuery = (clone $query)->latest();
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Reference', 'Vehicle', 'User', 'Purpose', 'Start', 'End', 'Status']);
-                foreach ($all as $b) {
+                foreach ($exportQuery->lazy(200) as $b) {
                     $this->putCsv($handle, [
                         $b->reference_number ?? '',
                         $b->asset?->name ?? '', $b->user?->name ?? '', $b->purpose,

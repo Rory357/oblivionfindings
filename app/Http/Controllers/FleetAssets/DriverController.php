@@ -22,11 +22,11 @@ class DriverController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $allDrivers = (clone $query)->orderBy('name')->limit(5000)->get();
-            return response()->streamDownload(function () use ($allDrivers) {
+            $exportQuery = (clone $query)->orderBy('name');
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Email', 'Licence Class', 'Licence Expires', 'Status', 'Can Drive Clients']);
-                foreach ($allDrivers as $u) {
+                foreach ($exportQuery->lazy(200) as $u) {
                     $e = $u->hrDriverEligibility;
                     $this->putCsv($handle, [
                         $u->name, $u->email,

@@ -246,11 +246,11 @@ class ResidentTransportController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $all = (clone $query)->latest('departed_at')->limit(5000)->get();
-            return response()->streamDownload(function () use ($all) {
+            $exportQuery = (clone $query)->latest('departed_at');
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['ID', 'Vehicle', 'Driver', 'Resident', 'Type', 'Pickup', 'Dropoff', 'Departed', 'Arrived', 'Duration (min)', 'Passengers', 'Supervisor', 'Status', 'Notes']);
-                foreach ($all as $t) {
+                foreach ($exportQuery->lazy(200) as $t) {
                     $duration = ($t->departed_at && $t->arrived_at)
                         ? round($t->departed_at->diffInMinutes($t->arrived_at), 1)
                         : '';
@@ -1023,11 +1023,11 @@ class ResidentTransportController extends Controller
 
         // CSV export for compliance
         if ($request->input('export') === 'csv') {
-            $all = (clone $query)->latest('packed_at')->limit(5000)->get();
-            return response()->streamDownload(function () use ($all) {
+            $exportQuery = (clone $query)->latest('packed_at');
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
-                foreach ($all as $log) {
+                foreach ($exportQuery->lazy(200) as $log) {
                     $this->putCsv($handle, [
                         $log->id,
                         trim(($log->client?->first_name ?? '') . ' ' . ($log->client?->last_name ?? '')),

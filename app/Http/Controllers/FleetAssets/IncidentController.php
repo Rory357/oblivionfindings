@@ -1060,10 +1060,36 @@ class IncidentController extends Controller
         return $user ? (bool) $user->canDo('hr.assets.view') : false;
     }
 
+    public function searchOptions(Request $request)
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:assets,users'],
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        $term = $data['q'];
+        $results = $data['type'] === 'assets'
+            ? Asset::query()
+                ->where(fn ($query) => $query
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('registration_number', 'like', "%{$term}%"))
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name', 'registration_number', 'category'])
+            : User::query()
+                ->where('name', 'like', "%{$term}%")
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name']);
+
+        return response()->json(['results' => $results]);
+    }
+
     private function formOptions(): array
     {
         $assets = Asset::query()
             ->orderBy('name')
+            ->limit(20)
             ->get(['id', 'name', 'registration_number', 'category'])
             ->map(fn ($a) => [
                 'id' => $a->id,
@@ -1072,8 +1098,28 @@ class IncidentController extends Controller
                 'category' => $a->category,
             ])->values();
 
-        $users = User::query()->orderBy('name')->get(['id', 'name'])
+        $selectedAssetId = request()->integer('vehicle_id');
+        if ($selectedAssetId && ! $assets->contains('id', $selectedAssetId)) {
+            $selectedAsset = Asset::query()->find($selectedAssetId, ['id', 'name', 'registration_number', 'category']);
+            if ($selectedAsset) {
+                $assets->prepend([
+                    'id' => $selectedAsset->id,
+                    'name' => $selectedAsset->name,
+                    'registration_number' => $selectedAsset->registration_number,
+                    'category' => $selectedAsset->category,
+                ]);
+            }
+        }
+
+        $users = User::query()->orderBy('name')->limit(20)->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values();
+        $selectedUserId = request()->integer('driver_id');
+        if ($selectedUserId && ! $users->contains('id', $selectedUserId)) {
+            $selectedUser = User::query()->find($selectedUserId, ['id', 'name']);
+            if ($selectedUser) {
+                $users->prepend(['id' => $selectedUser->id, 'name' => $selectedUser->name]);
+            }
+        }
 
         $sites = Schema::hasTable('sites')
             ? Site::query()->orderBy('name')->get(['id', 'name'])->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()
@@ -1092,12 +1138,12 @@ class IncidentController extends Controller
 
     private function exportCsv($query)
     {
-        $all = (clone $query)->with(['asset:id,name', 'reportedBy:id,name', 'driver:id,name'])->latest('occurred_at')->limit(5000)->get();
+        $exportQuery = (clone $query)->with(['asset:id,name', 'reportedBy:id,name', 'driver:id,name'])->latest('occurred_at');
 
-        return response()->streamDownload(function () use ($all) {
+        return response()->streamDownload(function () use ($exportQuery) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['Ref', 'Date', 'Vehicle/Asset', 'Type', 'Severity', 'Location', 'Reported By', 'Driver', 'Status', 'Injury', 'Off-road', 'Police due', 'TCR ref', 'Insurance ref', 'Description']);
-            foreach ($all as $i) {
+            foreach ($exportQuery->lazy(200) as $i) {
                 $this->putCsv($handle, [
                     $i->reference(),
                     optional($i->occurred_at)->format('Y-m-d H:i') ?? '',

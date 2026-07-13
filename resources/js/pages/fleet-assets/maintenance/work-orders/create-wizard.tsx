@@ -37,7 +37,7 @@ import {
     Wrench,
     Zap,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export type WizardAsset = {
     id: number;
@@ -107,6 +107,9 @@ export function WorkOrderCreateWizard({
 }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [assetSearch, setAssetSearch] = useState('');
+    const [userSearch, setUserSearch] = useState('');
+    const [assetOptions, setAssetOptions] = useState(assets);
+    const [userOptions, setUserOptions] = useState(users);
 
     const form = useForm({
         asset_id: prefillAssetId ?? '',
@@ -121,19 +124,63 @@ export function WorkOrderCreateWizard({
         notes: '',
     });
 
-    const filteredAssets = useMemo(() => {
-        if (!assetSearch.trim()) return assets;
-        const q = assetSearch.toLowerCase();
-        return assets.filter(
-            (a) =>
-                a.name.toLowerCase().includes(q) ||
-                (a.asset_tag ?? '').toLowerCase().includes(q) ||
-                (a.category ?? '').toLowerCase().includes(q),
-        );
-    }, [assets, assetSearch]);
+    useEffect(() => {
+        const query = assetSearch.trim();
+        if (query.length < 2) {
+            setAssetOptions(assets);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/maintenance/work-orders/options/search?type=assets&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setAssetOptions((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setAssetOptions([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [assetSearch, assets]);
 
-    const selectedAsset = assets.find((a) => String(a.id) === form.data.asset_id) ?? null;
-    const selectedUser = users.find((u) => String(u.id) === form.data.assigned_to_user_id) ?? null;
+    useEffect(() => {
+        const query = userSearch.trim();
+        if (query.length < 2) {
+            setUserOptions(users);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/maintenance/work-orders/options/search?type=users&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setUserOptions((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setUserOptions([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [userSearch, users]);
+
+    const selectedAsset = [...assetOptions, ...assets].find((a) => String(a.id) === form.data.asset_id) ?? null;
+    const selectedUser = [...userOptions, ...users].find((u) => String(u.id) === form.data.assigned_to_user_id) ?? null;
+    const visibleAssetOptions = selectedAsset && !assetOptions.some((asset) => asset.id === selectedAsset.id)
+        ? [selectedAsset, ...assetOptions]
+        : assetOptions;
+    const visibleUserOptions = selectedUser && !userOptions.some((user) => user.id === selectedUser.id)
+        ? [selectedUser, ...userOptions]
+        : userOptions;
+    const filteredAssets = visibleAssetOptions;
     const selectedRun = checklistRuns.find((r) => String(r.id) === form.data.checklist_run_id) ?? null;
     const priority = PRIORITY_OPTIONS.find((p) => p.value === form.data.priority);
 
@@ -305,6 +352,12 @@ export function WorkOrderCreateWizard({
                             </div>
                             <div>
                                 <Label className="mb-1.5 block">Assigned to</Label>
+                                <Input
+                                    value={userSearch}
+                                    onChange={(event) => setUserSearch(event.target.value)}
+                                    placeholder="Search people..."
+                                    className="mb-2"
+                                />
                                 <Select
                                     value={form.data.assigned_to_user_id === '' ? NONE : form.data.assigned_to_user_id}
                                     onValueChange={(v) => form.setData('assigned_to_user_id', v === NONE ? '' : v)}
@@ -314,7 +367,7 @@ export function WorkOrderCreateWizard({
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={NONE}>Unassigned</SelectItem>
-                                        {users.map((u) => (
+                                        {visibleUserOptions.map((u) => (
                                             <SelectItem key={u.id} value={String(u.id)}>
                                                 {u.name}
                                             </SelectItem>

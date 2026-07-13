@@ -68,11 +68,11 @@ class AssetController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $allAssets = (clone $query)->orderBy('name')->limit(5000)->get();
-            return response()->streamDownload(function () use ($allAssets) {
+            $exportQuery = (clone $query)->orderBy('name');
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
-                foreach ($allAssets as $a) {
+                foreach ($exportQuery->lazy(200) as $a) {
                     $this->putCsv($handle, [
                         $a->name, $a->asset_tag, $a->category, $a->status,
                         $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,

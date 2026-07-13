@@ -60,11 +60,11 @@ class VehicleController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $allVehicles = (clone $query)->orderBy('name')->limit(5000)->get();
-            return response()->streamDownload(function () use ($allVehicles, $hasFleetFields) {
+            $exportQuery = (clone $query)->orderBy('name');
+            return response()->streamDownload(function () use ($exportQuery, $hasFleetFields) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
-                foreach ($allVehicles as $v) {
+                foreach ($exportQuery->lazy(200) as $v) {
                     $this->putCsv($handle, [
                         $v->name,
                         $v->asset_tag,
@@ -551,27 +551,26 @@ class VehicleController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $allTrips = (clone $query)->limit(5000)->get();
-            $csv = "Vehicle,Driver,Start Time,End Time,Distance (km),Duration (min),Max Speed (km/h),Start Address,End Address,Status\n";
-            foreach ($allTrips as $trip) {
-                $driver = $trip->driverSession?->user?->name ?? '';
-                $csv .= implode(',', [
-                    '"' . ($trip->asset?->name ?? '') . '"',
-                    '"' . $driver . '"',
-                    '"' . optional($trip->started_at)->format('Y-m-d H:i:s') . '"',
-                    '"' . optional($trip->ended_at)->format('Y-m-d H:i:s') . '"',
-                    $trip->distance_km ?? 0,
-                    round(($trip->duration_s ?? 0) / 60),
-                    $trip->max_speed_kph ?? '',
-                    '"' . str_replace('"', '""', $trip->start_address ?? '') . '"',
-                    '"' . str_replace('"', '""', $trip->end_address ?? '') . '"',
-                    $trip->status ?? '',
-                ]) . "\n";
-            }
-            return response($csv, 200, [
-                'Content-Type' => 'text/csv',
-                'Content-Disposition' => 'attachment; filename="trips-export.csv"',
-            ]);
+            $exportQuery = clone $query;
+            return response()->streamDownload(function () use ($exportQuery) {
+                $handle = fopen('php://output', 'w');
+                $this->putCsv($handle, ['Vehicle', 'Driver', 'Start Time', 'End Time', 'Distance (km)', 'Duration (min)', 'Max Speed (km/h)', 'Start Address', 'End Address', 'Status']);
+                foreach ($exportQuery->lazy(200) as $trip) {
+                    $this->putCsv($handle, [
+                        $trip->asset?->name ?? '',
+                        $trip->driverSession?->user?->name ?? '',
+                        optional($trip->started_at)->format('Y-m-d H:i:s'),
+                        optional($trip->ended_at)->format('Y-m-d H:i:s'),
+                        $trip->distance_km ?? 0,
+                        round(($trip->duration_s ?? 0) / 60),
+                        $trip->max_speed_kph ?? '',
+                        $trip->start_address ?? '',
+                        $trip->end_address ?? '',
+                        $trip->status ?? '',
+                    ]);
+                }
+                fclose($handle);
+            }, 'trips-export.csv');
         }
 
         // Summary stats (from the same filtered query, without pagination)
@@ -770,26 +769,26 @@ class VehicleController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $allLogs = (clone $query)->limit(5000)->get();
-            $csv = "Date,Vehicle,Odometer (km),Litres,Cost ($),Cost/Litre,Fuel Type,Station,Notes,Logged By\n";
-            foreach ($allLogs as $log) {
-                $csv .= implode(',', [
-                    '"' . optional($log->logged_at)->format('Y-m-d H:i:s') . '"',
-                    '"' . ($log->asset?->name ?? '') . '"',
-                    $log->odometer_km ?? '',
-                    $log->quantity_litres ?? 0,
-                    $log->total_cost ?? 0,
-                    $log->cost_per_litre ?? 0,
-                    '"' . ($log->fuel_type ?? '') . '"',
-                    '"' . str_replace('"', '""', $log->station_name ?? '') . '"',
-                    '"' . str_replace('"', '""', $log->notes ?? '') . '"',
-                    '"' . ($log->user?->name ?? '') . '"',
-                ]) . "\n";
-            }
-            return response($csv, 200, [
-                'Content-Type' => 'text/csv',
-                'Content-Disposition' => 'attachment; filename="fuel-logs-export.csv"',
-            ]);
+            $exportQuery = clone $query;
+            return response()->streamDownload(function () use ($exportQuery) {
+                $handle = fopen('php://output', 'w');
+                $this->putCsv($handle, ['Date', 'Vehicle', 'Odometer (km)', 'Litres', 'Cost ($)', 'Cost/Litre', 'Fuel Type', 'Station', 'Notes', 'Logged By']);
+                foreach ($exportQuery->lazy(200) as $log) {
+                    $this->putCsv($handle, [
+                        optional($log->logged_at)->format('Y-m-d H:i:s'),
+                        $log->asset?->name ?? '',
+                        $log->odometer_km ?? '',
+                        $log->quantity_litres ?? 0,
+                        $log->total_cost ?? 0,
+                        $log->cost_per_litre ?? 0,
+                        $log->fuel_type ?? '',
+                        $log->station_name ?? '',
+                        $log->notes ?? '',
+                        $log->user?->name ?? '',
+                    ]);
+                }
+                fclose($handle);
+            }, 'fuel-logs-export.csv');
         }
 
         // Summary stats (MTD)

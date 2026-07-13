@@ -281,8 +281,18 @@ export default function DevicesIndex({
     const lowBatteryCount = stats?.low_battery ?? 0;
     const consentGranted = stats?.consent_granted ?? 0;
     const consentBlocked = stats?.consent_blocked ?? 0;
-    const availableDevices = pairing_options?.devices ?? [];
-    const availableAssets = pairing_options?.assets ?? [];
+    const initialAvailableDevices = useMemo(
+        () => pairing_options?.devices ?? [],
+        [pairing_options?.devices],
+    );
+    const initialAvailableAssets = useMemo(
+        () => pairing_options?.assets ?? [],
+        [pairing_options?.assets],
+    );
+    const [availableDevices, setAvailableDevices] = useState(initialAvailableDevices);
+    const [availableAssets, setAvailableAssets] = useState(initialAvailableAssets);
+    const [deviceOptionSearch, setDeviceOptionSearch] = useState('');
+    const [assetOptionSearch, setAssetOptionSearch] = useState('');
     const consentRows = consent_devices ?? [];
 
     function handleSort(field: string) {
@@ -328,6 +338,66 @@ export default function DevicesIndex({
         device_id: '',
         asset_id: '',
     });
+    const selectedDeviceOption = [...availableDevices, ...initialAvailableDevices].find(
+        (device) => String(device.id) === pairForm.data.device_id,
+    );
+    const selectedAssetOption = [...availableAssets, ...initialAvailableAssets].find(
+        (asset) => String(asset.id) === pairForm.data.asset_id,
+    );
+    const visibleDeviceOptions = selectedDeviceOption && !availableDevices.some((device) => device.id === selectedDeviceOption.id)
+        ? [selectedDeviceOption, ...availableDevices]
+        : availableDevices;
+    const visibleAssetOptions = selectedAssetOption && !availableAssets.some((asset) => asset.id === selectedAssetOption.id)
+        ? [selectedAssetOption, ...availableAssets]
+        : availableAssets;
+
+    useEffect(() => {
+        const query = deviceOptionSearch.trim();
+        if (query.length < 2) {
+            setAvailableDevices(initialAvailableDevices);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/devices/options/search?type=devices&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setAvailableDevices((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setAvailableDevices([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [deviceOptionSearch, initialAvailableDevices]);
+
+    useEffect(() => {
+        const query = assetOptionSearch.trim();
+        if (query.length < 2) {
+            setAvailableAssets(initialAvailableAssets);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/devices/options/search?type=assets&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setAvailableAssets((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setAvailableAssets([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [assetOptionSearch, initialAvailableAssets]);
 
     const handlePair = () => {
         pairForm.post('/fleet-assets/devices/pair', {
@@ -866,6 +936,12 @@ export default function DevicesIndex({
                                 <label htmlFor="pair-device-id" className="text-sm font-medium">
                                     Tracking Device *
                                 </label>
+                                <Input
+                                    value={deviceOptionSearch}
+                                    onChange={(event) => setDeviceOptionSearch(event.target.value)}
+                                    placeholder="Search devices..."
+                                    className="mb-2"
+                                />
                                 <Select
                                     value={pairForm.data.device_id}
                                     onValueChange={(value) =>
@@ -876,7 +952,7 @@ export default function DevicesIndex({
                                         <SelectValue placeholder="Select an unpaired device" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {availableDevices.map((device) => (
+                                        {visibleDeviceOptions.map((device) => (
                                             <SelectItem
                                                 key={device.id}
                                                 value={String(device.id)}
@@ -891,6 +967,12 @@ export default function DevicesIndex({
                                 <label htmlFor="pair-asset-id" className="text-sm font-medium">
                                     Asset *
                                 </label>
+                                <Input
+                                    value={assetOptionSearch}
+                                    onChange={(event) => setAssetOptionSearch(event.target.value)}
+                                    placeholder="Search assets..."
+                                    className="mb-2"
+                                />
                                 <Select
                                     value={pairForm.data.asset_id}
                                     onValueChange={(value) =>
@@ -901,7 +983,7 @@ export default function DevicesIndex({
                                         <SelectValue placeholder="Select an asset" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {availableAssets.map((asset) => (
+                                        {visibleAssetOptions.map((asset) => (
                                             <SelectItem
                                                 key={asset.id}
                                                 value={String(asset.id)}

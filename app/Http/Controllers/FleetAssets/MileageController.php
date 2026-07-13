@@ -304,12 +304,12 @@ class MileageController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $all = $query->latest('date')->limit(5000)->get();
+        $exportQuery = $query->latest('date');
 
-        return response()->streamDownload(function () use ($all) {
+        return response()->streamDownload(function () use ($exportQuery) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['ID', 'Staff', 'Date', 'Start Location', 'End Location', 'Distance (km)', 'Purpose', 'Client', 'Rate/km', 'Total Amount', 'Status', 'Approved By', 'Approved At', 'Notes']);
-            foreach ($all as $t) {
+            foreach ($exportQuery->lazy(200) as $t) {
                 $this->putCsv($handle, [
                     $t->id,
                     $t->user?->name ?? '',

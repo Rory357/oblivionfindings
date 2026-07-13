@@ -135,6 +135,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Devices — write.
     Route::middleware('permission:fleet.manage|assets.trackers.manage')->group(function () {
+        Route::get('/devices/options/search', [DeviceController::class, 'searchPairingOptions'])->name('fleet-assets.devices.options.search');
         Route::post('/devices/pair', [DeviceController::class, 'pair'])->name('fleet-assets.devices.pair');
         Route::post('/devices/{device}/unpair', [DeviceController::class, 'unpair'])->whereNumber('device')->name('fleet-assets.devices.unpair');
         Route::post('/devices/{device}/consent/grant', [DeviceController::class, 'grantConsent'])->whereNumber('device')->name('fleet-assets.devices.consent.grant');
@@ -176,6 +177,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Maintenance — write (requires maintenance manage or fleet manage)
     Route::middleware('permission:fleet.maintenance.manage|fleet.manage')->group(function () {
+        Route::get('/maintenance/work-orders/options/search', [WorkOrderController::class, 'searchOptions'])->name('fleet-assets.work-orders.options.search');
         Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
         Route::put('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'update'])->whereNumber('workOrder')->name('fleet-assets.work-orders.update');
         Route::post('/maintenance/work-orders/bulk-action', [WorkOrderController::class, 'bulkAction'])->name('fleet-assets.work-orders.bulk-action');
@@ -266,6 +268,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Incidents (view, report) — read
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/incidents', [IncidentController::class, 'index'])->name('fleet-assets.incidents.index');
+        Route::get('/incidents/options/search', [IncidentController::class, 'searchOptions'])->name('fleet-assets.incidents.options.search');
         Route::get('/incidents/create', [IncidentController::class, 'create'])->name('fleet-assets.incidents.create');
         Route::post('/incidents', [IncidentController::class, 'store'])->name('fleet-assets.incidents.store');
         Route::get('/incidents/{incident}', [IncidentController::class, 'show'])->whereNumber('incident')->name('fleet-assets.incidents.show');

@@ -31,16 +31,15 @@ class DeviceController extends Controller
     {
         // CSV export — canonical devices.
         if ($request->input('export') === 'csv') {
-            $allDevices = Device::query()
+            $exportQuery = Device::query()
                 ->where('domain', 'tracking')
                 ->with(['activeAssetLinks.asset:id,name,asset_tag'])
-                ->orderByDesc('last_seen_at')
-                ->get();
+                ->orderByDesc('last_seen_at');
 
-            return response()->streamDownload(function () use ($allDevices) {
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Vendor', 'Device UID', 'IMEI', 'Serial Number', 'Linked Asset', 'Status', 'Last Seen']);
-                foreach ($allDevices as $d) {
+                foreach ($exportQuery->lazy(200) as $d) {
                     $link = $d->activeAssetLinks->first();
                     $this->putCsv($handle, [
                         $d->provider, $d->device_uid, $d->imei, $d->serial_number,
@@ -119,6 +118,7 @@ class DeviceController extends Controller
                     ->whereDoesntHave('activeAssetLinks')
                     ->orderBy('provider')
                     ->orderBy('device_uid')
+                    ->limit(20)
                     ->get()
                     ->map(fn (Device $device) => [
                         'id' => $device->id,
@@ -128,6 +128,7 @@ class DeviceController extends Controller
                 'assets' => Asset::query()
                     ->where('status', 'active')
                     ->orderBy('name')
+                    ->limit(20)
                     ->get(['id', 'name', 'asset_tag'])
                     ->map(fn (Asset $asset) => [
                         'id' => $asset->id,
@@ -136,6 +137,48 @@ class DeviceController extends Controller
                     ->values(),
             ],
         ]);
+    }
+
+    public function searchPairingOptions(Request $request)
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:assets,devices'],
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        $term = $data['q'];
+        $results = $data['type'] === 'devices'
+            ? Device::query()
+                ->where('domain', 'tracking')
+                ->whereDoesntHave('activeAssetLinks')
+                ->where(fn ($query) => $query
+                    ->where('provider', 'like', "%{$term}%")
+                    ->orWhere('device_uid', 'like', "%{$term}%")
+                    ->orWhere('serial_number', 'like', "%{$term}%"))
+                ->orderBy('provider')
+                ->orderBy('device_uid')
+                ->limit(20)
+                ->get()
+                ->map(fn (Device $device) => [
+                    'id' => $device->id,
+                    'label' => trim(collect([$device->provider, $device->device_uid])->filter()->implode(' - ')),
+                ])
+                ->values()
+            : Asset::query()
+                ->where('status', 'active')
+                ->where(fn ($query) => $query
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('asset_tag', 'like', "%{$term}%"))
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name', 'asset_tag'])
+                ->map(fn (Asset $asset) => [
+                    'id' => $asset->id,
+                    'label' => trim(collect([$asset->name, $asset->asset_tag])->filter()->implode(' - ')),
+                ])
+                ->values();
+
+        return response()->json(['results' => $results]);
     }
 
     /**

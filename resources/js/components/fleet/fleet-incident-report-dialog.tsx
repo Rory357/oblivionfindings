@@ -1,5 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
     Activity,
     AlertTriangle,
@@ -200,6 +200,10 @@ export function FleetIncidentReportDialog({
     const page = usePage().props as { flash?: { created_fleet_incident_id?: number; created_fleet_incident_reference?: string; error?: string } };
     const [stepIndex, setStepIndex] = useState(0);
     const [submitted, setSubmitted] = useState(false);
+    const [assetSearch, setAssetSearch] = useState('');
+    const [driverSearch, setDriverSearch] = useState('');
+    const [assetOptions, setAssetOptions] = useState(formOptions.assets);
+    const [driverOptions, setDriverOptions] = useState(formOptions.users);
 
     const form = useForm<FleetReportForm>({
         asset_id: initialAssetId != null && initialAssetId !== '' ? String(initialAssetId) : '',
@@ -248,13 +252,69 @@ export function FleetIncidentReportDialog({
     });
     const { data, setData, errors, processing } = form;
 
+    useEffect(() => {
+        const query = assetSearch.trim();
+        if (query.length < 2) {
+            setAssetOptions(formOptions.assets);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/incidents/options/search?type=assets&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setAssetOptions((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setAssetOptions([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [assetSearch, formOptions.assets]);
+
+    useEffect(() => {
+        const query = driverSearch.trim();
+        if (query.length < 2) {
+            setDriverOptions(formOptions.users);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/fleet-assets/incidents/options/search?type=users&q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+                if (response.ok) setDriverOptions((await response.json()).results ?? []);
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') setDriverOptions([]);
+            }
+        }, 300);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [driverSearch, formOptions.users]);
+
     const steps = useMemo(() => (mode === 'vehicle' ? VEHICLE_STEPS : mode === 'asset' ? ASSET_STEPS : NEAR_MISS_STEPS), [mode]);
     const lastIndex = steps.length - 1;
     const stepKey = steps[stepIndex].key;
 
-    const vehicleOptions = useMemo(() => formOptions.assets.map((a) => ({ value: String(a.id), label: a.registration_number ? `${a.name} · ${a.registration_number}` : a.name })), [formOptions.assets]);
-    const assetOnlyOptions = useMemo(() => formOptions.assets.filter((a) => a.category && a.category !== 'vehicle').map((a) => ({ value: String(a.id), label: a.name })), [formOptions.assets]);
-    const userOptions = useMemo(() => formOptions.users.map((u) => ({ value: String(u.id), label: u.name })), [formOptions.users]);
+    const selectedAsset = [...assetOptions, ...formOptions.assets].find((asset) => String(asset.id) === data.asset_id);
+    const selectedDriver = [...driverOptions, ...formOptions.users].find((user) => String(user.id) === data.driver_user_id);
+    const visibleAssetOptions = selectedAsset && !assetOptions.some((asset) => asset.id === selectedAsset.id)
+        ? [selectedAsset, ...assetOptions]
+        : assetOptions;
+    const visibleDriverOptions = selectedDriver && !driverOptions.some((user) => user.id === selectedDriver.id)
+        ? [selectedDriver, ...driverOptions]
+        : driverOptions;
+    const vehicleOptions = visibleAssetOptions.map((a) => ({ value: String(a.id), label: a.registration_number ? `${a.name} · ${a.registration_number}` : a.name }));
+    const assetOnlyOptions = visibleAssetOptions.filter((a) => a.category && a.category !== 'vehicle').map((a) => ({ value: String(a.id), label: a.name }));
+    const userOptions = visibleDriverOptions.map((u) => ({ value: String(u.id), label: u.name }));
 
     const tpField = (key: keyof ThirdParty, value: string) => {
         const existing: ThirdParty = data.third_parties[0] ?? { name: '', contact: '', vehicle_rego: '', insurer: '', claim_ref: '', liability: '' };
@@ -403,9 +463,11 @@ export function FleetIncidentReportDialog({
                     <div className="flex flex-col gap-4">
                         <StepHead icon={Truck} title="Vehicle & driver" blurb="Which vehicle, and who was driving?" />
                         <Field label="Vehicle" required error={errors.asset_id}>
+                            <Input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search vehicles..." className="mb-2" />
                             <SelectInput value={data.asset_id} onChange={(v) => setData('asset_id', v)} placeholder="Select vehicle" options={vehicleOptions} />
                         </Field>
                         <Field label="Driver">
+                            <Input value={driverSearch} onChange={(event) => setDriverSearch(event.target.value)} placeholder="Search drivers..." className="mb-2" />
                             <SelectInput value={data.driver_user_id} onChange={(v) => setData('driver_user_id', v)} placeholder="Select driver" options={userOptions} />
                         </Field>
                         <Field label="Duty status">
@@ -600,6 +662,7 @@ export function FleetIncidentReportDialog({
                     <div className="flex flex-col gap-4">
                         <StepHead icon={Box} title="Asset details" blurb="Which piece of equipment, and what happened?" />
                         <Field label="Asset" required error={errors.asset_id}>
+                            <Input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search assets..." className="mb-2" />
                             <SelectInput value={data.asset_id} onChange={(v) => setData('asset_id', v)} placeholder="Select asset" options={assetOnlyOptions} />
                         </Field>
                         <Field label="Serial number / asset tag" hint="Optional">
@@ -659,9 +722,11 @@ export function FleetIncidentReportDialog({
                     <div className="flex flex-col gap-4">
                         <StepHead icon={Eye} title="Vehicle & driver" blurb="Blame-free — thanks for reporting. No harm was done." />
                         <Field label="Vehicle / asset" required error={errors.asset_id}>
+                            <Input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search vehicles or assets..." className="mb-2" />
                             <SelectInput value={data.asset_id} onChange={(v) => setData('asset_id', v)} placeholder="Select vehicle or asset" options={vehicleOptions} />
                         </Field>
                         <Field label="Driver (optional)">
+                            <Input value={driverSearch} onChange={(event) => setDriverSearch(event.target.value)} placeholder="Search drivers..." className="mb-2" />
                             <SelectInput value={data.driver_user_id} onChange={(v) => setData('driver_user_id', v)} placeholder="Select driver" options={userOptions} />
                         </Field>
                         <InfoCard icon={Eye} tone="info">Near-miss reporting is blame-free. The type is set to Near miss automatically.</InfoCard>

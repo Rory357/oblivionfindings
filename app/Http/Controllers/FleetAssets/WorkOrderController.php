@@ -19,11 +19,11 @@ class WorkOrderController extends Controller
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $all = (clone $query)->latest()->limit(5000)->get();
-            return response()->streamDownload(function () use ($all) {
+            $exportQuery = (clone $query)->latest();
+            return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Title', 'Asset', 'Priority', 'Status', 'Assigned To', 'Due Date', 'Created']);
-                foreach ($all as $wo) {
+                foreach ($exportQuery->lazy(200) as $wo) {
                     $this->putCsv($handle, [
                         $wo->title, $wo->asset?->name ?? '', $wo->priority, $wo->status,
                         $wo->assignedTo?->name ?? '', optional($wo->due_at)->format('Y-m-d') ?? '',
@@ -63,7 +63,7 @@ class WorkOrderController extends Controller
 
         $workOrders = $query->reorder()->orderBy($sort, $direction)->paginate(25)->withQueryString();
 
-        $users = User::query()->orderBy('name')->get(['id', 'name']);
+        $users = User::query()->orderBy('name')->limit(20)->get(['id', 'name']);
 
         // Hero band stats — whole-table counts (the paginated slice above is not the world)
         $stats = [
@@ -79,7 +79,14 @@ class WorkOrderController extends Controller
         ];
 
         // Create-wizard options (modal lives on this page — ?new=1 shim)
-        $assets = Asset::query()->orderBy('name')->get(['id', 'name', 'asset_tag', 'category']);
+        $assets = Asset::query()->orderBy('name')->limit(20)->get(['id', 'name', 'asset_tag', 'category']);
+        $selectedAssetId = $request->integer('asset_id');
+        if ($selectedAssetId && ! $assets->contains('id', $selectedAssetId)) {
+            $selectedAsset = Asset::query()->find($selectedAssetId, ['id', 'name', 'asset_tag', 'category']);
+            if ($selectedAsset) {
+                $assets->prepend($selectedAsset);
+            }
+        }
         $checklistRuns = \App\Models\FleetChecklistRun::query()
             ->where('passed', false)
             ->with('asset:id,name', 'template:id,name')
@@ -133,6 +140,31 @@ class WorkOrderController extends Controller
             'asset_id' => $request->input('asset_id'),
             'checklist_run_id' => $request->input('checklist_run_id'),
         ])));
+    }
+
+    public function searchOptions(Request $request)
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:assets,users'],
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        $term = $data['q'];
+        $results = $data['type'] === 'assets'
+            ? Asset::query()
+                ->where(fn ($query) => $query
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('asset_tag', 'like', "%{$term}%"))
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name', 'asset_tag', 'category'])
+            : User::query()
+                ->where('name', 'like', "%{$term}%")
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name']);
+
+        return response()->json(['results' => $results]);
     }
 
     public function store(Request $request)
