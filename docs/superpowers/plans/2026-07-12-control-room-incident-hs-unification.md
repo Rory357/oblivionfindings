@@ -469,11 +469,11 @@ git commit -m "feat(incidents): separate draft and submit workflows"
 - Test: `tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php`
 - Test: `tests/Feature/HealthSafety/HsWorksafeConsistencyTest.php`
 
-- [ ] **Step 1: Write failing acceptance tests**
+- [x] **Step 1: Write failing acceptance tests**
 
 Assert submitted incident-backed events appear in `handover=awaiting`, drafts do not, an authorised H&S officer can accept, another-site user cannot, acceptance does not change `HsEvent.status`, and the owner/actor/time are returned to Incident and Control Room presenters.
 
-- [ ] **Step 2: Implement acceptance service and route**
+- [x] **Step 2: Implement acceptance service and route**
 
 ```php
 public function acceptHandover(HsEvent $event, User $actor, ?User $owner = null, ?string $notes = null): HsEvent;
@@ -481,28 +481,39 @@ public function acceptHandover(HsEvent $event, User $actor, ?User $owner = null,
 
 Route: `POST /health-safety/events/{event}/accept-handover`, named `health-safety.events.handover.accept`.
 
-- [ ] **Step 3: Write failing WorkSafe count-consistency tests**
+- [x] **Step 3: Write failing WorkSafe count-consistency tests**
 
 Create pending/notified/acknowledged H&S events and assert `/incidents` and `/health-safety` expose the same pending count and state from `HsEvent`.
 
-- [ ] **Step 4: Make HsEvent authoritative**
+- [x] **Step 4: Make HsEvent authoritative**
 
 Change H&S dashboard/worklists and incident detail payloads to read H&S WorkSafe fields. Treat draft incident fields as provisional submission input. Keep legacy columns as compatibility projections updated from the H&S service, never as an independent workflow.
 
-- [ ] **Step 5: Render acceptance and usable handover content**
+- [x] **Step 5: Render acceptance and usable handover content**
 
 H&S detail must show incident narrative, immediate controls, attachments, Control Room evidence, playbook outcome, important communications, operational tasks, official references, source/site, owner, acceptance, three lifecycle states, and next action.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `php artisan test tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php tests/Feature/HealthSafety/HsWorksafeConsistencyTest.php tests/Feature/HealthSafety/HsEventWorksafeTest.php tests/Feature/HealthSafety/HsDashboardServiceTest.php`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/HealthSafety app/Http/Controllers/HealthSafety app/Http/Controllers/IncidentController.php routes/health-safety.php resources/js/pages/health-safety resources/js/components/incidents tests/Feature/HealthSafety
 git commit -m "feat(health-safety): accept incident handovers"
 ```
+
+**Task 6 completion evidence — 2026-07-14**
+
+- Implementation commit: `1985f00d662f42c3f907951d091f37d64f739c40`.
+- H&S now has an explicit, site-scoped handover acceptance action with owner, accepting actor, timestamp, and notes. Incident and Control Room payloads surface that same acceptance state without changing the H&S event lifecycle status.
+- `HsEvent` is the authoritative WorkSafe workflow. Pending/notified/acknowledged state and counts are permission- and site-scoped across H&S and Incidents; submitted/reviewed Incident updates cannot mutate the legacy projection inward.
+- The desktop H&S detail and worklists now carry the usable handover context: incident narrative, immediate controls, evidence, playbook result, communications, tasks, official references, source/site, owner, acceptance, WorkSafe state, and next action. Restricted linked records render as inert summaries rather than fabricated links.
+- An idempotent historical backfill repairs only unambiguous, non-draft canonical Incident/H&S journey links and freezes the incident-time H&S site before synchronisation, avoiding current-client-site leakage after a move.
+- Focused PHP gate: 41 tests / 511 assertions. Focused component gate: 15 tests. Wider affected boundary: 351 tests / 2,029 assertions after correcting one stale permission expectation.
+- TypeScript, targeted ESLint, Prettier, Pint, PHP lint, `git diff --check`, the production client build (4,944 modules), and the SSR build (1,596 modules) passed.
+- Independent backend/security review: `PASS`. Independent specification review: `PASS`. No Task 7 lifecycle work, mobile, responsive/mobile testing, WebView, merge, push, or deployment work was included.
 
 ---
 
