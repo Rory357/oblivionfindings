@@ -171,6 +171,50 @@ class FleetHandoverSiteIsolationTest extends TestCase
             ->assertRedirect();
     }
 
+    public function test_incoming_participant_can_show_accept_or_dispute_without_manage_permission(): void
+    {
+        $incomingUser = $this->makeSiteScopedUser([$this->siteA], []);
+        $outgoingUser = User::factory()->create();
+
+        $acceptedHandover = FleetShiftHandover::create([
+            'asset_id' => $this->vehicleA->id,
+            'outgoing_user_id' => $outgoingUser->id,
+            'incoming_user_id' => $incomingUser->id,
+            'exterior_condition' => 'good',
+            'interior_condition' => 'clean',
+            'status' => 'pending_acceptance',
+            'handed_over_at' => now(),
+        ]);
+
+        $this->actingAs($incomingUser)
+            ->get("/fleet-assets/handovers/{$acceptedHandover->id}")
+            ->assertOk();
+
+        $this->actingAs($incomingUser)
+            ->post("/fleet-assets/handovers/{$acceptedHandover->id}/accept")
+            ->assertRedirect();
+
+        $this->assertSame('accepted', $acceptedHandover->fresh()->status);
+
+        $disputedHandover = FleetShiftHandover::create([
+            'asset_id' => $this->vehicleA->id,
+            'outgoing_user_id' => $outgoingUser->id,
+            'incoming_user_id' => $incomingUser->id,
+            'exterior_condition' => 'good',
+            'interior_condition' => 'clean',
+            'status' => 'pending_acceptance',
+            'handed_over_at' => now(),
+        ]);
+
+        $this->actingAs($incomingUser)
+            ->post("/fleet-assets/handovers/{$disputedHandover->id}/dispute", [
+                'dispute_reason' => 'The recorded fuel level is incorrect.',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('disputed', $disputedHandover->fresh()->status);
+    }
+
     public function test_multi_site_user_sees_handovers_from_both_sites(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['fleet.viewAny']);

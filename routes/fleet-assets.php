@@ -141,9 +141,13 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::post('/devices/{device}/consent/revoke', [DeviceController::class, 'revokeConsent'])->whereNumber('device')->name('fleet-assets.devices.consent.revoke');
     });
 
-    // Geofences
+    // Geofences — read
     Route::middleware('permission:fleet.viewAny|assets.geofences.manage')->group(function () {
         Route::get('/geofences', [GeofenceController::class, 'index'])->name('fleet-assets.geofences.index');
+    });
+
+    // Geofences — write
+    Route::middleware('permission:assets.geofences.manage|fleet.manage')->group(function () {
         Route::get('/geofences/create', [GeofenceController::class, 'create'])->name('fleet-assets.geofences.create');
         Route::post('/geofences', [GeofenceController::class, 'store'])->name('fleet-assets.geofences.store');
         Route::get('/geofences/{geofence}/edit', [GeofenceController::class, 'edit'])->whereNumber('geofence')->name('fleet-assets.geofences.edit');
@@ -157,7 +161,6 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/maintenance/dashboard', MaintenanceDashboardController::class)->name('fleet-assets.maintenance.dashboard');
         Route::get('/maintenance/work-orders', [WorkOrderController::class, 'index'])->name('fleet-assets.work-orders.index');
         Route::get('/maintenance/work-orders/create', [WorkOrderController::class, 'create'])->name('fleet-assets.work-orders.create');
-        Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
         Route::get('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'show'])->whereNumber('workOrder')->name('fleet-assets.work-orders.show');
 
         Route::get('/maintenance/checklists', [ChecklistController::class, 'index'])->name('fleet-assets.checklists.index');
@@ -173,6 +176,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Maintenance — write (requires maintenance manage or fleet manage)
     Route::middleware('permission:fleet.maintenance.manage|fleet.manage')->group(function () {
+        Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
         Route::put('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'update'])->whereNumber('workOrder')->name('fleet-assets.work-orders.update');
         Route::post('/maintenance/work-orders/bulk-action', [WorkOrderController::class, 'bulkAction'])->name('fleet-assets.work-orders.bulk-action');
 
