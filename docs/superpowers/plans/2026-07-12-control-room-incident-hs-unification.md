@@ -381,6 +381,7 @@ git commit -m "fix(incidents): prevent duplicate journey bridges"
 - Quality hardening adds stable medication and PRN request identity, durable failed-hook replay, alert-first locking and outer deadlock retries, queue/SLA/playbook reconciliation, reversible notification-outbox and administration UUID schema, exactly-once notification/governance jobs with scheduled recovery, and non-conversational filtering for operational outbox rows.
 - Final exact 10-file Task 4 union gate: 219 tests / 1,431 assertions / exit 0 / 448.22 seconds. Focused owning suites, Pint, PHP lint, container/job/schedule checks, `git diff --check`, and isolated migration apply → rollback → reapply all passed.
 - Final independent code-quality review: approved with no Critical/Important finding. Final independent specification reconciliation: pass at `a43c66ad`. No Task 5 UI, mobile, WebView, merge, push, or deployment work was included.
+- Residual reconciliation after Task 5: `eaf6c0c1e907973f1251a380a50bdc202859a655` terminalises stale queue/SLA/playbook state when a promoted alert has no compatible target, reactivates a later matching SLA as a new cycle, removes terminal SLA rows from presenters/compliance, preserves wildcard fallbacks, and aligns the stale H&S backbone assertion to the canonical incident journey. Affected proof: 242 tests / 1,532 assertions; independent re-review pass.
 
 ---
 
