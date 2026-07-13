@@ -159,6 +159,7 @@ class IncidentJourneyService
             $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent)
                 ?? $this->createIncidentAlert($lockedIncident, $actor, $reason);
 
+            $this->adoptExplicitIncidentReason($alert, $reason);
             $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
             $this->linkJourney(
                 $lockedIncident,
@@ -616,13 +617,18 @@ class IncidentJourneyService
             throw new \DomainException('Incident journey conflict: the alert client does not match the incident client.');
         }
 
+        $hasCanonicalDirectLink = $incident->control_room_alert_id !== null
+            && (int) $incident->control_room_alert_id === (int) $alert->id;
+
         foreach (['incident_id', 'normalized_data.incident_id'] as $path) {
             $claim = data_get($alert->context, $path);
             if ($claim === null || $claim === '') {
                 continue;
             }
 
-            if (! is_numeric($claim) || (int) $claim !== (int) $incident->id) {
+            if ((! is_numeric($claim) || (int) $claim !== (int) $incident->id)
+                && ! $hasCanonicalDirectLink
+            ) {
                 throw new \DomainException('Incident journey conflict: the alert context claims a different incident.');
             }
         }
@@ -796,6 +802,20 @@ class IncidentJourneyService
                 'service' => self::class,
             ],
         ];
+    }
+
+    private function adoptExplicitIncidentReason(ControlRoomAlert $alert, ?string $reason): void
+    {
+        if ($reason === null
+            || trim($reason) === ''
+            || data_get($alert->context, 'provenance.source') !== 'incident_journey'
+        ) {
+            return;
+        }
+
+        $context = (array) $alert->context;
+        $context['reason'] = $reason;
+        $alert->forceFill(['context' => $context])->saveQuietly();
     }
 
     private function requiresAutomaticAlert(ClientIncident $incident): bool

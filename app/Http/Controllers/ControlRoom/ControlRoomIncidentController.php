@@ -328,6 +328,29 @@ class ControlRoomIncidentController extends Controller
                 break;
         }
 
+        if ($data['source_type'] === 'client_incident') {
+            $journey = app(IncidentJourneyService::class)->ensureAlertForIncident(
+                $source,
+                $user,
+                $data['notes'] ?? null,
+            );
+            $alert = $journey->alert;
+
+            if ($alert === null) {
+                throw new \RuntimeException('The canonical incident journey did not return its operational alert.');
+            }
+
+            AuditLogger::log('controlRoom.alert.createFromIncident', $alert, [
+                'alert_id' => $alert->id,
+                'incident_source_type' => $data['source_type'],
+                'incident_source_id' => $data['source_id'],
+            ]);
+
+            return back()
+                ->with('success', 'Alert created from incident.')
+                ->with('created_alert_id', $alert->id);
+        }
+
         $alertData = [
             'source' => 'manual',
             'alert_type' => $alertType,

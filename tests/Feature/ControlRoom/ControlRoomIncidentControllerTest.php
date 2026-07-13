@@ -128,7 +128,7 @@ class ControlRoomIncidentControllerTest extends TestCase
             ->assertSessionHasErrors('source_type');
     }
 
-    public function test_create_alert_from_client_incident_creates_alert(): void
+    public function test_create_alert_from_submitted_client_incident_reuses_the_canonical_journey_on_first_and_repeated_calls(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
         $client = Client::factory()->create(['site_id' => $site->id]);
@@ -144,27 +144,42 @@ class ControlRoomIncidentControllerTest extends TestCase
             'description' => 'Slip in hallway',
         ]);
 
+        $canonicalAlert = ControlRoomAlert::query()->sole();
+        $canonicalHsEvent = HsEvent::query()->sole();
+        $reason = 'Operator requested Control Room review';
+        $payload = [
+            'source_type' => 'client_incident',
+            'source_id' => $incident->id,
+            'severity' => 'medium',
+            'notes' => $reason,
+        ];
+
         $this->actingAs($this->admin)
-            ->post('/control-room/incidents/create-alert', [
-                'source_type' => 'client_incident',
-                'source_id' => $incident->id,
-                'severity' => 'high',
-                'notes' => 'Escalating to control room',
-            ])
-            ->assertRedirect();
+            ->post('/control-room/incidents/create-alert', $payload)
+            ->assertRedirect()
+            ->assertSessionHas('created_alert_id', $canonicalAlert->id);
 
-        $this->assertDatabaseHas('control_room_alerts', [
-            'alert_type' => 'client_incident',
-            'severity' => 'high',
-            'site_id' => $site->id,
-            'client_id' => $client->id,
-        ]);
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/create-alert', $payload)
+            ->assertRedirect()
+            ->assertSessionHas('created_alert_id', $canonicalAlert->id);
 
-        $alert = ControlRoomAlert::where('alert_type', 'client_incident')->first();
-        $this->assertSame($incident->id, $alert->context['incident_source_id']);
+        $incident->refresh();
+        $alert = $canonicalAlert->fresh();
+        $hsEvent = $canonicalHsEvent->fresh();
 
-        // The new alert id is flashed so the UI can open its workspace in one step.
-        $this->assertEquals($alert->id, session('created_alert_id'));
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
+        $this->assertSame($incident->id, $alert->context['incident_id']);
+        $this->assertSame($reason, $alert->context['reason']);
+        $this->assertSame('incident', $alert->source);
+        $this->assertSame('incident_journey', $alert->context['provenance']['source']);
+        $this->assertSame(IncidentJourneyService::class, $alert->context['provenance']['service']);
+        $this->assertSame('high', $alert->severity);
+        $this->assertSame('high', $hsEvent->severity);
     }
 
     public function test_flag_as_incident_requires_create_permission(): void
