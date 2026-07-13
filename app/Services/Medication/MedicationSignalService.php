@@ -249,14 +249,14 @@ class MedicationSignalService
     protected function relatedEntityIdentity(array $context): array
     {
         foreach ([
-            'incident_id' => 'client_incident',
             'medication_error_id' => 'medication_error',
-            'loss_report_id' => 'loss_report',
-            'transport_log_id' => 'transport_log',
             'discrepancy_id' => 'discrepancy',
+            'loss_report_id' => 'loss_report',
             'followup_id' => 'followup',
             'correction_id' => 'correction',
             'administration_id' => 'administration',
+            'transport_log_id' => 'transport_log',
+            'incident_id' => 'client_incident',
             'client_medication_id' => 'medication',
         ] as $key => $type) {
             if (filled($context[$key] ?? null)) {

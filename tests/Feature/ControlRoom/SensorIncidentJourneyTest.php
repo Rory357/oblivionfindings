@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class SensorIncidentJourneyTest extends TestCase
@@ -218,5 +219,80 @@ class SensorIncidentJourneyTest extends TestCase
         $this->assertDatabaseCount('client_incidents', 0);
         $this->assertDatabaseCount('hs_events', 0);
         $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertSame(1, AuditLog::query()
+            ->where('action', 'controlRoom.alert.dismiss')
+            ->where('auditable_id', $alert->id)
+            ->count());
+    }
+
+    public function test_stale_open_model_cannot_dismiss_a_confirmed_alert_with_a_claimed_journey(): void
+    {
+        $operator = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $staleAlert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'sensor',
+            'alert_type' => 'sensor.fall_detected',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'context' => ['device_zone' => 'Bathroom'],
+        ]);
+        $signal = Signal::create([
+            'alert_id' => $staleAlert->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'signal_type_code' => 'fall_detected',
+            'severity_hint' => 'high',
+            'occurred_at' => now()->subMinute(),
+            'payload' => ['confidence' => 0.96],
+            'status' => 'processed',
+        ]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'reported_by' => $operator->id,
+            'source' => 'sensor',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'control_room_alert_id' => $staleAlert->id,
+        ]));
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
+            'control_room_alert_id' => $staleAlert->id,
+            'created_by' => $operator->id,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+        DB::table('control_room_alerts')->where('id', $staleAlert->id)->update([
+            'status' => ControlRoomAlert::STATUS_CONFIRMED,
+            'context' => json_encode([
+                'device_zone' => 'Bathroom',
+                'incident_id' => $incident->id,
+                'confirmed_by' => $operator->name,
+                'confirmed_at' => now()->toISOString(),
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        try {
+            app(SensorIncidentBridgeService::class)->dismiss(
+                $staleAlert,
+                'Stale false-positive decision.',
+                $operator,
+            );
+            $this->fail('A stale open model must not overwrite a confirmed incident journey.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('cannot be dismissed', $exception->getMessage());
+        }
+
+        $persistedAlert = $staleAlert->fresh();
+        $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $persistedAlert->status);
+        $this->assertSame($incident->id, data_get($persistedAlert->context, 'incident_id'));
+        $this->assertNull(data_get($persistedAlert->context, 'dismissed_reason'));
+        $this->assertSame($staleAlert->id, $incident->fresh()->control_room_alert_id);
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
+        $this->assertSame($staleAlert->id, $event->fresh()->control_room_alert_id);
+        $this->assertSame('processed', $signal->fresh()->status);
+        $this->assertSame(0, AuditLog::query()
+            ->where('action', 'controlRoom.alert.dismiss')
+            ->where('auditable_id', $staleAlert->id)
+            ->count());
     }
 }

@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class MedicationIncidentIntegrationService
 {
@@ -104,59 +105,86 @@ class MedicationIncidentIntegrationService
         ClientMedication $medication,
         int $attemptedBy
     ): ?ClientIncident {
-        if (! $this->shouldAutoCreateIncident('prn_over_limit', $medication)) {
-            return null;
-        }
+        return DB::transaction(function () use ($client, $medication, $attemptedBy): ?ClientIncident {
+            $lockedClient = Client::query()
+                ->whereKey($client->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lockedMedication = ClientMedication::query()
+                ->whereKey($medication->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $count24h = $medication->prnCountLast24Hours;
-        $maxPerDay = (int) filter_var($medication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
+            if ((int) $lockedMedication->client_id !== (int) $lockedClient->id) {
+                throw new \DomainException('The PRN medication does not belong to the selected client.');
+            }
 
-        $incident = new ClientIncident;
-        $incident->client_id = $client->id;
-        $incident->title = "PRN limit exceeded: {$medication->name}";
-        $incident->description = "Attempted to administer PRN medication {$medication->name} when limit already reached.\n\n".
-            "Maximum per 24h: {$maxPerDay}\n".
-            "Given in last 24h: {$count24h}\n".
-            "Attempted by: User ID {$attemptedBy}\n\n".
-            'System blocked administration.';
-        $incident->category = 'medication';
-        $incident->severity = 'high';
-        $incident->status = 'draft';
-        $incident->occurred_at = now();
-        $incident->reported_by = $attemptedBy;
-        $this->assignIncidentServiceContext($incident, $client->service_context_id);
-        $incident->save();
+            if (! $this->shouldAutoCreateIncident('prn_over_limit', $lockedMedication)) {
+                return null;
+            }
 
-        $this->linkToMedication($incident, $medication);
+            $count24h = $lockedMedication->prnCountLast24Hours;
+            $maxPerDay = (int) filter_var($lockedMedication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
+            $attemptedAt = now();
+            $attemptId = (string) Str::uuid();
 
-        MedicationDashboardAlert::createOrUpdateAlert(
-            $client->id,
-            'prn_over_limit',
-            'critical',
-            "PRN limit exceeded: {$medication->name} ({$count24h}/{$maxPerDay})",
-            $medication->id
-        );
+            $incident = new ClientIncident;
+            $incident->client_id = $lockedClient->id;
+            $incident->title = "PRN limit exceeded: {$lockedMedication->name}";
+            $incident->description = "Attempted to administer PRN medication {$lockedMedication->name} when limit already reached.\n\n".
+                "Maximum per 24h: {$maxPerDay}\n".
+                "Given in last 24h: {$count24h}\n".
+                "Attempted by: User ID {$attemptedBy}\n\n".
+                'System blocked administration.';
+            $incident->category = 'medication';
+            $incident->severity = 'high';
+            $incident->status = 'draft';
+            $incident->occurred_at = $attemptedAt;
+            $incident->reported_by = $attemptedBy;
+            $incident->metadata = [
+                'medication_prn_attempt' => [
+                    'id' => $attemptId,
+                    'attempted_by' => $attemptedBy,
+                    'prn_count_24h' => $count24h,
+                    'max_per_day' => $maxPerDay,
+                    'attempted_at' => $attemptedAt->toIso8601String(),
+                ],
+            ];
+            $this->assignIncidentServiceContext($incident, $lockedClient->service_context_id);
+            $incident->save();
 
-        // Operational signal → Control Room
-        $this->signalService->emit(
-            MedicationSignalService::TYPE_PRN_OVER_LIMIT,
-            $client->id,
-            'critical',
-            "PRN limit exceeded: {$medication->name} ({$count24h}/{$maxPerDay})",
-            [
-                'incident_id' => $incident->id,
-                'client_medication_id' => $medication->id,
-                'medication_name' => $medication->name,
-                'prn_count_24h' => $count24h,
-                'max_per_day' => $maxPerDay,
-                'attempted_by' => $attemptedBy,
-                'controlled_drug' => $medication->controlled_drug,
-                'high_risk' => $medication->high_risk,
-                'site_id' => $client->site_id,
-            ],
-        );
+            $this->linkToMedication($incident, $lockedMedication);
 
-        return $incident;
+            MedicationDashboardAlert::createOrUpdateAlert(
+                $lockedClient->id,
+                'prn_over_limit',
+                'critical',
+                "PRN limit exceeded: {$lockedMedication->name} ({$count24h}/{$maxPerDay})",
+                $lockedMedication->id
+            );
+
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_PRN_OVER_LIMIT,
+                $lockedClient->id,
+                'critical',
+                "PRN limit exceeded: {$lockedMedication->name} ({$count24h}/{$maxPerDay})",
+                [
+                    'incident_id' => $incident->id,
+                    'client_medication_id' => $lockedMedication->id,
+                    'medication_name' => $lockedMedication->name,
+                    'prn_attempt_id' => $attemptId,
+                    'prn_count_24h' => $count24h,
+                    'max_per_day' => $maxPerDay,
+                    'attempted_by' => $attemptedBy,
+                    'controlled_drug' => $lockedMedication->controlled_drug,
+                    'high_risk' => $lockedMedication->high_risk,
+                    'site_id' => $lockedClient->site_id,
+                    'occurred_at' => $attemptedAt->toIso8601String(),
+                ],
+            );
+
+            return $incident->fresh();
+        });
     }
 
     /**
@@ -174,6 +202,11 @@ class MedicationIncidentIntegrationService
                 ->firstOrFail();
             $medication = $lockedDiscrepancy->medication;
             $client = $lockedDiscrepancy->client;
+            $actor = $this->requireSubmittedMedicationActor(
+                $createdBy,
+                $lockedDiscrepancy->reported_by,
+                'controlled drug discrepancy',
+            );
             $incident = $lockedDiscrepancy->incident_id === null
                 ? null
                 : ClientIncident::query()
@@ -191,7 +224,7 @@ class MedicationIncidentIntegrationService
                 $incident->status = 'submitted';
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedDiscrepancy->reported_at ?? now();
-                $incident->reported_by = $createdBy ?? $lockedDiscrepancy->reported_by;
+                $incident->reported_by = $actor->id;
                 $this->assignIncidentServiceContext($incident, $lockedDiscrepancy->service_context_id);
                 $incident->save();
 
@@ -199,8 +232,6 @@ class MedicationIncidentIntegrationService
                 $lockedDiscrepancy->updateQuietly(['incident_id' => $incident->id]);
             }
 
-            $actorId = $createdBy ?? $lockedDiscrepancy->reported_by;
-            $actor = $actorId === null ? null : User::query()->find($actorId);
             $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
             MedicationDashboardAlert::createOrUpdateAlert(
@@ -476,6 +507,12 @@ class MedicationIncidentIntegrationService
                 return null;
             }
 
+            $actor = $this->requireSubmittedMedicationActor(
+                null,
+                $lockedFollowup->created_by,
+                'medication refusal escalation',
+            );
+
             $incident = ClientIncident::query()
                 ->where('client_id', $client->id)
                 ->where('metadata->medication_refusal_followup_id', $lockedFollowup->id)
@@ -496,7 +533,7 @@ class MedicationIncidentIntegrationService
                 $incident->status = 'submitted';
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedFollowup->created_at ?? now();
-                $incident->reported_by = $lockedFollowup->created_by;
+                $incident->reported_by = $actor->id;
                 $incident->metadata = [
                     'medication_refusal_followup_id' => $lockedFollowup->id,
                 ];
@@ -511,9 +548,6 @@ class MedicationIncidentIntegrationService
                 }
             }
 
-            $actor = $incident->reported_by === null
-                ? null
-                : User::query()->find($incident->reported_by);
             $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
             MedicationDashboardAlert::createOrUpdateAlert(
@@ -564,6 +598,12 @@ class MedicationIncidentIntegrationService
                 return null;
             }
 
+            $actor = $this->requireSubmittedMedicationActor(
+                $createdBy,
+                $lockedReport->discovered_by,
+                'controlled drug loss',
+            );
+
             $medication = $lockedReport->medication;
             $medicationName = $lockedReport->medication_name ?: $medication?->name ?: 'Controlled medication';
             $incident = $lockedReport->incident_id === null
@@ -583,7 +623,7 @@ class MedicationIncidentIntegrationService
                 $incident->status = 'submitted';
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedReport->discovered_at ?? now();
-                $incident->reported_by = $createdBy ?? $lockedReport->discovered_by;
+                $incident->reported_by = $actor->id;
                 $this->assignIncidentServiceContext($incident, $client->service_context_id);
                 $incident->save();
 
@@ -594,9 +634,6 @@ class MedicationIncidentIntegrationService
                 $lockedReport->updateQuietly(['incident_id' => $incident->id]);
             }
 
-            $actor = $incident->reported_by === null
-                ? null
-                : User::query()->find($incident->reported_by);
             $this->journeyService->ensureForSubmittedIncident($incident, $actor);
 
             MedicationDashboardAlert::createOrUpdateAlert(
@@ -985,6 +1022,23 @@ class MedicationIncidentIntegrationService
             'kind' => $kind,
         ];
         $incident->metadata = $metadata;
+    }
+
+    private function requireSubmittedMedicationActor(
+        ?int $suppliedActorId,
+        ?int $sourceReporterId,
+        string $journeyType,
+    ): User {
+        $actorId = $suppliedActorId ?? $sourceReporterId;
+        $actor = $actorId === null ? null : User::query()->find($actorId);
+
+        if ($actor === null) {
+            throw new \DomainException(
+                "Submitted {$journeyType} journey requires an explicit actor or source reporter before any records are written.",
+            );
+        }
+
+        return $actor;
     }
 
     /**

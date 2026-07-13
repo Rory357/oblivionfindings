@@ -95,17 +95,36 @@ class SensorIncidentBridgeService
      */
     public function dismiss(ControlRoomAlert $alert, string $reason, User $operator): void
     {
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_DISMISSED)) {
-            throw new InvalidArgumentException("Alert {$alert->id} cannot be dismissed from status '{$alert->status}'.");
-        }
-
         DB::transaction(function () use ($alert, $reason, $operator) {
-            $context = $alert->context ?? [];
+            $lockedAlert = ControlRoomAlert::query()
+                ->whereKey($alert->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_DISMISSED)) {
+                throw new InvalidArgumentException(
+                    "Alert {$lockedAlert->id} cannot be dismissed from status '{$lockedAlert->status}'.",
+                );
+            }
+
+            $context = $lockedAlert->context ?? [];
+            $hasJourneyClaim = filled(data_get($context, 'incident_id'))
+                || filled(data_get($context, 'normalized_data.incident_id'))
+                || $lockedAlert->clientIncident()->exists()
+                || $lockedAlert->hsEvent()->exists();
+
+            if ($hasJourneyClaim) {
+                throw new InvalidArgumentException(
+                    "Alert {$lockedAlert->id} cannot be dismissed because it owns an incident journey.",
+                );
+            }
+
+            $signals = $lockedAlert->signals()->lockForUpdate()->get();
             $context['dismissed_reason'] = $reason;
             $context['dismissed_by'] = $operator->name;
             $context['dismissed_at'] = now()->toISOString();
 
-            $alert->update([
+            $lockedAlert->update([
                 'status' => ControlRoomAlert::STATUS_DISMISSED,
                 'resolution_code' => 'false_positive',
                 'context' => $context,
@@ -113,12 +132,12 @@ class SensorIncidentBridgeService
                 'resolved_by_user_id' => $operator->id,
             ]);
 
-            foreach ($alert->signals as $signal) {
+            foreach ($signals as $signal) {
                 $signal->markSuppressed("false_positive: {$reason}");
             }
 
-            AuditLogger::log('controlRoom.alert.dismiss', $alert, [
-                'alert_id' => $alert->id,
+            AuditLogger::log('controlRoom.alert.dismiss', $lockedAlert, [
+                'alert_id' => $lockedAlert->id,
                 'reason' => $reason,
                 'dismissed_by' => $operator->id,
             ]);

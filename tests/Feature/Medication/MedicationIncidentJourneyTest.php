@@ -14,6 +14,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\Site;
 use App\Models\User;
@@ -25,11 +26,177 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MedicationIncidentJourneyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_distinct_medication_errors_on_one_incident_emit_distinct_retry_safe_signals(): void
+    {
+        [$actor, $client, $medication] = $this->medicationFixture();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'reported_by' => $actor->id,
+            'type' => 'medication',
+            'status' => 'draft',
+            'submitted_at' => null,
+        ]));
+        $errors = collect(['wrong_dose', 'wrong_time'])->map(
+            fn (string $errorType): MedicationError => MedicationError::create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medication->id,
+                'client_incident_id' => $incident->id,
+                'error_type' => $errorType,
+                'severity' => 'major',
+                'description' => "Distinct {$errorType} error.",
+                'reported_by' => $actor->id,
+                'reported_at' => now()->startOfSecond(),
+                'status' => 'reported',
+            ]),
+        );
+        $signals = app(MedicationSignalService::class);
+
+        foreach ($errors as $error) {
+            $signals->emitError($error);
+        }
+        foreach ($errors as $error) {
+            $signals->emitError($error->fresh());
+        }
+
+        $alert = ControlRoomAlert::query()->sole();
+        $signalRows = Signal::query()->orderBy('id')->get();
+
+        $this->assertCount(2, $signalRows);
+        $this->assertEqualsCanonicalizing(
+            $errors->pluck('id')->all(),
+            $signalRows->pluck('normalized_data')->map(
+                fn (array $normalized): int => (int) $normalized['medication_error_id'],
+            )->all(),
+        );
+        $this->assertSame($alert->id, $incident->fresh()->control_room_alert_id);
+        $this->assertSame($signalRows->last()->id, data_get($alert->context, 'signal_id'));
+        $this->assertSame(
+            [$signalRows->last()->id],
+            collect(data_get($alert->context, 'correlated_signals', []))->pluck('signal_id')->all(),
+        );
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    #[DataProvider('nonCanonicalIncidentIds')]
+    public function test_medication_signal_rejects_non_canonical_incident_identifiers(mixed $incidentId): void
+    {
+        [, $client] = $this->medicationFixture();
+        $source = $this->medicationSignalSource();
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => MedicationSignalService::TYPE_MISSED_DOSE,
+            'client_id' => $client->id,
+            'severity_hint' => 'medium',
+            'occurred_at' => now(),
+            'normalized_data' => ['incident_id' => $incidentId],
+            'status' => 'pending',
+        ]);
+
+        try {
+            app(SignalProcessingService::class)->process($signal);
+            $this->fail('A non-canonical incident identifier must not be trusted.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('valid incident', $exception->getMessage());
+        }
+
+        $this->assertSame('pending', $signal->fresh()->status);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_untrusted_signal_source_cannot_attach_an_incident_claim(): void
+    {
+        [, $client] = $this->medicationFixture();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+        ]));
+        $source = SignalSource::create([
+            'name' => 'Untrusted third-party source',
+            'slug' => 'third_party',
+            'vendor' => 'external',
+            'status' => 'active',
+            'capabilities' => ['event_driven'],
+        ]);
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'third_party_event',
+            'client_id' => $client->id,
+            'severity_hint' => 'medium',
+            'occurred_at' => now(),
+            'normalized_data' => ['incident_id' => $incident->id],
+            'status' => 'pending',
+        ]);
+
+        try {
+            app(SignalProcessingService::class)->process($signal);
+            $this->fail('An untrusted source must not claim an incident journey.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('trusted source', $exception->getMessage());
+        }
+
+        $this->assertNull($incident->fresh()->control_room_alert_id);
+        $this->assertSame('pending', $signal->fresh()->status);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_internal_medication_source_can_attach_a_canonical_incident_claim(): void
+    {
+        [, $client] = $this->medicationFixture();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $client->id,
+        ]));
+        $source = $this->medicationSignalSource();
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => MedicationSignalService::TYPE_MISSED_DOSE,
+            'client_id' => $client->id,
+            'severity_hint' => 'medium',
+            'occurred_at' => now(),
+            'normalized_data' => ['incident_id' => (string) $incident->id],
+            'status' => 'pending',
+        ]);
+
+        $alert = app(SignalProcessingService::class)->process($signal);
+
+        $this->assertNotNull($alert);
+        $this->assertSame($alert->id, $incident->fresh()->control_room_alert_id);
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertSame('processed', $signal->fresh()->status);
+    }
+
+    public function test_generic_signal_without_incident_claim_remains_processable_from_untrusted_source(): void
+    {
+        [, $client] = $this->medicationFixture();
+        $source = SignalSource::create([
+            'name' => 'Generic third-party source',
+            'slug' => 'generic_third_party',
+            'vendor' => 'external',
+            'status' => 'active',
+            'capabilities' => ['event_driven'],
+        ]);
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'generic_event',
+            'client_id' => $client->id,
+            'severity_hint' => 'low',
+            'occurred_at' => now(),
+            'normalized_data' => ['title' => 'Generic operational event'],
+            'status' => 'pending',
+        ]);
+
+        $alert = app(SignalProcessingService::class)->process($signal);
+
+        $this->assertNotNull($alert);
+        $this->assertSame($alert->id, $signal->fresh()->alert_id);
+        $this->assertSame('processed', $signal->fresh()->status);
+    }
 
     public function test_controlled_discrepancy_signal_enriches_one_official_journey_and_retry_is_exact(): void
     {
@@ -403,6 +570,14 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertNotNull($first);
         $this->assertNotNull($second);
         $this->assertFalse($first->is($second));
+        $this->assertNotNull(data_get($first->metadata, 'medication_prn_attempt.id'));
+        $this->assertNotNull(data_get($second->metadata, 'medication_prn_attempt.id'));
+        $this->assertNotSame(
+            data_get($first->metadata, 'medication_prn_attempt.id'),
+            data_get($second->metadata, 'medication_prn_attempt.id'),
+        );
+        $this->assertSame($actor->id, data_get($first->metadata, 'medication_prn_attempt.attempted_by'));
+        $this->assertSame($actor->id, data_get($second->metadata, 'medication_prn_attempt.attempted_by'));
         $this->assertDatabaseCount('client_incidents', 2);
         $this->assertDatabaseCount('control_room_alerts', 2);
         $this->assertDatabaseCount('control_room_signals', 2);
@@ -413,6 +588,92 @@ class MedicationIncidentJourneyTest extends TestCase
                 ->map(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'))
                 ->all(),
         );
+    }
+
+    public function test_prn_attempt_rolls_back_when_signal_source_is_unavailable(): void
+    {
+        [$actor, $client, $medication] = $this->medicationFixture();
+        $medication->update(['max_per_day' => '4']);
+        $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            protected function getSignalSource(): ?SignalSource
+            {
+                return null;
+            }
+        };
+        $service = new MedicationIncidentIntegrationService(
+            $signals,
+            app(IncidentJourneyService::class),
+        );
+
+        try {
+            $service->handlePrnOverLimit($client, $medication->fresh(), $actor->id);
+            $this->fail('Missing PRN signal source must roll back the whole attempt.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Medication signal source is unavailable for an incident journey.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('medication_dashboard_alerts', 0);
+    }
+
+    public function test_prn_attempt_rolls_back_when_signal_processing_fails(): void
+    {
+        [$actor, $client, $medication] = $this->medicationFixture();
+        $medication->update(['max_per_day' => '4']);
+        $processor = $this->partialMock(SignalProcessingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('process')
+                ->once()
+                ->andThrow(new \RuntimeException('Forced PRN signal processing failure'));
+        });
+        $service = new MedicationIncidentIntegrationService(
+            new MedicationSignalService($processor),
+            app(IncidentJourneyService::class),
+        );
+
+        try {
+            $service->handlePrnOverLimit($client, $medication->fresh(), $actor->id);
+            $this->fail('PRN signal processing failure must roll back the whole attempt.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced PRN signal processing failure', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('medication_dashboard_alerts', 0);
+    }
+
+    public function test_submitted_controlled_discrepancy_rejects_a_missing_actor_before_writes(): void
+    {
+        [, $client, $medication] = $this->medicationFixture();
+        $discrepancy = ClientControlledDrugDiscrepancy::create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'on_hand_before' => 10,
+            'on_hand_after' => 9,
+            'difference' => -1,
+            'reason' => 'No accountable reporter is available.',
+            'reported_at' => now()->subMinute(),
+            'reported_by' => null,
+            'status' => 'open',
+        ]);
+
+        try {
+            app(MedicationIncidentIntegrationService::class)->handleControlledDiscrepancy($discrepancy);
+            $this->fail('A submitted medication journey requires an accountable actor.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('explicit actor', $exception->getMessage());
+        }
+
+        $this->assertNull($discrepancy->fresh()->incident_id);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('medication_dashboard_alerts', 0);
     }
 
     public function test_submitted_source_journey_rolls_back_when_incident_signal_processing_fails(): void
@@ -599,5 +860,29 @@ class MedicationIncidentJourneyTest extends TestCase
             'scheduled_for' => now()->subHour(),
             'administered_at' => now(),
         ], $attributes));
+    }
+
+    private function medicationSignalSource(): SignalSource
+    {
+        return SignalSource::create([
+            'name' => 'Medication / eMAR',
+            'slug' => 'medication',
+            'vendor' => 'internal',
+            'status' => 'active',
+            'capabilities' => ['scheduled_checks', 'event_driven', 'incident_correlation'],
+        ]);
+    }
+
+    public static function nonCanonicalIncidentIds(): array
+    {
+        return [
+            'zero integer' => [0],
+            'negative integer' => [-1],
+            'decimal text' => ['1.0'],
+            'scientific text' => ['1e0'],
+            'signed text' => ['+1'],
+            'leading zero text' => ['01'],
+            'whitespace text' => [' 1 '],
+        ];
     }
 }

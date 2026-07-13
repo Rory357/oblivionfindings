@@ -236,13 +236,7 @@ class SignalProcessingServiceTest extends TestCase
         $client = Client::factory()->create();
         $firstIncident = ClientIncident::factory()->create(['client_id' => $client->id]);
         $secondIncident = ClientIncident::factory()->create(['client_id' => $client->id]);
-        $source = SignalSource::create([
-            'name' => 'Incident Signals',
-            'slug' => 'incident-signals',
-            'category' => 'medication',
-            'vendor' => 'internal',
-            'status' => 'active',
-        ]);
+        $source = $this->medicationIncidentSource();
         $signalType = SignalType::create([
             'code' => 'medication.incident',
             'name' => 'Medication Incident',
@@ -316,13 +310,7 @@ class SignalProcessingServiceTest extends TestCase
             'context' => ['incident_id' => $incident->id],
         ]);
         $incident->updateQuietly(['control_room_alert_id' => $directAlert->id]);
-        $source = SignalSource::create([
-            'name' => 'Direct Incident Signals',
-            'slug' => 'direct-incident-signals',
-            'category' => 'medication',
-            'vendor' => 'internal',
-            'status' => 'active',
-        ]);
+        $source = $this->medicationIncidentSource();
         $signalType = SignalType::create([
             'code' => 'medication.direct_incident',
             'name' => 'Direct Medication Incident',
@@ -364,13 +352,7 @@ class SignalProcessingServiceTest extends TestCase
     {
         $client = Client::factory()->create();
         $incident = ClientIncident::factory()->create(['client_id' => $client->id]);
-        $source = SignalSource::create([
-            'name' => 'Ambiguous Incident Signals',
-            'slug' => 'ambiguous-incident-signals',
-            'category' => 'medication',
-            'vendor' => 'internal',
-            'status' => 'active',
-        ]);
+        $source = $this->medicationIncidentSource();
         $signalType = SignalType::create([
             'code' => 'medication.ambiguous_incident',
             'name' => 'Ambiguous Medication Incident',
@@ -586,5 +568,17 @@ class SignalProcessingServiceTest extends TestCase
 
         $this->assertInstanceOf(Signal::class, $signal);
         $this->assertEquals($device->id, $signal->device_id);
+    }
+
+    private function medicationIncidentSource(): SignalSource
+    {
+        return SignalSource::create([
+            'name' => 'Medication / eMAR',
+            'slug' => 'medication',
+            'category' => 'medication',
+            'vendor' => 'internal',
+            'status' => 'active',
+            'capabilities' => ['scheduled_checks', 'event_driven', 'incident_correlation'],
+        ]);
     }
 }

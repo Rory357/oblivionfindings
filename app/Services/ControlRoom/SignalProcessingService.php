@@ -34,6 +34,10 @@ use Illuminate\Support\Facades\Log;
 
 class SignalProcessingService
 {
+    private const INCIDENT_CORRELATION_CAPABILITY = 'incident_correlation';
+
+    private const TRUSTED_INCIDENT_SOURCE_SLUGS = ['medication'];
+
     public function __construct(
         protected ControlRoomNotificationService $notifications,
         protected ?ShiftSignalService $shiftSignals = null,
@@ -388,8 +392,22 @@ class SignalProcessingService
             return null;
         }
 
-        if (! is_numeric($incidentId)) {
+        if (! $this->hasCanonicalPositiveIntegerIdentity($incidentId)) {
             throw new \DomainException('Incident signal correlation requires a valid incident.');
+        }
+
+        $source = $signal->signalSource;
+        $capabilities = $source?->capabilities ?? [];
+        $isTrustedSource = $source !== null
+            && $source->status === 'active'
+            && $source->vendor === 'internal'
+            && (
+                in_array($source->slug, self::TRUSTED_INCIDENT_SOURCE_SLUGS, true)
+                || in_array(self::INCIDENT_CORRELATION_CAPABILITY, $capabilities, true)
+            );
+
+        if (! $isTrustedSource) {
+            throw new \DomainException('Incident signal correlation requires a trusted source.');
         }
 
         $incident = ClientIncident::query()
@@ -405,6 +423,17 @@ class SignalProcessingService
         }
 
         return $incident;
+    }
+
+    private function hasCanonicalPositiveIntegerIdentity(mixed $identity): bool
+    {
+        if (is_int($identity)) {
+            return $identity > 0;
+        }
+
+        return is_string($identity)
+            && preg_match('/^[1-9][0-9]*$/D', $identity) === 1
+            && (string) (int) $identity === $identity;
     }
 
     private function exactAlertForIncident(ClientIncident $incident): ?ControlRoomAlert
