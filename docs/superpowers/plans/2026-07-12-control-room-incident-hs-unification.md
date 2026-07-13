@@ -329,42 +329,58 @@ git commit -m "feat(incidents): orchestrate one incident journey"
 - Test: `tests/Feature/ControlRoom/SensorIncidentJourneyTest.php`
 - Test: `tests/Feature/Medication/MedicationIncidentJourneyTest.php`
 
-- [ ] **Step 1: Write failing draft/submission observer tests**
+- [x] **Step 1: Write failing draft/submission observer tests**
 
 Assert a created draft has no `HsEvent`; changing the same incident to submitted creates exactly one H&S event, and repeated updates remain one.
 
-- [ ] **Step 2: Write failing sensor and medication correlation tests**
+- [x] **Step 2: Write failing sensor and medication correlation tests**
 
 Sensor confirmation must reuse its alert and preserve evidence. A controlled-drug incident plus emitted signal must result in exactly one incident, one alert, one H&S event, and matching links.
 
-- [ ] **Step 3: Run all three files and capture the current duplicate/orphan failures**
+- [x] **Step 3: Run all three files and capture the current duplicate/orphan failures**
 
 Run: `php artisan test tests/Feature/HealthSafety/ControlRoomBridgeWiringTest.php tests/Feature/ControlRoom/SensorIncidentJourneyTest.php tests/Feature/Medication/MedicationIncidentJourneyTest.php`
 
-- [ ] **Step 4: Make the observer a compatibility caller**
+- [x] **Step 4: Make the observer a compatibility caller**
 
 On `created`, return immediately for drafts; otherwise call `ensureForSubmittedIncident()`. On draft → submitted call the same method. Synchronise mutable source fields through the journey service. Do not catch-and-forget a partial link; dispatch a reconciliation job or log a structured repair-required event.
 
-- [ ] **Step 5: Make bridge deduplication return the correlated alert**
+- [x] **Step 5: Make bridge deduplication return the correlated alert**
 
 Incident-backed paths query `context.incident_id` or the direct FK. Fuzzy deduplication may remain for non-incident operational signals, but it must never return `null` for a distinct incident that needs a relationship.
 
-- [ ] **Step 6: Delegate sensor and medication creation to the service**
+- [x] **Step 6: Delegate sensor and medication creation to the service**
 
 Keep sensor-specific evidence capture and dismissal, but use `submitFromAlert()` for confirmation. Medication signal enrichment locates the official incident journey instead of opening a second alert.
 
-- [ ] **Step 7: Run bridge regression suites**
+- [x] **Step 7: Run bridge regression suites**
 
 Run: `php artisan test tests/Feature/HealthSafety/ControlRoomBridgeWiringTest.php tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php tests/Feature/ControlRoom/SensorIncidentJourneyTest.php tests/Feature/Medication/MedicationIncidentJourneyTest.php`
 
 Expected: PASS with exact record counts and stable links.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add app/Observers app/Services/ControlRoom app/Services/Medication app/Services/MedicationIncidentIntegrationService.php tests/Feature
 git commit -m "fix(incidents): prevent duplicate journey bridges"
 ```
+
+#### Crash-containment checkpoint — 2026-07-13
+
+- Task 4 implementation and hardening are present through commit `2dde398d53064349ca1bbd141b19a026af991d68` (`fix(incidents): harden bridge identity and races`), following `d371f89f`, `2018927c`, `5fc1531f`, and `df49e2bd`.
+- The final formatted Task 4 code passed the exact six-file gate: 135 tests, 595 assertions, exit 0. Pint, PHP lint for all seven touched files, and `git diff --check` also passed.
+- This is an implementation checkpoint, not Task 4 acceptance. A fresh independent specification re-review and code-quality re-review at `2dde398d` are still required, so the Task 4 checkboxes remain deliberately unchecked.
+- No Task 5 UI work, dashboard redesign, desktop browser E2E scenario, final client/SSR build, merge, push, or deployment has started.
+- Exact resume point: review Task 4 at `2dde398d`; if both reviews approve, record the completion evidence and only then begin Task 5.
+
+#### Task 4 completion evidence — 2026-07-13
+
+- Canonical bridge implementation and successive hardening are committed through `a43c66ad28bb42137a46f2704b6575b22138d811`, including `d371f89f`, `2018927c`, `5fc1531f`, `df49e2bd`, `2dde398d`, `5818fe48`, `cd65b87f`, and `962a3c28`.
+- Final behaviour keeps `IncidentJourneyService` as the sole alert/incident/H&S link writer; drafts create no H&S event; submitted observer, sensor, medication, signal, and legacy-controller paths converge on one atomic, retry-safe journey with exact client/source validation and monotonic severity, WorkSafe, and lifecycle state.
+- Quality hardening adds stable medication and PRN request identity, durable failed-hook replay, alert-first locking and outer deadlock retries, queue/SLA/playbook reconciliation, reversible notification-outbox and administration UUID schema, exactly-once notification/governance jobs with scheduled recovery, and non-conversational filtering for operational outbox rows.
+- Final exact 10-file Task 4 union gate: 219 tests / 1,431 assertions / exit 0 / 448.22 seconds. Focused owning suites, Pint, PHP lint, container/job/schedule checks, `git diff --check`, and isolated migration apply → rollback → reapply all passed.
+- Final independent code-quality review: approved with no Critical/Important finding. Final independent specification reconciliation: pass at `a43c66ad`. No Task 5 UI, mobile, WebView, merge, push, or deployment work was included.
 
 ---
 
@@ -1166,3 +1182,101 @@ The cumulative baseline-to-product-HEAD diff is 42 files: 6,888 insertions and 2
 ### Next safe step
 
 Resume Task 3 with a fresh independent specification review of `b6748d2f`, explicitly test the lifecycle-retry and H&S-canonical WorkSafe concerns, return any findings to the Task 3 implementer under TDD, then obtain a fresh quality review and root-owned focused rerun. Do not begin Task 4 until Task 3 is approved. Continue with desktop-only scope.
+
+---
+
+## Crash-containment checkpoint — 2026-07-13 (Task 4 final-hardening stop)
+
+This work is intentionally paused immediately after the one in-flight focused test completed. No fix was applied after its result, and no further test suite, audit section, browser journey, formatting pass, commit, merge, push, deployment, reset, discard, archive, or cleanup outside this task was started.
+
+### Exact branch and working-tree state
+
+- Worktree: `C:\Users\steph\.config\superpowers\worktrees\oblivionfindings\codex-control-room-incident-hs-unification`
+- Branch: `codex/control-room-incident-hs-unification`
+- HEAD: `2dde398d53064349ca1bbd141b19a026af991d68` (`fix(incidents): harden bridge identity and races`)
+- Ten product/test files are modified but uncommitted: six application files and four test files, currently 588 insertions and 104 deletions.
+- This plan was already modified and remains intentionally uncommitted; the present section is the only containment-time edit.
+
+### Exact scope reached in the resumed hardening pass
+
+- Implemented the four findings from the fresh Task 4 specification review under focused TDD: canonical journey ownership for incident-correlated signal alerts, transactional medication-error controller integration, fail-closed handling of every non-empty incident claim, and client validation for exact direct/context alert correlation.
+- Also removed a direct journey-link write from the Control Room flag-as-incident path and stopped the sensor bridge from re-writing canonical incident context after submission.
+- Focused four-file verification reached 59 passing tests and 383 assertions after the planned fixes.
+- A final self-review identified one additional unresolved provenance defect: a critical Control Room alert is capped to a high ClientIncident and the new generic attachment path currently creates a high H&S event instead of preserving the original critical alert severity.
+- The focused regression for that defect completed RED at this stop point: 1 failed test, 4 assertions, exit code 1. Expected H&S severity `critical`; actual `high` at `tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php:233`.
+- The provenance fix, Pint, PHP lint, `git diff --check`, the final focused rerun, and the exact Task 4 six-file gate have **not** been run. The uncommitted pass must not be treated as approved or complete.
+
+### Files currently changed
+
+- `app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php`
+- `app/Http/Controllers/Emar/MedicationErrorController.php`
+- `app/Services/ControlRoom/SensorIncidentBridgeService.php`
+- `app/Services/ControlRoom/SignalProcessingService.php`
+- `app/Services/Incidents/IncidentJourneyService.php`
+- `app/Services/Medication/MedicationSignalService.php`
+- `tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php`
+- `tests/Feature/Emar/MedicationErrorsTest.php`
+- `tests/Feature/Medication/MedicationIncidentJourneyTest.php`
+- `tests/Unit/ControlRoom/SignalProcessingServiceTest.php`
+- `docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md` (pre-existing checkpoint document plus this containment section)
+
+### Browser and process containment
+
+- This Task 4 hardening pass did not open or control a browser tab and did not start a preview server, so there was no task-owned browser or preview state to close.
+- The only task-owned PHP test runner exited normally with test exit code 1; no task-owned runner remains.
+- A separate Vite build was observed under `C:\Users\steph\.codex\worktrees\43ca\oblivionfindings`. It does not belong to this worktree/task and was deliberately left untouched.
+- No implementation or review subagent was spawned by this hardening pass; nothing task-owned remains to interrupt.
+
+### Next safe step
+
+Resume at the existing RED test only. Preserve the original alert severity provenance in `IncidentJourneyService::attachAlertToIncident()` before draft/submitted H&S creation or synchronisation, make the focused controller regression green, then run Pint, PHP lint, `git diff --check`, the final focused suite, and the exact Task 4 six-file gate. Review and commit only the ten product/test files; keep this plan out of that product commit. Continue with desktop-only scope and do not begin the dashboard/UI audit section until Task 4 is independently approved.
+
+---
+
+## Crash-containment checkpoint — 2026-07-13 (Task 4 final-hardening GREEN stop)
+
+This checkpoint supersedes the older Task 4 RED-stop instructions immediately above. Work is intentionally paused after the current combined focused runner exited successfully. No further self-review, formatter, lint, diff check, expanded gate, commit, merge, push, deployment, browser journey, or new audit section was started after that result.
+
+### Exact branch and verification state
+
+- Worktree: `C:\Users\steph\.config\superpowers\worktrees\oblivionfindings\codex-control-room-incident-hs-unification`
+- Branch: `codex/control-room-incident-hs-unification`
+- HEAD: `cd65b87f856057caf3b0ad1cecde699d12f86ef6`
+- Initial combined RED: 12 failed, 90 passed, 725 assertions, exit code 1, 202.81 seconds.
+- Current combined GREEN: 102 passed, 797 assertions, exit code 0, 202.77 seconds.
+- The GREEN gate covered the Control Room incident request path, trusted-signal promotion, medication-error delivery/linking, medication incident identity, canonical incident journey operations/locking, sensor retry contracts, and governance escalation locking.
+- Pint, final PHP lint, `git diff --check`, the exact expanded Task 4 gate, and a product commit have **not** been run on this state. It is a strong focused checkpoint, not final Task 4 approval.
+
+### Exact scope currently changed
+
+Nine application files and seven test files are uncommitted; the plan remains separately dirty and must stay out of the product commit:
+
+- `app/Domain/Governance/Services/IncidentEscalationService.php`
+- `app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php`
+- `app/Http/Controllers/Emar/MedicationErrorController.php`
+- `app/Services/ControlRoom/ComprehensiveAlertBridgeService.php`
+- `app/Services/ControlRoom/IncidentAlertOperationalInitializer.php` (new, untracked)
+- `app/Services/ControlRoom/SensorIncidentBridgeService.php`
+- `app/Services/ControlRoom/SignalProcessingService.php`
+- `app/Services/Incidents/IncidentJourneyService.php`
+- `app/Services/Medication/MedicationSignalService.php`
+- `tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php`
+- `tests/Feature/ControlRoom/SensorIncidentJourneyTest.php`
+- `tests/Feature/Emar/MedicationErrorsTest.php`
+- `tests/Feature/Governance/GovernanceCrossModuleEscalationTest.php`
+- `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
+- `tests/Feature/Medication/MedicationIncidentJourneyTest.php`
+- `tests/Unit/ControlRoom/SignalProcessingServiceTest.php`
+- `docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md` (pre-existing checkpoints plus this containment update)
+
+The implemented hardening covers monotonic requested-severity provenance; critical trusted-signal promotion through alert, incident provenance, and H&S; fail-closed major/critical medication delivery; idempotent medication-error linking and rollback; stable durable medication event identity including PRN attempts; operational queue/SLA/automation/notification initialization for newly created incident alerts; consistent alert-before-incident lock order with outer retry contracts; and governance escalation serialization on the incident lock. Adjacent stale bridge writes and unlocked correlated-alert updates were also removed or locked within this Task 4 boundary.
+
+### Browser and process containment
+
+- The containment browser session had zero managed tabs and found zero open Oblivion Findings, localhost, or loopback preview tabs. Nothing was closed because this task owned no browser tab.
+- No `php`, `node`, `npm`, `npx`, Vite, Playwright, Chrome, or Edge process matched this worktree or a task preview/test command. Nothing was stopped.
+- The combined PHP test runner exited normally; no task-owned command session remains running.
+
+### Next safe step
+
+Resume from this exact 102-passing/797-assertion GREEN state. Self-review the eight recorded Task 4 quality concerns, run Pint only on the sixteen changed product/test PHP files, run PHP lint and `git diff --check`, then run the exact expanded Task 4 gate once on the final formatted code plus only any narrow formatter regression that is genuinely needed. Commit only the sixteen product/test files and exclude this plan. Do not begin Task 5, dashboard/UI, mobile, WebView, merge, push, or deployment work.
