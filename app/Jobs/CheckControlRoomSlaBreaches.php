@@ -32,6 +32,7 @@ class CheckControlRoomSlaBreaches implements ShouldQueue
         $escalatedCount = 0;
 
         AlertSla::query()
+            ->applicable()
             ->with(['alert', 'slaDefinition'])
             ->whereNull('resolved_at')
             ->chunkById(100, function ($slas) use ($notificationService, &$escalatedCount) {
@@ -43,7 +44,7 @@ class CheckControlRoomSlaBreaches implements ShouldQueue
 
                     $alert = $sla->alert;
                     $definition = $sla->slaDefinition;
-                    if (!$alert || !$definition) {
+                    if (! $alert || ! $definition) {
                         continue;
                     }
 

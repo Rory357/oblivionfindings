@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AlertSla extends Model
 {
+    public const ENDED_RECONCILED_NO_MATCH = 'reconciled_no_match';
+
     protected $table = 'control_room_alert_sla';
 
     protected $fillable = [
@@ -64,18 +66,28 @@ class AlertSla extends Model
 
     public function scopeBreached($query)
     {
-        return $query->where(function ($q) {
+        return $query->applicable()->where(function ($q) {
             $q->where('acknowledge_breached', true)
                 ->orWhere('response_breached', true)
                 ->orWhere('resolution_breached', true);
         });
     }
 
+    public function scopeApplicable($query)
+    {
+        return $query
+            ->whereNotNull('sla_definition_id')
+            ->where(function ($q) {
+                $q->whereNull('ended_as')
+                    ->orWhere('ended_as', '!=', self::ENDED_RECONCILED_NO_MATCH);
+            });
+    }
+
     public function scopeAtRisk($query, int $warningMinutes = 5)
     {
         $warningTime = now()->addMinutes($warningMinutes);
 
-        return $query->where(function ($q) use ($warningTime) {
+        return $query->applicable()->where(function ($q) use ($warningTime) {
             $q->where(function ($sq) use ($warningTime) {
                 $sq->whereNull('acknowledged_at')
                     ->where('acknowledge_deadline', '<=', $warningTime);
@@ -91,7 +103,8 @@ class AlertSla extends Model
 
     public static function createFromDefinition(ControlRoomAlert $alert, SlaDefinition $sla): self
     {
-        $deadlines = $sla->calculateDeadlines($alert->triggered_at);
+        $cycleStartedAt = $alert->triggered_at ?? $alert->created_at ?? now();
+        $deadlines = $sla->calculateDeadlines($cycleStartedAt);
 
         return static::create([
             'alert_id' => $alert->id,
@@ -102,11 +115,16 @@ class AlertSla extends Model
             'acknowledge_deadline' => $deadlines['acknowledge'] ?? null,
             'response_deadline' => $deadlines['response'] ?? null,
             'resolution_deadline' => $deadlines['resolution'] ?? null,
+            'cycle_started_at' => $cycleStartedAt,
         ]);
     }
 
     public function recordAcknowledge(): void
     {
+        if (! $this->isApplicable()) {
+            return;
+        }
+
         $acknowledgedAt = now();
         $breached = $this->acknowledge_deadline && $acknowledgedAt->gt($this->acknowledge_deadline);
         $variance = $this->acknowledge_deadline
@@ -123,6 +141,10 @@ class AlertSla extends Model
 
     public function recordResponse(): void
     {
+        if (! $this->isApplicable()) {
+            return;
+        }
+
         $respondedAt = now();
         $breached = $this->response_deadline && $respondedAt->gt($this->response_deadline);
         $variance = $this->response_deadline
@@ -139,6 +161,10 @@ class AlertSla extends Model
 
     public function recordResolution(): void
     {
+        if (! $this->isApplicable()) {
+            return;
+        }
+
         $resolvedAt = now();
         $breached = $this->resolution_deadline && $resolvedAt->gt($this->resolution_deadline);
         $variance = $this->resolution_deadline
@@ -155,6 +181,10 @@ class AlertSla extends Model
 
     public function checkForBreaches(): array
     {
+        if (! $this->isApplicable()) {
+            return [];
+        }
+
         $breaches = [];
         $now = now();
 
@@ -187,11 +217,122 @@ class AlertSla extends Model
 
     public function isBreached(): bool
     {
-        return $this->acknowledge_breached || $this->response_breached || $this->resolution_breached;
+        return $this->isApplicable()
+            && ($this->acknowledge_breached || $this->response_breached || $this->resolution_breached);
+    }
+
+    public function isApplicable(): bool
+    {
+        return $this->sla_definition_id !== null
+            && $this->ended_as !== self::ENDED_RECONCILED_NO_MATCH;
+    }
+
+    public function terminaliseForNoMatchingDefinition(string $severity): void
+    {
+        if (! $this->isApplicable()) {
+            return;
+        }
+
+        $endedAt = now();
+        $definition = $this->slaDefinition;
+        $history = $this->cycle_history ?? [];
+        $history[] = [
+            'cycle_number' => (int) $this->cycle_number,
+            'cycle_started_at' => $this->cycle_started_at?->toIso8601String(),
+            'ended_at' => $endedAt->toIso8601String(),
+            'ended_as' => self::ENDED_RECONCILED_NO_MATCH,
+            'reconciled_for_severity' => $severity,
+            'definition' => [
+                'id' => $this->sla_definition_id,
+                'code' => $definition?->code,
+                'name' => $definition?->name,
+            ],
+            'targets' => [
+                'acknowledge_minutes' => $this->acknowledge_target_minutes,
+                'response_minutes' => $this->response_target_minutes,
+                'resolution_minutes' => $this->resolution_target_minutes,
+            ],
+            'deadlines' => [
+                'acknowledge_at' => $this->acknowledge_deadline?->toIso8601String(),
+                'response_at' => $this->response_deadline?->toIso8601String(),
+                'resolution_at' => $this->resolution_deadline?->toIso8601String(),
+            ],
+            'results' => [
+                'acknowledged_at' => $this->acknowledged_at?->toIso8601String(),
+                'responded_at' => $this->responded_at?->toIso8601String(),
+                'resolved_at' => $this->resolved_at?->toIso8601String(),
+                'acknowledge_variance_minutes' => $this->acknowledge_variance_minutes,
+                'response_variance_minutes' => $this->response_variance_minutes,
+                'resolution_variance_minutes' => $this->resolution_variance_minutes,
+                'acknowledge_breached' => (bool) $this->acknowledge_breached,
+                'response_breached' => (bool) $this->response_breached,
+                'resolution_breached' => (bool) $this->resolution_breached,
+                'first_breach_at' => $this->first_breach_at?->toIso8601String(),
+            ],
+        ];
+
+        $this->forceFill([
+            'sla_definition_id' => null,
+            'acknowledge_target_minutes' => null,
+            'response_target_minutes' => null,
+            'resolution_target_minutes' => null,
+            'acknowledge_deadline' => null,
+            'response_deadline' => null,
+            'resolution_deadline' => null,
+            'acknowledged_at' => null,
+            'responded_at' => null,
+            'resolved_at' => null,
+            'acknowledge_variance_minutes' => null,
+            'response_variance_minutes' => null,
+            'resolution_variance_minutes' => null,
+            'acknowledge_breached' => false,
+            'response_breached' => false,
+            'resolution_breached' => false,
+            'first_breach_at' => null,
+            'cycle_started_at' => null,
+            'cycle_history' => $history,
+            'ended_as' => self::ENDED_RECONCILED_NO_MATCH,
+        ])->save();
+    }
+
+    public function reactivateFromDefinition(SlaDefinition $sla, \DateTime $cycleStartedAt): void
+    {
+        if ($this->ended_as !== self::ENDED_RECONCILED_NO_MATCH) {
+            return;
+        }
+
+        $deadlines = $sla->calculateDeadlines($cycleStartedAt);
+        $this->forceFill([
+            'sla_definition_id' => $sla->id,
+            'acknowledge_target_minutes' => $sla->acknowledge_target_minutes,
+            'response_target_minutes' => $sla->response_target_minutes,
+            'resolution_target_minutes' => $sla->resolution_target_minutes,
+            'acknowledge_deadline' => $deadlines['acknowledge'] ?? null,
+            'response_deadline' => $deadlines['response'] ?? null,
+            'resolution_deadline' => $deadlines['resolution'] ?? null,
+            'acknowledged_at' => null,
+            'responded_at' => null,
+            'resolved_at' => null,
+            'acknowledge_variance_minutes' => null,
+            'response_variance_minutes' => null,
+            'resolution_variance_minutes' => null,
+            'acknowledge_breached' => false,
+            'response_breached' => false,
+            'resolution_breached' => false,
+            'first_breach_at' => null,
+            'cycle_number' => (int) $this->cycle_number + 1,
+            'cycle_started_at' => $cycleStartedAt,
+            'ended_as' => null,
+        ])->save();
+        $this->unsetRelation('slaDefinition');
     }
 
     public function getStatus(): string
     {
+        if (! $this->isApplicable()) {
+            return 'not_applicable';
+        }
+
         if ($this->resolved_at) {
             return 'resolved';
         }

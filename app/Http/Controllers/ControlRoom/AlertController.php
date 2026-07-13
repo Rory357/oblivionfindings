@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -173,7 +174,7 @@ class AlertController extends Controller
             // Workspace-over-list: the shared alerts page opens the alert
             // workspace via ?alert= on this view too.
             'detail' => fn () => $request->filled('alert')
-                ? app(\App\Services\ControlRoom\AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
                 : null,
         ]);
     }
@@ -268,7 +269,7 @@ class AlertController extends Controller
      */
     private function deriveSlaStatus(ControlRoomAlert $alert): ?string
     {
-        if (! $alert->sla) {
+        if (! $alert->sla?->isApplicable()) {
             return null;
         }
 

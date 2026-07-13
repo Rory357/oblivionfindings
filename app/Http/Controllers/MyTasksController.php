@@ -10,6 +10,7 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
+use App\Models\FirstAidFollowup;
 use App\Models\IncidentFollowup;
 use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
@@ -1002,7 +1003,7 @@ class MyTasksController extends Controller
     private function getFirstAidFollowups(User $user): array
     {
         try {
-            return \App\Models\FirstAidFollowup::query()
+            return FirstAidFollowup::query()
                 ->where('assigned_to_user_id', $user->id)
                 ->whereNull('completed_at')
                 ->whereHas('record')
@@ -1326,11 +1327,12 @@ class MyTasksController extends Controller
                         ? trim($alert->client->first_name.' '.$alert->client->last_name)
                         : null;
 
+                    $sla = $alert->sla?->isApplicable() ? $alert->sla : null;
                     $slaStatus = null;
-                    if ($alert->sla) {
-                        if ($alert->sla->response_breached) {
+                    if ($sla) {
+                        if ($sla->response_breached) {
                             $slaStatus = 'breached';
-                        } elseif ($alert->sla->response_deadline && $alert->sla->response_deadline->lt(now()->addMinutes(15))) {
+                        } elseif ($sla->response_deadline && $sla->response_deadline->lt(now()->addMinutes(15))) {
                             $slaStatus = 'at_risk';
                         } else {
                             $slaStatus = 'on_track';
@@ -1356,7 +1358,7 @@ class MyTasksController extends Controller
                         'priority' => $alert->severity ?? 'medium',
                         'status' => $alert->status,
                         'source_url' => '/control-room/alerts/'.$alert->id,
-                        'due_at' => $alert->sla?->response_deadline?->toIso8601String(),
+                        'due_at' => $sla?->response_deadline?->toIso8601String(),
                         'created_at' => $alert->triggered_at?->toIso8601String() ?? $alert->created_at->toIso8601String(),
                         'meta' => [
                             'source' => $alert->source,

@@ -124,12 +124,11 @@ class HsEventService
     }
 
     /**
-     * Update HsEvent severity when the source model's severity escalates.
+     * Project a source-model severity onto an existing H&S event.
      *
-     * This also implements carry-forward #1: escalation bypass for dedup.
-     * When severity materially escalates (e.g. high → critical), a new
-     * Control Room bridge call is dispatched with an escalation flag so
-     * the dedup window does not silently suppress it.
+     * Callers own any monotonic floor or linked Control Room journey update.
+     * This method normalises the requested value and marks an investigation
+     * required when the change is a material escalation.
      */
     public function syncSeverity(HsEvent $hsEvent, string $newSeverity): void
     {
@@ -351,8 +350,7 @@ class HsEventService
     }
 
     /**
-     * Determine if a severity change represents a material escalation
-     * that should bypass the bridge dedup window.
+     * Determine if a severity change requires an H&S investigation.
      *
      * Material escalation = crossing from below-high to high-or-above,
      * or from high to critical.

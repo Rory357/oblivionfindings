@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlRoom;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,7 +23,7 @@ class ControlRoomReportControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -57,11 +58,11 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_reports_accessible_by_support_worker_with_view_any_permission(): void
+    public function test_reports_blocked_for_support_worker_without_report_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_reports_blocked_for_user_without_permission(): void
@@ -263,11 +264,11 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_export_accessible_by_support_worker_with_view_any_permission(): void
+    public function test_export_blocked_for_support_worker_without_report_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports/export')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_export_returns_csv(): void

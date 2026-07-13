@@ -3,10 +3,12 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +26,7 @@ class IntegrationAlertControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->teamLead = $this->roleUser('team_lead');
         $this->coordinator = $this->roleUser('coordinator');
@@ -110,6 +112,29 @@ class IntegrationAlertControllerTest extends TestCase
         $this->actingAs($this->coordinator)
             ->post("/control-room/integration-alerts/{$alert->id}/create-incident")
             ->assertNotFound();
+    }
+
+    public function test_residual_terminal_sla_is_omitted_from_integration_alert_status(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $this->scopeUserToSite($this->teamLead, $site);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'integration_unifi',
+            'site_id' => $site->id,
+        ]);
+        AlertSla::query()->create([
+            'alert_id' => $alert->id,
+            'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+            'cycle_history' => [['ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH]],
+        ]);
+
+        $this->actingAs($this->teamLead)
+            ->get('/control-room/integration-alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('alerts.data.0.id', $alert->id)
+                ->where('alerts.data.0.sla_status', null)
+            );
     }
 
     public function test_integration_alert_assign_blocks_out_of_scope_assignee_for_scoped_user(): void

@@ -2,10 +2,9 @@
 
 namespace Tests\Feature\HealthSafety;
 
-use App\Models\Client;
+use App\Models\Asset;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
-use App\Models\Asset;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\HazardousSubstance;
@@ -13,7 +12,6 @@ use App\Models\HsEvent;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
-use App\Models\SiteHazard;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SubstanceExposureRecord;
@@ -476,12 +474,13 @@ class HsEventBackboneTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────
-    // Escalation bypass (carry-forward #1)
+    // Canonical incident journey severity promotion
     // ──────────────────────────────────────────────────────
 
-    public function test_severity_escalation_on_incident_bridges_with_escalation_flag(): void
+    public function test_severity_escalation_on_incident_promotes_the_canonical_journey_once(): void
     {
         $incident = ClientIncident::factory()->create([
+            'type' => 'fall',
             'severity' => 'low',
             'status' => 'submitted',
         ]);
@@ -490,10 +489,25 @@ class HsEventBackboneTest extends TestCase
 
         $incident->update(['severity' => 'high']);
 
-        // Should create an escalation alert
+        $incident->refresh();
+        $hsEvent = HsEvent::query()->whereKey($incident->hs_event_id)->firstOrFail();
+        $alert = ControlRoomAlert::query()->sole();
+
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
+        $this->assertSame('incident', $alert->source);
+        $this->assertSame('incident.fall', $alert->alert_type);
+        $this->assertSame('high', $alert->severity);
+        $this->assertSame($incident->id, $alert->context['incident_id']);
+        $this->assertSame('Automatic high-severity incident escalation', $alert->context['reason']);
+        $this->assertSame('incident_journey', $alert->context['provenance']['source']);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
         $this->assertDatabaseHas('control_room_alerts', [
-            'source' => 'operations',
-            'alert_type' => 'operations.client_incident_escalation',
+            'id' => $alert->id,
+            'source' => 'incident',
+            'alert_type' => 'incident.fall',
         ]);
     }
 

@@ -287,7 +287,7 @@ class ControlRoomAlertController extends Controller
      */
     private function deriveSlaStatus(ControlRoomAlert $alert): ?string
     {
-        if (! $alert->sla) {
+        if (! $alert->sla?->isApplicable()) {
             return null;
         }
 

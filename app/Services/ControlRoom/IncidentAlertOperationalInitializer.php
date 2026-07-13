@@ -58,6 +58,18 @@ class IncidentAlertOperationalInitializer
                 ],
                 ['entered_at' => now()],
             );
+        } else {
+            AlertQueue::query()
+                ->where('alert_id', $alert->id)
+                ->whereNull('exited_at')
+                ->update([
+                    'exited_at' => now(),
+                    'exit_reason' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+                ]);
+
+            if ($alert->queue_id !== null) {
+                $alert->forceFill(['queue_id' => null])->saveQuietly();
+            }
         }
 
         $this->reconcileSla($alert);
@@ -103,13 +115,21 @@ class IncidentAlertOperationalInitializer
             $alert->severity,
             $alert->source,
         );
+        $alertSla = $alert->sla()->lockForUpdate()->first();
         if ($slaDefinition === null) {
+            $alertSla?->terminaliseForNoMatchingDefinition($alert->severity);
+
             return;
         }
 
-        $alertSla = $alert->sla()->lockForUpdate()->first();
         if ($alertSla === null) {
             AlertSla::createFromDefinition($alert, $slaDefinition);
+
+            return;
+        }
+
+        if ($alertSla->ended_as === AlertSla::ENDED_RECONCILED_NO_MATCH) {
+            $alertSla->reactivateFromDefinition($slaDefinition, now());
 
             return;
         }
@@ -136,17 +156,46 @@ class IncidentAlertOperationalInitializer
 
     private function attachPlaybook(ControlRoomAlert $alert): void
     {
-        $targetPlaybook = Playbook::findForAlert($alert->alert_type, $alert->severity);
-        if ($targetPlaybook === null) {
-            return;
-        }
-
         $currentRun = $alert->playbook_run_id === null
             ? null
             : PlaybookRun::query()
                 ->whereKey($alert->playbook_run_id)
                 ->lockForUpdate()
                 ->first();
+        $targetPlaybook = Playbook::findForAlert($alert->alert_type, $alert->severity);
+        if ($targetPlaybook === null) {
+            if ($currentRun !== null
+                && in_array(
+                    $currentRun->status,
+                    [PlaybookRun::STATUS_PENDING, PlaybookRun::STATUS_IN_PROGRESS],
+                    true,
+                )
+            ) {
+                $reconciledAt = now();
+                $currentRun->steps()
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->update([
+                        'status' => 'skipped',
+                        'completed_at' => $reconciledAt,
+                    ]);
+                $currentRun->forceFill([
+                    'status' => PlaybookRun::STATUS_CANCELLED,
+                    'completed_at' => $reconciledAt,
+                    'context' => array_merge($currentRun->context ?? [], [
+                        'reconciled_for_severity' => $alert->severity,
+                        'reconciled_at' => $reconciledAt->toIso8601String(),
+                        'reconciliation_reason' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+                    ]),
+                ])->save();
+            }
+
+            if ($alert->playbook_run_id !== null) {
+                $alert->forceFill(['playbook_run_id' => null])->saveQuietly();
+            }
+
+            return;
+        }
+
         if ((int) $currentRun?->playbook_id === (int) $targetPlaybook->id) {
             return;
         }

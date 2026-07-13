@@ -4,6 +4,7 @@ namespace App\Services\ControlRoom;
 
 use App\Models\AuditLog;
 use App\Models\ControlRoom\ConfigOption;
+use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -193,7 +194,7 @@ class AlertWorkspaceService
             ] : null,
             'available_playbooks' => $alert->playbookRun
                 ? []
-                : \App\Models\ControlRoom\Playbook::query()
+                : Playbook::query()
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(['id', 'name', 'category', 'description'])
@@ -231,7 +232,7 @@ class AlertWorkspaceService
                 'sent_at' => optional($c->sent_at)->toISOString(),
                 'created_at' => optional($c->created_at)->toISOString(),
             ])->values(),
-            'sla' => $alert->sla ? [
+            'sla' => $alert->sla?->isApplicable() ? [
                 'acknowledge_deadline' => optional($alert->sla->acknowledge_deadline)->toISOString(),
                 'response_deadline' => optional($alert->sla->response_deadline)->toISOString(),
                 'resolution_deadline' => optional($alert->sla->resolution_deadline)->toISOString(),

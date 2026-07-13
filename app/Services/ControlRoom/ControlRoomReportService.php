@@ -35,7 +35,7 @@ class ControlRoomReportService
     {
         $alertQuery = $this->baseAlertQuery($from, $to, $siteId);
 
-        $totalWithSla = (clone $alertQuery)->whereHas('sla')->count();
+        $totalWithSla = (clone $alertQuery)->whereHas('sla', fn ($q) => $q->applicable())->count();
         $breached = (clone $alertQuery)->whereHas('sla', fn ($q) => $q->breached())->count();
         $met = $totalWithSla - $breached;
 
@@ -59,7 +59,7 @@ class ControlRoomReportService
         $bySeverity = [];
         foreach (['critical', 'high', 'medium', 'low'] as $severity) {
             $sevQuery = (clone $alertQuery)->where('severity', $severity);
-            $sevTotal = (clone $sevQuery)->whereHas('sla')->count();
+            $sevTotal = (clone $sevQuery)->whereHas('sla', fn ($q) => $q->applicable())->count();
             $sevBreached = (clone $sevQuery)->whereHas('sla', fn ($q) => $q->breached())->count();
 
             $bySeverity[$severity] = [
@@ -352,10 +352,12 @@ class ControlRoomReportService
 
         // SLA compliance check (last 7 days)
         $recentSlaTotal = AlertSla::query()
+            ->applicable()
             ->where('created_at', '>=', now()->subDays(7))
             ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))
             ->count();
         $recentSlaBreached = AlertSla::query()
+            ->applicable()
             ->where('created_at', '>=', now()->subDays(7))
             ->breached()
             ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))

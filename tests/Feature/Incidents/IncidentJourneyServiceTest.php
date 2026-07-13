@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Incidents;
 
+use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
 use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
 use App\Models\Client;
@@ -25,11 +26,15 @@ use App\Models\Site;
 use App\Models\User;
 use App\Notifications\ControlRoomAlertNotification;
 use App\Observers\ClientIncidentObserver;
+use App\Services\ControlRoom\AlertAutomationService;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomNotificationService;
+use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -657,6 +662,410 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame(HsEvent::WORKSAFE_ACKNOWLEDGED, $hsEvent->worksafe_status);
         $this->assertSame('WS-PROMOTION-1', $hsEvent->worksafe_reference);
         $this->assertTrue($hsEvent->worksafe_site_preserved);
+    }
+
+    public function test_residual_medium_to_critical_promotion_terminalises_unmatched_operations_once(): void
+    {
+        Notification::fake();
+        $this->seed(RbacSeeder::class);
+        $actor = User::factory()->create([
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+        $actor->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $mediumQueue = TriageQueue::query()->create([
+            'name' => 'Medium-only promotion queue',
+            'code' => 'medium-only-promotion',
+            'tier' => 2,
+            'handle_severities' => ['medium'],
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'is_active' => true,
+        ]);
+        $mediumSla = SlaDefinition::query()->create([
+            'name' => 'Medium-only promotion SLA',
+            'code' => 'medium-only-promotion-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['medium'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 1,
+            'response_target_minutes' => 2,
+            'resolution_target_minutes' => 3,
+            'escalate_on_resolution_breach' => true,
+            'is_active' => true,
+        ]);
+        $mediumPlaybook = Playbook::query()->create([
+            'name' => 'Medium-only fall response',
+            'code' => 'medium-only-fall-response',
+            'category' => Playbook::CATEGORY_SAFETY,
+            'version' => 1,
+            'is_active' => true,
+            'auto_attach' => true,
+            'trigger_alert_types' => ['incident.fall'],
+            'trigger_severities' => ['medium'],
+        ]);
+        foreach (['Observe and review', 'Record follow-up'] as $order => $title) {
+            PlaybookStep::query()->create([
+                'playbook_id' => $mediumPlaybook->id,
+                'order' => $order,
+                'title' => $title,
+                'type' => PlaybookStep::TYPE_TASK,
+                'is_required' => true,
+            ]);
+        }
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+            'occurred_at' => now()->subHour(),
+        ]);
+        $initial = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Medium operator review',
+        );
+        $alert = $initial->alert->fresh();
+        $sla = AlertSla::query()->where('alert_id', $alert->id)->sole();
+        $mediumRun = $alert->playbookRun()->firstOrFail();
+        $this->assertNotNull($sla->cycle_started_at);
+        $this->assertSame(
+            $alert->triggered_at->toDateTimeString(),
+            $sla->cycle_started_at->toDateTimeString(),
+        );
+        $acknowledgedAt = $alert->triggered_at->copy()->addMinutes(2);
+        $respondedAt = $alert->triggered_at->copy()->addMinutes(3);
+        $firstBreachAt = $acknowledgedAt->copy();
+        $cycleStartedAt = $alert->triggered_at->copy();
+        $sla->forceFill([
+            'acknowledged_at' => $acknowledgedAt,
+            'responded_at' => $respondedAt,
+            'acknowledge_variance_minutes' => 1,
+            'response_variance_minutes' => 1,
+            'acknowledge_breached' => true,
+            'response_breached' => true,
+            'first_breach_at' => $firstBreachAt,
+        ])->save();
+
+        $promoted = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+
+        $alert = $alert->fresh();
+        $queueHistory = AlertQueue::query()->where('alert_id', $alert->id)->sole();
+        $sla = AlertSla::query()->where('alert_id', $alert->id)->sole();
+        $mediumRun->refresh();
+        $this->assertTrue($promoted->alert->is($alert));
+        $this->assertSame('critical', $alert->severity);
+        $this->assertNull($alert->queue_id);
+        $this->assertNotNull($queueHistory->exited_at);
+        $this->assertSame('reconciled_no_match', $queueHistory->exit_reason);
+        $this->assertNull($sla->sla_definition_id);
+        $this->assertNull($sla->acknowledge_target_minutes);
+        $this->assertNull($sla->response_target_minutes);
+        $this->assertNull($sla->resolution_target_minutes);
+        $this->assertNull($sla->acknowledge_deadline);
+        $this->assertNull($sla->response_deadline);
+        $this->assertNull($sla->resolution_deadline);
+        $this->assertNull($sla->acknowledged_at);
+        $this->assertNull($sla->responded_at);
+        $this->assertNull($sla->resolved_at);
+        $this->assertNull($sla->acknowledge_variance_minutes);
+        $this->assertNull($sla->response_variance_minutes);
+        $this->assertNull($sla->resolution_variance_minutes);
+        $this->assertFalse($sla->acknowledge_breached);
+        $this->assertFalse($sla->response_breached);
+        $this->assertFalse($sla->resolution_breached);
+        $this->assertNull($sla->first_breach_at);
+        $this->assertNull($sla->cycle_started_at);
+        $this->assertSame('reconciled_no_match', $sla->ended_as);
+        $this->assertCount(1, $sla->cycle_history ?? []);
+        $snapshot = $sla->cycle_history[0];
+        $this->assertSame(1, $snapshot['cycle_number']);
+        $this->assertSame('reconciled_no_match', $snapshot['ended_as']);
+        $this->assertSame('critical', $snapshot['reconciled_for_severity']);
+        $this->assertNotEmpty($snapshot['ended_at']);
+        $this->assertSame([
+            'id' => $mediumSla->id,
+            'code' => 'medium-only-promotion-sla',
+            'name' => 'Medium-only promotion SLA',
+        ], $snapshot['definition']);
+        $this->assertEquals([
+            'acknowledge_minutes' => 1,
+            'response_minutes' => 2,
+            'resolution_minutes' => 3,
+        ], $snapshot['targets']);
+        $this->assertSame($cycleStartedAt->toIso8601String(), $snapshot['cycle_started_at']);
+        $this->assertSame($acknowledgedAt->toIso8601String(), $snapshot['results']['acknowledged_at']);
+        $this->assertSame($respondedAt->toIso8601String(), $snapshot['results']['responded_at']);
+        $this->assertNull($snapshot['results']['resolved_at']);
+        $this->assertSame(1, $snapshot['results']['acknowledge_variance_minutes']);
+        $this->assertSame(1, $snapshot['results']['response_variance_minutes']);
+        $this->assertNull($snapshot['results']['resolution_variance_minutes']);
+        $this->assertTrue($snapshot['results']['acknowledge_breached']);
+        $this->assertTrue($snapshot['results']['response_breached']);
+        $this->assertFalse($snapshot['results']['resolution_breached']);
+        $this->assertSame($firstBreachAt->toIso8601String(), $snapshot['results']['first_breach_at']);
+        $this->assertNull($alert->playbook_run_id);
+        $this->assertSame(PlaybookRun::STATUS_CANCELLED, $mediumRun->status);
+        $this->assertNotNull($mediumRun->completed_at);
+        $this->assertSame('critical', data_get($mediumRun->context, 'reconciled_for_severity'));
+        $this->assertSame('reconciled_no_match', data_get($mediumRun->context, 'reconciliation_reason'));
+        $this->assertNotEmpty(data_get($mediumRun->context, 'reconciled_at'));
+        $this->assertSame(
+            ['skipped', 'skipped'],
+            $mediumRun->steps()->orderBy('order')->pluck('status')->all(),
+        );
+
+        $queueExitedAt = $queueHistory->exited_at->toDateTimeString();
+        $slaUpdatedAt = $sla->updated_at->toDateTimeString();
+        $playbookCompletedAt = $mediumRun->completed_at->toDateTimeString();
+        $playbookReconciledAt = data_get($mediumRun->context, 'reconciled_at');
+        $this->travel(1)->minute();
+        $retry = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+        $this->travelBack();
+
+        $this->assertTrue($retry->alert->is($promoted->alert));
+        $this->assertSame($queueExitedAt, $queueHistory->fresh()->exited_at->toDateTimeString());
+        $this->assertSame($slaUpdatedAt, $sla->fresh()->updated_at->toDateTimeString());
+        $this->assertSame($playbookCompletedAt, $mediumRun->fresh()->completed_at->toDateTimeString());
+        $this->assertSame($playbookReconciledAt, data_get($mediumRun->fresh()->context, 'reconciled_at'));
+        $this->assertCount(1, $sla->fresh()->cycle_history ?? []);
+        $this->assertSame(1, AlertQueue::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(1, AlertSla::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(1, PlaybookRun::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(2, $mediumRun->steps()->count());
+
+        $escalationLevel = (int) $alert->fresh()->escalation_level;
+        app(CheckControlRoomSlaBreaches::class)->handle(
+            app(ControlRoomNotificationService::class),
+            app(AlertAutomationService::class),
+        );
+        $this->assertSame($escalationLevel, (int) $alert->fresh()->escalation_level);
+        $this->assertFalse($sla->fresh()->resolution_breached);
+        $this->assertSame(
+            0,
+            app(ControlRoomReportService::class)
+                ->slaCompliance(now()->subDay(), now()->addDay())['total_with_sla'],
+        );
+        $workspace = app(AlertWorkspaceService::class)->build($actor, $alert->id);
+        $this->assertNotNull($workspace);
+        $this->assertNull($workspace['sla']);
+        $this->assertNull($workspace['playbook_run']);
+    }
+
+    public function test_residual_terminal_sla_reactivates_as_a_new_cycle_when_a_later_severity_matches(): void
+    {
+        Notification::fake();
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $mediumSla = SlaDefinition::query()->create([
+            'name' => 'Medium staged SLA',
+            'code' => 'medium-staged-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['medium'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 20,
+            'resolution_target_minutes' => 120,
+            'is_active' => true,
+        ]);
+        $criticalSla = SlaDefinition::query()->create([
+            'name' => 'Critical staged SLA',
+            'code' => 'critical-staged-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => ['critical'],
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 5,
+            'response_target_minutes' => 10,
+            'resolution_target_minutes' => 30,
+            'is_active' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+            'occurred_at' => now()->subHour(),
+        ]);
+        $initial = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Medium operator review',
+        );
+        $alert = $initial->alert->fresh();
+        $initialSla = AlertSla::query()->where('alert_id', $alert->id)->sole();
+        $this->assertSame($mediumSla->id, $initialSla->sla_definition_id);
+        $this->assertSame(1, $initialSla->cycle_number);
+        $this->assertSame(
+            $alert->triggered_at->toDateTimeString(),
+            $initialSla->cycle_started_at?->toDateTimeString(),
+        );
+
+        app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'High escalation without an SLA target',
+            'high',
+        );
+        $terminalSla = $initialSla->fresh();
+        $this->assertNull($terminalSla->sla_definition_id);
+        $this->assertSame(AlertSla::ENDED_RECONCILED_NO_MATCH, $terminalSla->ended_as);
+        $this->assertCount(1, $terminalSla->cycle_history ?? []);
+        $terminalHistory = $terminalSla->cycle_history;
+
+        $this->travel(10)->minutes();
+        $criticalPromotionAt = now()->copy();
+        $promoted = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical escalation with a new SLA target',
+            'critical',
+        );
+
+        $activeSla = $terminalSla->fresh();
+        $this->assertSame($alert->id, $promoted->alert->id);
+        $this->assertSame($criticalSla->id, $activeSla->sla_definition_id);
+        $this->assertTrue($activeSla->isApplicable());
+        $this->assertNull($activeSla->ended_as);
+        $this->assertSame(2, $activeSla->cycle_number);
+        $this->assertSame(
+            $criticalPromotionAt->toDateTimeString(),
+            $activeSla->cycle_started_at?->toDateTimeString(),
+        );
+        $this->assertSame(
+            $criticalPromotionAt->copy()->addMinutes(5)->toDateTimeString(),
+            $activeSla->acknowledge_deadline?->toDateTimeString(),
+        );
+        $this->assertSame(
+            $criticalPromotionAt->copy()->addMinutes(10)->toDateTimeString(),
+            $activeSla->response_deadline?->toDateTimeString(),
+        );
+        $this->assertSame(
+            $criticalPromotionAt->copy()->addMinutes(30)->toDateTimeString(),
+            $activeSla->resolution_deadline?->toDateTimeString(),
+        );
+        $this->assertEquals($terminalHistory, $activeSla->cycle_history);
+        $this->assertNull($activeSla->acknowledged_at);
+        $this->assertNull($activeSla->responded_at);
+        $this->assertNull($activeSla->resolved_at);
+        $this->assertFalse($activeSla->acknowledge_breached);
+        $this->assertFalse($activeSla->response_breached);
+        $this->assertFalse($activeSla->resolution_breached);
+
+        $cycleStartedAt = $activeSla->cycle_started_at->toDateTimeString();
+        $acknowledgeDeadline = $activeSla->acknowledge_deadline->toDateTimeString();
+        $updatedAt = $activeSla->updated_at->toDateTimeString();
+        $this->travel(1)->minute();
+        $retry = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical escalation with a new SLA target',
+            'critical',
+        );
+        $this->travelBack();
+
+        $activeSla = $activeSla->fresh();
+        $this->assertSame($promoted->alert->id, $retry->alert->id);
+        $this->assertSame(2, $activeSla->cycle_number);
+        $this->assertSame($cycleStartedAt, $activeSla->cycle_started_at->toDateTimeString());
+        $this->assertSame($acknowledgeDeadline, $activeSla->acknowledge_deadline->toDateTimeString());
+        $this->assertSame($updatedAt, $activeSla->updated_at->toDateTimeString());
+        $this->assertEquals($terminalHistory, $activeSla->cycle_history);
+        $this->assertSame(1, AlertSla::query()->where('alert_id', $alert->id)->count());
+    }
+
+    public function test_medium_to_critical_promotion_keeps_matching_wildcard_operations(): void
+    {
+        Notification::fake();
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $wildcardQueue = TriageQueue::query()->create([
+            'name' => 'Wildcard incident queue',
+            'code' => 'wildcard-incident-promotion',
+            'tier' => 1,
+            'handle_severities' => null,
+            'handle_sources' => ['incident'],
+            'handle_alert_types' => ['incident.fall'],
+            'is_active' => true,
+        ]);
+        $wildcardSla = SlaDefinition::query()->create([
+            'name' => 'Wildcard incident SLA',
+            'code' => 'wildcard-incident-promotion-sla',
+            'alert_types' => ['incident.fall'],
+            'severities' => null,
+            'sources' => ['incident'],
+            'acknowledge_target_minutes' => 5,
+            'resolution_target_minutes' => 60,
+            'is_active' => true,
+        ]);
+        $wildcardPlaybook = Playbook::query()->create([
+            'name' => 'Wildcard fall response',
+            'code' => 'wildcard-fall-response',
+            'category' => Playbook::CATEGORY_SAFETY,
+            'version' => 1,
+            'is_active' => true,
+            'auto_attach' => true,
+            'trigger_alert_types' => ['incident.fall'],
+            'trigger_severities' => null,
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $wildcardPlaybook->id,
+            'order' => 0,
+            'title' => 'Respond at any severity',
+            'type' => PlaybookStep::TYPE_TASK,
+            'is_required' => true,
+        ]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'type' => 'fall',
+            'severity' => 'medium',
+        ]);
+        $initial = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $actor,
+            'Medium operator review',
+        );
+        $alert = $initial->alert->fresh();
+        $sla = AlertSla::query()->where('alert_id', $alert->id)->sole();
+        $run = $alert->playbookRun()->firstOrFail();
+        $queueHistory = AlertQueue::query()->where('alert_id', $alert->id)->sole();
+
+        $promoted = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+        $retry = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident->fresh(),
+            $actor,
+            'Critical clinical escalation',
+            'critical',
+        );
+
+        $alert = $alert->fresh();
+        $this->assertTrue($retry->alert->is($promoted->alert));
+        $this->assertSame('critical', $alert->severity);
+        $this->assertSame($wildcardQueue->id, $alert->queue_id);
+        $this->assertNull($queueHistory->fresh()->exited_at);
+        $this->assertSame($wildcardSla->id, $sla->fresh()->sla_definition_id);
+        $this->assertNotNull($sla->fresh()->acknowledge_deadline);
+        $this->assertNull($sla->fresh()->ended_as);
+        $this->assertNull($sla->fresh()->cycle_history);
+        $this->assertSame($run->id, $alert->playbook_run_id);
+        $this->assertSame($wildcardPlaybook->id, $run->fresh()->playbook_id);
+        $this->assertSame(PlaybookRun::STATUS_IN_PROGRESS, $run->fresh()->status);
+        $this->assertSame(1, AlertQueue::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(1, AlertSla::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(1, PlaybookRun::query()->where('alert_id', $alert->id)->count());
+        $this->assertSame(1, $run->steps()->count());
     }
 
     public function test_medium_to_critical_promotion_reconciles_queue_sla_playbook_and_delivery_once_on_retry(): void

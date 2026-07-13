@@ -4,6 +4,7 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
@@ -155,6 +156,25 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('daily_trend', 14)
+            );
+    }
+
+    public function test_residual_terminal_sla_is_omitted_from_dashboard_status_and_daily_compliance(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+        AlertSla::query()->create([
+            'alert_id' => $alert->id,
+            'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+            'cycle_history' => [['ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH]],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('alerts.data.0.id', $alert->id)
+                ->where('alerts.data.0.sla_status', null)
+                ->has('sla_daily_trend', 0)
             );
     }
 

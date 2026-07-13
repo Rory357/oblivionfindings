@@ -41,9 +41,9 @@ class ControlRoomMyTasksController extends Controller
                     'asset_tag' => $a->asset->asset_tag,
                 ] : null,
                 'client_name' => $a->client
-                    ? trim($a->client->first_name . ' ' . $a->client->last_name)
+                    ? trim($a->client->first_name.' '.$a->client->last_name)
                     : null,
-                'sla_status' => $a->sla ? (
+                'sla_status' => $a->sla?->isApplicable() ? (
                     ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached)
                         ? 'breached'
                         : (
@@ -83,7 +83,7 @@ class ControlRoomMyTasksController extends Controller
         $activeShift = Shift::where('status', 'active')
             ->where(function ($q) use ($user) {
                 $q->where('shift_lead_user_id', $user->id)
-                  ->orWhereJsonContains('team_members', $user->id);
+                    ->orWhereJsonContains('team_members', $user->id);
             })
             ->latest('starts_at')
             ->first();

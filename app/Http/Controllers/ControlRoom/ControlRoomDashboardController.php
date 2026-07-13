@@ -4,7 +4,9 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Shift;
+use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
@@ -175,7 +177,7 @@ class ControlRoomDashboardController extends Controller
 
         $recentActivity = AuditLog::where('action', 'like', 'controlRoom.%')
             ->where('action', '!=', 'controlRoom.dashboard.view')
-            ->where('auditable_type', (new ControlRoomAlert())->getMorphClass())
+            ->where('auditable_type', (new ControlRoomAlert)->getMorphClass())
             ->whereIn('auditable_id', $recentActivityAlertIds)
             ->with('user:id,name')
             ->orderByDesc('created_at')
@@ -235,7 +237,7 @@ class ControlRoomDashboardController extends Controller
                     'client_id' => $a->client_id,
                     'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : null,
                     'site_id' => $a->site_id,
-                    'sla_status' => $a->sla ? ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached ? 'breached' : (($a->sla->acknowledge_deadline && $a->sla->acknowledge_deadline->isPast()) || ($a->sla->response_deadline && $a->sla->response_deadline->isPast()) ? 'at_risk' : 'on_track')) : null,
+                    'sla_status' => $a->sla?->isApplicable() ? ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached ? 'breached' : (($a->sla->acknowledge_deadline && $a->sla->acknowledge_deadline->isPast()) || ($a->sla->response_deadline && $a->sla->response_deadline->isPast()) ? 'at_risk' : 'on_track')) : null,
                     'notes' => $a->notes ? substr($a->notes, 0, 100).(strlen($a->notes) > 100 ? '...' : '') : null,
                 ])->values(),
                 'links' => $alerts->linkCollection()->toArray(),
@@ -301,7 +303,7 @@ class ControlRoomDashboardController extends Controller
 
             // Workload + queue pressure for dashboard charts
             'workload' => $this->reportService->workloadDistribution($from, $to, $reportSiteScope),
-            'queues' => \App\Models\ControlRoom\TriageQueue::active()
+            'queues' => TriageQueue::active()
                 ->withCount(['alerts as active_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])->tap(fn ($alertQuery) => $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions))])
                 ->orderBy('tier')
                 ->get(['id', 'name', 'tier'])
@@ -332,7 +334,8 @@ class ControlRoomDashboardController extends Controller
     {
         $siteAccess = app(UserSiteAccessService::class);
 
-        $rows = \App\Models\ControlRoom\AlertSla::query()
+        $rows = AlertSla::query()
+            ->applicable()
             ->whereBetween('created_at', [$from, $to])
             ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $siteId) {
                 $siteAccess->applyAlertScope($alertQuery, $user, $this->alertBypassPermissions());
