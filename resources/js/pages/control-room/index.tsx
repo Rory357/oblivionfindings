@@ -810,13 +810,10 @@ export default function ControlRoomIndex({
                                                     borderRadius: '8px',
                                                     fontSize: '12px',
                                                 }}
-                                                formatter={(
-                                                    v?: number | null,
-                                                ) => [
-                                                    v === null ||
-                                                    v === undefined
+                                                formatter={(value) => [
+                                                    typeof value !== 'number'
                                                         ? 'Not assessed'
-                                                        : `${v}%`,
+                                                        : `${value}%`,
                                                     'Compliance',
                                                 ]}
                                             />
