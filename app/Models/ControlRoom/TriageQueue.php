@@ -2,6 +2,7 @@
 
 namespace App\Models\ControlRoom;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -94,12 +95,23 @@ class TriageQueue extends Model
         return $this->alerts()->unresolved()->highPriority()->count();
     }
 
-    public function shouldAutoEscalate(\App\Models\ControlRoomAlert $alert): bool
+    public function shouldAutoEscalate(AlertQueue $assignment, ?CarbonInterface $asOf = null): bool
     {
-        if (!$this->auto_escalate_after_minutes || !$this->escalate_to_queue_id) {
+        $dwellMinutes = (int) ($this->auto_escalate_after_minutes ?? 0);
+
+        if (! $this->is_active
+            || $dwellMinutes <= 0
+            || ! $this->escalate_to_queue_id
+            || $assignment->exited_at !== null
+            || (int) $assignment->queue_id !== (int) $this->id) {
             return false;
         }
 
-        return $alert->triggered_at->lt(now()->subMinutes($this->auto_escalate_after_minutes));
+        $asOf ??= now();
+
+        return $assignment->entered_at !== null
+            && $assignment->entered_at->lt(
+                $asOf->copy()->subMinutes($dwellMinutes),
+            );
     }
 }

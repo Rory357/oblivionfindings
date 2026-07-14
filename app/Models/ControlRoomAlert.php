@@ -55,14 +55,30 @@ class ControlRoomAlert extends Model
     ];
 
     /**
+     * Positive allowlist for alerts that still require an operational action.
+     */
+    public const ACTIVE_STATUSES = [
+        self::STATUS_OPEN,
+        self::STATUS_ACK,
+        self::STATUS_TRIAGING,
+        self::STATUS_CONFIRMED,
+    ];
+
+    public const TERMINAL_STATUSES = [
+        self::STATUS_RESOLVED,
+        self::STATUS_CLOSED,
+        self::STATUS_DISMISSED,
+    ];
+
+    /**
      * Valid state transitions. Each key lists the statuses it may transition TO.
      */
     public const ALLOWED_TRANSITIONS = [
-        self::STATUS_OPEN => [self::STATUS_ACK, self::STATUS_TRIAGING, self::STATUS_RESOLVED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
-        self::STATUS_ACK => [self::STATUS_TRIAGING, self::STATUS_RESOLVED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
-        self::STATUS_TRIAGING => [self::STATUS_RESOLVED, self::STATUS_CLOSED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
-        self::STATUS_CONFIRMED => [self::STATUS_RESOLVED, self::STATUS_CLOSED],
-        self::STATUS_DISMISSED => [self::STATUS_CLOSED],
+        self::STATUS_OPEN => [self::STATUS_ACK, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_ACK => [self::STATUS_TRIAGING, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_TRIAGING => [self::STATUS_RESOLVED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_CONFIRMED => [self::STATUS_RESOLVED],
+        self::STATUS_DISMISSED => [],
         self::STATUS_RESOLVED => [self::STATUS_CLOSED],
         self::STATUS_CLOSED => [],
     ];
@@ -274,7 +290,15 @@ class ControlRoomAlert extends Model
      */
     public function scopeUnresolved($query)
     {
-        return $query->whereNotIn('status', ['resolved', 'closed']);
+        return $query->actionable();
+    }
+
+    /**
+     * Scope for alerts that still require an operational action.
+     */
+    public function scopeActionable($query)
+    {
+        return $query->whereIn('status', self::ACTIVE_STATUSES);
     }
 
     /**
@@ -290,7 +314,10 @@ class ControlRoomAlert extends Model
      */
     public function scopeSnoozed($query)
     {
-        return $query->whereNotNull('snoozed_until')->where('snoozed_until', '>', now());
+        return $query
+            ->actionable()
+            ->whereNotNull('snoozed_until')
+            ->where('snoozed_until', '>', now());
     }
 
     /**
@@ -372,8 +399,7 @@ class ControlRoomAlert extends Model
      */
     public function isTerminal(): bool
     {
-        // Dismissed (false positive) is terminal too — no further triage.
-        return in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_CLOSED, self::STATUS_DISMISSED], true);
+        return in_array($this->status, self::TERMINAL_STATUSES, true);
     }
 
     /**
@@ -381,6 +407,6 @@ class ControlRoomAlert extends Model
      */
     public function isActionable(): bool
     {
-        return ! $this->isTerminal();
+        return in_array($this->status, self::ACTIVE_STATUSES, true);
     }
 }

@@ -521,10 +521,6 @@ class ControlRoomIncidentController extends Controller
 
     protected function applyMedicationErrorScope(Builder $query, User $user): Builder
     {
-        if ($this->siteAccess()->canBypass($user, $this->alertBypassPermissions())) {
-            return $query;
-        }
-
         return $query->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess()->applyClientScope(
             $clientQuery,
             $user,
@@ -537,7 +533,7 @@ class ControlRoomIncidentController extends Controller
         $siteAccess = $this->siteAccess();
         $bypassPermissions = $this->alertBypassPermissions();
 
-        if (! $siteAccess->canBypass($user, $bypassPermissions)) {
+        if (! $siteAccess->isUnrestrictedPlatformUser($user)) {
             $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
 
             if ($siteIds === []) {

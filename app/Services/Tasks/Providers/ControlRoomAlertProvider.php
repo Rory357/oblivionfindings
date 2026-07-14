@@ -10,10 +10,13 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /**
      * Same bypass list ControlRoomAlertController uses for its site scoping.
      *
@@ -45,77 +48,96 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        $access = app(UserSiteAccessService::class);
-
-        // Same site check the module's assign action asserts (assertCanAccessAlert),
-        // applied as query scope so an out-of-scope alert reads as "not found".
-        $alert = ControlRoomAlert::query()
-            ->tap(fn ($q) => $access->applyAlertScope($q, $actor, self::ALERT_BYPASS_PERMISSIONS))
-            ->find($id);
-
-        if (! $alert) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'Alert not found or outside your site access.',
-            ]);
-        }
-
-        if (! $alert->isActionable()) {
-            throw ValidationException::withMessages([
-                'assignee_id' => "Cannot assign an alert in '{$alert->status}' status.",
-            ]);
-        }
-
-        $assignee = null;
-
-        if ($assigneeId !== null) {
-            // Mirrors assertCanAssignControlRoomAlertToUser(): the assignee must
-            // be assignable staff within the actor's scope.
-            $assignee = User::staff()
-                ->whereKey($assigneeId)
-                ->tap(fn ($q) => $access->applyControlRoomAssigneeScope($q, $actor, self::ALERT_BYPASS_PERMISSIONS))
-                ->first();
-
-            if (! $assignee) {
+        DB::transaction(function () use ($actor, $assigneeId, $id): void {
+            $access = app(UserSiteAccessService::class);
+            $freshActor = User::query()->whereKey($actor->id)->first();
+            if (! $freshActor || ! $this->canAssign($freshActor)) {
                 throw ValidationException::withMessages([
-                    'assignee_id' => 'You are not authorized to assign alerts to that staff member.',
+                    'assignee_id' => 'You do not have permission to assign this alert.',
                 ]);
             }
-        }
 
-        // Same assignment-history bookkeeping the module keeps in context.
-        $assignmentHistory = $alert->context['assignment_history'] ?? [];
-        $assignmentHistory[] = [
-            'action' => $assigneeId === null
-                ? 'unassigned'
-                : ($alert->assigned_to_user_id ? 'reassigned' : 'assigned'),
-            'from_user_id' => $alert->assigned_to_user_id,
-            'from_user_name' => $alert->assignedTo?->name,
-            'to_user_id' => $assigneeId,
-            'to_user_name' => $assignee?->name,
-            'by_user_id' => $actor->id,
-            'by_user_name' => $actor->name,
-            'reason' => null,
-            'at' => now()->toISOString(),
-        ];
+            // Scope and lock the current database row together so a stale
+            // queue item cannot bypass tenant access or terminal-state gates.
+            $alert = ControlRoomAlert::query()
+                ->whereKey($id)
+                ->tap(fn ($query) => $access->applyAlertScope(
+                    $query,
+                    $freshActor,
+                    self::ALERT_BYPASS_PERMISSIONS,
+                ))
+                ->lockForUpdate()
+                ->first();
 
-        $alert->update([
-            'assigned_to_user_id' => $assigneeId,
-            'assigned_at' => $assigneeId !== null ? now() : null,
-            'assigned_by_user_id' => $assigneeId !== null ? $actor->id : null,
-            'context' => array_merge($alert->context ?? [], [
-                'assignment_history' => $assignmentHistory,
-            ]),
-        ]);
+            if (! $alert) {
+                throw ValidationException::withMessages([
+                    'assignee_id' => 'Alert not found or outside your site access.',
+                ]);
+            }
 
-        AuditLogger::log(
-            $assigneeId === null ? 'controlRoom.alert.unassign' : 'controlRoom.alert.assign',
-            $alert,
-            [
-                'alert_id' => $alert->id,
-                'assigned_to' => $assigneeId,
-                'assigned_by' => $actor->id,
-            ],
-        );
+            if (! $alert->isActionable()) {
+                throw ValidationException::withMessages([
+                    'assignee_id' => "Cannot assign an alert in '{$alert->status}' status.",
+                ]);
+            }
+
+            $assignee = null;
+            if ($assigneeId !== null) {
+                $assignee = User::staff()
+                    ->whereKey($assigneeId)
+                    ->tap(fn ($query) => $access->applyControlRoomAssigneeScope(
+                        $query,
+                        $freshActor,
+                        self::ALERT_BYPASS_PERMISSIONS,
+                    ))
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $assignee) {
+                    throw ValidationException::withMessages([
+                        'assignee_id' => 'You are not authorized to assign alerts to that staff member.',
+                    ]);
+                }
+            }
+
+            $at = now();
+            $assignmentHistory = $alert->context['assignment_history'] ?? [];
+            $assignmentHistory[] = [
+                'action' => $assigneeId === null
+                    ? 'unassigned'
+                    : ($alert->assigned_to_user_id ? 'reassigned' : 'assigned'),
+                'from_user_id' => $alert->assigned_to_user_id,
+                'from_user_name' => $alert->assigned_to_user_id
+                    ? User::query()->whereKey($alert->assigned_to_user_id)->value('name')
+                    : null,
+                'to_user_id' => $assigneeId,
+                'to_user_name' => $assignee?->name,
+                'by_user_id' => $freshActor->id,
+                'by_user_name' => $freshActor->name,
+                'reason' => null,
+                'at' => $at->toISOString(),
+            ];
+
+            $alert->forceFill([
+                'assigned_to_user_id' => $assigneeId,
+                'assigned_at' => $assigneeId !== null ? $at : null,
+                'assigned_by_user_id' => $assigneeId !== null ? $freshActor->id : null,
+                'context' => array_merge($alert->context ?? [], [
+                    'assignment_history' => $assignmentHistory,
+                ]),
+            ])->save();
+
+            AuditLogger::logOrFail(
+                $assigneeId === null ? 'controlRoom.alert.unassign' : 'controlRoom.alert.assign',
+                $alert,
+                [
+                    'alert_id' => $alert->id,
+                    'assigned_to' => $assigneeId,
+                    'assigned_by' => $freshActor->id,
+                    'actor_id' => $freshActor->id,
+                ],
+            );
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     public function canView(User $user): bool
@@ -135,7 +157,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             ->limit(300);
 
         if (empty($filters['include_done'])) {
-            $query->whereNotIn('status', ['resolved', 'closed', 'dismissed']);
+            $query->actionable();
         }
 
         return $query->get()->map(function (ControlRoomAlert $alert) {

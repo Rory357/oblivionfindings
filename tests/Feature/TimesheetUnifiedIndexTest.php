@@ -2,10 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,17 +29,20 @@ class TimesheetUnifiedIndexTest extends TestCase
 
     protected User $admin;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create(['tenant_id' => $this->admin->organization_id]);
     }
 
     public function test_index_returns_redesigned_prop_shape(): void
@@ -121,6 +125,9 @@ class TimesheetUnifiedIndexTest extends TestCase
         $timesheet = Timesheet::factory()->create([
             'user_id' => $this->admin->id,
             'shift_id' => null,
+            'client_id' => null,
+            'shift_site_id' => null,
+            'site_id' => $this->site->id,
             'activity_type' => 'admin',
             'status' => 'approved',
         ]);
@@ -151,6 +158,9 @@ class TimesheetUnifiedIndexTest extends TestCase
         $timesheet = Timesheet::factory()->create([
             'user_id' => $this->admin->id,
             'shift_id' => null,
+            'client_id' => null,
+            'shift_site_id' => null,
+            'site_id' => $this->site->id,
             'activity_type' => 'admin',
             'status' => 'approved',
             'archived_at' => now(),
@@ -170,6 +180,9 @@ class TimesheetUnifiedIndexTest extends TestCase
         $timesheet = Timesheet::factory()->create([
             'user_id' => $this->admin->id,
             'shift_id' => null,
+            'client_id' => null,
+            'shift_site_id' => null,
+            'site_id' => $this->site->id,
             'activity_type' => 'admin',
             'status' => 'returned',
             'archived_at' => now(),

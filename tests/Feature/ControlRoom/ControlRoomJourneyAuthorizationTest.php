@@ -3,10 +3,12 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetSignal;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\SafeguardingConcern;
@@ -168,6 +170,50 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('site_id');
+
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_manual_alert_rejects_foreign_asset_and_signal_references_even_when_the_alert_tuple_is_local(): void
+    {
+        $localSite = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $foreignSite = Site::factory()->create(['tenant_id' => 2, 'type' => 'house']);
+        $localClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $localSite->id,
+            'status' => 'active',
+        ]);
+        $foreignAsset = Asset::factory()->forSite($foreignSite)->create();
+        $foreignSignal = FleetSignal::query()->create([
+            'asset_id' => $foreignAsset->id,
+            'signal_type' => 'geofence_breach',
+            'severity_hint' => 'high',
+            'occurred_at' => now(),
+            'idempotency_key' => 'foreign-alert-create-signal',
+            'payload' => ['latitude' => -36.8485, 'longitude' => 174.7633],
+        ]);
+        $operator = $this->userWithPermissions([
+            'controlRoom.alerts.create',
+            'reports.viewAny',
+        ]);
+
+        $payload = [
+            'source' => 'fleet',
+            'alert_type' => 'geofence_breach',
+            'severity' => 'high',
+            'site_id' => $localSite->id,
+            'client_id' => $localClient->id,
+        ];
+
+        $this->actingAs($operator)
+            ->postJson('/control-room/alerts', $payload + ['asset_id' => $foreignAsset->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('asset_id');
+
+        $this->actingAs($operator)
+            ->postJson('/control-room/alerts', $payload + ['fleet_signal_id' => $foreignSignal->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('fleet_signal_id');
 
         $this->assertDatabaseCount('control_room_alerts', 0);
     }

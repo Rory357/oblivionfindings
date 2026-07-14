@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -19,56 +21,31 @@ class ControlRoomSlaController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
-        $slaDefinitions = SlaDefinition::withCount('alertSlas')
+        $slaDefinitions = SlaDefinition::withCount([
+            'alertSlas as applicable_alert_slas_count' => function ($query) use ($siteAccess, $user, $bypassPermissions) {
+                $query->applicable()->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+                    $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+                });
+            },
+        ])
             ->get()
-            ->map(function (SlaDefinition $sla) {
-                $totalAlerts = $sla->alert_slas_count;
-
-                $acknowledgeMetCount = 0;
-                $responseMetCount = 0;
-                $resolutionMetCount = 0;
-                $acknowledgeApplicable = 0;
-                $responseApplicable = 0;
-                $resolutionApplicable = 0;
-
-                if ($totalAlerts > 0) {
-                    $acknowledgeApplicable = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('acknowledge_deadline')
-                        ->count();
-
-                    $responseApplicable = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('response_deadline')
-                        ->count();
-
-                    $resolutionApplicable = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('resolution_deadline')
-                        ->count();
-
-                    $acknowledgeMetCount = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('acknowledge_deadline')
-                        ->where(function ($q) {
-                            $q->where('acknowledge_breached', false)
-                                ->orWhereNull('acknowledge_breached');
-                        })
-                        ->count();
-
-                    $responseMetCount = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('response_deadline')
-                        ->where(function ($q) {
-                            $q->where('response_breached', false)
-                                ->orWhereNull('response_breached');
-                        })
-                        ->count();
-
-                    $resolutionMetCount = AlertSla::where('sla_definition_id', $sla->id)
-                        ->whereNotNull('resolution_deadline')
-                        ->where(function ($q) {
-                            $q->where('resolution_breached', false)
-                                ->orWhereNull('resolution_breached');
-                        })
-                        ->count();
-                }
+            ->map(function (SlaDefinition $sla) use ($siteAccess, $user, $bypassPermissions) {
+                $totalAlerts = $sla->applicable_alert_slas_count;
+                $definitionSlas = AlertSla::query()
+                    ->where('sla_definition_id', $sla->id)
+                    ->applicable()
+                    ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+                        $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+                    });
+                $acknowledgeApplicable = (clone $definitionSlas)->milestoneAssessed('acknowledge')->count();
+                $responseApplicable = (clone $definitionSlas)->milestoneAssessed('response')->count();
+                $resolutionApplicable = (clone $definitionSlas)->milestoneAssessed('resolution')->count();
+                $acknowledgeMetCount = (clone $definitionSlas)->milestoneMet('acknowledge')->count();
+                $responseMetCount = (clone $definitionSlas)->milestoneMet('response')->count();
+                $resolutionMetCount = (clone $definitionSlas)->milestoneMet('resolution')->count();
 
                 return [
                     'id' => $sla->id,
@@ -226,6 +203,8 @@ class ControlRoomSlaController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
@@ -236,11 +215,29 @@ class ControlRoomSlaController extends Controller
 
         $dateFrom = $filters['date_from'] ?? now()->subDays(30)->toDateString();
         $dateTo = $filters['date_to'] ?? now()->toDateString();
+        $rangeStart = Carbon::parse($dateFrom)->startOfDay();
+        $rangeEnd = Carbon::parse($dateTo)->endOfDay();
 
         $query = AlertSla::query()
             ->breached()
-            ->whereDate('first_breach_at', '>=', $dateFrom)
-            ->whereDate('first_breach_at', '<=', $dateTo)
+            ->where(function ($dateQuery) use ($rangeStart, $rangeEnd) {
+                $dateQuery->whereBetween('first_breach_at', [$rangeStart, $rangeEnd])
+                    ->orWhere(function ($milestoneQuery) use ($rangeStart, $rangeEnd) {
+                        $milestoneQuery->milestoneBreached('acknowledge')
+                            ->whereBetween('acknowledge_deadline', [$rangeStart, $rangeEnd]);
+                    })
+                    ->orWhere(function ($milestoneQuery) use ($rangeStart, $rangeEnd) {
+                        $milestoneQuery->milestoneBreached('response')
+                            ->whereBetween('response_deadline', [$rangeStart, $rangeEnd]);
+                    })
+                    ->orWhere(function ($milestoneQuery) use ($rangeStart, $rangeEnd) {
+                        $milestoneQuery->milestoneBreached('resolution')
+                            ->whereBetween('resolution_deadline', [$rangeStart, $rangeEnd]);
+                    });
+            })
+            ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+                $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+            })
             ->with([
                 'alert:id,alert_type,severity,source,status,triggered_at',
                 'slaDefinition:id,name,code',
@@ -254,22 +251,14 @@ class ControlRoomSlaController extends Controller
 
         if (!empty($filters['breach_type'])) {
             $breachType = $filters['breach_type'];
-            $query->where("{$breachType}_breached", true);
+            $query->milestoneBreached($breachType);
         }
 
+        $statsQuery = clone $query;
         $breaches = $query->orderByDesc('first_breach_at')
             ->paginate(25)
             ->through(function (AlertSla $alertSla) {
-                $breachTypes = [];
-                if ($alertSla->acknowledge_breached) {
-                    $breachTypes[] = 'acknowledge';
-                }
-                if ($alertSla->response_breached) {
-                    $breachTypes[] = 'response';
-                }
-                if ($alertSla->resolution_breached) {
-                    $breachTypes[] = 'resolution';
-                }
+                $breachTypes = $alertSla->breachTypes();
 
                 return [
                     'id' => $alertSla->id,
@@ -282,28 +271,23 @@ class ControlRoomSlaController extends Controller
                     'breach_types' => $breachTypes,
                     'acknowledge_deadline' => $alertSla->acknowledge_deadline?->toISOString(),
                     'acknowledged_at' => $alertSla->acknowledged_at?->toISOString(),
-                    'acknowledge_variance_minutes' => $alertSla->acknowledge_breached ? $alertSla->acknowledge_variance_minutes : null,
+                    'acknowledge_variance_minutes' => in_array('acknowledge', $breachTypes, true) ? $alertSla->acknowledge_variance_minutes : null,
                     'response_deadline' => $alertSla->response_deadline?->toISOString(),
                     'responded_at' => $alertSla->responded_at?->toISOString(),
-                    'response_variance_minutes' => $alertSla->response_breached ? $alertSla->response_variance_minutes : null,
+                    'response_variance_minutes' => in_array('response', $breachTypes, true) ? $alertSla->response_variance_minutes : null,
                     'resolution_deadline' => $alertSla->resolution_deadline?->toISOString(),
                     'resolved_at' => $alertSla->resolved_at?->toISOString(),
-                    'resolution_variance_minutes' => $alertSla->resolution_breached ? $alertSla->resolution_variance_minutes : null,
-                    'first_breach_at' => $alertSla->first_breach_at?->toISOString(),
+                    'resolution_variance_minutes' => in_array('resolution', $breachTypes, true) ? $alertSla->resolution_variance_minutes : null,
+                    'first_breach_at' => $alertSla->effectiveFirstBreachAt()?->toISOString(),
                 ];
             });
 
-        // Summary stats
-        $statsQuery = AlertSla::query()
-            ->breached()
-            ->whereDate('first_breach_at', '>=', $dateFrom)
-            ->whereDate('first_breach_at', '<=', $dateTo);
-
+        // Summary stats use the same date, site, severity, and breach filters.
         $totalBreaches = $statsQuery->count();
 
-        $acknowledgeBreaches = (clone $statsQuery)->where('acknowledge_breached', true)->count();
-        $responseBreaches = (clone $statsQuery)->where('response_breached', true)->count();
-        $resolutionBreaches = (clone $statsQuery)->where('resolution_breached', true)->count();
+        $acknowledgeBreaches = (clone $statsQuery)->milestoneBreached('acknowledge')->count();
+        $responseBreaches = (clone $statsQuery)->milestoneBreached('response')->count();
+        $resolutionBreaches = (clone $statsQuery)->milestoneBreached('resolution')->count();
 
         return Inertia::render('control-room/sla/breaches', [
             'breaches' => $breaches,
@@ -320,5 +304,13 @@ class ControlRoomSlaController extends Controller
                 'breach_type' => $filters['breach_type'] ?? null,
             ],
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

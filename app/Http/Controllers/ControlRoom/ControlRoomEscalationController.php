@@ -8,12 +8,18 @@ use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class ControlRoomEscalationController extends Controller
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /**
      * Display the escalation queue Kanban board.
      */
@@ -21,21 +27,25 @@ class ControlRoomEscalationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         $queues = TriageQueue::active()
             ->orderBy('tier')
             ->orderBy('name')
             ->get()
-            ->map(function (TriageQueue $queue) {
+            ->map(function (TriageQueue $queue) use ($siteAccess, $user, $bypassPermissions) {
                 // Board columns show the top of the queue only — rendering every
                 // alert (dev data has 1,000+) makes the page unusable. The full
                 // count still drives the column badge and capacity bar.
-                $totalCount = ControlRoomAlert::unresolved()
-                    ->where('queue_id', $queue->id)
-                    ->count();
+                $queueAlerts = ControlRoomAlert::query()
+                    ->unresolved()
+                    ->where('queue_id', $queue->id);
+                $siteAccess->applyAlertScope($queueAlerts, $user, $bypassPermissions);
 
-                $alerts = ControlRoomAlert::unresolved()
-                    ->where('queue_id', $queue->id)
+                $totalCount = (clone $queueAlerts)->count();
+
+                $alerts = (clone $queueAlerts)
                     ->with(['assignedTo:id,name', 'sla', 'client:id,first_name,last_name'])
                     ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
                     ->orderBy('triggered_at')
@@ -140,28 +150,26 @@ class ControlRoomEscalationController extends Controller
     /**
      * Acknowledge an alert from the escalation queue page.
      */
-    public function acknowledgeFromQueue(Request $request, ControlRoomAlert $alert)
+    public function acknowledgeFromQueue(
+        Request $request,
+        ControlRoomAlert $alert,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->siteAccess()->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to acknowledge this alert.',
+        );
 
-        if ($alert->status === 'closed' || $alert->status === 'resolved') {
-            return back()->withErrors(['alert' => 'Cannot acknowledge a closed or resolved alert.']);
+        try {
+            $lifecycle->acknowledge($alert, $user);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
         }
-
-        $alert->update([
-            'status' => 'ack',
-            'acknowledged_at' => now(),
-            'acknowledged_by_user_id' => $user->id,
-        ]);
-
-        $alert->sla?->recordAcknowledge();
-
-        AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
-            'alert_id' => $alert->id,
-            'acknowledged_by' => $user->id,
-            'source' => 'escalation_queue',
-        ]);
 
         return back()->with('success', 'Alert acknowledged.');
     }
@@ -174,18 +182,33 @@ class ControlRoomEscalationController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
 
-        $alert->update([
-            'assigned_to_user_id' => $user->id,
-            'assigned_at' => now(),
-            'assigned_by_user_id' => $user->id,
-        ]);
+        try {
+            DB::transaction(function () use ($alert, $user): void {
+                $lockedAlert = $this->lockAlert($alert);
+                $this->siteAccess()->assertCanAccessAlert(
+                    $user,
+                    $lockedAlert,
+                    $this->alertBypassPermissions(),
+                    'You are not authorized to assign this alert.',
+                );
+                $this->assertActionable($lockedAlert, 'assign');
 
-        AuditLogger::log('controlRoom.alert.assignToMe', $alert, [
-            'alert_id' => $alert->id,
-            'assigned_to' => $user->id,
-            'assigned_by' => $user->id,
-            'source' => 'escalation_queue',
-        ]);
+                $lockedAlert->update([
+                    'assigned_to_user_id' => $user->id,
+                    'assigned_at' => now(),
+                    'assigned_by_user_id' => $user->id,
+                ]);
+
+                AuditLogger::log('controlRoom.alert.assignToMe', $lockedAlert, [
+                    'alert_id' => $lockedAlert->id,
+                    'assigned_to' => $user->id,
+                    'assigned_by' => $user->id,
+                    'source' => 'escalation_queue',
+                ]);
+            }, self::TRANSACTION_ATTEMPTS);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
+        }
 
         return back()->with('success', 'Alert assigned to you.');
     }
@@ -202,27 +225,57 @@ class ControlRoomEscalationController extends Controller
             'target_queue_id' => ['required', 'integer', 'exists:control_room_triage_queues,id'],
         ]);
 
-        $targetQueue = TriageQueue::findOrFail($validated['target_queue_id']);
+        try {
+            $targetQueue = DB::transaction(function () use ($alert, $user, $validated): TriageQueue {
+                $lockedAlert = $this->lockAlert($alert);
+                $this->siteAccess()->assertCanAccessAlert(
+                    $user,
+                    $lockedAlert,
+                    $this->alertBypassPermissions(),
+                    'You are not authorized to move this alert.',
+                );
+                $this->assertActionable($lockedAlert, 'move');
+                if ($lockedAlert->queue_id !== null) {
+                    $currentQueue = TriageQueue::query()
+                        ->whereKey($lockedAlert->queue_id)
+                        ->lockForUpdate()
+                        ->first();
+                    if (! $currentQueue?->is_active) {
+                        throw new InvalidArgumentException('The current queue is inactive; reactivate or reconcile it before moving this alert.');
+                    }
+                }
+                $targetQueue = TriageQueue::query()
+                    ->whereKey($validated['target_queue_id'])
+                    ->lockForUpdate()
+                    ->first();
+                if (! $targetQueue?->is_active) {
+                    throw new InvalidArgumentException('The destination queue is inactive and cannot receive alerts.');
+                }
+                $movedAt = now();
 
-        // Close the current queue entry
-        AlertQueue::where('alert_id', $alert->id)
-            ->whereNull('exited_at')
-            ->update([
-                'exited_at' => now(),
-                'exit_reason' => 'moved',
-            ]);
+                AlertQueue::query()
+                    ->where('alert_id', $lockedAlert->id)
+                    ->whereNull('exited_at')
+                    ->update([
+                        'exited_at' => $movedAt,
+                        'exit_reason' => 'moved',
+                    ]);
 
-        // Create a new queue entry
-        AlertQueue::create([
-            'alert_id' => $alert->id,
-            'queue_id' => $targetQueue->id,
-            'entered_at' => now(),
-        ]);
+                AlertQueue::query()->create([
+                    'alert_id' => $lockedAlert->id,
+                    'queue_id' => $targetQueue->id,
+                    'entered_at' => $movedAt,
+                ]);
 
-        // Update the alert's queue
-        $alert->update([
-            'queue_id' => $targetQueue->id,
-        ]);
+                $lockedAlert->update([
+                    'queue_id' => $targetQueue->id,
+                ]);
+
+                return $targetQueue;
+            }, self::TRANSACTION_ATTEMPTS);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
+        }
 
         return redirect()->back()->with('success', "Alert #{$alert->id} moved to {$targetQueue->name}.");
     }
@@ -243,71 +296,137 @@ class ControlRoomEscalationController extends Controller
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $escalatedCount = 0;
-        $skippedCount = 0;
+        $alertIds = collect($validated['alert_ids'])
+            ->map(fn ($alertId) => (int) $alertId)
+            ->unique()
+            ->values();
+        [$escalatedCount, $skippedCount] = DB::transaction(function () use ($alertIds, $user, $validated): array {
+            // Lock alerts first, in a stable order, before touching queue history.
+            // This makes the site and actionable checks authoritative at write time.
+            $alertsQuery = ControlRoomAlert::query()
+                ->whereIn('id', $alertIds)
+                ->orderBy('id');
+            $this->siteAccess()->applyAlertScope(
+                $alertsQuery,
+                $user,
+                $this->alertBypassPermissions(),
+            );
+            $alerts = $alertsQuery->lockForUpdate()->get()->keyBy('id');
 
-        foreach ($validated['alert_ids'] as $alertId) {
-            $alert = ControlRoomAlert::find($alertId);
-            if (!$alert || !$alert->queue_id) {
-                $skippedCount++;
-                continue;
-            }
+            abort_if(
+                $alerts->count() !== $alertIds->count(),
+                403,
+                'You are not authorized to escalate one or more selected alerts.',
+            );
 
-            $currentQueue = TriageQueue::find($alert->queue_id);
-            if (!$currentQueue || !$currentQueue->escalate_to_queue_id) {
-                $skippedCount++;
-                continue;
-            }
+            $escalatedCount = 0;
+            $skippedCount = 0;
 
-            $nextQueue = TriageQueue::find($currentQueue->escalate_to_queue_id);
-            if (!$nextQueue) {
-                $skippedCount++;
-                continue;
-            }
+            foreach ($alertIds as $alertId) {
+                $alert = $alerts->get($alertId);
+                if (! $alert->isActionable() || ! $alert->queue_id) {
+                    $skippedCount++;
 
-            // Close current queue entry
-            AlertQueue::where('alert_id', $alert->id)
-                ->whereNull('exited_at')
-                ->update([
-                    'exited_at' => now(),
-                    'exit_reason' => 'escalated',
+                    continue;
+                }
+
+                $currentQueue = TriageQueue::query()
+                    ->whereKey($alert->queue_id)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $currentQueue?->is_active || ! $currentQueue->escalate_to_queue_id) {
+                    $skippedCount++;
+
+                    continue;
+                }
+
+                $nextQueue = TriageQueue::query()
+                    ->whereKey($currentQueue->escalate_to_queue_id)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $nextQueue?->is_active) {
+                    $skippedCount++;
+
+                    continue;
+                }
+
+                $escalatedAt = now();
+                AlertQueue::query()
+                    ->where('alert_id', $alert->id)
+                    ->whereNull('exited_at')
+                    ->update([
+                        'exited_at' => $escalatedAt,
+                        'exit_reason' => 'escalated',
+                    ]);
+
+                AlertQueue::query()->create([
+                    'alert_id' => $alert->id,
+                    'queue_id' => $nextQueue->id,
+                    'entered_at' => $escalatedAt,
                 ]);
 
-            // Create new queue entry
-            AlertQueue::create([
-                'alert_id' => $alert->id,
-                'queue_id' => $nextQueue->id,
-                'entered_at' => now(),
-            ]);
-
-            // Update alert
-            $newLevel = ($alert->escalation_level ?? 0) + 1;
-            $alert->update([
-                'queue_id' => $nextQueue->id,
-                'escalation_level' => $newLevel,
-                'escalated_at' => now(),
-                'escalated_by_user_id' => $user->id,
-                'context' => array_merge($alert->context ?? [], [
-                    'escalation_history' => array_merge($alert->context['escalation_history'] ?? [], [
-                        [
-                            'level' => $newLevel,
-                            'reason' => $validated['reason'],
-                            'escalated_by' => $user->id,
-                            'escalated_at' => now()->toISOString(),
-                            'bulk' => true,
-                        ],
+                $newLevel = min(
+                    ((int) ($alert->escalation_level ?? 0)) + 1,
+                    ControlRoomAlert::MAX_ESCALATION_LEVEL,
+                );
+                $alert->update([
+                    'queue_id' => $nextQueue->id,
+                    'escalation_level' => $newLevel,
+                    'escalated_at' => $escalatedAt,
+                    'escalated_by_user_id' => $user->id,
+                    'context' => array_merge($alert->context ?? [], [
+                        'escalation_history' => array_merge($alert->context['escalation_history'] ?? [], [
+                            [
+                                'level' => $newLevel,
+                                'reason' => $validated['reason'],
+                                'escalated_by' => $user->id,
+                                'escalated_at' => $escalatedAt->toISOString(),
+                                'bulk' => true,
+                            ],
+                        ]),
                     ]),
-                ]),
-            ]);
+                ]);
 
-            $escalatedCount++;
-        }
+                $escalatedCount++;
+            }
+
+            return [$escalatedCount, $skippedCount];
+        }, self::TRANSACTION_ATTEMPTS);
 
         $message = "{$escalatedCount} alert(s) escalated.";
         if ($skippedCount > 0) {
-            $message .= " {$skippedCount} skipped (no next queue).";
+            $message .= " {$skippedCount} skipped (terminal, inactive, or no next queue).";
         }
 
         return redirect()->back()->with('success', $message);
+    }
+
+    protected function lockAlert(ControlRoomAlert $alert): ControlRoomAlert
+    {
+        return ControlRoomAlert::query()
+            ->lockForUpdate()
+            ->findOrFail($alert->getKey());
+    }
+
+    protected function assertActionable(ControlRoomAlert $alert, string $action): void
+    {
+        if (! $alert->isActionable()) {
+            throw new InvalidArgumentException(
+                "Cannot {$action} an alert with terminal status '{$alert->status}'.",
+            );
+        }
+    }
+
+    protected function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

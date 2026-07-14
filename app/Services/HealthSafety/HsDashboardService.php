@@ -3,6 +3,7 @@
 namespace App\Services\HealthSafety;
 
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\EmergencyDrill;
 use App\Models\HsCorrectiveAction;
@@ -43,7 +44,7 @@ class HsDashboardService
      */
     public function getEventKpis(
         ?Carbon $since = null,
-        ?int $siteId = null,
+        int|array|null $siteId = null,
         ?User $viewer = null,
     ): array {
         $since = $since ?? now()->subDays(30);
@@ -89,16 +90,22 @@ class HsDashboardService
     /*  Investigation KPIs */
     /* ------------------------------------------------------------------ */
 
-    public function getInvestigationKpis(): array
+    public function getInvestigationKpis(int|array|null $siteId = null): array
     {
+        $base = HsInvestigation::query()
+            ->when($siteId !== null, fn (Builder $query) => $query->whereHas(
+                'hsEvent',
+                fn (Builder $eventQuery) => $this->applySiteScope($eventQuery, $siteId),
+            ));
+
         return [
-            'active_investigations' => HsInvestigation::active()->count(),
-            'overdue_investigations' => HsInvestigation::overdue()->count(),
-            'investigations_by_status' => HsInvestigation::select('status', DB::raw('COUNT(*) as count'))
+            'active_investigations' => (clone $base)->active()->count(),
+            'overdue_investigations' => (clone $base)->overdue()->count(),
+            'investigations_by_status' => (clone $base)->select('status', DB::raw('COUNT(*) as count'))
                 ->groupBy('status')
                 ->pluck('count', 'status')
                 ->toArray(),
-            'awaiting_review' => HsInvestigation::ofStatus(HsInvestigation::STATUS_UNDER_REVIEW)->count(),
+            'awaiting_review' => (clone $base)->ofStatus(HsInvestigation::STATUS_UNDER_REVIEW)->count(),
         ];
     }
 
@@ -106,18 +113,24 @@ class HsDashboardService
     /*  Corrective Action KPIs */
     /* ------------------------------------------------------------------ */
 
-    public function getCorrectiveActionKpis(): array
+    public function getCorrectiveActionKpis(int|array|null $siteId = null): array
     {
+        $base = HsCorrectiveAction::query()
+            ->when($siteId !== null, fn (Builder $query) => $query->whereHas(
+                'hsEvent',
+                fn (Builder $eventQuery) => $this->applySiteScope($eventQuery, $siteId),
+            ));
+
         return [
-            'open_actions' => HsCorrectiveAction::open()->count(),
-            'overdue_actions' => HsCorrectiveAction::overdue()->count(),
-            'awaiting_verification' => HsCorrectiveAction::awaitingVerification()->count(),
-            'actions_by_priority' => HsCorrectiveAction::open()
+            'open_actions' => (clone $base)->open()->count(),
+            'overdue_actions' => (clone $base)->overdue()->count(),
+            'awaiting_verification' => (clone $base)->awaitingVerification()->count(),
+            'actions_by_priority' => (clone $base)->open()
                 ->select('priority', DB::raw('COUNT(*) as count'))
                 ->groupBy('priority')
                 ->pluck('count', 'priority')
                 ->toArray(),
-            'actions_by_status' => HsCorrectiveAction::select('status', DB::raw('COUNT(*) as count'))
+            'actions_by_status' => (clone $base)->select('status', DB::raw('COUNT(*) as count'))
                 ->groupBy('status')
                 ->pluck('count', 'status')
                 ->toArray(),
@@ -128,13 +141,15 @@ class HsDashboardService
     /*  Risk Assessment KPIs */
     /* ------------------------------------------------------------------ */
 
-    public function getRiskAssessmentKpis(): array
+    public function getRiskAssessmentKpis(int|array|null $siteId = null): array
     {
+        $base = $this->riskAssessmentQuery($siteId);
+
         return [
-            'active_assessments' => HsRiskAssessment::active()->count(),
-            'high_extreme_active' => HsRiskAssessment::active()->highOrExtreme()->count(),
-            'due_for_review' => HsRiskAssessment::dueForReview()->count(),
-            'assessments_by_level' => HsRiskAssessment::active()
+            'active_assessments' => (clone $base)->active()->count(),
+            'high_extreme_active' => (clone $base)->active()->highOrExtreme()->count(),
+            'due_for_review' => (clone $base)->dueForReview()->count(),
+            'assessments_by_level' => (clone $base)->active()
                 ->select('risk_level', DB::raw('COUNT(*) as count'))
                 ->groupBy('risk_level')
                 ->pluck('count', 'risk_level')
@@ -146,9 +161,9 @@ class HsDashboardService
     /*  Training Compliance KPIs */
     /* ------------------------------------------------------------------ */
 
-    public function getTrainingComplianceKpis(): array
+    public function getTrainingComplianceKpis(int|array|null $siteId = null): array
     {
-        $requirements = HsTrainingRequirement::active()->get();
+        $requirements = $this->trainingRequirementQuery($siteId)->get();
 
         if ($requirements->isEmpty()) {
             return [
@@ -166,7 +181,10 @@ class HsDashboardService
 
         $nonCompliantCount = 0;
         if ($hrRequirementIds->isNotEmpty()) {
-            $nonCompliantCount = HrStaffComplianceStatus::whereIn('requirement_id', $hrRequirementIds)
+            $statusQuery = HrStaffComplianceStatus::query()
+                ->whereIn('requirement_id', $hrRequirementIds);
+            $this->applyStaffSiteScope($statusQuery, $siteId);
+            $nonCompliantCount = $statusQuery
                 ->whereIn('status', ['expired', 'not_started'])
                 ->distinct('user_id')
                 ->count('user_id');
@@ -195,11 +213,13 @@ class HsDashboardService
      * client/staff ids (from the parent HsEvent) for the context-menu jumps.
      * Site-scoped via the parent event.
      */
-    public function overdueCorrectiveActions(?int $siteId = null, int $limit = 10): array
+    public function overdueCorrectiveActions(int|array|null $siteId = null, int $limit = 10): array
     {
-        return HsCorrectiveAction::overdue()
-            ->with(['assignedTo:id,name', 'hsEvent:id,client_id,staff_id,site_id,reference_number'])
-            ->when($siteId, fn (Builder $q) => $q->whereHas('hsEvent', fn (Builder $e) => $e->where('site_id', $siteId)))
+        $query = HsCorrectiveAction::overdue()
+            ->with(['assignedTo:id,name', 'hsEvent:id,client_id,staff_id,site_id,reference_number']);
+        $this->applyRelatedSiteScope($query, 'hsEvent', $siteId);
+
+        return $query
             ->orderBy('due_date')
             ->limit($limit)
             ->get()
@@ -223,13 +243,15 @@ class HsDashboardService
      * Open (not-completed) investigations as worklist rows, flagging overdue ones.
      * Site-scoped via the parent event; client/staff ids for context-menu jumps.
      */
-    public function openInvestigations(?int $siteId = null, int $limit = 10): array
+    public function openInvestigations(int|array|null $siteId = null, int $limit = 10): array
     {
         $today = now()->toDateString();
 
-        return HsInvestigation::active()
-            ->with(['leadInvestigator:id,name', 'hsEvent:id,client_id,staff_id,site_id,reference_number'])
-            ->when($siteId, fn (Builder $q) => $q->whereHas('hsEvent', fn (Builder $e) => $e->where('site_id', $siteId)))
+        $query = HsInvestigation::active()
+            ->with(['leadInvestigator:id,name', 'hsEvent:id,client_id,staff_id,site_id,reference_number']);
+        $this->applyRelatedSiteScope($query, 'hsEvent', $siteId);
+
+        return $query
             ->orderByRaw('target_completion_date IS NULL, target_completion_date')
             ->limit($limit)
             ->get()
@@ -254,7 +276,7 @@ class HsDashboardService
      * `related_incident_id` deep-links to the source incident when present.
      */
     public function notifiableEvents(
-        ?int $siteId = null,
+        int|array|null $siteId = null,
         int $limit = 10,
         ?User $viewer = null,
     ): array {
@@ -293,14 +315,15 @@ class HsDashboardService
      * One unified `expiring[]` feed across risk assessments (review_due_at), SDS
      * (review_date) and scheduled drills (scheduled_at), within `withinDays` (incl. overdue).
      * Each item: {type, type_label, label, due_date, days_until (negative = overdue),
-     * register_url, site}. Drills are site-scoped; risk/SDS are org-level registers.
+     * register_url, site}. Site views include only attributable risk, SDS, drill and PPE rows.
      */
-    public function expiringFeed(?int $siteId = null, int $withinDays = 60, int $limit = 20): array
+    public function expiringFeed(int|array|null $siteId = null, int $withinDays = 60, int $limit = 20): array
     {
         $horizon = now()->copy()->addDays($withinDays)->toDateString();
         $items = [];
 
-        foreach (HsRiskAssessment::active()
+        foreach ($this->riskAssessmentQuery($siteId)
+            ->active()
             ->whereNotNull('review_due_at')
             ->where('review_due_at', '<=', $horizon)
             ->orderBy('review_due_at')
@@ -313,6 +336,10 @@ class HsDashboardService
             ->with('hazardousSubstance')
             ->whereNotNull('review_date')
             ->where('review_date', '<=', $horizon)
+            ->when($siteId !== null, fn (Builder $query) => $query->whereHas(
+                'hazardousSubstance.storageLocations',
+                fn (Builder $locationQuery) => $this->applySiteScope($locationQuery, $siteId),
+            ))
             ->orderBy('review_date')
             ->limit($limit)
             ->get() as $sds) {
@@ -324,7 +351,7 @@ class HsDashboardService
             ->where('status', 'scheduled')
             ->whereNotNull('scheduled_at')
             ->where('scheduled_at', '<=', now()->copy()->addDays($withinDays))
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn (Builder $q) => $this->applySiteScope($q, $siteId))
             ->with('site:id,name')
             ->orderBy('scheduled_at')
             ->limit($limit)
@@ -338,7 +365,7 @@ class HsDashboardService
             ->whereNotIn('status', ['condemned', 'disposed'])
             ->whereNotNull('next_inspection_due')
             ->whereDate('next_inspection_due', '<=', $horizon)
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn (Builder $q) => $this->applySiteScope($q, $siteId))
             ->with(['ppeType:id,name', 'site:id,name'])
             ->orderBy('next_inspection_due')
             ->limit($limit)
@@ -351,7 +378,7 @@ class HsDashboardService
             ->whereNotIn('status', ['condemned', 'disposed'])
             ->whereNotNull('expiry_date')
             ->whereDate('expiry_date', '<=', $horizon)
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn (Builder $q) => $this->applySiteScope($q, $siteId))
             ->with(['ppeType:id,name', 'site:id,name'])
             ->orderBy('expiry_date')
             ->limit($limit)
@@ -386,7 +413,7 @@ class HsDashboardService
      *
      * @return array<int, array{id: int, name: string, incidents: int, hazards: int}>
      */
-    public function siteLeague(?Carbon $from = null, ?Carbon $to = null): array
+    public function siteLeague(?Carbon $from = null, ?Carbon $to = null, int|array|null $siteId = null): array
     {
         $from = $from ?? now()->subDays(30);
         $to = $to ?? now();
@@ -396,6 +423,7 @@ class HsDashboardService
             ->whereIn('event_category', [HsEvent::CATEGORY_INCIDENT, HsEvent::CATEGORY_NEAR_MISS, HsEvent::CATEGORY_INJURY])
             ->whereBetween('occurred_at', [$from, $to])
             ->whereNotNull('site_id')
+            ->when($siteId !== null, fn (Builder $query) => $this->applySiteScope($query, $siteId))
             ->select('site_id', DB::raw('COUNT(*) as aggregate'))
             ->groupBy('site_id')
             ->pluck('aggregate', 'site_id');
@@ -403,11 +431,15 @@ class HsDashboardService
         $hazardsBySite = SiteHazard::query()
             ->whereIn('status', ['open', 'in_progress'])
             ->whereNotNull('site_id')
+            ->when($siteId !== null, fn (Builder $query) => $this->applySiteScope($query, $siteId))
             ->select('site_id', DB::raw('COUNT(*) as aggregate'))
             ->groupBy('site_id')
             ->pluck('aggregate', 'site_id');
 
-        return Site::orderBy('name')->get(['id', 'name'])
+        return Site::query()
+            ->when($siteId !== null, fn (Builder $query) => $this->applySiteScope($query, $siteId, 'id'))
+            ->orderBy('name')
+            ->get(['id', 'name'])
             ->map(fn (Site $site) => [
                 'id' => $site->id,
                 'name' => $site->name,
@@ -425,19 +457,87 @@ class HsDashboardService
 
     public function getDashboardSummary(
         ?Carbon $since = null,
-        ?int $siteId = null,
+        int|array|null $siteId = null,
         ?User $viewer = null,
     ): array {
         return [
             'events' => $this->getEventKpis($since, $siteId, $viewer),
-            'investigations' => $this->getInvestigationKpis(),
-            'corrective_actions' => $this->getCorrectiveActionKpis(),
-            'risk_assessments' => $this->getRiskAssessmentKpis(),
-            'training' => $this->getTrainingComplianceKpis(),
+            'investigations' => $this->getInvestigationKpis($siteId),
+            'corrective_actions' => $this->getCorrectiveActionKpis($siteId),
+            'risk_assessments' => $this->getRiskAssessmentKpis($siteId),
+            'training' => $this->getTrainingComplianceKpis($siteId),
         ];
     }
 
-    private function hsEventQuery(?int $siteId, ?User $viewer): Builder
+    private function riskAssessmentQuery(int|array|null $siteId): Builder
+    {
+        $query = HsRiskAssessment::query();
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $query->where(function (Builder $scope) use ($siteIds): void {
+            $scope->where(function (Builder $siteScope) use ($siteIds): void {
+                $siteScope->where('assessable_type', Site::class)
+                    ->whereIn('assessable_id', $siteIds);
+            })->orWhere(function (Builder $clientScope) use ($siteIds): void {
+                $clientScope->where('assessable_type', Client::class)
+                    ->whereIn('assessable_id', Client::query()->whereIn('site_id', $siteIds)->select('id'));
+            })->orWhereHas('hsEvent', fn (Builder $eventQuery) => $this->applySiteScope($eventQuery, $siteIds));
+        });
+    }
+
+    private function applyStaffSiteScope(Builder $query, int|array|null $siteId): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $query->whereHas('user.hrEmployeeProfile', function (Builder $profileQuery) use ($siteIds): void {
+            $profileQuery->whereIn('primary_site_id', $siteIds);
+            foreach ($siteIds as $id) {
+                $profileQuery->orWhereJsonContains('secondary_site_ids', $id);
+            }
+        });
+    }
+
+    private function trainingRequirementQuery(int|array|null $siteId): Builder
+    {
+        $query = HsTrainingRequirement::query()->active();
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+        $clientIds = Client::query()->whereIn('site_id', $siteIds)->pluck('id');
+
+        return $query->where(function (Builder $scope) use ($siteIds, $clientIds): void {
+            $scope->whereIn('scope_type', [
+                HsTrainingRequirement::SCOPE_GLOBAL,
+                HsTrainingRequirement::SCOPE_ROLE,
+            ]);
+
+            foreach ($siteIds as $id) {
+                $scope->orWhere(function (Builder $siteScope) use ($id): void {
+                    $siteScope->where('scope_type', HsTrainingRequirement::SCOPE_SITE)
+                        ->whereJsonContains('scope_site_ids', $id);
+                });
+            }
+
+            foreach ($clientIds as $clientId) {
+                $scope->orWhere(function (Builder $clientScope) use ($clientId): void {
+                    $clientScope->where('scope_type', HsTrainingRequirement::SCOPE_CLIENT)
+                        ->whereJsonContains('scope_client_ids', (int) $clientId);
+                });
+            }
+        });
+    }
+
+    private function hsEventQuery(int|array|null $siteId, ?User $viewer): Builder
     {
         $query = HsEvent::query();
 
@@ -450,9 +550,48 @@ class HsDashboardService
         }
 
         if ($siteId !== null) {
-            $query->where('site_id', $siteId);
+            $this->applySiteScope($query, $siteId);
         }
 
         return $query;
+    }
+
+    private function applySiteScope(Builder $query, int|array|null $siteId, string $column = 'site_id'): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn($column), $siteIds);
+    }
+
+    private function applyRelatedSiteScope(
+        Builder $query,
+        string $relationship,
+        int|array|null $siteId,
+    ): Builder {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        return $query->whereHas(
+            $relationship,
+            fn (Builder $related) => $this->applySiteScope($related, $siteId),
+        );
+    }
+
+    /** @return array<int, int> */
+    private function normalizeSiteIds(int|array $siteId): array
+    {
+        return collect(is_array($siteId) ? $siteId : [$siteId])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

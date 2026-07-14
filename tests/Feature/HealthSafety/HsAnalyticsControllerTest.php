@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\Role;
@@ -20,16 +22,20 @@ class HsAnalyticsControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
     }
 
     protected function hsOfficer(): User
     {
         $user = User::factory()->create([
             'role' => 'health_safety_officer',
+            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
@@ -67,8 +73,16 @@ class HsAnalyticsControllerTest extends TestCase
 
     public function test_root_cause_analytics_uses_investigation_root_causes(): void
     {
-        $event = HsEvent::factory()->create([
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
             'occurred_at' => now()->subDay(),
+        ]);
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
             'reported_at' => now()->subDay(),
         ]);
         HsInvestigation::factory()->completed()->create([
@@ -95,7 +109,7 @@ class HsAnalyticsControllerTest extends TestCase
 
     public function test_analytics_echoes_period_site_lens_and_scopes_drills(): void
     {
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->hsOfficer())
             ->get('/health-safety/analytics?period=30d&lens=governance&site_id='.$site->id)
@@ -138,6 +152,7 @@ class HsAnalyticsControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'role' => 'support_worker',
+            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         if ($role = Role::where('name', 'support_worker')->first()) {

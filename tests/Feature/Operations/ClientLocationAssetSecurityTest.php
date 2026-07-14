@@ -7,6 +7,9 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ClientPersonalAsset;
 use App\Models\ConsentType;
+use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\SlaDefinition;
+use App\Models\ControlRoomAlert;
 use App\Models\LocationHardware;
 use App\Models\Permission;
 use App\Models\Queclink\QueclinkDevice;
@@ -656,4 +659,52 @@ it('preserves the original personal asset photo and removes the replacement when
         ->and(Storage::disk('public')->get($originalPath))->toBe('original photo')
         ->and(Storage::disk('public')->allFiles("clients/{$client->id}/assets"))
         ->toBe([$originalPath]);
+});
+
+it('acknowledges only open client panic alerts through the canonical lifecycle', function () {
+    $site = makeClientLocationAssetSite(1, 'Panic Lifecycle Home');
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+        'status' => 'active',
+    ]);
+    $manager = User::factory()->create(['organization_id' => 1]);
+    grantClientLocationAssetPermissions($manager, [
+        'clients.viewAny',
+        'assets.viewAny',
+        'assets.telemetry.view',
+        'assets.trackers.manage',
+    ]);
+    grantClientLocationAssetTrackingConsent($client, $manager);
+
+    $openAlert = ControlRoomAlert::factory()->open()->create([
+        'client_id' => $client->id,
+        'source' => 'tracker',
+    ]);
+    $triagingAlert = ControlRoomAlert::factory()->triaging()->create([
+        'client_id' => $client->id,
+        'source' => 'resident_tracker',
+    ]);
+    $definition = SlaDefinition::query()->create([
+        'name' => 'Client panic acknowledgement',
+        'code' => 'client-panic-acknowledgement',
+        'acknowledge_target_minutes' => 5,
+        'response_target_minutes' => 10,
+        'resolution_target_minutes' => 60,
+        'is_active' => true,
+    ]);
+    $openSla = AlertSla::createFromDefinition($openAlert, $definition);
+    $triagingSla = AlertSla::createFromDefinition($triagingAlert, $definition);
+
+    $this->actingAs($manager)
+        ->from("/operations/clients/{$client->id}?tab=location")
+        ->post(route('operations.clients.location.acknowledge-panic', $client, false))
+        ->assertRedirect("/operations/clients/{$client->id}?tab=location")
+        ->assertSessionHasNoErrors();
+
+    expect($openAlert->fresh()->status)->toBe(ControlRoomAlert::STATUS_ACK)
+        ->and($openAlert->fresh()->acknowledged_by_user_id)->toBe($manager->id)
+        ->and($openSla->fresh()->acknowledged_at)->not->toBeNull()
+        ->and($triagingAlert->fresh()->status)->toBe(ControlRoomAlert::STATUS_TRIAGING)
+        ->and($triagingSla->fresh()->acknowledged_at)->toBeNull();
 });

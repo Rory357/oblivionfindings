@@ -7,6 +7,8 @@ use App\Models\IncidentFollowup;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class IncidentFollowupController extends Controller
 {
@@ -21,19 +23,33 @@ class IncidentFollowupController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $followup = IncidentFollowup::create([
-            'client_incident_id' => $incident->id,
-            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-            'due_at' => $data['due_at'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'created_by' => $request->user()?->id,
-        ]);
+        [$incident, $followup] = DB::transaction(function () use ($incident, $data, $request): array {
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($lockedIncident->status === 'closed') {
+                throw ValidationException::withMessages([
+                    'incident' => 'Closed incidents cannot receive new follow-ups. Reopen the incident before creating more work.',
+                ]);
+            }
+
+            $followup = IncidentFollowup::create([
+                'client_incident_id' => $lockedIncident->id,
+                'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+                'due_at' => $data['due_at'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $request->user()?->id,
+            ]);
+
+            return [$lockedIncident, $followup];
+        }, 3);
 
         $incident->loadMissing(['client:id,first_name,last_name']);
         $client = $incident->client;
 
         $targets = [];
-        if (!empty($followup->assigned_to_user_id)) {
+        if (! empty($followup->assigned_to_user_id)) {
             $targets[] = (int) $followup->assigned_to_user_id;
         }
 
@@ -50,8 +66,8 @@ class IncidentFollowupController extends Controller
                 'target_user_ids' => $targets,
                 'include_entity_user' => false,
                 'context' => [
-                    'Client' => trim($client->first_name . ' ' . $client->last_name),
-                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Client' => trim($client->first_name.' '.$client->last_name),
+                    'Incident' => 'ClientIncident #'.$incident->id,
                     'Due' => $followup->due_at?->format('Y-m-d H:i'),
                     'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
                 ],
@@ -64,7 +80,7 @@ class IncidentFollowupController extends Controller
     public function update(Request $request, ClientIncident $incident, IncidentFollowup $followup)
     {
         $this->authorize('view', $incident);
-        abort_unless((int)$followup->client_incident_id === (int)$incident->id, 404);
+        abort_unless((int) $followup->client_incident_id === (int) $incident->id, 404);
         $this->authorize('update', $followup);
 
         // Audit guardrail: completed follow-ups cannot be modified.
@@ -82,7 +98,7 @@ class IncidentFollowupController extends Controller
         $client = $incident->client;
 
         $targets = [];
-        if (!empty($followup->assigned_to_user_id)) {
+        if (! empty($followup->assigned_to_user_id)) {
             $targets[] = (int) $followup->assigned_to_user_id;
         }
 
@@ -99,8 +115,8 @@ class IncidentFollowupController extends Controller
                 'target_user_ids' => $targets,
                 'include_entity_user' => false,
                 'context' => [
-                    'Client' => trim($client->first_name . ' ' . $client->last_name),
-                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Client' => trim($client->first_name.' '.$client->last_name),
+                    'Incident' => 'ClientIncident #'.$incident->id,
                     'Due' => $followup->due_at?->format('Y-m-d H:i'),
                     'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
                 ],
@@ -113,7 +129,7 @@ class IncidentFollowupController extends Controller
     public function complete(Request $request, ClientIncident $incident, IncidentFollowup $followup)
     {
         $this->authorize('view', $incident);
-        abort_unless((int)$followup->client_incident_id === (int)$incident->id, 404);
+        abort_unless((int) $followup->client_incident_id === (int) $incident->id, 404);
         $this->authorize('complete', $followup);
 
         $data = $request->validate([
@@ -130,7 +146,7 @@ class IncidentFollowupController extends Controller
 
         // Notify managers + incident team; also ping the follow-up assignee.
         $targets = [];
-        if (!empty($followup->assigned_to_user_id)) {
+        if (! empty($followup->assigned_to_user_id)) {
             $targets[] = (int) $followup->assigned_to_user_id;
         }
 
@@ -147,8 +163,8 @@ class IncidentFollowupController extends Controller
                 'target_user_ids' => $targets,
                 'include_entity_user' => false,
                 'context' => [
-                    'Client' => trim($client->first_name . ' ' . $client->last_name),
-                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Client' => trim($client->first_name.' '.$client->last_name),
+                    'Incident' => 'ClientIncident #'.$incident->id,
                     'Completed' => $followup->completed_at?->format('Y-m-d H:i'),
                     'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
                 ],

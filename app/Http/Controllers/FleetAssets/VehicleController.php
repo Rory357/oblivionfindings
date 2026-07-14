@@ -16,12 +16,15 @@ use App\Models\FleetVehicleStateSnapshot;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class VehicleController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     private function canManageFleet(?\App\Models\User $user): bool
     {
         return (bool) $user?->canDo('fleet.manage');
@@ -167,9 +170,10 @@ class VehicleController extends Controller
                 ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
-        $openAlerts = ControlRoomAlert::query()->whereNotIn('status', ['closed', 'resolved'])->count();
-        $criticalAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
+        $alertQuery = ControlRoomAlert::query()->actionable();
+        $this->siteAccess->applyAlertScope($alertQuery, $user, ['fleet.manage']);
+        $openAlerts = (clone $alertQuery)->count();
+        $criticalAlerts = (clone $alertQuery)
             ->where('severity', 'critical')
             ->count();
 

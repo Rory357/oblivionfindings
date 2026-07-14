@@ -32,7 +32,7 @@ import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
 type Props = {
-    kpis: Record<string, number>;
+    kpis: Record<string, number | null>;
     incident_trends: Array<{
         month: string;
         count: number;

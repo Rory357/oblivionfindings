@@ -55,7 +55,9 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_daily_check_and_vehicle_index_expose_live_compliance_badge_counts(): void
     {
-        $user = $this->makeFleetUser();
+        // This contract verifies organisation-wide badge arithmetic. Cross-site
+        // totals are intentionally reserved for the explicit fleet manager bypass.
+        $user = $this->makeFleetUser(['fleet.manage']);
 
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->addDays(10),

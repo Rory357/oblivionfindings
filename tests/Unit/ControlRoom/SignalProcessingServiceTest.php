@@ -12,6 +12,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
@@ -628,6 +629,113 @@ class SignalProcessingServiceTest extends TestCase
 
         $this->assertSame($firstAlert?->id, $secondAlert?->id);
         $this->assertSame(1, ControlRoomAlert::query()->count());
+    }
+
+    public function test_lone_worker_correlation_pushes_the_complete_immutable_tuple_into_the_locking_query(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 581]);
+        $worker = User::factory()->create(['organization_id' => 581]);
+        $source = SignalSource::create([
+            'name' => 'Lone Worker',
+            'slug' => 'lone_worker',
+            'category' => 'safety',
+            'vendor' => 'internal',
+            'status' => 'active',
+        ]);
+        $signalType = SignalType::create([
+            'code' => 'lone_worker_emergency',
+            'name' => 'Lone Worker Emergency',
+            'category' => 'safety',
+            'default_severity' => 'critical',
+        ]);
+        SignalRule::create([
+            'name' => 'Lone Worker Emergency Correlation',
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'conditions' => [],
+            'alert_type' => 'Lone Worker Emergency',
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+            'priority' => 1,
+        ]);
+        $matchingTuple = [
+            'source_module' => 'lone_worker',
+            'signal_type' => $signalType->code,
+            'lone_worker_session_id' => 58101,
+            'worker_user_id' => $worker->id,
+            'site_id' => $site->id,
+            'client_id' => null,
+        ];
+        $matching = ControlRoomAlert::factory()->open()->create([
+            'source' => 'lone_worker',
+            'alert_type' => 'Lone Worker Emergency',
+            'site_id' => $site->id,
+            'client_id' => null,
+            'triggered_at' => now()->subMinute(),
+            'context' => [
+                'signal_type_code' => $signalType->code,
+                'normalized_data' => $matchingTuple,
+            ],
+        ]);
+        $unrelated = ControlRoomAlert::factory()->open()->create([
+            'source' => 'lone_worker',
+            'alert_type' => 'Lone Worker Emergency',
+            'site_id' => $site->id,
+            'client_id' => null,
+            'triggered_at' => now(),
+            'context' => [
+                'signal_type_code' => $signalType->code,
+                'normalized_data' => array_merge($matchingTuple, [
+                    'lone_worker_session_id' => 58102,
+                ]),
+            ],
+        ]);
+        $retry = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'idempotency_key' => 'lone-worker-complete-sql-tuple-retry',
+            'site_id' => $site->id,
+            'client_id' => null,
+            'normalized_data' => $matchingTuple,
+            'received_at' => now(),
+            'occurred_at' => now(),
+            'status' => 'pending',
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $result = $this->service->process($retry);
+        $lockingQuery = collect(DB::getQueryLog())->first(function (array $entry): bool {
+            $sql = strtolower($entry['query']);
+
+            return str_contains($sql, 'from `control_room_alerts`')
+                && str_contains($sql, 'for update')
+                && str_contains($sql, '`triggered_at`');
+        });
+        DB::disableQueryLog();
+
+        $this->assertSame($matching->id, $result?->id);
+        $this->assertSame('open', $unrelated->fresh()->status);
+        $this->assertNotNull($lockingQuery);
+        $sql = strtolower($lockingQuery['query']);
+        foreach ([
+            '`source`',
+            '$.signal_type_code',
+            '$.normalized_data.source_module',
+            '$.normalized_data.signal_type',
+            '$.normalized_data.lone_worker_session_id',
+            '$.normalized_data.worker_user_id',
+            '$.normalized_data.site_id',
+            '$.normalized_data.client_id',
+        ] as $immutablePredicate) {
+            $this->assertStringContainsString($immutablePredicate, $sql);
+        }
+        $this->assertContains('lone_worker', $lockingQuery['bindings']);
+        $this->assertContains((string) $matchingTuple['lone_worker_session_id'], $lockingQuery['bindings']);
+        $this->assertContains((string) $worker->id, $lockingQuery['bindings']);
+        $this->assertContains((string) $site->id, $lockingQuery['bindings']);
     }
 
     // ──────────────────────────────────────

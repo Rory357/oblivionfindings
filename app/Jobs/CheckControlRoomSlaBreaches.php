@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertAutomationService;
 use App\Services\ControlRoom\ControlRoomNotificationService;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -33,58 +35,81 @@ class CheckControlRoomSlaBreaches implements ShouldQueue
 
         AlertSla::query()
             ->applicable()
-            ->with(['alert', 'slaDefinition'])
+            ->whereHas('alert', fn ($query) => $query->actionable())
             ->whereNull('resolved_at')
-            ->chunkById(100, function ($slas) use ($notificationService, &$escalatedCount) {
-                foreach ($slas as $sla) {
-                    $breaches = $sla->checkForBreaches();
-                    if (empty($breaches)) {
-                        continue;
-                    }
+            ->chunkById(100, function ($slas) use ($notificationService, $automationService, &$escalatedCount) {
+                foreach ($slas as $candidate) {
+                    $escalated = DB::transaction(function () use ($candidate, $notificationService, $automationService): bool {
+                        // Lock the lifecycle owner first, then its SLA row. This
+                        // prevents a terminal transition racing an escalation.
+                        $alert = ControlRoomAlert::query()
+                            ->whereKey($candidate->alert_id)
+                            ->lockForUpdate()
+                            ->first();
+                        if (! $alert || ! $alert->isActionable()) {
+                            return false;
+                        }
 
-                    $alert = $sla->alert;
-                    $definition = $sla->slaDefinition;
-                    if (! $alert || ! $definition) {
-                        continue;
-                    }
+                        $sla = AlertSla::query()
+                            ->whereKey($candidate->id)
+                            ->where('alert_id', $alert->id)
+                            ->lockForUpdate()
+                            ->first();
+                        if (! $sla || ! $sla->isApplicable() || $sla->resolved_at !== null) {
+                            return false;
+                        }
 
-                    $escalate = (
-                        (in_array('acknowledge', $breaches, true) && $definition->escalate_on_acknowledge_breach) ||
-                        (in_array('response', $breaches, true) && $definition->escalate_on_response_breach) ||
-                        (in_array('resolution', $breaches, true) && $definition->escalate_on_resolution_breach)
-                    );
+                        $definition = $sla->slaDefinition()->first();
+                        if (! $definition) {
+                            return false;
+                        }
 
-                    if ($escalate) {
-                        $newLevel = min(($alert->escalation_level ?? 0) + 1, 5);
+                        $breaches = $sla->checkForBreaches();
+                        if ($breaches === []) {
+                            return false;
+                        }
 
+                        $shouldEscalate = (
+                            (in_array('acknowledge', $breaches, true) && $definition->escalate_on_acknowledge_breach) ||
+                            (in_array('response', $breaches, true) && $definition->escalate_on_response_breach) ||
+                            (in_array('resolution', $breaches, true) && $definition->escalate_on_resolution_breach)
+                        );
+                        if (! $shouldEscalate) {
+                            return false;
+                        }
+
+                        $at = now();
+                        $previousLevel = (int) ($alert->escalation_level ?? 0);
+                        $newLevel = min($previousLevel + 1, 5);
                         $alert->update([
                             'escalation_level' => $newLevel,
-                            'escalated_at' => $alert->escalated_at ?? now(),
+                            'escalated_at' => $alert->escalated_at ?? $at,
                             'context' => array_merge($alert->context ?? [], [
                                 'sla_breaches' => array_values(array_unique(array_merge(
                                     $alert->context['sla_breaches'] ?? [],
-                                    $breaches
+                                    $breaches,
                                 ))),
                                 'last_escalation_reason' => 'sla_breach',
-                                'last_escalation_at' => now()->toIso8601String(),
+                                'last_escalation_at' => $at->toIso8601String(),
                             ]),
                         ]);
 
-                        $previousLevel = $newLevel - 1;
-
-                        // Notify appropriate roles about the escalation
+                        // Required notification, automation, audit, alert and
+                        // SLA flags share the transaction. A failure rolls the
+                        // whole escalation back so a retry sees truthful state.
                         $notificationService->notifySlaBreachEscalation($alert, $definition, $breaches);
-
-                        // Run escalation-driven automation (watchers, etc.)
                         $automationService->onAlertEscalated($alert, $previousLevel);
-
-                        AuditLogger::log('controlRoom.alert.slaBreached', $alert, [
+                        AuditLogger::logOrFail('controlRoom.alert.slaBreached', $alert, [
                             'alert_id' => $alert->id,
                             'breaches' => $breaches,
                             'escalation_level' => $newLevel,
                             'sla_definition_id' => $definition->id,
                         ]);
 
+                        return true;
+                    }, 3);
+
+                    if ($escalated) {
                         $escalatedCount++;
                     }
                 }

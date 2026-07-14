@@ -24,6 +24,7 @@ class AlertWorkspaceService
     public function __construct(
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
+        private ControlRoomAlertProvenanceService $provenance,
     ) {}
 
     /**
@@ -52,8 +53,10 @@ class AlertWorkspaceService
         }
 
         $alert->load([
-            'asset:id,name,asset_tag',
-            'fleetSignal',
+            'asset:id,name,asset_tag,site_id,home_site_id,client_id',
+            'asset.client:id,site_id,organization_id',
+            'fleetSignal.asset:id,site_id,home_site_id,client_id',
+            'fleetSignal.asset.client:id,site_id,organization_id',
             'assignedTo:id,name,email',
             'acknowledgedBy:id,name',
             'resolvedBy:id,name',
@@ -67,8 +70,8 @@ class AlertWorkspaceService
             'evidencePacks.evidenceItems',
             'communications',
             'sla.slaDefinition',
-            'client:id,first_name,last_name',
-            'device:id,type,latitude,longitude,location_description',
+            'client:id,first_name,last_name,site_id,organization_id',
+            'device:id,type,latitude,longitude,location_description,site_id,client_id,asset_id',
             'tasks' => fn ($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
             'discussions' => fn ($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn ($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
             'watchers.user:id,name',
@@ -94,6 +97,21 @@ class AlertWorkspaceService
             'alert_id' => $alert->id,
         ]);
 
+        $safeClient = $this->provenance->safeClient($alert);
+        $safeAsset = $this->provenance->safeAsset($alert);
+        $safeAssignedTo = $this->provenance->safeAssignedTo($alert, $user);
+        $safeFleetSignal = $alert->fleetSignal
+            && $this->provenance->fleetSignalMatchesAlert($alert, $alert->fleetSignal)
+            ? $alert->fleetSignal
+            : null;
+        $safeDevice = $alert->device && $this->provenance->deviceMatchesAlert($alert, $alert->device)
+            ? $alert->device
+            : null;
+        $unsafeFleetReference = ($alert->asset_id !== null && $safeAsset === null)
+            || ($alert->fleet_signal_id !== null && $safeFleetSignal === null);
+        $unsafeDeviceReference = $alert->device_id !== null && $safeDevice === null;
+        $safeContext = $this->provenance->sanitiseContextForRead($alert);
+
         return [
             'alert' => [
                 'id' => $alert->id,
@@ -101,28 +119,30 @@ class AlertWorkspaceService
                 'alert_type' => $alert->alert_type,
                 'severity' => $alert->severity,
                 'status' => $alert->status,
-                'asset_id' => $alert->asset_id,
-                'asset' => $alert->asset ? [
-                    'id' => $alert->asset->id,
-                    'name' => $alert->asset->name,
-                    'asset_tag' => $alert->asset->asset_tag,
+                'asset_id' => $safeAsset?->id,
+                'asset' => $safeAsset ? [
+                    'id' => $safeAsset->id,
+                    'name' => $safeAsset->name,
+                    'asset_tag' => $safeAsset->asset_tag,
                 ] : null,
-                'fleet_signal_id' => $alert->fleet_signal_id,
-                'fleet_signal' => $alert->fleetSignal ? [
-                    'id' => $alert->fleetSignal->id,
-                    'signal_type' => $alert->fleetSignal->signal_type,
-                    'severity_hint' => $alert->fleetSignal->severity_hint,
-                    'occurred_at' => optional($alert->fleetSignal->occurred_at)->toISOString(),
-                    'payload' => $alert->fleetSignal->payload,
+                'fleet_signal_id' => $safeFleetSignal?->id,
+                'fleet_signal' => $safeFleetSignal ? [
+                    'id' => $safeFleetSignal->id,
+                    'signal_type' => $safeFleetSignal->signal_type,
+                    'severity_hint' => $safeFleetSignal->severity_hint,
+                    'occurred_at' => optional($safeFleetSignal->occurred_at)->toISOString(),
+                    'payload' => $safeFleetSignal->payload,
                 ] : null,
-                'fleet_context' => $alert->context['fleet_context']
-                    ?? $alert->context['normalized_data']['fleet_context']
-                    ?? null,
-                'assigned_to_user_id' => $alert->assigned_to_user_id,
-                'assigned_to' => $alert->assignedTo ? [
-                    'id' => $alert->assignedTo->id,
-                    'name' => $alert->assignedTo->name,
-                    'email' => $alert->assignedTo->email,
+                'fleet_context' => $unsafeFleetReference
+                    ? null
+                    : ($safeContext['fleet_context']
+                        ?? $safeContext['normalized_data']['fleet_context']
+                        ?? null),
+                'assigned_to_user_id' => $safeAssignedTo?->id,
+                'assigned_to' => $safeAssignedTo ? [
+                    'id' => $safeAssignedTo->id,
+                    'name' => $safeAssignedTo->name,
+                    'email' => $safeAssignedTo->email,
                 ] : null,
                 'acknowledged_by' => $alert->acknowledgedBy ? [
                     'id' => $alert->acknowledgedBy->id,
@@ -155,7 +175,7 @@ class AlertWorkspaceService
                 'escalated_at' => optional($alert->escalated_at)->toISOString(),
                 'assigned_at' => optional($alert->assigned_at)->toISOString(),
                 'escalation_level' => $alert->escalation_level,
-                'context' => $alert->context,
+                'context' => $safeContext,
                 'notes' => $alert->notes,
                 'priority' => $alert->priority,
                 'due_at' => optional($alert->due_at)->toISOString(),
@@ -240,14 +260,14 @@ class AlertWorkspaceService
                 'response_breached' => $alert->sla->response_breached,
                 'resolution_breached' => $alert->sla->resolution_breached,
             ] : null,
-            'client' => $alert->client ? [
-                'id' => $alert->client->id,
-                'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
+            'client' => $safeClient ? [
+                'id' => $safeClient->id,
+                'name' => trim($safeClient->first_name.' '.$safeClient->last_name),
             ] : null,
-            'location' => $alert->device && $alert->device->latitude ? [
-                'lat' => (float) $alert->device->latitude,
-                'lng' => (float) $alert->device->longitude,
-                'description' => $alert->device->location_description,
+            'location' => $safeDevice && $safeDevice->latitude ? [
+                'lat' => (float) $safeDevice->latitude,
+                'lng' => (float) $safeDevice->longitude,
+                'description' => $safeDevice->location_description,
             ] : null,
             'audit_logs' => $auditLogs,
             'can' => [
@@ -340,4 +360,5 @@ class AlertWorkspaceService
 
         return $staffQuery->get(['id', 'name', 'email']);
     }
+
 }

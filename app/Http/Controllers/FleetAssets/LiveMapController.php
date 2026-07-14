@@ -7,19 +7,72 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class LiveMapController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function __invoke(Request $request)
     {
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
+        $user = $request->user();
+        $organizationId = $this->organizationId($user);
+        $tenantSiteIds = $organizationId === null
+            ? []
+            : Site::query()
+                ->where('tenant_id', $organizationId)
+                ->pluck('id')
+                ->map(fn ($siteId) => (int) $siteId)
+                ->all();
+        $profileSiteIds = array_values(array_intersect(
+            $this->siteAccess->accessibleSiteIds($user),
+            $tenantSiteIds,
+        ));
+        $accessibleSiteIds = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)
+            ? $tenantSiteIds
+            : $profileSiteIds;
+
+        $applyAssetScope = function (Builder $query) use ($accessibleSiteIds, $hasFleetFields): Builder {
+            if ($accessibleSiteIds === []) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function (Builder $sites) use ($accessibleSiteIds, $hasFleetFields): void {
+                $sites->whereIn('site_id', $accessibleSiteIds);
+                if ($hasFleetFields) {
+                    $sites->orWhere(function (Builder $homeSite) use ($accessibleSiteIds): void {
+                        $homeSite->whereNull('site_id')
+                            ->whereIn('home_site_id', $accessibleSiteIds);
+                    });
+                }
+            });
+        };
+        $accessibleAssetIds = $applyAssetScope(Asset::query())
+            ->pluck('id')
+            ->map(fn ($assetId) => (int) $assetId)
+            ->all();
+        $accessibleClientIds = $organizationId === null || $accessibleSiteIds === []
+            ? []
+            : \App\Models\Client::query()
+                ->where('organization_id', $organizationId)
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->pluck('id')
+                ->map(fn ($clientId) => (int) $clientId)
+                ->all();
 
         $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
-            $eagerLoads[] = 'homeSite';
+            $eagerLoads['homeSite'] = fn ($query) => $organizationId === null
+                ? $query->whereRaw('1 = 0')
+                : $query->where('tenant_id', $organizationId);
         }
 
         $selectColumns = ['id', 'name', 'asset_tag', 'category', 'status'];
@@ -27,9 +80,8 @@ class LiveMapController extends Controller
             $selectColumns[] = 'home_site_id';
         }
 
-        $vehicles = Asset::vehicles()
-            ->with($eagerLoads)
-            ->get($selectColumns);
+        $vehicleQuery = $applyAssetScope(Asset::vehicles()->with($eagerLoads));
+        $vehicles = $vehicleQuery->get($selectColumns);
 
         $vehicleMarkers = $vehicles->filter(fn ($v) => $v->fleetState)
             ->map(fn ($v) => [
@@ -50,10 +102,11 @@ class LiveMapController extends Controller
                 ] : null,
             ])->values();
 
-        $houses = Site::query()
+        $houseQuery = Site::query()
+            ->whereIn('id', $accessibleSiteIds)
             ->where('type', 'house')
-            ->whereNotNull('latitude')
-            ->get(['id', 'name', 'address_line_1', 'latitude', 'longitude'])
+            ->whereNotNull('latitude');
+        $houses = $houseQuery->get(['id', 'name', 'address_line_1', 'latitude', 'longitude'])
             ->map(fn ($h) => [
                 'id' => $h->id,
                 'name' => $h->name,
@@ -63,10 +116,28 @@ class LiveMapController extends Controller
                 'lng' => $h->longitude,
             ])->values();
 
-        $geofences = AssetGeofence::query()
-            ->with('asset:id,name')
-            ->where('is_active', true)
-            ->get()
+        $geofenceQuery = AssetGeofence::query()
+            ->with(['asset' => fn ($query) => $query
+                ->whereIn('assets.id', $accessibleAssetIds)
+                ->select(['id', 'name'])])
+            ->where('is_active', true);
+        if ($accessibleSiteIds === []) {
+            $geofenceQuery->whereRaw('1 = 0');
+        } else {
+            $geofenceQuery->where(function (Builder $scope) use ($accessibleSiteIds, $accessibleAssetIds): void {
+                $scope->whereIn('site_id', $accessibleSiteIds)
+                    ->orWhere(function (Builder $fallback) use ($accessibleAssetIds): void {
+                        $fallback->whereNull('site_id')
+                            ->where(function (Builder $assets) use ($accessibleAssetIds): void {
+                                $assets->whereHas('asset', fn (Builder $asset) => $asset
+                                    ->whereIn('assets.id', $accessibleAssetIds))
+                                    ->orWhereHas('assignedAssets', fn (Builder $asset) => $asset
+                                        ->whereIn('assets.id', $accessibleAssetIds));
+                            });
+                    });
+            });
+        }
+        $geofences = $geofenceQuery->get()
             ->map(fn ($g) => [
                 'id' => $g->id,
                 'name' => $g->name,
@@ -80,9 +151,26 @@ class LiveMapController extends Controller
             ])->values();
 
         // Open alerts for the hero band — single COUNT query.
-        $openAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
-            ->count();
+        $openAlertsQuery = ControlRoomAlert::query()
+            ->actionable()
+            ->where(function (Builder $scope) use (
+                $accessibleSiteIds,
+                $accessibleClientIds,
+                $accessibleAssetIds,
+            ): void {
+                $scope->whereIn('site_id', $accessibleSiteIds)
+                    ->orWhere(function (Builder $clientFallback) use ($accessibleClientIds): void {
+                        $clientFallback->whereNull('site_id')
+                            ->whereNotNull('client_id')
+                            ->whereIn('client_id', $accessibleClientIds);
+                    })->orWhere(function (Builder $assetFallback) use ($accessibleAssetIds): void {
+                        $assetFallback->whereNull('site_id')
+                            ->whereNull('client_id')
+                            ->whereNotNull('asset_id')
+                            ->whereIn('asset_id', $accessibleAssetIds);
+                    });
+            });
+        $openAlerts = $openAlertsQuery->count();
 
         return Inertia::render('fleet-assets/map', [
             'vehicle_markers' => $vehicleMarkers,
@@ -90,5 +178,14 @@ class LiveMapController extends Controller
             'geofences' => $geofences,
             'open_alerts' => $openAlerts,
         ]);
+    }
+
+    private function organizationId(?User $user): ?int
+    {
+        $organizationId = $user?->organization_id;
+
+        return is_numeric($organizationId) && (int) $organizationId > 0
+            ? (int) $organizationId
+            : null;
     }
 }

@@ -90,6 +90,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::post('/alerts/bulk-action', [AlertController::class, 'bulkAction'])->name('fleet-assets.alerts.bulk-action');
         Route::post('/alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])->whereNumber('alert')->name('fleet-assets.alerts.acknowledge');
+        Route::post('/alerts/{alert}/triage', [AlertController::class, 'triage'])->whereNumber('alert')->name('fleet-assets.alerts.triage');
         Route::post('/alerts/{alert}/resolve', [AlertController::class, 'resolve'])->whereNumber('alert')->name('fleet-assets.alerts.resolve');
     });
 

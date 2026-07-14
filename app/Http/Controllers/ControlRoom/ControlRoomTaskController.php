@@ -8,13 +8,18 @@ use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class ControlRoomTaskController extends Controller
 {
     use AuthorizesControlRoomAlertAccess;
+
+    private const TRANSACTION_ATTEMPTS = 3;
 
     /**
      * List tasks for an alert with assignee name and subtask count.
@@ -26,7 +31,7 @@ class ControlRoomTaskController extends Controller
         $this->assertCanAccessAlert($user, $alert);
 
         $tasks = AlertTask::where('alert_id', $alert->id)
-            ->with('assignedTo:id,name')
+            ->with(['assignedTo:id,name', 'transferredBy:id,name'])
             ->withCount('subtasks')
             ->orderBy('sort_order')
             ->get()
@@ -43,6 +48,10 @@ class ControlRoomTaskController extends Controller
                 'subtask_count' => $task->subtasks_count,
                 'due_at' => $task->due_at?->toISOString(),
                 'completed_at' => $task->completed_at?->toISOString(),
+                'transferred_to_hs_corrective_action_id' => $task->transferred_to_hs_corrective_action_id,
+                'transferred_at' => $task->transferred_at?->toISOString(),
+                'transferred_by_user_id' => $task->transferred_by_user_id,
+                'transferred_by_name' => $task->transferredBy?->name,
                 'estimated_minutes' => $task->estimated_minutes,
                 'actual_minutes' => $task->actual_minutes,
                 'sort_order' => $task->sort_order,
@@ -80,26 +89,45 @@ class ControlRoomTaskController extends Controller
             $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
         }
 
-        $maxSort = AlertTask::where('alert_id', $alert->id)->max('sort_order') ?? 0;
+        DB::transaction(function () use ($alert, $data, $user): void {
+            $lockedAlert = $this->lockAlert($alert);
+            if ($lockedAlert->isTerminal()) {
+                throw ValidationException::withMessages([
+                    'alert' => 'Operational tasks cannot be created for a resolved, closed, or dismissed alert.',
+                ]);
+            }
 
-        $task = AlertTask::create([
-            'alert_id' => $alert->id,
-            'title' => $data['title'],
-            'description' => $data['description'] ?? null,
-            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-            'created_by_user_id' => $user->id,
-            'status' => 'open',
-            'priority' => $data['priority'],
-            'due_at' => $data['due_at'] ?? null,
-            'estimated_minutes' => $data['estimated_minutes'] ?? null,
-            'parent_task_id' => $data['parent_task_id'] ?? null,
-            'sort_order' => $maxSort + 1,
-        ]);
+            $lockedTasks = AlertTask::query()
+                ->where('alert_id', $lockedAlert->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id', 'sort_order']);
+            $parentTaskId = $data['parent_task_id'] ?? null;
+            if ($parentTaskId !== null && ! $lockedTasks->contains('id', (int) $parentTaskId)) {
+                throw ValidationException::withMessages([
+                    'parent_task_id' => 'The selected parent task is no longer available on this alert.',
+                ]);
+            }
 
-        AuditLogger::log('controlRoom.task.created', $alert, [
-            'alert_id' => $alert->id,
-            'task_id' => $task->id,
-        ]);
+            $task = AlertTask::create([
+                'alert_id' => $lockedAlert->id,
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+                'created_by_user_id' => $user->id,
+                'status' => AlertTask::STATUS_OPEN,
+                'priority' => $data['priority'],
+                'due_at' => $data['due_at'] ?? null,
+                'estimated_minutes' => $data['estimated_minutes'] ?? null,
+                'parent_task_id' => $parentTaskId,
+                'sort_order' => ((int) ($lockedTasks->max('sort_order') ?? 0)) + 1,
+            ]);
+
+            AuditLogger::log('controlRoom.task.created', $lockedAlert, [
+                'alert_id' => $lockedAlert->id,
+                'task_id' => $task->id,
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Task created.');
     }
@@ -134,19 +162,26 @@ class ControlRoomTaskController extends Controller
             $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
         }
 
-        if (array_key_exists('parent_task_id', $data)) {
-            $this->assertTaskParentDoesNotCreateCycle(
-                $task,
-                $data['parent_task_id'] === null ? null : (int) $data['parent_task_id'],
-            );
-        }
+        DB::transaction(function () use ($alert, $task, $data): void {
+            $lockedAlert = $this->lockAlert($alert);
+            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+            $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
+            $this->assertTaskIsMutable($lockedTask);
 
-        $task->update($data);
+            if (array_key_exists('parent_task_id', $data)) {
+                $this->assertTaskParentDoesNotCreateCycle(
+                    $lockedTask,
+                    $data['parent_task_id'] === null ? null : (int) $data['parent_task_id'],
+                );
+            }
 
-        AuditLogger::log('controlRoom.task.updated', $task->alert, [
-            'task_id' => $task->id,
-            'changes' => array_keys($data),
-        ]);
+            $lockedTask->update($data);
+
+            AuditLogger::log('controlRoom.task.updated', $lockedAlert, [
+                'task_id' => $lockedTask->id,
+                'changes' => array_keys($data),
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Task updated.');
     }
@@ -154,36 +189,93 @@ class ControlRoomTaskController extends Controller
     /**
      * Update a task's status (toggle/set).
      */
-    public function updateStatus(Request $request, AlertTask $task)
-    {
+    public function updateStatus(
+        Request $request,
+        AlertTask $task,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $task->alert);
 
         $data = $request->validate([
-            'status' => ['required', 'in:open,in_progress,blocked,completed,cancelled'],
+            'status' => ['required', Rule::in([
+                AlertTask::STATUS_OPEN,
+                AlertTask::STATUS_IN_PROGRESS,
+                AlertTask::STATUS_BLOCKED,
+                AlertTask::STATUS_COMPLETED,
+                AlertTask::STATUS_CANCELLED,
+            ])],
+            'reason' => [
+                Rule::requiredIf(fn () => $request->input('status') === AlertTask::STATUS_CANCELLED),
+                'nullable',
+                'string',
+                'max:2000',
+            ],
         ]);
 
-        $oldStatus = $task->status;
         $newStatus = $data['status'];
 
-        $updates = ['status' => $newStatus];
+        if ($newStatus === AlertTask::STATUS_CANCELLED) {
+            try {
+                $lifecycle->cancelTask($task, $user, $data['reason']);
+            } catch (InvalidArgumentException $exception) {
+                return back()->withErrors(['task' => $exception->getMessage()]);
+            }
 
-        if ($newStatus === 'completed') {
-            $updates['completed_at'] = now();
-        } elseif ($oldStatus === 'completed' && $newStatus !== 'completed') {
-            $updates['completed_at'] = null;
+            return back()->with('success', 'Task cancelled.');
         }
 
-        $task->update($updates);
+        DB::transaction(function () use ($task, $newStatus, $user): void {
+            $lockedAlert = $this->lockAlertForTask($task);
+            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+            $this->assertAlertAllowsTaskMutation($lockedAlert, 'status');
+            $this->assertTaskIsMutable($lockedTask);
 
-        AuditLogger::log('controlRoom.task.statusChanged', $task->alert, [
-            'task_id' => $task->id,
-            'old_status' => $oldStatus,
-            'new_status' => $newStatus,
-        ]);
+            $oldStatus = (string) $lockedTask->status;
+            $updates = ['status' => $newStatus];
+            if ($newStatus === AlertTask::STATUS_COMPLETED) {
+                $updates['completed_at'] = now();
+            } elseif ($oldStatus === AlertTask::STATUS_COMPLETED) {
+                $updates['completed_at'] = null;
+            }
+
+            $lockedTask->update($updates);
+
+            AuditLogger::log('controlRoom.task.statusChanged', $lockedAlert, [
+                'actor_id' => $user->id,
+                'task_id' => $lockedTask->id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Task status updated.');
+    }
+
+    /**
+     * Transfer an active operational task to the canonical H&S corrective action.
+     */
+    public function transferToHealthSafety(
+        Request $request,
+        AlertTask $task,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $task->alert);
+
+        $request->validate([
+            'hs_event_id' => ['prohibited'],
+        ]);
+
+        try {
+            $lifecycle->transferTaskToHealthSafety($task, $user);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['task' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Task transferred to Health & Safety.');
     }
 
     /**
@@ -196,15 +288,18 @@ class ControlRoomTaskController extends Controller
 
         $alert = $task->alert;
         $this->assertCanAccessAlert($user, $alert);
-        $taskId = $task->id;
 
-        $task->delete();
+        DB::transaction(function () use ($alert, $task): void {
+            $lockedAlert = $this->lockAlert($alert);
+            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+            $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
+            $this->assertTaskIsMutable($lockedTask);
+            throw ValidationException::withMessages([
+                'task' => 'Tasks are part of the alert history and cannot be deleted. Complete, cancel with a reason, or transfer active tasks instead.',
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
-        AuditLogger::log('controlRoom.task.deleted', $alert, [
-            'task_id' => $taskId,
-        ]);
-
-        return back()->with('success', 'Task deleted.');
+        return back();
     }
 
     /**
@@ -226,18 +321,71 @@ class ControlRoomTaskController extends Controller
             ],
         ]);
 
-        foreach ($data['task_ids'] as $index => $taskId) {
-            AlertTask::where('id', $taskId)
-                ->where('alert_id', $alert->id)
-                ->update(['sort_order' => $index + 1]);
-        }
+        DB::transaction(function () use ($alert, $data, $user): void {
+            $lockedAlert = $this->lockAlert($alert);
+            $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
+            $lockedTasks = AlertTask::query()
+                ->where('alert_id', $lockedAlert->id)
+                ->whereIn('id', $data['task_ids'])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-        AuditLogger::log('controlRoom.task.reordered', $alert, [
-            'alert_id' => $alert->id,
-            'task_ids' => $data['task_ids'],
-        ]);
+            if ($lockedTasks->count() !== count($data['task_ids'])) {
+                throw ValidationException::withMessages([
+                    'task_ids' => 'One or more tasks are no longer available on this alert.',
+                ]);
+            }
+            if ($lockedTasks->contains(
+                fn (AlertTask $lockedTask): bool => in_array(
+                    $lockedTask->status,
+                    AlertTask::TERMINAL_STATUSES,
+                    true,
+                ),
+            )) {
+                throw ValidationException::withMessages([
+                    'task_ids' => 'Completed, cancelled, and transferred tasks are historical and cannot be reordered.',
+                ]);
+            }
+
+            foreach ($data['task_ids'] as $index => $taskId) {
+                $lockedTasks->get((int) $taskId)->update(['sort_order' => $index + 1]);
+            }
+
+            AuditLogger::log('controlRoom.task.reordered', $lockedAlert, [
+                'actor_id' => $user->id,
+                'alert_id' => $lockedAlert->id,
+                'task_ids' => $data['task_ids'],
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Tasks reordered.');
+    }
+
+    private function lockAlert(ControlRoomAlert $alert): ControlRoomAlert
+    {
+        return ControlRoomAlert::query()
+            ->whereKey($alert->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function lockAlertForTask(AlertTask $task): ControlRoomAlert
+    {
+        return ControlRoomAlert::query()
+            ->whereKey($task->alert_id)
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function lockTaskForAlert(AlertTask $task, ControlRoomAlert $alert): AlertTask
+    {
+        return AlertTask::query()
+            ->whereKey($task->id)
+            ->where('alert_id', $alert->id)
+            ->lockForUpdate()
+            ->firstOrFail();
     }
 
     private function assertTaskParentDoesNotCreateCycle(AlertTask $task, ?int $parentTaskId): void
@@ -248,7 +396,14 @@ class ControlRoomTaskController extends Controller
 
         $parentIdsByTask = AlertTask::query()
             ->where('alert_id', $task->alert_id)
+            ->orderBy('id')
+            ->lockForUpdate()
             ->pluck('parent_task_id', 'id');
+        if (! $parentIdsByTask->has($parentTaskId)) {
+            throw ValidationException::withMessages([
+                'parent_task_id' => 'The selected parent task is no longer available on this alert.',
+            ]);
+        }
         $visitedTaskIds = [];
         $currentTaskId = $parentTaskId;
 
@@ -263,6 +418,28 @@ class ControlRoomTaskController extends Controller
             $nextTaskId = $parentIdsByTask->get($currentTaskId);
             $currentTaskId = $nextTaskId === null ? null : (int) $nextTaskId;
         }
+    }
+
+    private function assertTaskIsMutable(AlertTask $task): void
+    {
+        if (! in_array($task->status, AlertTask::TERMINAL_STATUSES, true)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'task' => 'Completed, cancelled, and transferred tasks are historical and read-only.',
+        ]);
+    }
+
+    private function assertAlertAllowsTaskMutation(ControlRoomAlert $alert, string $field): void
+    {
+        if (! $alert->isTerminal()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $field => 'Operational tasks are historical and read-only once their alert is resolved, closed, or dismissed.',
+        ]);
     }
 
     private function assertCanAssignAlertToUser(User $user, int $assigneeUserId): void

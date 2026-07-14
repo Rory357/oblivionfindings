@@ -23,22 +23,39 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->supportWorker = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->site = Site::factory()->create([
+            'tenant_id' => 1,
+            'type' => 'house',
+        ]);
     }
 
     public function test_index_requires_view_permission(): void
     {
-        $stranger = User::factory()->create(['approved_at' => now()]);
+        $stranger = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
 
         $this->actingAs($stranger)
             ->get('/control-room/incidents')
@@ -65,8 +82,9 @@ class ControlRoomIncidentControllerTest extends TestCase
     {
         // Regression: the feed read Client->name (which doesn't exist — the
         // model appends full_name), so every client incident showed "Unknown".
-        $site = Site::factory()->create(['type' => 'house']);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
         $client = Client::factory()->create([
+            'organization_id' => 1,
             'site_id' => $site->id,
             'first_name' => 'Aroha',
             'last_name' => 'Kingi',
@@ -74,6 +92,7 @@ class ControlRoomIncidentControllerTest extends TestCase
 
         ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $this->admin->id,
             'title' => 'Feed name check',
             'type' => 'behaviour',
@@ -94,11 +113,15 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_create_alert_from_incident_requires_create_permission(): void
     {
-        $site = Site::factory()->create(['type' => 'house']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
 
         $incident = ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $this->admin->id,
             'title' => 'Slip in hallway',
             'type' => 'injury',
@@ -130,11 +153,15 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_create_alert_from_submitted_client_incident_reuses_the_canonical_journey_on_first_and_repeated_calls(): void
     {
-        $site = Site::factory()->create(['type' => 'house']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
 
         $incident = ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $this->admin->id,
             'title' => 'Slip in hallway',
             'type' => 'injury',
@@ -184,10 +211,14 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_create_alert_from_low_incident_honours_a_critical_operator_escalation(): void
     {
-        $site = Site::factory()->create(['type' => 'house']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
         $incident = ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $this->admin->id,
             'title' => 'Low incident requiring urgent review',
             'type' => 'injury',
@@ -227,10 +258,14 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_requested_incident_alert_severity_is_monotonic_below_critical(): void
     {
-        $site = Site::factory()->create(['type' => 'house']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
         $incident = ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $this->admin->id,
             'title' => 'Low incident requiring elevated review',
             'type' => 'injury',
@@ -265,7 +300,10 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_flag_as_incident_requires_create_permission(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->supportWorker)
             ->post('/control-room/incidents/flag', [
@@ -278,8 +316,11 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_flag_as_incident_creates_linked_incident_and_alert(): void
     {
-        $site = Site::factory()->create(['type' => 'house']);
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post('/control-room/incidents/flag', [
@@ -310,7 +351,10 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_flag_as_incident_maps_critical_alert_to_high_incident(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post('/control-room/incidents/flag', [
@@ -333,7 +377,10 @@ class ControlRoomIncidentControllerTest extends TestCase
 
     public function test_flag_as_incident_rolls_back_when_canonical_journey_attachment_fails(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
         $this->partialMock(IncidentJourneyService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('attachAlertToIncident')
                 ->once()

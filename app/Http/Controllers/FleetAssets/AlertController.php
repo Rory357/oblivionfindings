@@ -4,47 +4,110 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ControlRoom\ControlRoomAlertController as CanonicalAlertController;
+use App\Models\Asset;
 use App\Models\AssetAlert;
 use App\Models\ControlRoomAlert;
-use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class AlertController extends Controller
 {
     /**
      * Acknowledge a control room alert from the fleet module.
      */
-    public function acknowledge(Request $request, ControlRoomAlert $alert, CanonicalAlertController $canonical)
+    public function acknowledge(
+        Request $request,
+        ControlRoomAlert $alert,
+        CanonicalAlertController $canonical,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
     {
         $this->assertFleetAlert($alert);
+        $this->siteAccess()->assertCanAccessAlert(
+            $request->user(),
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to acknowledge this fleet alert.',
+        );
 
-        return $canonical->acknowledge($request, $alert);
+        return $canonical->acknowledge($request, $alert, $lifecycle);
+    }
+
+    /**
+     * Start the canonical Control Room triage step from the fleet module.
+     */
+    public function triage(
+        Request $request,
+        ControlRoomAlert $alert,
+        CanonicalAlertController $canonical,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
+    {
+        $this->assertFleetAlert($alert);
+        $this->siteAccess()->assertCanAccessAlert(
+            $request->user(),
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to triage this fleet alert.',
+        );
+
+        return $canonical->triage($request, $alert, $lifecycle);
     }
 
     /**
      * Resolve a control room alert from the fleet module.
      */
-    public function resolve(Request $request, ControlRoomAlert $alert, CanonicalAlertController $canonical)
+    public function resolve(
+        Request $request,
+        ControlRoomAlert $alert,
+        CanonicalAlertController $canonical,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
     {
         $this->assertFleetAlert($alert);
+        $this->siteAccess()->assertCanAccessAlert(
+            $request->user(),
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to resolve this fleet alert.',
+        );
 
-        return $canonical->resolve($request, $alert);
+        return $canonical->resolve($request, $alert, $lifecycle);
     }
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        $siteAccess = $this->siteAccess();
+        $bypassPermissions = $this->alertBypassPermissions();
+        $provenance = $this->alertProvenance();
+
+        if ($request->filled('asset_id')) {
+            $this->assertCanAccessAssetId($user, (int) $request->input('asset_id'));
+        }
+
         // Canonical operational alerts from fleet/asset sources.
         $crQuery = ControlRoomAlert::query()
-            ->with(['asset:id,name,asset_tag', 'assignedTo:id,name'])
+            ->with([
+                'asset:id,name,asset_tag,site_id,home_site_id,client_id',
+                'asset.client:id,site_id,organization_id',
+                'fleetSignal:id,asset_id',
+                'fleetSignal.asset:id,site_id,home_site_id,client_id',
+                'fleetSignal.asset.client:id,site_id,organization_id',
+                'assignedTo:id,name',
+            ])
             ->whereIn('source', ['fleet', 'asset', 'tracker', 'geofence']);
+        $siteAccess->applyAlertScope($crQuery, $user, $bypassPermissions);
 
         if ($request->filled('status')) {
             $crQuery->where('status', $request->input('status'));
         } else {
             // Default to unresolved
-            $crQuery->whereNotIn('status', ['closed', 'resolved']);
+            $crQuery->actionable();
         }
 
         if ($request->filled('severity')) {
@@ -69,6 +132,7 @@ class AlertController extends Controller
         // Archived legacy asset_alerts history.
         $archivedAssetAlertQuery = AssetAlert::query()
             ->with(['asset:id,name,asset_tag', 'tracker:id,vendor,device_uid']);
+        $this->applyArchivedAssetAlertScope($archivedAssetAlertQuery, $user);
 
         if ($request->filled('status')) {
             $archivedAssetAlertQuery->where('status', $request->input('status'));
@@ -100,9 +164,10 @@ class AlertController extends Controller
 
         // Hero — whole fleet-alert universe (independent of filters/pagination).
         $heroBase = ControlRoomAlert::query()->whereIn('source', $this->fleetAlertSources());
+        $siteAccess->applyAlertScope($heroBase, $user, $bypassPermissions);
         $hero = [
-            'unresolved' => (clone $heroBase)->whereNotIn('status', ['closed', 'resolved'])->count(),
-            'critical' => (clone $heroBase)->whereNotIn('status', ['closed', 'resolved'])->where('severity', 'critical')->count(),
+            'unresolved' => (clone $heroBase)->actionable()->count(),
+            'critical' => (clone $heroBase)->actionable()->where('severity', 'critical')->count(),
             'acknowledged_today' => (clone $heroBase)->where('acknowledged_at', '>=', now()->startOfDay())->count(),
             'resolved_7d' => (clone $heroBase)->where('resolved_at', '>=', now()->subDays(7))->count(),
         ];
@@ -110,20 +175,9 @@ class AlertController extends Controller
         return Inertia::render('fleet-assets/alerts/index', [
             'hero' => $hero,
             'control_room_alerts' => [
-                'data' => $controlRoomAlerts->getCollection()->map(fn ($a) => [
-                    'id' => $a->id,
-                    'source' => 'control_room',
-                    'alert_type' => $a->alert_type,
-                    'severity' => $a->severity,
-                    'status' => $a->status,
-                    'triggered_at' => optional($a->triggered_at)->toISOString(),
-                    'acknowledged_at' => optional($a->acknowledged_at)->toISOString(),
-                    'resolved_at' => optional($a->resolved_at)->toISOString(),
-                    'context' => $a->context,
-                    'notes' => $a->notes,
-                    'asset' => $a->asset ? ['id' => $a->asset->id, 'name' => $a->asset->name, 'asset_tag' => $a->asset->asset_tag] : null,
-                    'assigned_to' => $a->assignedTo ? ['id' => $a->assignedTo->id, 'name' => $a->assignedTo->name] : null,
-                ])->values(),
+                'data' => $controlRoomAlerts->getCollection()
+                    ->map(fn (ControlRoomAlert $alert) => $this->mapControlRoomAlert($alert, $provenance))
+                    ->values(),
                 'links' => $controlRoomAlerts->linkCollection()->toArray(),
                 'meta' => [
                     'current_page' => $controlRoomAlerts->currentPage(),
@@ -139,13 +193,13 @@ class AlertController extends Controller
         ]);
     }
 
-    public function bulkAction(Request $request)
+    public function bulkAction(Request $request, ControlRoomAlertLifecycleService $lifecycle)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
         $data = $request->validate([
-            'action' => ['required', 'string', 'in:acknowledge,resolve'],
+            'action' => ['required', 'string', 'in:acknowledge,triage,resolve'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
             'resolution_notes' => ['required_if:action,resolve', 'nullable', 'string', 'max:2000'],
@@ -173,54 +227,24 @@ class AlertController extends Controller
         $skipped = 0;
 
         foreach ($alerts as $alert) {
-            if ($data['action'] === 'acknowledge') {
-                if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
-                    $skipped++;
-
-                    continue;
+            try {
+                if ($data['action'] === 'acknowledge') {
+                    $lifecycle->acknowledge($alert, $user);
+                } elseif ($data['action'] === 'triage') {
+                    $lifecycle->startTriage($alert, $user);
+                } else {
+                    $lifecycle->resolve(
+                        $alert,
+                        $user,
+                        $data['resolution_notes'],
+                        'fleet_bulk_resolution',
+                    );
                 }
-
-                $alert->update([
-                    'status' => ControlRoomAlert::STATUS_ACK,
-                    'acknowledged_at' => now(),
-                    'acknowledged_by_user_id' => $user->id,
-                ]);
-
-                $alert->sla?->recordAcknowledge();
-
-                AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
-                    'alert_id' => $alert->id,
-                    'acknowledged_by' => $user->id,
-                    'bulk' => true,
-                    'source_bridge' => 'fleet-assets',
-                ]);
-
-                $count++;
-
-                continue;
-            }
-
-            if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+            } catch (InvalidArgumentException) {
                 $skipped++;
 
                 continue;
             }
-
-            $alert->update([
-                'status' => ControlRoomAlert::STATUS_RESOLVED,
-                'resolved_at' => now(),
-                'resolved_by_user_id' => $user->id,
-                'notes' => $data['resolution_notes'],
-            ]);
-
-            $alert->sla?->recordResolution();
-
-            AuditLogger::log('controlRoom.alert.resolve', $alert, [
-                'alert_id' => $alert->id,
-                'resolved_by' => $user->id,
-                'bulk' => true,
-                'source_bridge' => 'fleet-assets',
-            ]);
 
             $count++;
         }
@@ -233,9 +257,217 @@ class AlertController extends Controller
         return back()->with('success', $message);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function mapControlRoomAlert(
+        ControlRoomAlert $alert,
+        ControlRoomAlertProvenanceService $provenance,
+    ): array {
+        $safeAsset = $alert->asset && $provenance->assetMatchesAlert($alert, $alert->asset)
+            ? $alert->asset
+            : null;
+        $unsafeFleetReference = ($alert->asset_id !== null && $safeAsset === null)
+            || ($alert->fleet_signal_id !== null
+                && ! $provenance->fleetSignalMatchesAlert($alert, $alert->fleetSignal));
+        $context = is_array($alert->context) ? $alert->context : [];
+
+        if ($unsafeFleetReference) {
+            $context = $this->sanitiseUnsafeFleetContext($context);
+        }
+
+        return [
+            'id' => $alert->id,
+            'source' => 'control_room',
+            'alert_type' => $alert->alert_type,
+            'severity' => $alert->severity,
+            'status' => $alert->status,
+            'triggered_at' => optional($alert->triggered_at)->toISOString(),
+            'acknowledged_at' => optional($alert->acknowledged_at)->toISOString(),
+            'resolved_at' => optional($alert->resolved_at)->toISOString(),
+            'context' => $context,
+            'notes' => $alert->notes,
+            'asset' => $safeAsset ? [
+                'id' => $safeAsset->id,
+                'name' => $safeAsset->name,
+                'asset_tag' => $safeAsset->asset_tag,
+            ] : null,
+            'assigned_to' => $alert->assignedTo ? [
+                'id' => $alert->assignedTo->id,
+                'name' => $alert->assignedTo->name,
+            ] : null,
+        ];
+    }
+
+    /**
+     * Preserve lifecycle notes while removing nested fleet identifiers and
+     * location data whose linked asset or signal failed provenance validation.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    protected function sanitiseUnsafeFleetContext(array $context): array
+    {
+        unset(
+            $context['fleet_context'],
+            $context['asset_id'],
+            $context['fleet_signal_id'],
+            $context['latitude'],
+            $context['longitude'],
+            $context['coordinates'],
+        );
+
+        if (is_array($context['normalized_data'] ?? null)) {
+            unset(
+                $context['normalized_data']['fleet_context'],
+                $context['normalized_data']['asset_id'],
+                $context['normalized_data']['fleet_signal_id'],
+                $context['normalized_data']['latitude'],
+                $context['normalized_data']['longitude'],
+                $context['normalized_data']['coordinates'],
+            );
+        }
+
+        return $context;
+    }
+
     protected function assertFleetAlert(ControlRoomAlert $alert): void
     {
         abort_unless(in_array($alert->source, $this->fleetAlertSources(), true), 404);
+    }
+
+    protected function assertCanAccessAssetId($user, int $assetId): void
+    {
+        if ($this->hasInstallationWideAssetAccess($user)) {
+            return;
+        }
+
+        $siteIds = $this->siteAccess()->accessibleSiteIds($user, $this->alertBypassPermissions());
+        $query = Asset::query()->whereKey($assetId);
+        $this->applyAssetSiteScope(
+            $query,
+            $siteIds,
+            $user?->organization_id === null ? null : (int) $user->organization_id,
+        );
+
+        abort_unless($query->exists(), 403, 'You are not authorized to access fleet alerts for that asset.');
+    }
+
+    protected function applyArchivedAssetAlertScope($query, $user): void
+    {
+        if ($this->hasInstallationWideAssetAccess($user)) {
+            return;
+        }
+
+        $siteIds = $this->siteAccess()->accessibleSiteIds($user, $this->alertBypassPermissions());
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $organizationId = $user?->organization_id;
+        $query->whereHas('asset', fn ($assetQuery) => $this->applyAssetSiteScope(
+            $assetQuery,
+            $siteIds,
+            $organizationId === null ? null : (int) $organizationId,
+        ));
+    }
+
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    protected function applyAssetSiteScope(
+        $query,
+        array $siteIds,
+        ?int $organizationId,
+    ): void
+    {
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $assetSiteColumn = $query->qualifyColumn('site_id');
+        $assetHomeSiteColumn = $query->qualifyColumn('home_site_id');
+        $assetClientColumn = $query->qualifyColumn('client_id');
+
+        $query->where(function ($provenance) use (
+            $siteIds,
+            $organizationId,
+            $assetSiteColumn,
+            $assetHomeSiteColumn,
+            $assetClientColumn,
+        ) {
+            $provenance->where(function ($directSite) use (
+                $siteIds,
+                $organizationId,
+                $assetSiteColumn,
+                $assetClientColumn,
+            ) {
+                $directSite
+                    ->whereIn($assetSiteColumn, $siteIds)
+                    ->where(function ($clientAgreement) use (
+                        $organizationId,
+                        $assetSiteColumn,
+                        $assetClientColumn,
+                    ) {
+                        $clientAgreement
+                            ->whereNull($assetClientColumn)
+                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                                ->where('organization_id', $organizationId)
+                                ->whereColumn(
+                                    $clientQuery->qualifyColumn('site_id'),
+                                    $assetSiteColumn,
+                                ));
+                    });
+            })->orWhere(function ($homeSite) use (
+                $siteIds,
+                $organizationId,
+                $assetSiteColumn,
+                $assetHomeSiteColumn,
+                $assetClientColumn,
+            ) {
+                $homeSite
+                    ->whereNull($assetSiteColumn)
+                    ->whereIn($assetHomeSiteColumn, $siteIds)
+                    ->where(function ($clientAgreement) use (
+                        $organizationId,
+                        $assetHomeSiteColumn,
+                        $assetClientColumn,
+                    ) {
+                        $clientAgreement
+                            ->whereNull($assetClientColumn)
+                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                                ->where('organization_id', $organizationId)
+                                ->whereColumn(
+                                    $clientQuery->qualifyColumn('site_id'),
+                                    $assetHomeSiteColumn,
+                                ));
+                    });
+            })->orWhere(function ($clientFallback) use (
+                $siteIds,
+                $organizationId,
+                $assetSiteColumn,
+                $assetHomeSiteColumn,
+                $assetClientColumn,
+            ) {
+                $clientFallback
+                    ->whereNull($assetSiteColumn)
+                    ->whereNull($assetHomeSiteColumn)
+                    ->whereNotNull($assetClientColumn)
+                    ->whereHas('client', fn ($clientQuery) => $clientQuery
+                        ->where('organization_id', $organizationId)
+                        ->whereIn('site_id', $siteIds));
+            });
+        });
+    }
+
+    protected function hasInstallationWideAssetAccess($user): bool
+    {
+        return $this->siteAccess()->canBypass($user, $this->alertBypassPermissions())
+            && $this->siteAccess()->isUnrestrictedPlatformUser($user);
     }
 
     /**
@@ -251,11 +483,16 @@ class AlertController extends Controller
         return app(UserSiteAccessService::class);
     }
 
+    protected function alertProvenance(): ControlRoomAlertProvenanceService
+    {
+        return app(ControlRoomAlertProvenanceService::class);
+    }
+
     /**
      * @return array<int, string>
      */
     protected function alertBypassPermissions(): array
     {
-        return ['reports.viewAny'];
+        return ['reports.viewAny', 'fleet.manage'];
     }
 }

@@ -7,6 +7,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\References\ReferenceNumberGenerator;
@@ -60,6 +61,7 @@ class IncidentJourneyService
         private readonly HsEventService $hsEventService,
         private readonly ReferenceNumberGenerator $references,
         private readonly IncidentAlertOperationalInitializer $alertOperations,
+        private readonly ControlRoomAlertProvenanceService $alertProvenance,
     ) {}
 
     /**
@@ -342,6 +344,12 @@ class IncidentJourneyService
             ?? $incident?->site_id
             ?? $alert->site_id
             ?? $client->site_id;
+        $siteId = is_numeric($siteId) ? (int) $siteId : null;
+        $this->alertProvenance->assertIncidentTuple(
+            $alert,
+            (int) $clientId,
+            $siteId,
+        );
         $type = trim((string) ($safe['type'] ?? $incident?->type ?? $this->typeFromAlert($alert)));
         $type = $type === '' ? 'other' : $type;
         $requestedSeverity = $alert->severity === HsEvent::SEVERITY_CRITICAL
@@ -368,7 +376,7 @@ class IncidentJourneyService
             'reference_number' => $incident?->reference_number
                 ?? $this->references->next(ClientIncident::REFERENCE_PREFIX),
             'client_id' => (int) $clientId,
-            'site_id' => is_numeric($siteId) ? (int) $siteId : null,
+            'site_id' => $siteId,
             'type' => $type,
             'severity' => $normalisedSeverity === HsEvent::SEVERITY_CRITICAL
                 ? HsEvent::SEVERITY_HIGH

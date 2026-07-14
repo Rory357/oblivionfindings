@@ -2,7 +2,11 @@
 
 namespace Tests\Feature\Safeguarding;
 
+use App\Models\AuditLog;
 use App\Models\ClientIncident;
+use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Permission;
@@ -63,12 +67,30 @@ class SafeguardingCrossModuleTest extends TestCase
             );
     }
 
-    public function test_closing_a_concern_closes_the_linked_hs_event_and_resolves_the_alert(): void
+    public function test_closing_a_concern_preserves_the_linked_alert_lifecycle_and_requests_an_operational_decision(): void
     {
         $user = $this->makeUser(['safeguarding.update']);
         $concern = SafeguardingConcern::factory()->create(['status' => 'monitoring']);
 
-        $alert = ControlRoomAlert::factory()->create(['status' => ControlRoomAlert::STATUS_OPEN]);
+        $alert = ControlRoomAlert::factory()->create([
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'context' => ['existing_key' => 'preserved'],
+        ]);
+        $task = AlertTask::query()->create([
+            'alert_id' => $alert->id,
+            'title' => 'Keep the client safe while safeguarding closes',
+            'status' => AlertTask::STATUS_OPEN,
+            'created_by_user_id' => $user->id,
+        ]);
+        $definition = SlaDefinition::query()->create([
+            'name' => 'Safeguarding operational response',
+            'code' => 'safeguarding-operational-response',
+            'acknowledge_target_minutes' => 15,
+            'response_target_minutes' => 30,
+            'resolution_target_minutes' => 120,
+            'is_active' => true,
+        ]);
+        $sla = AlertSla::createFromDefinition($alert, $definition);
         $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->id, HsEvent::CATEGORY_SAFEGUARDING);
 
         // The concern observer records the HsEvent on create; reuse it (or create
@@ -88,7 +110,30 @@ class SafeguardingCrossModuleTest extends TestCase
 
         $this->assertSame('closed', $concern->fresh()->status);
         $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
-        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
+
+        $alert->refresh();
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
+        $this->assertNull($alert->resolved_at);
+        $this->assertSame('preserved', data_get($alert->context, 'existing_key'));
+        $this->assertSame('safeguarding_terminal', data_get($alert->context, 'journey_attention.type'));
+        $this->assertSame($concern->id, data_get($alert->context, 'journey_attention.safeguarding_concern_id'));
+        $this->assertSame($hsEvent->id, data_get($alert->context, 'journey_attention.hs_event_id'));
+        $this->assertSame($user->id, data_get($alert->context, 'journey_attention.actor_id'));
+        $this->assertTrue(data_get($alert->context, 'journey_attention.requires_operational_decision'));
+
+        $this->assertNull($sla->fresh()->resolved_at);
+        $this->assertNull($sla->fresh()->ended_as);
+        $this->assertSame(AlertTask::STATUS_OPEN, $task->fresh()->status);
+
+        $audit = AuditLog::query()
+            ->where('action', 'controlRoom.alert.safeguardingTerminalAttention')
+            ->where('auditable_type', $alert->getMorphClass())
+            ->where('auditable_id', $alert->id)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($audit);
+        $this->assertSame($concern->id, data_get($audit->meta, 'safeguarding_concern_id'));
+        $this->assertTrue(data_get($audit->meta, 'requires_operational_decision'));
     }
 
     public function test_external_report_accepts_msd_dss_authority(): void

@@ -4,7 +4,9 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Factories\ControlRoomAlertFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,14 +16,23 @@ class ControlRoomStatsControllerTest extends TestCase
 
     protected User $admin;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(\Database\Seeders\RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
     }
 
     public function test_stats_requires_authentication(): void
@@ -31,7 +42,10 @@ class ControlRoomStatsControllerTest extends TestCase
 
     public function test_stats_blocked_for_user_without_permission(): void
     {
-        $user = User::factory()->create(['approved_at' => now()]);
+        $user = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'approved_at' => now(),
+        ]);
 
         $this->actingAs($user)
             ->get('/control-room/stats')
@@ -75,8 +89,8 @@ class ControlRoomStatsControllerTest extends TestCase
 
     public function test_stats_aggregates_open_alerts(): void
     {
-        ControlRoomAlert::factory()->open()->count(3)->create();
-        ControlRoomAlert::factory()->resolved()->count(2)->create();
+        $this->alertFactory()->open()->count(3)->create();
+        $this->alertFactory()->resolved()->count(2)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room/stats')
@@ -84,5 +98,12 @@ class ControlRoomStatsControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('kpis.open_alerts', 3)
             );
+    }
+
+    private function alertFactory(): ControlRoomAlertFactory
+    {
+        return ControlRoomAlert::factory()->state([
+            'site_id' => $this->site->id,
+        ]);
     }
 }

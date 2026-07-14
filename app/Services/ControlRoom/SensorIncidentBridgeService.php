@@ -6,7 +6,6 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -28,6 +27,7 @@ class SensorIncidentBridgeService
 
     public function __construct(
         private readonly IncidentJourneyService $journeys,
+        private readonly ControlRoomAlertLifecycleService $lifecycle,
     ) {}
 
     /**
@@ -43,6 +43,9 @@ class SensorIncidentBridgeService
                 ->whereKey($alert->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+            if (! $this->lifecycle->isDetectionAlert($lockedAlert)) {
+                throw new InvalidArgumentException("Alert {$lockedAlert->id} is not a sensor alert.");
+            }
             $isConfirmedRepair = $lockedAlert->status === ControlRoomAlert::STATUS_CONFIRMED;
             if (! $isConfirmedRepair && ! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_CONFIRMED)) {
                 throw new InvalidArgumentException(
@@ -69,23 +72,7 @@ class SensorIncidentBridgeService
                 return $incident;
             }
 
-            $lockedAlert->refresh();
-            $context = $lockedAlert->context ?? [];
-            $context['confirmed_by'] = $operator->name;
-            $context['confirmed_at'] = now()->toISOString();
-
-            $lockedAlert->update([
-                'status' => ControlRoomAlert::STATUS_CONFIRMED,
-                'context' => $context,
-                'acknowledged_at' => $lockedAlert->acknowledged_at ?? now(),
-                'acknowledged_by_user_id' => $lockedAlert->acknowledged_by_user_id ?? $operator->id,
-            ]);
-
-            AuditLogger::log('controlRoom.alert.confirm', $lockedAlert, [
-                'alert_id' => $lockedAlert->id,
-                'incident_id' => $incident->id,
-                'confirmed_by' => $operator->id,
-            ]);
+            $this->lifecycle->confirmSensor($lockedAlert->refresh(), $operator);
 
             return $incident;
         }, self::TRANSACTION_ATTEMPTS);
@@ -97,53 +84,7 @@ class SensorIncidentBridgeService
      */
     public function dismiss(ControlRoomAlert $alert, string $reason, User $operator): void
     {
-        DB::transaction(function () use ($alert, $reason, $operator) {
-            $lockedAlert = ControlRoomAlert::query()
-                ->whereKey($alert->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_DISMISSED)) {
-                throw new InvalidArgumentException(
-                    "Alert {$lockedAlert->id} cannot be dismissed from status '{$lockedAlert->status}'.",
-                );
-            }
-
-            $context = $lockedAlert->context ?? [];
-            $hasJourneyClaim = filled(data_get($context, 'incident_id'))
-                || filled(data_get($context, 'normalized_data.incident_id'))
-                || $lockedAlert->clientIncident()->exists()
-                || $lockedAlert->hsEvent()->exists();
-
-            if ($hasJourneyClaim) {
-                throw new InvalidArgumentException(
-                    "Alert {$lockedAlert->id} cannot be dismissed because it owns an incident journey.",
-                );
-            }
-
-            $signals = $lockedAlert->signals()->lockForUpdate()->get();
-            $context['dismissed_reason'] = $reason;
-            $context['dismissed_by'] = $operator->name;
-            $context['dismissed_at'] = now()->toISOString();
-
-            $lockedAlert->update([
-                'status' => ControlRoomAlert::STATUS_DISMISSED,
-                'resolution_code' => 'false_positive',
-                'context' => $context,
-                'resolved_at' => now(),
-                'resolved_by_user_id' => $operator->id,
-            ]);
-
-            foreach ($signals as $signal) {
-                $signal->markSuppressed("false_positive: {$reason}");
-            }
-
-            AuditLogger::log('controlRoom.alert.dismiss', $lockedAlert, [
-                'alert_id' => $lockedAlert->id,
-                'reason' => $reason,
-                'dismissed_by' => $operator->id,
-            ]);
-        }, self::TRANSACTION_ATTEMPTS);
+        $this->lifecycle->dismissSensor($alert, $operator, $reason);
     }
 
     /**

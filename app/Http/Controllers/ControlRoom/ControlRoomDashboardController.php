@@ -4,7 +4,6 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -14,6 +13,7 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +63,8 @@ class ControlRoomDashboardController extends Controller
 
         if ($request->filled('status') && $request->input('status') !== 'all') {
             $query->where('status', $request->input('status'));
+        } else {
+            $query->actionable();
         }
         if ($request->filled('severity') && $request->input('severity') !== 'all') {
             $query->where('severity', $request->input('severity'));
@@ -97,12 +99,7 @@ class ControlRoomDashboardController extends Controller
         if ($request->filled('date_to')) {
             $query->whereDate('triggered_at', '<=', $request->input('date_to'));
         }
-        if ($siteId) {
-            $query->where(function ($scopedQuery) use ($siteId) {
-                $scopedQuery->where('site_id', $siteId)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-            });
-        }
+        $this->applySelectedSiteScope($query, $siteId);
 
         $sortField = $request->input('sort', 'triggered_at');
         $sortDir = $request->input('dir', 'desc');
@@ -118,12 +115,7 @@ class ControlRoomDashboardController extends Controller
         // --- Real-time stats (current state, not historical) ---
         $statsBase = ControlRoomAlert::query();
         $siteAccess->applyAlertScope($statsBase, $user, $bypassPermissions);
-        if ($siteId) {
-            $statsBase->where(function ($scopedQuery) use ($siteId) {
-                $scopedQuery->where('site_id', $siteId)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-            });
-        }
+        $this->applySelectedSiteScope($statsBase, $siteId);
 
         $stats = [
             'total' => (clone $statsBase)->count(),
@@ -132,11 +124,11 @@ class ControlRoomDashboardController extends Controller
             'triaging' => (clone $statsBase)->where('status', 'triaging')->count(),
             'resolved' => (clone $statsBase)->where('status', 'resolved')->count(),
             'closed' => (clone $statsBase)->where('status', 'closed')->count(),
-            'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'high' => (clone $statsBase)->where('severity', 'high')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'escalated' => (clone $statsBase)->where('escalation_level', '>', 0)->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'my_alerts' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'critical' => (clone $statsBase)->where('severity', 'critical')->actionable()->count(),
+            'high' => (clone $statsBase)->where('severity', 'high')->actionable()->count(),
+            'escalated' => (clone $statsBase)->where('escalation_level', '>', 0)->actionable()->count(),
+            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->actionable()->count(),
+            'my_alerts' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->actionable()->count(),
         ];
 
         // --- PR11 report service metrics (period-aware, replaces inline queries) ---
@@ -151,8 +143,11 @@ class ControlRoomDashboardController extends Controller
         $siteComparison = $this->reportService->siteComparison($from, $to, $reportSiteScope);
         $dailyTrend = $this->padCountSeries($volume['daily_trend'], 14, $to);
 
-        // --- Active shift ---
-        $activeShift = Shift::where('status', 'active')->latest('starts_at')->first();
+        // Control Room shifts have no trustworthy site or tenant provenance.
+        // Only the explicitly modelled installation administrator may see them.
+        $activeShift = $siteAccess->isUnrestrictedPlatformUser($user)
+            ? Shift::where('status', 'active')->latest('starts_at')->first()
+            : null;
         $activeShiftData = null;
         if ($activeShift) {
             $leadName = $activeShift->shift_lead_user_id
@@ -168,12 +163,7 @@ class ControlRoomDashboardController extends Controller
         // --- Recent activity ---
         $recentActivityAlertIds = ControlRoomAlert::query()->select('id');
         $siteAccess->applyAlertScope($recentActivityAlertIds, $user, $bypassPermissions);
-        if ($siteId) {
-            $recentActivityAlertIds->where(function ($scopedQuery) use ($siteId) {
-                $scopedQuery->where('site_id', $siteId)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-            });
-        }
+        $this->applySelectedSiteScope($recentActivityAlertIds, $siteId);
 
         $recentActivity = AuditLog::where('action', 'like', 'controlRoom.%')
             ->where('action', '!=', 'controlRoom.dashboard.view')
@@ -237,7 +227,12 @@ class ControlRoomDashboardController extends Controller
                     'client_id' => $a->client_id,
                     'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : null,
                     'site_id' => $a->site_id,
-                    'sla_status' => $a->sla?->isApplicable() ? ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached ? 'breached' : (($a->sla->acknowledge_deadline && $a->sla->acknowledge_deadline->isPast()) || ($a->sla->response_deadline && $a->sla->response_deadline->isPast()) ? 'at_risk' : 'on_track')) : null,
+                    'sla_status' => match ($a->sla?->getStatus()) {
+                        'breached' => 'breached',
+                        'at_risk' => 'at_risk',
+                        'on_track', 'resolved' => 'on_track',
+                        default => null,
+                    },
                     'notes' => $a->notes ? substr($a->notes, 0, 100).(strlen($a->notes) > 100 ? '...' : '') : null,
                 ])->values(),
                 'links' => $alerts->linkCollection()->toArray(),
@@ -253,14 +248,9 @@ class ControlRoomDashboardController extends Controller
             // PR11 metrics (replaces old inline queries)
             'daily_trend' => $dailyTrend,
             'by_severity' => $volume['by_severity'],
-            'unresolved_by_severity' => tap(ControlRoomAlert::unresolved(), function ($severityQuery) use ($siteAccess, $user, $bypassPermissions, $siteId) {
+            'unresolved_by_severity' => tap(ControlRoomAlert::actionable(), function ($severityQuery) use ($siteAccess, $user, $bypassPermissions, $siteId) {
                 $siteAccess->applyAlertScope($severityQuery, $user, $bypassPermissions);
-                if ($siteId) {
-                    $severityQuery->where(function ($scopedQuery) use ($siteId) {
-                        $scopedQuery->where('site_id', $siteId)
-                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-                    });
-                }
+                $this->applySelectedSiteScope($severityQuery, $siteId);
             })
                 ->select('severity', DB::raw('COUNT(*) as count'))
                 ->groupBy('severity')
@@ -271,28 +261,18 @@ class ControlRoomDashboardController extends Controller
             'sparkline_data' => array_map(fn ($d) => $d['count'], $dailyTrend),
             'alerts_today' => tap(ControlRoomAlert::query()->whereDate('triggered_at', now()->toDateString()), function ($todayQuery) use ($siteAccess, $user, $bypassPermissions, $siteId) {
                 $siteAccess->applyAlertScope($todayQuery, $user, $bypassPermissions);
-                if ($siteId) {
-                    $todayQuery->where(function ($scopedQuery) use ($siteId) {
-                        $scopedQuery->where('site_id', $siteId)
-                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-                    });
-                }
+                $this->applySelectedSiteScope($todayQuery, $siteId);
             })->count(),
             'alerts_yesterday' => tap(ControlRoomAlert::query()->whereDate('triggered_at', now()->subDay()->toDateString()), function ($yesterdayQuery) use ($siteAccess, $user, $bypassPermissions, $siteId) {
                 $siteAccess->applyAlertScope($yesterdayQuery, $user, $bypassPermissions);
-                if ($siteId) {
-                    $yesterdayQuery->where(function ($scopedQuery) use ($siteId) {
-                        $scopedQuery->where('site_id', $siteId)
-                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-                    });
-                }
+                $this->applySelectedSiteScope($yesterdayQuery, $siteId);
             })->count(),
             'avg_response_minutes' => $sla['avg_acknowledge_minutes'],
-            'sla_compliance_pct' => (int) $sla['compliance_pct'],
+            'sla_compliance_pct' => $sla['compliance_pct'],
             'escalation_rate' => $escalation['escalation_rate'],
 
             // Daily trend data for SLA + escalation charts
-            'sla_daily_trend' => $this->buildSlaDailyTrend($from, $to, $user, $siteId),
+            'sla_daily_trend' => $this->reportService->slaDailyTrend($from, $to, $reportSiteScope),
             'escalation_daily_trend' => $this->buildEscalationDailyTrend($from, $to, $user, $siteId),
 
             // PR12 additions
@@ -304,7 +284,7 @@ class ControlRoomDashboardController extends Controller
             // Workload + queue pressure for dashboard charts
             'workload' => $this->reportService->workloadDistribution($from, $to, $reportSiteScope),
             'queues' => TriageQueue::active()
-                ->withCount(['alerts as active_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])->tap(fn ($alertQuery) => $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions))])
+                ->withCount(['alerts as active_count' => fn ($q) => $q->actionable()->tap(fn ($alertQuery) => $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions))])
                 ->orderBy('tier')
                 ->get(['id', 'name', 'tier'])
                 ->map(fn ($q) => ['name' => $q->name, 'tier' => $q->tier, 'active_alerts' => $q->active_count])
@@ -326,44 +306,6 @@ class ControlRoomDashboardController extends Controller
     }
 
     /**
-     * Build daily SLA compliance trend data.
-     *
-     * Returns array of {date, compliance_pct} for each day in range.
-     */
-    private function buildSlaDailyTrend(Carbon $from, Carbon $to, User $user, ?int $siteId): array
-    {
-        $siteAccess = app(UserSiteAccessService::class);
-
-        $rows = AlertSla::query()
-            ->applicable()
-            ->whereBetween('created_at', [$from, $to])
-            ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $siteId) {
-                $siteAccess->applyAlertScope($alertQuery, $user, $this->alertBypassPermissions());
-                if ($siteId) {
-                    $alertQuery->where(function ($scopedQuery) use ($siteId) {
-                        $scopedQuery->where('site_id', $siteId)
-                            ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-                    });
-                }
-            })
-            ->select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('COUNT(*) as total'),
-                DB::raw('SUM(CASE WHEN acknowledge_breached = 1 OR response_breached = 1 OR resolution_breached = 1 THEN 1 ELSE 0 END) as breached')
-            )
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->orderBy('date')
-            ->get();
-
-        return $rows->map(fn ($r) => [
-            'date' => $r->date,
-            'compliance_pct' => $r->total > 0
-                ? (int) round((($r->total - $r->breached) / $r->total) * 100)
-                : 100,
-        ])->values()->toArray();
-    }
-
-    /**
      * Build daily escalation count trend data.
      */
     private function buildEscalationDailyTrend(Carbon $from, Carbon $to, User $user, ?int $siteId): array
@@ -374,12 +316,7 @@ class ControlRoomDashboardController extends Controller
 
         app(UserSiteAccessService::class)->applyAlertScope($query, $user, $this->alertBypassPermissions());
 
-        if ($siteId) {
-            $query->where(function ($scopedQuery) use ($siteId) {
-                $scopedQuery->where('site_id', $siteId)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-            });
-        }
+        $this->applySelectedSiteScope($query, $siteId);
 
         return $query
             ->select(
@@ -407,11 +344,21 @@ class ControlRoomDashboardController extends Controller
 
         $siteAccess = app(UserSiteAccessService::class);
 
-        if ($siteAccess->canBypass($user, $this->alertBypassPermissions())) {
+        if ($siteAccess->isUnrestrictedPlatformUser($user)) {
             return null;
         }
 
         return $siteAccess->accessibleSiteIds($user, $this->alertBypassPermissions());
+    }
+
+    protected function applySelectedSiteScope(Builder $query, ?int $siteId): Builder
+    {
+        if (! $siteId) {
+            return $query;
+        }
+
+        return app(UserSiteAccessService::class)
+            ->applyAlertSiteScopeForSiteIds($query, [$siteId]);
     }
 
     /**

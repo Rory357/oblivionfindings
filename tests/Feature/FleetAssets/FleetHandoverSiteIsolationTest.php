@@ -8,6 +8,7 @@ use App\Models\FleetShiftHandover;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -31,12 +32,13 @@ class FleetHandoverSiteIsolationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-04-07 10:00:00'));
 
         if (! Schema::hasTable('fleet_shift_handovers')) {
             Schema::create('fleet_shift_handovers', function (Blueprint $table) {
                 $table->id();
+                $table->unsignedBigInteger('tenant_id')->nullable()->index();
                 $table->foreignId('asset_id')->constrained('assets');
                 $table->foreignId('outgoing_user_id')->constrained('users');
                 $table->foreignId('incoming_user_id')->nullable()->constrained('users');
@@ -76,10 +78,13 @@ class FleetHandoverSiteIsolationTest extends TestCase
     public function test_user_sees_only_fleet_handovers_from_accessible_sites(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny']);
+        $siteBParticipant = $this->makeSiteScopedUser([$this->siteB], []);
 
         $visibleHandover = FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleA->id,
             'outgoing_user_id' => $user->id,
+            'incoming_user_id' => $user->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -87,8 +92,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         ]);
 
         FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
-            'outgoing_user_id' => $user->id,
+            'outgoing_user_id' => $siteBParticipant->id,
+            'incoming_user_id' => $siteBParticipant->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -108,14 +115,15 @@ class FleetHandoverSiteIsolationTest extends TestCase
     public function test_user_cannot_view_fleet_handover_from_another_site(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny']);
-        $stranger = User::factory()->create();
+        $stranger = $this->makeSiteScopedUser([$this->siteB], []);
 
-        // The user must NOT be a handover participant — HandoverController
-        // intentionally allows participants to read handovers regardless of
-        // site (see test_home_site_id_grants_access_when_site_id_is_null).
+        // Keep the requesting user out of both participant columns so this
+        // exercises the site gate against an otherwise canonical handover.
         $foreignHandover = FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
             'outgoing_user_id' => $stranger->id,
+            'incoming_user_id' => $stranger->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -130,13 +138,13 @@ class FleetHandoverSiteIsolationTest extends TestCase
     public function test_user_cannot_view_fleet_handover_show_from_another_site(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny', 'assets.viewAny']);
+        $stranger = $this->makeSiteScopedUser([$this->siteB], []);
 
-        // Same rationale as above: keep the requesting user out of both
-        // outgoing/incoming columns so the site scope is what gates access.
         $foreignHandover = FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
-            'outgoing_user_id' => User::factory()->create()->id,
-            'incoming_user_id' => User::factory()->create()->id,
+            'outgoing_user_id' => $stranger->id,
+            'incoming_user_id' => $stranger->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -153,6 +161,7 @@ class FleetHandoverSiteIsolationTest extends TestCase
         $manager = $this->makeBypassUser(['fleet.viewAny', 'fleet.manage']);
 
         $handover = FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
             'outgoing_user_id' => $manager->id,
             'incoming_user_id' => $manager->id,
@@ -176,8 +185,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         $user = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['fleet.viewAny']);
 
         FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleA->id,
             'outgoing_user_id' => $user->id,
+            'incoming_user_id' => $user->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -185,8 +196,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         ]);
 
         FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
             'outgoing_user_id' => $user->id,
+            'incoming_user_id' => $user->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -207,8 +220,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         $manager = $this->makeBypassUser(['fleet.viewAny', 'fleet.manage']);
 
         FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleA->id,
             'outgoing_user_id' => $manager->id,
+            'incoming_user_id' => $manager->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -216,8 +231,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         ]);
 
         FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $this->vehicleB->id,
             'outgoing_user_id' => $manager->id,
+            'incoming_user_id' => $manager->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -258,8 +275,10 @@ class FleetHandoverSiteIsolationTest extends TestCase
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny']);
 
         $handover = FleetShiftHandover::create([
+            'tenant_id' => 1,
             'asset_id' => $vehicleHomeSite->id,
             'outgoing_user_id' => $user->id,
+            'incoming_user_id' => $user->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -278,6 +297,7 @@ class FleetHandoverSiteIsolationTest extends TestCase
     protected function makeSiteScopedUser(array $sites, array $permissionKeys): User
     {
         $user = User::factory()->create([
+            'organization_id' => 1,
             'approved_at' => now(),
             'role' => 'support_worker',
         ]);
@@ -307,11 +327,26 @@ class FleetHandoverSiteIsolationTest extends TestCase
     protected function makeBypassUser(array $permissionKeys): User
     {
         $user = User::factory()->create([
+            'organization_id' => 1,
             'approved_at' => now(),
             'role' => 'admin',
         ]);
 
         $this->grantPermissions($user, $permissionKeys);
+
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $user->id,
+            'employee_number' => 'EMP-FH-'.$user->id,
+            'work_email' => $user->email,
+            'position_title' => 'Fleet Manager',
+            'position_role' => 'admin',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->siteA->id,
+            'secondary_site_ids' => [$this->siteB->id],
+        ]);
 
         return $user;
     }

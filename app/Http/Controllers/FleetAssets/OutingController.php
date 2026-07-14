@@ -11,6 +11,7 @@ use App\Models\FleetOutingResident;
 use App\Models\FleetVehicleBooking;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,8 @@ use Inertia\Inertia;
 
 class OutingController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         if (!Schema::hasTable('fleet_outings')) {
@@ -170,10 +173,7 @@ class OutingController extends Controller
                         ->where('ends_at', '<', now())
                         ->count()
                     : 0,
-                'critical_alerts' => ControlRoomAlert::query()
-                    ->whereNotIn('status', ['closed', 'resolved'])
-                    ->where('severity', 'critical')
-                    ->count(),
+                'critical_alerts' => $this->criticalAlertCount($request),
             ],
             'chart_data' => $chartFormatted,
             'can' => [
@@ -181,6 +181,16 @@ class OutingController extends Controller
                     || (bool) $request->user()?->canDo('fleet.outings.manage'),
             ],
         ]);
+    }
+
+    private function criticalAlertCount(Request $request): int
+    {
+        $query = ControlRoomAlert::query()
+            ->actionable()
+            ->where('severity', 'critical');
+        $this->siteAccess->applyAlertScope($query, $request->user(), ['fleet.manage']);
+
+        return $query->count();
     }
 
     public function create(Request $request)

@@ -110,6 +110,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.close');
 
+        Route::post('/control-room/alerts/{alert}/reopen-for-incident', [ControlRoomAlertController::class, 'reopenForIncident'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.reopen-for-incident');
+
         Route::post('/control-room/alerts/{alert}/note', [ControlRoomAlertController::class, 'addNote'])
             ->whereNumber('alert')
             ->name('control-room.alerts.note');
@@ -137,6 +141,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.tasks.update');
         Route::post('/control-room/tasks/{task}/status', [ControlRoomTaskController::class, 'updateStatus'])
             ->name('control-room.tasks.status');
+        Route::post('/control-room/tasks/{task}/transfer-to-health-safety', [ControlRoomTaskController::class, 'transferToHealthSafety'])
+            ->whereNumber('task')
+            ->name('control-room.tasks.transfer-to-health-safety');
         Route::delete('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
             ->name('control-room.tasks.destroy');
         Route::post('/control-room/alerts/{alert}/tasks/reorder', [ControlRoomTaskController::class, 'reorder'])

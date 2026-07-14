@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 /**
  * Integration Alert Controller
@@ -22,6 +26,8 @@ use Inertia\Inertia;
  */
 class AlertController extends Controller
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /**
      * List integration-sourced alerts.
      *
@@ -49,8 +55,11 @@ class AlertController extends Controller
         $siteAccess->applyAlertScope($query, $user, ['reports.viewAny']);
 
         // Filters — same set as ControlRoomAlertController
-        if ($status = $request->input('status')) {
+        $status = $request->input('status');
+        if (filled($status) && $status !== 'all') {
             $query->where('status', $status);
+        } else {
+            $query->actionable();
         }
 
         if ($severity = $request->input('severity')) {
@@ -147,9 +156,9 @@ class AlertController extends Controller
         $stats = [
             'total' => (clone $statsBase)->notSnoozed()->count(),
             'open' => (clone $statsBase)->notSnoozed()->where('status', 'open')->count(),
-            'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->actionable()->count(),
+            'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->actionable()->count(),
+            'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->actionable()->count(),
             'snoozed' => (clone $statsBase)->snoozed()->count(),
         ];
 
@@ -182,21 +191,20 @@ class AlertController extends Controller
     /**
      * Acknowledge an integration-sourced alert.
      */
-    public function acknowledge(Request $request, ControlRoomAlert $alert)
-    {
+    public function acknowledge(
+        Request $request,
+        ControlRoomAlert $alert,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessIntegrationAlert($user, $alert);
 
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
-            return back()->withErrors(['alert' => "Cannot acknowledge an alert in '{$alert->status}' status."]);
+        try {
+            $lifecycle->acknowledge($alert, $user);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
         }
-
-        $alert->update([
-            'status' => 'ack',
-            'acknowledged_at' => now(),
-            'acknowledged_by_user_id' => $user->id,
-        ]);
 
         return redirect()->back();
     }
@@ -210,27 +218,36 @@ class AlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessIntegrationAlert($user, $alert);
 
-        if (! $alert->isActionable()) {
-            return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
-        }
-
-        $request->validate([
+        $data = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
         ]);
 
-        app(UserSiteAccessService::class)->assertCanAssignControlRoomAlertToUser(
-            $user,
-            (int) $request->integer('user_id'),
-            $this->alertBypassPermissions(),
-            'You are not authorized to assign alerts to that staff member.',
-        );
+        DB::transaction(function () use ($alert, $data, $user): void {
+            $lockedAlert = ControlRoomAlert::query()
+                ->whereKey($alert->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertCanAccessIntegrationAlert($user, $lockedAlert);
 
-        $alert->update([
-            'status' => 'triaging',
-            'assigned_to_user_id' => $request->input('user_id'),
-            'assigned_at' => now(),
-            'assigned_by_user_id' => $user->id,
-        ]);
+            if (! $lockedAlert->isActionable()) {
+                throw ValidationException::withMessages([
+                    'alert' => "Cannot assign an alert in '{$lockedAlert->status}' status.",
+                ]);
+            }
+
+            app(UserSiteAccessService::class)->assertCanAssignControlRoomAlertToUser(
+                $user,
+                (int) $data['user_id'],
+                $this->alertBypassPermissions(),
+                'You are not authorized to assign alerts to that staff member.',
+            );
+
+            $lockedAlert->update([
+                'assigned_to_user_id' => (int) $data['user_id'],
+                'assigned_at' => now(),
+                'assigned_by_user_id' => $user->id,
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return redirect()->back();
     }
@@ -238,27 +255,29 @@ class AlertController extends Controller
     /**
      * Close (resolve) an integration-sourced alert.
      */
-    public function close(Request $request, ControlRoomAlert $alert)
-    {
+    public function close(
+        Request $request,
+        ControlRoomAlert $alert,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessIntegrationAlert($user, $alert);
 
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
-            return back()->withErrors(['alert' => "Cannot resolve an alert in '{$alert->status}' status."]);
+        $data = $request->validate([
+            'close_reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $lifecycle->resolve(
+                $alert,
+                $user,
+                $data['close_reason'],
+                'closed_via_integration_view',
+            );
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
         }
-
-        $request->validate([
-            'close_reason' => ['nullable', 'string'],
-        ]);
-
-        $alert->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolved_by_user_id' => $user->id,
-            'resolution_code' => 'closed_via_integration_view',
-            'notes' => $request->input('close_reason'),
-        ]);
 
         return redirect()->back();
     }
@@ -269,29 +288,12 @@ class AlertController extends Controller
      */
     private function deriveSlaStatus(ControlRoomAlert $alert): ?string
     {
-        if (! $alert->sla?->isApplicable()) {
-            return null;
-        }
-
-        $sla = $alert->sla;
-        if ($sla->resolution_breached || $sla->response_breached || $sla->acknowledge_breached) {
-            return 'red';
-        }
-
-        $now = now();
-        $deadlines = array_filter([
-            $sla->acknowledge_deadline,
-            $sla->response_deadline,
-            $sla->resolution_deadline,
-        ]);
-
-        foreach ($deadlines as $deadline) {
-            if ($deadline && $deadline->gt($now) && $deadline->diffInMinutes($now) <= 30) {
-                return 'yellow';
-            }
-        }
-
-        return 'green';
+        return match ($alert->sla?->getStatus()) {
+            'breached' => 'red',
+            'at_risk' => 'yellow',
+            'on_track', 'resolved' => 'green',
+            default => null,
+        };
     }
 
     protected function assignableStaff(User $user): Collection

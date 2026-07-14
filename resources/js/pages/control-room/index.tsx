@@ -1,4 +1,10 @@
+import {
+    AlertWorkspaceDialog,
+    type AlertWorkspaceDetail,
+} from '@/components/control-room/alert-workspace-dialog';
+import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import { KpiCard } from '@/components/dashboard/kpi-card';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,16 +17,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
-import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
-import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
-    ChevronRight,
     AlertTriangle,
     Bell,
+    ChevronRight,
     Clock,
     Info,
     MapPin,
@@ -29,7 +32,6 @@ import {
     Search,
     Shield,
     ShieldCheck,
-    TrendingUp,
     User,
     XCircle,
 } from 'lucide-react';
@@ -117,7 +119,7 @@ interface Props {
     alerts_today: number;
     alerts_yesterday: number;
     avg_response_minutes: number;
-    sla_compliance_pct: number;
+    sla_compliance_pct: number | null;
     active_shift: ActiveShift | null;
     recent_activity: ActivityEvent[];
     staff: { id: number; name: string }[];
@@ -168,7 +170,10 @@ interface Props {
         unassigned: number;
     };
     queues?: Array<{ name: string; tier: number; active_alerts: number }>;
-    sla_daily_trend?: Array<{ date: string; compliance_pct: number }>;
+    sla_daily_trend?: Array<{
+        date: string;
+        compliance_pct: number | null;
+    }>;
     escalation_daily_trend?: Array<{ date: string; count: number }>;
 }
 
@@ -313,12 +318,20 @@ export default function ControlRoomIndex({
     const openWorkspace = (id: number) => {
         const params = new URLSearchParams(window.location.search);
         params.set('alert', String(id));
-        router.get(`/control-room?${params.toString()}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            `/control-room?${params.toString()}`,
+            {},
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
     const closeWorkspace = () => {
         const params = new URLSearchParams(window.location.search);
         params.delete('alert');
-        router.get(`/control-room${params.size ? `?${params.toString()}` : ''}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            `/control-room${params.size ? `?${params.toString()}` : ''}`,
+            {},
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
 
     // Auto-refresh every 30 seconds
@@ -415,8 +428,17 @@ export default function ControlRoomIndex({
                     stats={[
                         { label: 'Open alerts', value: stats.open },
                         { label: 'Critical', value: stats.critical },
-                        { label: 'SLA compliance', value: `${sla_compliance_pct}%` },
-                        { label: 'Avg response', value: `${avg_response_minutes}m` },
+                        {
+                            label: 'SLA compliance',
+                            value:
+                                sla_compliance_pct === null
+                                    ? 'Not assessed'
+                                    : `${sla_compliance_pct}%`,
+                        },
+                        {
+                            label: 'Avg response',
+                            value: `${avg_response_minutes}m`,
+                        },
                     ]}
                     actions={
                         <div className="flex items-center gap-3">
@@ -454,7 +476,10 @@ export default function ControlRoomIndex({
                 />
 
                 {/* Command centre tabs — the four alert surfaces are one workspace */}
-                <CommandCentreTabs current="/control-room" badges={{ '/control-room/alerts': stats.open }} />
+                <CommandCentreTabs
+                    current="/control-room"
+                    badges={{ '/control-room/alerts': stats.open }}
+                />
 
                 {/* Row 1: KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -498,10 +523,15 @@ export default function ControlRoomIndex({
                     />
                     <KpiCard
                         label="SLA Compliance"
-                        value={`${sla_compliance_pct}%`}
+                        value={
+                            sla_compliance_pct === null
+                                ? 'Not assessed'
+                                : `${sla_compliance_pct}%`
+                        }
                         icon={ShieldCheck}
                         href="/control-room/sla"
                         className={
+                            sla_compliance_pct !== null &&
                             sla_compliance_pct < 90
                                 ? 'border-status-warning/30 bg-status-warning-bg'
                                 : undefined
@@ -572,15 +602,24 @@ export default function ControlRoomIndex({
                     already carries the #1 item, so it's filtered out here). */}
                 {(() => {
                     const flags = (attention_flags ?? []).filter(
-                        (f) => !(stats.critical > 0 && f.message.toLowerCase().includes('critical alert')),
+                        (f) =>
+                            !(
+                                stats.critical > 0 &&
+                                f.message
+                                    .toLowerCase()
+                                    .includes('critical alert')
+                            ),
                     );
                     if (!flags.length) return null;
                     // Each flag deep-links to the view where you fix it.
                     const FLAG_HREFS: Record<string, string> = {
-                        critical_alerts: '/control-room/alerts?severity=critical',
-                        unassigned: '/control-room/alerts?assigned_to=unassigned',
+                        critical_alerts:
+                            '/control-room/alerts?severity=critical',
+                        unassigned:
+                            '/control-room/alerts?assigned_to=unassigned',
                         high_escalation: '/control-room/escalations',
-                        stale_open: '/control-room/alerts?status=open&sort=triggered_at&dir=asc',
+                        stale_open:
+                            '/control-room/alerts?status=open&sort=triggered_at&dir=asc',
                         sla_compliance: '/control-room/sla/breaches',
                     };
                     return (
@@ -598,16 +637,27 @@ export default function ControlRoomIndex({
                                             ) : (
                                                 <AlertCircle className="h-4 w-4 shrink-0 text-status-warning" />
                                             )}
-                                            <span className="flex-1 text-foreground">{flag.message}</span>
-                                            {href ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
+                                            <span className="flex-1 text-foreground">
+                                                {flag.message}
+                                            </span>
+                                            {href ? (
+                                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            ) : null}
                                         </>
                                     );
                                     return href ? (
-                                        <Link key={i} href={href} className="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors hover:bg-muted/50">
+                                        <Link
+                                            key={i}
+                                            href={href}
+                                            className="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors hover:bg-muted/50"
+                                        >
                                             {inner}
                                         </Link>
                                     ) : (
-                                        <div key={i} className="flex items-center gap-2.5 px-4 py-2 text-sm">
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-2.5 px-4 py-2 text-sm"
+                                        >
                                             {inner}
                                         </div>
                                     );
@@ -760,8 +810,13 @@ export default function ControlRoomIndex({
                                                     borderRadius: '8px',
                                                     fontSize: '12px',
                                                 }}
-                                                formatter={(v?: number) => [
-                                                    `${v ?? 0}%`,
+                                                formatter={(
+                                                    v?: number | null,
+                                                ) => [
+                                                    v === null ||
+                                                    v === undefined
+                                                        ? 'Not assessed'
+                                                        : `${v}%`,
                                                     'Compliance',
                                                 ]}
                                             />
@@ -1535,7 +1590,8 @@ export default function ControlRoomIndex({
                     <div className="divide-y">
                         {alerts.data.length ? (
                             alerts.data.map((alert, idx) => (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     type="button"
                                     key={alert.id}
                                     onClick={() => openWorkspace(alert.id)}
@@ -1680,7 +1736,11 @@ export default function ControlRoomIndex({
 
             {/* Workspace-over-list */}
             {detail ? (
-                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+                <AlertWorkspaceDialog
+                    detail={detail}
+                    open
+                    onClose={closeWorkspace}
+                />
             ) : null}
         </AppLayout>
     );

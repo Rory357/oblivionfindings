@@ -4,8 +4,10 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Console\Commands\AutoResolveStaleAlerts;
 use App\Models\ControlRoomAlert;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Symfony\Component\Console\Tester\CommandTester;
 use Tests\TestCase;
 
 class StaleAlertAutoResolutionTest extends TestCase
@@ -113,6 +115,50 @@ class StaleAlertAutoResolutionTest extends TestCase
 
         $alert->refresh();
         $this->assertSame('ack', $alert->status);
+    }
+
+    public function test_candidate_acknowledged_after_selection_is_rechecked_under_lock(): void
+    {
+        $alert = $this->makeStaleShiftAlert();
+
+        $this->runWithCandidateMutation([
+            'status' => ControlRoomAlert::STATUS_ACK,
+            'acknowledged_at' => now(),
+        ])->assertCommandIsSuccessful();
+
+        $alert->refresh();
+        $this->assertSame(ControlRoomAlert::STATUS_ACK, $alert->status);
+        $this->assertNull($alert->resolved_at);
+    }
+
+    public function test_candidate_escalated_after_selection_is_rechecked_under_lock(): void
+    {
+        $alert = $this->makeStaleShiftAlert();
+        $escalatedAt = now();
+
+        $this->runWithCandidateMutation([
+            'escalated_at' => $escalatedAt,
+        ])->assertCommandIsSuccessful();
+
+        $alert->refresh();
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
+        $this->assertTrue($alert->escalated_at->equalTo($escalatedAt));
+        $this->assertNull($alert->resolved_at);
+    }
+
+    public function test_candidate_made_recent_after_selection_is_rechecked_under_lock(): void
+    {
+        $alert = $this->makeStaleShiftAlert();
+        $newTriggeredAt = now()->subHour();
+
+        $this->runWithCandidateMutation([
+            'triggered_at' => $newTriggeredAt,
+        ])->assertCommandIsSuccessful();
+
+        $alert->refresh();
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
+        $this->assertTrue($alert->triggered_at->equalTo($newTriggeredAt));
+        $this->assertNull($alert->resolved_at);
     }
 
     public function test_already_resolved_alert_is_not_touched(): void
@@ -274,5 +320,48 @@ class StaleAlertAutoResolutionTest extends TestCase
 
         $this->assertSame(0, ControlRoomAlert::where('status', 'open')->count());
         $this->assertSame(3, ControlRoomAlert::where('status', 'resolved')->count());
+    }
+
+    private function makeStaleShiftAlert(): ControlRoomAlert
+    {
+        return ControlRoomAlert::factory()->create([
+            'source' => 'shift_operations',
+            'alert_type' => 'Shift No Show',
+            'severity' => 'high',
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'triggered_at' => now()->subHours(30),
+            'escalated_at' => null,
+        ]);
+    }
+
+    /** @param array<string, mixed> $changes */
+    private function runWithCandidateMutation(array $changes): CommandTester
+    {
+        $command = new class($changes) extends AutoResolveStaleAlerts
+        {
+            /** @param array<string, mixed> $changes */
+            public function __construct(private readonly array $changes)
+            {
+                parent::__construct();
+            }
+
+            protected function resolveAsStale(
+                ControlRoomAlert $alert,
+                int $ttlHours,
+                ControlRoomAlertLifecycleService $lifecycle,
+            ): bool {
+                ControlRoomAlert::query()
+                    ->whereKey($alert->id)
+                    ->update($this->changes);
+
+                return parent::resolveAsStale($alert, $ttlHours, $lifecycle);
+            }
+        };
+        $command->setLaravel($this->app);
+
+        $tester = new CommandTester($command);
+        $tester->execute([]);
+
+        return $tester;
     }
 }

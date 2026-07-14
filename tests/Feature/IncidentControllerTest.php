@@ -23,6 +23,7 @@ use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
@@ -110,6 +111,18 @@ class IncidentControllerTest extends TestCase
         ], $overrides);
     }
 
+    private function assignCoordinatorToPrimarySite(): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => (int) $this->site->tenant_id,
+            'user_id' => $this->coordinator->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  1. INDEX - Authentication
     // ──────────────────────────────────────────────────────────────
@@ -187,7 +200,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => $this->client->organization_id,
+            'organization_id' => $this->site->tenant_id,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
@@ -2277,7 +2290,7 @@ class IncidentControllerTest extends TestCase
         $this->assertEquals('No issues remain.', $incident->closed_notes);
     }
 
-    public function test_closing_incident_resolves_linked_control_room_alert(): void
+    public function test_closing_incident_does_not_silently_resolve_linked_control_room_alert(): void
     {
         $this->mockNotificationService();
 
@@ -2290,10 +2303,13 @@ class IncidentControllerTest extends TestCase
             ])
             ->assertRedirect();
 
-        // State-sync (Gap D): the linked alert resolves with the incident.
+        // Incident review and operational response are independently truthful.
+        // An operator must use the gated Control Room lifecycle to resolve it.
         $alert->refresh();
-        $this->assertSame('resolved', $alert->status);
-        $this->assertSame('incident_closed', $alert->resolution_code);
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
+        $this->assertNull($alert->resolved_at);
+        $this->assertNull($alert->resolved_by_user_id);
+        $this->assertNull($alert->resolution_code);
     }
 
     // ── Corrective actions (Option B: raised from the incident, governed in H&S) ──
@@ -2514,6 +2530,95 @@ class IncidentControllerTest extends TestCase
         $this->assertEquals('closed', $incident->status);
     }
 
+    public function test_task7_final_gap_sequential_followup_and_close_orderings_never_leave_closed_with_open_work(): void
+    {
+        $this->mockNotificationService();
+
+        $followupFirst = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$followupFirst->id}/followups", [
+                'notes' => 'Created before the close attempt.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$followupFirst->id}/close", [
+                'closed_outcome' => 'Must remain reviewed',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('reviewed', $followupFirst->fresh()->status);
+        $this->assertSame(1, $followupFirst->followups()->whereNull('completed_at')->count());
+
+        $closeFirst = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$closeFirst->id}/close", [
+                'closed_outcome' => 'Closed before any follow-up',
+            ])
+            ->assertRedirect()
+            ->assertSessionMissing('error');
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$closeFirst->id}/followups", [
+                'notes' => 'Must not be created after closure.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors([
+                'incident' => 'Closed incidents cannot receive new follow-ups. Reopen the incident before creating more work.',
+            ]);
+
+        $this->assertSame('closed', $closeFirst->fresh()->status);
+        $this->assertSame(0, $closeFirst->followups()->count());
+    }
+
+    public function test_task7_final_gap_followup_store_and_close_lock_the_incident_before_dependent_work(): void
+    {
+        $this->mockNotificationService();
+        $storeIncident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+        ]);
+
+        $storeQueries = $this->captureIncidentBoundaryQueries(fn () => $this->actingAs($this->coordinator)
+            ->post("/incidents/{$storeIncident->id}/followups", [
+                'notes' => 'Lock-order follow-up.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors());
+        $storeSql = collect($storeQueries)->pluck('query')->map($this->normaliseIncidentBoundarySql(...))->values();
+        $storeLock = $storeSql->search(fn (string $sql): bool => str_contains($sql, 'from client_incidents')
+            && str_contains($sql, 'for update'));
+        $followupInsert = $storeSql->search(fn (string $sql): bool => str_starts_with($sql, 'insert into incident_followups'));
+
+        $this->assertNotFalse($storeLock, 'Follow-up creation must lock the parent incident.');
+        $this->assertNotFalse($followupInsert);
+        $this->assertLessThan($followupInsert, $storeLock);
+
+        $closeIncident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $closeQueries = $this->captureIncidentBoundaryQueries(fn () => $this->actingAs($this->coordinator)
+            ->post("/incidents/{$closeIncident->id}/close", [
+                'closed_outcome' => 'Lock-order close.',
+            ])
+            ->assertRedirect()
+            ->assertSessionMissing('error'));
+        $closeSql = collect($closeQueries)->pluck('query')->map($this->normaliseIncidentBoundarySql(...))->values();
+        $closeLock = $closeSql->search(fn (string $sql): bool => str_contains($sql, 'from client_incidents')
+            && str_contains($sql, 'for update'));
+        $followupCheck = $closeSql->search(fn (string $sql): bool => str_contains($sql, 'from incident_followups'));
+        $incidentUpdate = $closeSql->search(fn (string $sql): bool => str_starts_with($sql, 'update client_incidents'));
+
+        $this->assertNotFalse($closeLock, 'Closure must lock the parent incident.');
+        $this->assertNotFalse($followupCheck);
+        $this->assertNotFalse($incidentUpdate);
+        $this->assertLessThan($followupCheck, $closeLock);
+        $this->assertLessThan($incidentUpdate, $closeLock);
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  REOPEN
     // ──────────────────────────────────────────────────────────────
@@ -2527,8 +2632,11 @@ class IncidentControllerTest extends TestCase
     public function test_reopen_changes_closed_to_reviewed(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'status' => 'closed',
             'closed_by' => $this->coordinator->id,
             'closed_at' => now()->subDay(),
@@ -2665,8 +2773,11 @@ class IncidentControllerTest extends TestCase
     public function test_lifecycle_close_then_reopen(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'status' => 'closed',
             'closed_by' => $this->coordinator->id,
             'closed_at' => now()->subDay(),
@@ -3322,8 +3433,13 @@ class IncidentControllerTest extends TestCase
     {
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
+        $this->assignCoordinatorToPrimarySite();
 
-        $incident = ClientIncident::factory()->create(['status' => 'closed']);
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'status' => 'closed',
+        ]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/reopen", [
@@ -3430,5 +3546,26 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($auditor)
             ->get('/incidents')
             ->assertOk();
+    }
+
+    /** @return list<array{query: string, bindings: array<mixed>, time: float}> */
+    private function captureIncidentBoundaryQueries(callable $action): array
+    {
+        $connection = DB::connection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            $action();
+
+            return $connection->getQueryLog();
+        } finally {
+            $connection->disableQueryLog();
+        }
+    }
+
+    private function normaliseIncidentBoundarySql(string $query): string
+    {
+        return strtolower(str_replace([chr(96), '"'], '', $query));
     }
 }

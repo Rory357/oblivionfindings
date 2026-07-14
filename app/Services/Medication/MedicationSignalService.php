@@ -8,7 +8,7 @@ use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationError;
-use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +77,10 @@ class MedicationSignalService
 
     public function __construct(
         protected SignalProcessingService $signalProcessor,
-    ) {}
+        protected ?ControlRoomAlertLifecycleService $lifecycle = null,
+    ) {
+        $this->lifecycle ??= app(ControlRoomAlertLifecycleService::class);
+    }
 
     /**
      * Emit a medication signal into the Control Room pipeline.
@@ -452,40 +455,27 @@ class MedicationSignalService
         }
 
         $alerts = $query->get();
-        $resolvedAt = now();
-        $resolvedBy = $metadata['resolved_by_user_id'] ?? null;
-        $resolutionMetadata = $metadata;
-        unset($resolutionMetadata['resolved_by_user_id']);
+        $resolved = 0;
 
         foreach ($alerts as $alert) {
-            $context = $alert->context ?? [];
-            $resolution = array_merge([
-                'resolved_at' => $resolvedAt->toISOString(),
-                'reason' => $reason,
-                'source' => $resolutionSource,
-            ], $resolutionMetadata);
-            $history = $context['resolution_history'] ?? [];
-            $history[] = $resolution;
-
-            $alert->update([
-                'status' => ControlRoomAlert::STATUS_RESOLVED,
-                'resolved_at' => $resolvedAt,
-                'resolved_by_user_id' => $resolvedBy,
-                'notes' => $reason,
-                'context' => array_merge($context, [
-                    'resolution' => $resolution,
-                    'resolution_history' => $history,
-                ]),
-            ]);
-
-            $alert->sla?->recordResolution();
-
-            AuditLogger::log('controlRoom.alert.resolve', $alert, [
-                'source' => 'medication_signal_pipeline',
-                'resolution_source' => $resolutionSource,
-            ]);
+            try {
+                $this->lifecycle->resolveAutomatically(
+                    $alert,
+                    $reason,
+                    'medication_workflow',
+                    $resolutionSource,
+                    $metadata,
+                );
+                $resolved++;
+            } catch (\InvalidArgumentException $e) {
+                Log::warning('MedicationSignalService: alert resolution was gated', [
+                    'alert_id' => $alert->id,
+                    'resolution_source' => $resolutionSource,
+                    'reason' => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $alerts->count();
+        return $resolved;
     }
 }

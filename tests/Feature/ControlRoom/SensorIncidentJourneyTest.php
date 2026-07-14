@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Site;
@@ -316,5 +317,74 @@ class SensorIncidentJourneyTest extends TestCase
             ->where('action', 'controlRoom.alert.dismiss')
             ->where('auditable_id', $staleAlert->id)
             ->count());
+    }
+
+    public function test_task7_final_gap_signal_category_allows_a_production_source_slug_to_confirm(): void
+    {
+        $operator = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $signalType = SignalType::query()->create([
+            'code' => 'wearable_fall_detected',
+            'name' => 'Wearable fall detected',
+            'category' => SignalType::CATEGORY_PEOPLE_SAFETY,
+            'default_severity' => 'critical',
+            'is_active' => true,
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'personal_tracker',
+            'alert_type' => 'wearable_fall_detected',
+            'severity' => 'critical',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        Signal::query()->create([
+            'alert_id' => $alert->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'severity_hint' => 'critical',
+            'occurred_at' => now()->subMinute(),
+            'payload' => ['confidence' => 0.99],
+            'status' => 'processed',
+        ]);
+
+        $incident = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $alert->fresh()->status);
+        $this->assertSame($incident->id, data_get($alert->fresh()->context, 'incident_id'));
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+    }
+
+    public function test_task7_final_gap_non_detection_signal_category_cannot_use_sensor_confirmation(): void
+    {
+        $operator = User::factory()->create();
+        $signalType = SignalType::query()->create([
+            'code' => 'training_record_updated',
+            'name' => 'Training record updated',
+            'category' => SignalType::CATEGORY_COMPLIANCE,
+            'default_severity' => 'low',
+            'is_active' => true,
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'external_hr',
+            'alert_type' => 'training_record_updated',
+        ]);
+        Signal::query()->create([
+            'alert_id' => $alert->id,
+            'signal_type_id' => $signalType->id,
+            'signal_type_code' => $signalType->code,
+            'occurred_at' => now(),
+            'payload' => [],
+            'status' => 'processed',
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Alert {$alert->id} is not a sensor alert.");
+
+        app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
     }
 }

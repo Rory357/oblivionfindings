@@ -3,6 +3,9 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
@@ -136,11 +139,127 @@ class ControlRoomReportScopeTest extends TestCase
             );
     }
 
+    public function test_report_site_scope_uses_alert_site_before_client_site(): void
+    {
+        $visibleClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->visibleSite->id,
+        ]);
+        $hiddenClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->hiddenSite->id,
+        ]);
+
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->hiddenSite->id,
+            'client_id' => $visibleClient->id,
+            'triggered_at' => now()->subDay(),
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->visibleSite->id,
+            'client_id' => $hiddenClient->id,
+            'triggered_at' => now()->subDay(),
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => null,
+            'client_id' => $visibleClient->id,
+            'triggered_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room/reports/alerts?period=7d')
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('open', 2);
+    }
+
+    public function test_playbook_performance_is_limited_to_the_report_viewers_tenant(): void
+    {
+        $tenantManager = $this->makeRoleUser('provider_manager');
+        $tenantManager->update(['organization_id' => 1]);
+        $foreignSite = Site::factory()->create([
+            'tenant_id' => 2,
+            'type' => 'house',
+        ]);
+        $playbook = Playbook::query()->create([
+            'name' => 'Tenant-scoped response',
+            'code' => 'tenant-scoped-response',
+            'category' => Playbook::CATEGORY_SAFETY,
+            'is_active' => true,
+        ]);
+        $visibleAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->visibleSite->id,
+            'triggered_at' => now()->subDay(),
+        ]);
+        $foreignAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $foreignSite->id,
+            'triggered_at' => now()->subDay(),
+        ]);
+
+        PlaybookRun::query()->create([
+            'playbook_id' => $playbook->id,
+            'alert_id' => $visibleAlert->id,
+            'status' => PlaybookRun::STATUS_COMPLETED,
+            'started_at' => now()->subHours(3),
+            'completed_at' => now()->subHours(2),
+            'created_at' => now()->subDay(),
+        ]);
+        PlaybookRun::query()->create([
+            'playbook_id' => $playbook->id,
+            'alert_id' => $foreignAlert->id,
+            'status' => PlaybookRun::STATUS_IN_PROGRESS,
+            'started_at' => now()->subHours(3),
+            'created_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($tenantManager)
+            ->get('/control-room/reports?period=7d')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('playbooks.total_runs', 1)
+                ->where('playbooks.completed', 1)
+                ->where('playbooks.in_progress', 0)
+                ->where('playbooks.by_playbook.0.total_runs', 1)
+            );
+    }
+
+    public function test_platform_report_site_filter_does_not_let_client_site_override_alert_site(): void
+    {
+        $platformAdmin = $this->makeRoleUser('admin');
+        $platformAdmin->update(['organization_id' => null]);
+        $visibleClient = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->visibleSite->id,
+        ]);
+
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->hiddenSite->id,
+            'client_id' => $visibleClient->id,
+            'triggered_at' => now()->subDay(),
+            'notes' => 'EXPLICIT-HIDDEN-SITE',
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => null,
+            'client_id' => $visibleClient->id,
+            'triggered_at' => now()->subDay(),
+            'notes' => 'CLIENT-SITE-FALLBACK',
+        ]);
+
+        $response = $this->actingAs($platformAdmin)
+            ->get("/control-room/reports/export?period=7d&site_id={$this->visibleSite->id}")
+            ->assertOk();
+        $content = $response->getContent();
+
+        $this->assertStringContainsString('CLIENT-SITE-FALLBACK', $content);
+        $this->assertStringNotContainsString('EXPLICIT-HIDDEN-SITE', $content);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([
             'role' => $roleName,
             'approved_at' => now(),
+            'organization_id' => 1,
         ]);
 
         $role = Role::query()->where('name', $roleName)->first();

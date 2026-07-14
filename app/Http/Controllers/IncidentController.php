@@ -15,6 +15,8 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentJourney;
@@ -24,7 +26,6 @@ use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -205,7 +206,7 @@ class IncidentController extends Controller
         )->count();
         $activeAlerts = $applyFilters(ClientIncident::query())
             ->whereNotNull('control_room_alert_id')
-            ->whereHas('controlRoomAlert', fn ($a) => $a->whereNotIn('status', ['resolved', 'closed']))
+            ->whereHas('controlRoomAlert', fn ($a) => $a->actionable())
             ->count();
 
         $hero = [
@@ -1485,41 +1486,51 @@ class IncidentController extends Controller
     {
         $this->authorize('close', $incident);
 
-        // Guardrail: closing is only valid for reviewed incidents.
-        abort_unless($incident->status === 'reviewed', 403);
-
         $data = $request->validate([
             'closed_outcome' => ['required', 'string', 'max:120'],
             'closed_notes' => ['nullable', 'string'],
         ]);
 
-        // Guardrail: high-severity incidents require a completed investigation before closure.
-        // The investigation normally lives on the incident's governance HsEvent, so accept a
-        // completed investigation there too (covers records written before the status sync).
-        if (in_array($incident->severity, ['high', 'critical'], true)
-            && $incident->investigation_status !== 'completed'
-            && ! $this->hasCompletedHsInvestigation($incident)) {
-            return back()->with('error', 'High-severity incidents require a completed investigation before closure. Open the Investigation section to start one.');
+        [$incident, $closeError] = DB::transaction(function () use ($incident, $data, $request): array {
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Every close/follow-up writer locks this parent first. Whichever
+            // operation wins is visible to the other before it can continue.
+            abort_unless($lockedIncident->status === 'reviewed', 403);
+
+            if (in_array($lockedIncident->severity, ['high', 'critical'], true)
+                && $lockedIncident->investigation_status !== 'completed'
+                && ! $this->hasCompletedHsInvestigation($lockedIncident)) {
+                return [
+                    $lockedIncident,
+                    'High-severity incidents require a completed investigation before closure. Open the Investigation section to start one.',
+                ];
+            }
+
+            if ($lockedIncident->followups()->whereNull('completed_at')->exists()) {
+                return [
+                    $lockedIncident,
+                    'There are open follow-ups. Please complete them before closing the incident.',
+                ];
+            }
+
+            $lockedIncident->update([
+                'status' => 'closed',
+                'closed_by' => $request->user()?->id,
+                'closed_at' => now(),
+                'closed_outcome' => $data['closed_outcome'],
+                'closed_notes' => $data['closed_notes'] ?? null,
+            ]);
+
+            return [$lockedIncident, null];
+        }, 3);
+
+        if ($closeError !== null) {
+            return back()->with('error', $closeError);
         }
-
-        // Guardrail: incidents cannot be closed while there are any open follow-ups.
-        // This applies if follow-ups were explicitly flagged *or* any follow-up records exist.
-        $hasOpenFollowups = $incident->followups()->whereNull('completed_at')->exists();
-        if ($hasOpenFollowups) {
-            return back()->with('error', 'There are open follow-ups. Please complete them before closing the incident.');
-        }
-
-        $incident->update([
-            'status' => 'closed',
-            'closed_by' => $request->user()?->id,
-            'closed_at' => now(),
-            'closed_outcome' => $data['closed_outcome'],
-            'closed_notes' => $data['closed_notes'] ?? null,
-        ]);
-
-        // State-sync (Gap D): closing the system-of-record resolves the linked
-        // Control Room alert so the two stay coherent and it leaves the live queue.
-        $this->resolveLinkedAlertOnClose($incident, $request->user()?->id);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
@@ -1549,58 +1560,111 @@ class IncidentController extends Controller
         return back()->with('success', 'Incident closed.');
     }
 
-    /**
-     * Resolve the Control Room alert linked to a just-closed incident (Gap D).
-     * Only an actionable alert is transitioned; failures never block the close.
-     */
-    private function resolveLinkedAlertOnClose(ClientIncident $incident, ?int $userId): void
-    {
-        if (! $incident->control_room_alert_id) {
-            return;
-        }
-
-        try {
-            $alert = ControlRoomAlert::find($incident->control_room_alert_id);
-            if ($alert && $alert->isActionable() && $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
-                $alert->update([
-                    'status' => ControlRoomAlert::STATUS_RESOLVED,
-                    'resolved_at' => now(),
-                    'resolved_by_user_id' => $userId,
-                    'resolution_code' => $alert->resolution_code ?? 'incident_closed',
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('IncidentController: failed to resolve linked alert on incident close', [
-                'incident_id' => $incident->id,
-                'alert_id' => $incident->control_room_alert_id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
     public function reopen(Request $request, ClientIncident $incident)
     {
         $this->authorize('reopen', $incident);
-
-        // Only closed incidents may be reopened.
-        abort_unless($incident->status === 'closed', 403);
 
         $data = $request->validate([
             'reopened_reason' => ['required', 'string', 'max:2000'],
         ]);
 
-        $incident->update([
-            'status' => 'reviewed',
-            'reopened_by' => $request->user()?->id,
-            'reopened_at' => now(),
-            'reopened_reason' => $data['reopened_reason'],
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
+        $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
-            // clear closure fields so the incident becomes "open" again
-            'closed_by' => null,
-            'closed_at' => null,
-            'closed_outcome' => null,
-            'closed_notes' => null,
-        ]);
+        $incident = DB::transaction(function () use (
+            $incident,
+            $data,
+            $actor,
+            $siteAccess,
+            $siteBypassPermissions,
+        ): ClientIncident {
+            // Every cross-record workflow uses the same alert-first lock order.
+            // The route-bound incident is only an identity hint; all mutable
+            // state is re-read under lock before either record is changed.
+            $alert = null;
+            if ($incident->control_room_alert_id) {
+                $alertQuery = ControlRoomAlert::query();
+                $siteAccess->applyAlertScope($alertQuery, $actor, $siteBypassPermissions);
+                $alert = $alertQuery
+                    ->whereKey($incident->control_room_alert_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            }
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless($actor->can('reopen', $lockedIncident), 403);
+            $siteAccess->assertCanAccessClientIncident($actor, $lockedIncident, $siteBypassPermissions);
+            abort_unless($lockedIncident->status === 'closed', 403);
+            if ($lockedIncident->control_room_alert_id !== null) {
+                abort_unless(
+                    $alert
+                        && (int) $lockedIncident->control_room_alert_id === (int) $alert->id,
+                    409,
+                );
+
+                $lockedIncident->loadMissing([
+                    'client:id,site_id,organization_id',
+                    'shift.client:id,site_id,organization_id',
+                ]);
+                $incidentSiteId = $lockedIncident->site_id
+                    ?: $lockedIncident->client?->site_id
+                    ?: $lockedIncident->shift?->site_id
+                    ?: $lockedIncident->shift?->client?->site_id;
+                app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
+                    $alert,
+                    (int) $lockedIncident->client_id,
+                    $incidentSiteId ? (int) $incidentSiteId : null,
+                );
+            }
+
+            $at = now();
+            $lockedIncident->update([
+                'status' => 'reviewed',
+                'reopened_by' => $actor?->id,
+                'reopened_at' => $at,
+                'reopened_reason' => $data['reopened_reason'],
+
+                // Clear closure fields so the factual incident review is open.
+                'closed_by' => null,
+                'closed_at' => null,
+                'closed_outcome' => null,
+                'closed_notes' => null,
+            ]);
+
+            // Reopening the factual incident does not silently mutate the
+            // operational or H&S lifecycle. The marker and incident update are
+            // one transaction so an operator never sees half a handover.
+            if ($alert) {
+                $requiresOperationalReopen = $alert->isTerminal();
+                $context = $alert->context ?? [];
+                $context['journey_attention'] = [
+                    'type' => 'incident_reopened',
+                    'incident_id' => $lockedIncident->id,
+                    'reason' => $data['reopened_reason'],
+                    'actor_id' => $actor?->id,
+                    'actor_name' => $actor?->name,
+                    'requested_at' => $at->toIso8601String(),
+                    'requires_operational_reopen' => $requiresOperationalReopen,
+                ];
+                $alert->update(['context' => $context]);
+
+                AuditLogger::logOrFail('controlRoom.alert.incidentReopenedAttention', $alert, [
+                    'actor_id' => $actor?->id,
+                    'alert_id' => $alert->id,
+                    'incident_id' => $lockedIncident->id,
+                    'reason' => $data['reopened_reason'],
+                    'requires_operational_reopen' => $requiresOperationalReopen,
+                ]);
+            }
+
+            return $lockedIncident->refresh();
+        }, 3);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
