@@ -675,36 +675,44 @@ git commit -m "feat(health-safety): disposition investigation recommendations"
 - Test: `resources/js/components/command-centre/hero-kit.test.tsx`
 - Test: `resources/js/components/incidents/incident-journey-status.test.tsx`
 
-- [ ] **Step 1: Write failing presenter tests**
+- [x] **Step 1: Write failing presenter tests**
 
 Assert official references, incident-time site, narrative/controls/evidence, playbook/comms/tasks, H&S acceptance/owner, WorkSafe, three lifecycle states, and role-aware next action. Assert no fabricated `CR-{id}` or `INC-{id}`.
 
-- [ ] **Step 2: Write failing priority tests**
+- [x] **Step 2: Write failing priority tests**
 
 Order SLA breached → explicit priority/severity fallback → escalation → next deadline → oldest. Include dismissed, snoozed, confirmed, unassigned, and tied rows. Assert the presenter emits a human-readable priority reason.
 
-- [ ] **Step 3: Implement presenters and shared query**
+- [x] **Step 3: Implement presenters and shared query**
 
 Use `scopeActionable()`, site scoping, deterministic ordering, and eager loading. Return one canonical payload to Desk, Active alerts, My queue, Safety handovers, and shift handover.
 
-- [ ] **Step 4: Extract neutral hero/ribbon primitives**
+- [x] **Step 4: Extract neutral hero/ribbon primitives**
 
 Move `HeroShell`, status pill, medallion, clusters, tiles, segmented control, and summary strip under `command-centre`. Keep H&S compliance badges in H&S and re-export old symbols to prevent visual churn.
 
-- [ ] **Step 5: Implement shared vocabulary and accessible status**
+- [x] **Step 5: Implement shared vocabulary and accessible status**
 
 Every severity/SLA/status uses icon + text + colour. Dates use `resources/js/lib/datetime.ts` with `en-NZ` and `Pacific/Auckland`.
 
-- [ ] **Step 6: Run backend and frontend unit tests**
+- [x] **Step 6: Run backend and frontend unit tests**
 
 Run: `php artisan test tests/Unit/ControlRoom/AlertPriorityServiceTest.php tests/Unit/ControlRoom/AlertWorklistPresenterTest.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php && npm test -- resources/js/components/command-centre/hero-kit.test.tsx resources/js/components/incidents/incident-journey-status.test.tsx`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/Incidents app/Services/ControlRoom resources/js/components/command-centre resources/js/components/control-room/alert-worklist resources/js/components/incidents resources/js/lib/control-room-vocab.ts resources/js/pages/health-safety/components tests/Unit tests/Feature resources/js/**/*.test.tsx
 git commit -m "feat(ui): share incident journey command-centre language"
 ```
+
+**Task 9 evidence (2026-07-15):**
+
+- RED proof first failed on the absent presenter/query/priority/component classes; implementation then made the canonical six-test backend contract pass with 38 assertions.
+- The final worklist query/presenter rerun passed 2 tests / 12 assertions after adding permission-scoped eager loading; the existing nested-provenance regression suite passed 8 tests / 45 assertions after the loaded-client optimisation.
+- Frontend proof passed 9 tests across the neutral command-centre hero, three-stage incident journey status and existing H&S compliance hero contract. `npm run types`, focused ESLint, PHP syntax checks, Pint test mode, Prettier check and `git diff --check` all exited 0.
+- The shared order is SLA breach, explicit priority/severity fallback, escalation, next applicable deadline, oldest trigger and deterministic ID. Default worklists include confirmed alerts and exclude dismissed/currently snoozed rows.
+- Official alert/incident/H&S references remain authoritative; missing references stay null. No desktop browser E2E, mobile/responsive/WebView test, merge, push or deployment was performed in this task.
 
 ---
 

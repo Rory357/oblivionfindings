@@ -46,7 +46,10 @@ class ControlRoomAlertProvenanceService
         // Context identity is untrusted enrichment and must be checked against
         // an independently resolved context site, never allowed to choose it.
         if (is_numeric($alert->client_id) && (int) $alert->client_id > 0) {
-            $clientSiteId = Client::query()->whereKey((int) $alert->client_id)->value('site_id');
+            $loadedClient = $alert->relationLoaded('client') ? $alert->client : null;
+            $clientSiteId = $loadedClient && (int) $loadedClient->id === (int) $alert->client_id
+                ? $loadedClient->site_id
+                : Client::query()->whereKey((int) $alert->client_id)->value('site_id');
             if (is_numeric($clientSiteId) && (int) $clientSiteId > 0) {
                 return (int) $clientSiteId;
             }
@@ -75,7 +78,10 @@ class ControlRoomAlertProvenanceService
             return $alert->client_id === null;
         }
 
-        $client = Client::query()->find($clientId);
+        $loadedClient = $alert->relationLoaded('client') ? $alert->client : null;
+        $client = $loadedClient && (int) $loadedClient->id === $clientId
+            ? $loadedClient
+            : Client::query()->find($clientId);
 
         return $client !== null
             && $this->clientMatchesTuple($client, $this->authoritativeSiteId($alert));
@@ -83,7 +89,10 @@ class ControlRoomAlertProvenanceService
 
     public function safeClient(ControlRoomAlert $alert): ?Client
     {
-        $alert->loadMissing('client:id,first_name,last_name,site_id,organization_id');
+        $alert->loadMissing([
+            'client:id,first_name,last_name,site_id,organization_id',
+            'client.site:id,tenant_id',
+        ]);
 
         return $alert->client && $this->clientMatchesAlert($alert)
             ? $alert->client
@@ -439,7 +448,9 @@ class ControlRoomAlertProvenanceService
             return false;
         }
 
-        $siteTenantId = Site::query()->whereKey($siteId)->value('tenant_id');
+        $siteTenantId = $client->relationLoaded('site') && (int) $client->site?->id === $siteId
+            ? $client->site?->tenant_id
+            : Site::query()->whereKey($siteId)->value('tenant_id');
 
         return is_numeric($siteTenantId)
             && is_numeric($client->organization_id)
