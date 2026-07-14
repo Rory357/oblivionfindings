@@ -532,15 +532,15 @@ git commit -m "feat(health-safety): accept incident handovers"
 - Test: `tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php`
 - Test: `tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php`
 
-- [ ] **Step 1: Write failing state, SLA, and active-scope tests**
+- [x] **Step 1: Write failing state, SLA, and active-scope tests**
 
 Cover `open → ack → triaging → resolved → closed`, confirmed continuing to resolve, dismissed excluded from actionable/unresolved/breach/escalation, no human open → resolved jump, explicit incident-driven reopen to triaging, and every transition updating actor/time/SLA once.
 
-- [ ] **Step 2: Write failing open-task resolution test**
+- [x] **Step 2: Write failing open-task resolution test**
 
 An alert with `open`, `in_progress`, or `blocked` tasks must reject resolution. Completed/cancelled/transferred tasks permit it. Cancelling a task requires a non-empty reason and records that reason in the audit trail; a bare status flip is rejected.
 
-- [ ] **Step 3: Implement lifecycle API**
+- [x] **Step 3: Implement lifecycle API**
 
 ```php
 public function acknowledge(ControlRoomAlert $alert, User $actor): ControlRoomAlert;
@@ -554,24 +554,34 @@ public function reopenForIncident(ControlRoomAlert $alert, ClientIncident $incid
 
 Use transactions and the existing audit logger. Append operator notes; do not overwrite the alert's original notes. Reopen clears terminal actor/time fields, returns to `triaging`, records the incident/reason, and creates a new audited SLA response cycle rather than rewriting the historic clock.
 
-- [ ] **Step 4: Implement transfer-to-H&S task endpoint**
+- [x] **Step 4: Implement transfer-to-H&S task endpoint**
 
 Create one `HsCorrectiveAction`, set task status `transferred`, store the three transfer fields, and make retries return the same corrective action.
 
-- [ ] **Step 5: Delegate controllers and jobs to canonical scopes/service**
+- [x] **Step 5: Delegate controllers and jobs to canonical scopes/service**
 
 Replace repeated `whereNotIn(['resolved','closed'])` with `actionable()`. Exclude dismissed SLA rows from compliance denominators. Sensor dismissal ends clocks without counting as successful compliance. Remove `IncidentController::close()`'s direct best-effort alert mutation; operational resolution is a separate gated service action. Incident reopen sets journey attention and exposes the explicit reopen action without silently changing H&S status.
 
-- [ ] **Step 6: Run lifecycle tests**
+- [x] **Step 6: Run lifecycle tests**
 
 Run: `php artisan test tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php tests/Feature/ControlRoom/StaleAlertAutoResolutionTest.php`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Models/ControlRoomAlert.php app/Models/ControlRoom/AlertSla.php app/Http/Controllers/ControlRoom app/Jobs routes/control-room.php tests/Unit/ControlRoom tests/Feature/ControlRoom
 git commit -m "fix(control-room): make lifecycle and sla truthful"
 ```
+
+**Task 7 completion evidence — 2026-07-15**
+
+- Implementation commit: `16605c165c5ffa3419515b2e035d540c732e1fb8`.
+- Alert lifecycle, SLA cycles, escalation, snooze, task cancellation/transfer, incident reopen, sensor confirmation/dismissal, stale-alert automation, operational reports, dashboards and worklists now share the canonical active-status and site/tenant provenance rules. Terminal and unknown statuses cannot leak into default actionable queues.
+- Control Room task resolution rejects open work; task deletion is no longer a lifecycle bypass; incident follow-ups reject closed incidents under lock; H&S transfer is idempotent and records the destination action. Audit writes needed for safety/lifecycle integrity are transactionally durable.
+- The expanded operational boundary now fail-closes Fleet/Lone Worker person attribution. It rechecks assignment history, device/tracker/asset/site/client identity and tracking consent after the base SOS callback, prevents silent worker/resident rerouting, preserves a masked safety alarm when consent alone changes, delays trip/driver metrics until final acceptance, and persists a privacy marker so delayed queue workers cannot reconstruct discarded person/location context.
+- Final Control Room corrective gate: 363 tests / 2,326 assertions. Final telemetry/Lone Worker/Control Room provenance gate: 176 tests / 6,652 assertions. Post-format telemetry focus: 11 tests / 1,469 assertions. Additional affected-file gates included 32 tests / 263 assertions and the full Fleet telemetry file at 54 tests / 5,602 assertions.
+- Pint was idempotent, all touched PHP files passed syntax lint, and the whole worktree passed `git diff --check`. Independent Task 7 specification re-review returned `PASS`; the final telemetry/privacy findings were closed with root read-only review plus non-vacuous regressions.
+- No desktop browser acceptance, mobile/responsive/mobile testing, WebView work, merge, push, or deployment was included in Task 7. Desktop browser and five-journey acceptance remain in Tasks 15–16.
 
 ---
 
@@ -890,44 +900,68 @@ git commit -m "feat(control-room): unify the command-centre module shell"
 
 ---
 
-### Task 14: Add reconciliation/backfill tooling and navigation cleanup
+### Task 14: Integrate Universal Tasks, add reconciliation tooling, and clean navigation
 
 **Files:**
 
 - Create: `app/Services/Incidents/IncidentJourneyReconciler.php`
 - Create: `app/Console/Commands/ReconcileIncidentJourneys.php`
+- Modify: `app/Services/Tasks/TaskAggregator.php`
+- Modify: `app/Services/Tasks/TaskItem.php`
+- Modify: `app/Services/Tasks/Providers/ControlRoomAlertProvider.php`
+- Modify: `app/Services/Tasks/Providers/ClientIncidentProvider.php`
+- Modify: `app/Services/Tasks/Providers/IncidentFollowupProvider.php`
+- Modify: `app/Services/Tasks/Providers/HsEventProvider.php`
+- Modify: `app/Services/Tasks/Providers/HsInvestigationProvider.php`
+- Modify: `app/Services/Tasks/Providers/HsCorrectiveActionProvider.php`
+- Modify: `resources/js/pages/tasks/index.tsx`
+- Modify: `resources/js/pages/tasks/task-detail-dialog.tsx`
 - Modify: `resources/js/components/app-sidebar.tsx`
 - Modify: `resources/js/pages/control-room/my-tasks.tsx`
+- Test: `tests/Feature/Tasks/AllTasksIncidentJourneyTest.php`
+- Test: `resources/js/pages/tasks/tasks-incident-journey.test.tsx`
 - Test: `tests/Feature/Console/ReconcileIncidentJourneysTest.php`
 - Test: `tests/Feature/Navigation/ControlRoomNavigationTest.php`
 
-- [ ] **Step 1: Write failing dry-run/apply/rerun tests**
+- [ ] **Step 1: Write failing Universal Tasks journey-contract tests**
+
+For the five journey entry paths, assert that `/tasks` shows every genuinely actionable Alert, Incident follow-up, H&S investigation and corrective action exactly once, with the source module, official references, incident-time site, authorised person label, owner, due/SLA state and canonical deep link. Assert tenant/site/sensitivity isolation, active-by-default behaviour, explicit completed history, and stable filtering/search by any official reference.
+
+- [ ] **Step 2: Write failing transfer and deduplication tests**
+
+Transferring an operational task to H&S must remove the source responsibility from active work and expose the one linked corrective action. Retries must not duplicate it. Keep separate accountable work—such as incident review and a corrective action—separate, but group it under one journey summary so staff understand why multiple actions exist.
+
+- [ ] **Step 3: Implement the Universal Tasks contract**
+
+Keep `/tasks` as the application-wide hub and Control Room `My queue` as a filtered specialist view. Extend `TaskItem` with journey references/source context, make every provider reuse canonical permissions and site scopes, and link rows to the source workspace. Use the shared status/date/reference language from Task 9. Do not create a second task lifecycle or allow Universal Tasks mutations to bypass source-module gates.
+
+- [ ] **Step 4: Write failing dry-run/apply/rerun tests**
 
 Seed missing H&S, inconsistent direct links, duplicate incident alerts, missing references, WorkSafe projection drift, missing site snapshot, dismissed-active data, and existing managed H&S events without acceptance. Dry-run reports counts without mutation; apply repairs deterministic cases and records ambiguities; a second apply reports zero repairs.
 
-- [ ] **Step 2: Implement reconciler issue/result types**
+- [ ] **Step 5: Implement reconciler issue/result types**
 
 Return counts for `missing_hs`, `link_mismatch`, `duplicate_alert`, `missing_reference`, `worksafe_drift`, `missing_site`, `dismissed_active`, `acceptance_backfill`, and `ambiguous`.
 
-- [ ] **Step 3: Implement command**
+- [ ] **Step 6: Implement command**
 
 Command: `incidents:reconcile-journeys {--apply} {--incident=} {--chunk=200}`. Default is dry-run. Apply uses chunked transactions and emits a non-zero exit only for unresolved fatal errors.
 
-- [ ] **Step 4: Clean navigation vocabulary**
+- [ ] **Step 7: Clean navigation vocabulary**
 
-Rename Control Room's `My Day` entry to `My Control Room queue`/`My queue`; keep `/my-day` as the only support-worker My Day. Rename Incident Tracker to Safety handovers and Overview to Desk.
+Rename Control Room's `My Day` entry to `My Control Room queue`/`My queue`; keep `/my-day` as the only support-worker My Day. Rename Incident Tracker to Safety handovers and Overview to Desk. Keep Universal Tasks visibly application-wide and label Control Room `My queue` as a filtered view, so the two destinations are not mistaken for duplicate task systems.
 
-- [ ] **Step 5: Run tests and a dry-run**
+- [ ] **Step 8: Run tests and a dry-run**
 
-Run: `php artisan test tests/Feature/Console/ReconcileIncidentJourneysTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php && php artisan incidents:reconcile-journeys`
+Run: `php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Console/ReconcileIncidentJourneysTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php && npm test -- resources/js/pages/tasks/tasks-incident-journey.test.tsx && php artisan incidents:reconcile-journeys`
 
-Expected: tests pass; dry-run prints a structured report and performs no writes.
+Expected: Universal Tasks shows one truthful, scoped cross-module work feed; tests pass; dry-run prints a structured report and performs no writes.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 9: Commit**
 
 ```powershell
-git add app/Services/Incidents/IncidentJourneyReconciler.php app/Console/Commands/ReconcileIncidentJourneys.php resources/js/components/app-sidebar.tsx resources/js/pages/control-room/my-tasks.tsx tests/Feature/Console tests/Feature/Navigation
-git commit -m "feat(incidents): reconcile journeys and clarify navigation"
+git add app/Services/Incidents/IncidentJourneyReconciler.php app/Console/Commands/ReconcileIncidentJourneys.php app/Services/Tasks resources/js/pages/tasks resources/js/components/app-sidebar.tsx resources/js/pages/control-room/my-tasks.tsx tests/Feature/Tasks tests/Feature/Console tests/Feature/Navigation
+git commit -m "feat(tasks): unify incident journey work and reconciliation"
 ```
 
 ---

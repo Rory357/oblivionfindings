@@ -206,6 +206,14 @@ The primary navigation becomes:
 
 Support workers use the canonical application My Day and do not receive a second Control Room “My Day.”
 
+### Universal Tasks contract
+
+`/tasks` remains the application-wide operational work hub. Control Room `My queue` is a focused Control Room view; it does not replace or compete with Universal Tasks.
+
+Every actionable Control Room alert, incident follow-up, H&S investigation and H&S corrective action must reach `/tasks` through its canonical task provider with the same permission, tenant and site rules as its source module. Rows show the source module, official journey references, person/site where authorised, owner, due/SLA state, current status and one clear next action. The destination opens the canonical Alert, Incident or H&S workspace rather than a duplicate task detail workflow.
+
+The hub defaults to active work. Resolved, closed, dismissed, completed, cancelled and transferred source records appear only through the explicit completed/history view. A transfer from a Control Room operational task to an H&S corrective action must replace the active source work with the H&S action; it must not create two active tickets for the same responsibility. Journey grouping may show the related accountable records together, but must not collapse genuinely separate responsibilities such as incident review and an assigned corrective action.
+
 ## 10. Desk dashboard design
 
 The first desktop viewport is an operational decision surface, not an analytics wall.
@@ -344,7 +352,7 @@ Each scenario must be proved through browser actions and database invariants on 
 4. **Sensor fall confirmation:** open the existing sensor alert, confirm it, verify one sensor incident, one H&S event, evidence visible in the handover, no duplicate alert, H&S acceptance, and operational resolution.
 5. **Medication safety incident:** create through the medication integration, verify one official incident/alert/H&S correlation despite the signal path, accept in H&S, verify source/evidence, and complete the applicable review/governance handoff.
 
-For every scenario the assertions include official references, incident-time site, role visibility, exact record counts, matching foreign keys, H&S appearance, acceptance actor/time, and the three lifecycle states.
+For every scenario the assertions include official references, incident-time site, role visibility, exact record counts, matching foreign keys, H&S appearance, acceptance actor/time, the three lifecycle states, and the expected Universal Tasks entries before and after assignment, transfer and completion.
 
 ## 17. Requirement-to-evidence ledger
 
@@ -370,6 +378,7 @@ For every scenario the assertions include official references, incident-time sit
 | R18 | Existing data can be repaired               | Dry-run/apply/rerun command tests and a reconciliation report                                                    |
 | R19 | Desktop accessibility basics                | Automated component/browser checks for text+icon states, sort semantics, names, and keyboard actions             |
 | R20 | No mobile scope leakage                     | Implementation plan and verification report contain desktop targets only                                         |
+| R21 | Universal Tasks is the cross-module work hub | Provider, UI and browser tests prove scoped, deduplicated journey work with canonical links and truthful history  |
 
 ## 18. Completion definition
 
