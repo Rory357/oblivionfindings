@@ -460,6 +460,7 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.viewAllSites', 'description' => 'View health and safety records across all sites', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.overrideClosure', 'description' => 'Override blocked H&S event closure with a recorded reason', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],

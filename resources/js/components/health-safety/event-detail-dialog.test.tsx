@@ -31,9 +31,12 @@ vi.mock('@inertiajs/react', async () => {
                 processing: false,
                 setData: (key: keyof T, value: T[keyof T]) =>
                     setDataState((current) => ({ ...current, [key]: value })),
-                post: (url: string, options: { onSuccess?: () => void }) => {
+                post: (
+                    url: string,
+                    options: { onSuccess?: (page: { props: object }) => void },
+                ) => {
                     inertia.post(url, data);
-                    options.onSuccess?.();
+                    options.onSuccess?.({ props: { flash: {} } });
                 },
                 reset: vi.fn(),
                 clearErrors: vi.fn(),
@@ -132,15 +135,21 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
         risk_assessments: [],
         attachments: [],
         close_gate: {
+            acceptance_ok: false,
+            worksafe_ok: true,
             investigation_ok: false,
+            recommendations_ok: false,
             actions_ok: true,
-            blockers: ['Investigation is incomplete.'],
+            blockers: [
+                'Accept the H&S handover before closing this event.',
+                'Complete the required investigation before closing this event.',
+            ],
         },
         assignable_staff: [
             { id: 8, name: 'Moana Rangi' },
             { id: 9, name: 'Tama Lewis' },
         ],
-        can: { manage: true },
+        can: { manage: true, override_closure: false },
         handover: {
             status: 'awaiting_acceptance',
             owner: null,
@@ -326,5 +335,184 @@ describe('EventDetailDialog control-room handover', () => {
         expect(
             screen.queryByRole('button', { name: 'Accept handover' }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('EventDetailDialog closure governance', () => {
+    it('lists every blocker in plain language and does not offer an unauthorised override', () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+
+        expect(
+            screen.getByText(
+                'Accept the H&S handover before closing this event.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Complete the required investigation before closing this event.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('textbox', { name: /Override reason/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Close event' }),
+        ).toBeDisabled();
+    });
+
+    it('shows the override decision only to an authorised user and posts the reason', () => {
+        renderDialog(
+            eventDetail({
+                can: { manage: true, override_closure: true },
+            } as Partial<EventDetail>),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Closure summary/ }),
+            { target: { value: 'Closed under the formal exception process.' } },
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Override reason/ }),
+            { target: { value: 'Executive statutory direction.' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/close',
+            {
+                closure_summary: 'Closed under the formal exception process.',
+                override_reason: 'Executive statutory direction.',
+            },
+        );
+    });
+});
+
+describe('EventDetailDialog recommendation outcomes', () => {
+    it('shows the decision, action link, actor and time for each recommendation', () => {
+        renderDialog(
+            eventDetail({
+                handover: {
+                    status: 'accepted',
+                    owner: { id: 8, name: 'Moana Rangi' },
+                    accepted_by: { id: 9, name: 'Tama Lewis' },
+                    accepted_at: '2026-07-14T02:15:00Z',
+                    notes: null,
+                    can_accept: false,
+                },
+                investigations: [
+                    {
+                        id: 31,
+                        reference_number: 'INV-2026-0031',
+                        investigation_type: 'standard',
+                        status: 'completed',
+                        methodology: '5_whys',
+                        lead_investigator_name: 'Moana Rangi',
+                        started_at: '2026-07-14T03:00:00Z',
+                        target_completion_date: '2026-07-21',
+                        completed_at: '2026-07-15T01:00:00Z',
+                        is_overdue: false,
+                        has_findings: true,
+                        has_recommendations: true,
+                        recommendation_count: 2,
+                        immediate_causes: [],
+                        root_causes: [],
+                        contributing_factors: [],
+                        findings_summary: 'Controls were reviewed.',
+                        recommendations: [
+                            {
+                                description: 'Retain the current control.',
+                                priority: 'medium',
+                                disposition: {
+                                    disposition: 'accepted_risk',
+                                    reason: 'Residual risk is within tolerance.',
+                                    corrective_action: null,
+                                    decided_by_name: 'Tama Lewis',
+                                    decided_at: '2026-07-15T02:00:00Z',
+                                },
+                            },
+                            {
+                                description:
+                                    'Update the loading-bay procedure.',
+                                priority: 'high',
+                                disposition: null,
+                            },
+                        ],
+                        lessons_learned: null,
+                    },
+                ],
+            } as Partial<EventDetail>),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
+
+        expect(screen.getByText('Accepted risk')).toBeInTheDocument();
+        expect(
+            screen.getByText('Residual risk is within tolerance.'),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Tama Lewis/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Choose outcome' }),
+        ).toBeInTheDocument();
+    });
+
+    it('records a reasoned non-action outcome from the recommendation row', () => {
+        const detail = eventDetail({
+            investigations: [
+                {
+                    id: 31,
+                    reference_number: 'INV-2026-0031',
+                    investigation_type: 'standard',
+                    status: 'completed',
+                    methodology: '5_whys',
+                    lead_investigator_name: 'Moana Rangi',
+                    started_at: '2026-07-14T03:00:00Z',
+                    target_completion_date: '2026-07-21',
+                    completed_at: '2026-07-15T01:00:00Z',
+                    is_overdue: false,
+                    has_findings: true,
+                    has_recommendations: true,
+                    recommendation_count: 1,
+                    immediate_causes: [],
+                    root_causes: [],
+                    contributing_factors: [],
+                    findings_summary: 'Controls were reviewed.',
+                    recommendations: [
+                        {
+                            description: 'Retain the current control.',
+                            priority: 'medium',
+                            disposition: null,
+                        },
+                    ],
+                    lessons_learned: null,
+                },
+            ],
+        } as Partial<EventDetail>);
+        renderDialog(detail);
+        fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Choose outcome' }));
+        fireEvent.click(screen.getByRole('combobox', { name: /Outcome/ }));
+        fireEvent.click(
+            screen.getByRole('option', {
+                name: 'Accept the residual risk',
+            }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Record outcome' }),
+        ).toBeDisabled();
+        fireEvent.change(screen.getByRole('textbox', { name: /Reason/ }), {
+            target: { value: 'Residual risk is within tolerance.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Record outcome' }));
+
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/investigations/31/recommendations/0/disposition',
+            {
+                disposition: 'accepted_risk',
+                reason: 'Residual risk is within tolerance.',
+            },
+        );
     });
 });

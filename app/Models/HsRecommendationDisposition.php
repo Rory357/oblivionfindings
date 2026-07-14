@@ -18,6 +18,13 @@ class HsRecommendationDisposition extends Model
 
     public const DISPOSITION_NO_ACTION = 'no_action';
 
+    public const VALID_DISPOSITIONS = [
+        self::DISPOSITION_CORRECTIVE_ACTION,
+        self::DISPOSITION_ACCEPTED_RISK,
+        self::DISPOSITION_DUPLICATE,
+        self::DISPOSITION_NO_ACTION,
+    ];
+
     protected $fillable = [
         'hs_investigation_id',
         'recommendation_index',

@@ -3,8 +3,12 @@
 namespace App\Services\HealthSafety;
 
 use App\Models\ClientIncident;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
+use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -17,8 +21,12 @@ use Illuminate\Support\Facades\Log;
  */
 class HsInvestigationService
 {
+    public function __construct(
+        private readonly HsCorrectiveActionService $correctiveActions,
+    ) {}
+
     /* ------------------------------------------------------------------ */
-    /*  Creation                                                           */
+    /*  Creation */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -81,7 +89,7 @@ class HsInvestigationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Lifecycle transitions                                              */
+    /*  Lifecycle transitions */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -258,7 +266,7 @@ class HsInvestigationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Findings update (while in_progress — before formal recording)     */
+    /*  Findings update (while in_progress — before formal recording) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -297,7 +305,128 @@ class HsInvestigationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Recommendation governance */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Record the one explicit outcome for a completed recommendation.
+     * Corrective-action outcomes create or reuse the canonical linked action;
+     * non-action outcomes require a durable explanation.
+     */
+    public function dispositionRecommendation(
+        HsInvestigation $investigation,
+        int $index,
+        string $disposition,
+        User $actor,
+        ?string $reason = null,
+    ): HsRecommendationDisposition {
+        return DB::transaction(function () use ($investigation, $index, $disposition, $actor, $reason): HsRecommendationDisposition {
+            $locked = HsInvestigation::query()->lockForUpdate()->findOrFail($investigation->id);
+
+            if (! $locked->isCompleted()) {
+                throw new \InvalidArgumentException('Complete the investigation before deciding recommendation outcomes.');
+            }
+
+            $recommendations = $locked->recommendations ?? [];
+            if (! array_key_exists($index, $recommendations)) {
+                throw new \InvalidArgumentException(
+                    "Recommendation index [{$index}] does not exist on investigation [{$locked->reference_number}]."
+                );
+            }
+
+            if (! in_array($disposition, HsRecommendationDisposition::VALID_DISPOSITIONS, true)) {
+                throw new \InvalidArgumentException('The selected recommendation disposition is not supported.');
+            }
+
+            $normalisedReason = filled($reason) ? trim((string) $reason) : null;
+            if ($disposition !== HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION && $normalisedReason === null) {
+                throw new \InvalidArgumentException('A reason is required when no corrective action will be raised.');
+            }
+
+            $action = HsCorrectiveAction::query()
+                ->where('hs_investigation_id', $locked->id)
+                ->where('recommendation_index', $index)
+                ->lockForUpdate()
+                ->first();
+
+            if ($disposition === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
+                $action ??= $this->correctiveActions->createFromRecommendation($locked, $index, [
+                    'created_by' => $actor->id,
+                    'assigned_by_user_id' => $actor->id,
+                ]);
+                $normalisedReason = null;
+            } elseif ($action !== null) {
+                throw new \InvalidArgumentException(
+                    'This recommendation already has a corrective action and must use the corrective-action disposition.'
+                );
+            }
+
+            $existing = HsRecommendationDisposition::query()
+                ->where('hs_investigation_id', $locked->id)
+                ->where('recommendation_index', $index)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing
+                && $existing->disposition === $disposition
+                && $existing->reason === $normalisedReason
+                && $existing->hs_corrective_action_id === $action?->id) {
+                return $existing;
+            }
+
+            $previous = $existing?->only([
+                'disposition',
+                'reason',
+                'hs_corrective_action_id',
+                'decided_by_user_id',
+                'decided_at',
+            ]);
+
+            $record = $existing ?? new HsRecommendationDisposition([
+                'hs_investigation_id' => $locked->id,
+                'recommendation_index' => $index,
+            ]);
+            $record->fill([
+                'disposition' => $disposition,
+                'reason' => $normalisedReason,
+                'hs_corrective_action_id' => $action?->id,
+                'decided_by_user_id' => $actor->id,
+                'decided_at' => now(),
+            ]);
+            $record->save();
+
+            AuditLogger::logOrFail('healthSafety.investigation.recommendationDispositioned', $locked, [
+                'actor_id' => $actor->id,
+                'recommendation_index' => $index,
+                'disposition' => $disposition,
+                'reason' => $normalisedReason,
+                'hs_corrective_action_id' => $action?->id,
+                'previous' => $previous,
+            ]);
+
+            return $record->fresh(['correctiveAction', 'decidedBy']);
+        }, 3);
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function undispositionedRecommendationIndexes(HsInvestigation $investigation): array
+    {
+        $recommendationIndexes = array_map(
+            static fn (int|string $index): int => (int) $index,
+            array_keys($investigation->recommendations ?? []),
+        );
+        $decidedIndexes = $investigation->recommendationDispositions()
+            ->pluck('recommendation_index')
+            ->map(static fn (mixed $index): int => (int) $index)
+            ->all();
+
+        return array_values(array_diff($recommendationIndexes, $decidedIndexes));
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     /**

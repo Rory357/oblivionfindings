@@ -4,8 +4,12 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +29,7 @@ class HsEventService
 {
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
+        private readonly HsInvestigationService $investigations,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -238,63 +243,172 @@ class HsEventService
      */
     public function closeBlockers(HsEvent $event): array
     {
-        $blockers = [];
+        return $this->closureGate($event)['blockers'];
+    }
 
-        if ($event->investigation_required && ! $event->hasCompletedInvestigation()) {
-            $blockers[] = 'A completed investigation is required before this event can be closed.';
+    /**
+     * @return array{
+     *     acceptance_ok: bool,
+     *     worksafe_ok: bool,
+     *     investigation_ok: bool,
+     *     recommendations_ok: bool,
+     *     actions_ok: bool,
+     *     blockers: list<string>
+     * }
+     */
+    public function closureGate(HsEvent $event): array
+    {
+        $blockers = [];
+        $sourceType = ltrim((string) $event->source_type, '\\');
+        $handoverRequiresAcceptance = $sourceType === ClientIncident::class
+            || in_array($event->handover_status, [
+                HsEvent::HANDOVER_NOT_READY,
+                HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ], true);
+        $acceptanceOk = ! $handoverRequiresAcceptance
+            || $event->handover_status === HsEvent::HANDOVER_ACCEPTED;
+
+        if (! $acceptanceOk) {
+            $blockers[] = 'Accept the H&S handover before closing this event.';
         }
 
-        if ($event->hasOpenCorrectiveActions()) {
+        $worksafeOk = ! $event->worksafe_notifiable
+            || in_array($event->worksafe_status, [
+                HsEvent::WORKSAFE_NOTIFIED,
+                HsEvent::WORKSAFE_ACKNOWLEDGED,
+            ], true);
+
+        if (! $worksafeOk) {
+            $blockers[] = 'Record the WorkSafe notification before closing this event.';
+        }
+
+        $hasActiveInvestigation = $event->investigations()
+            ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
+            ->exists();
+        $investigationOk = ! $hasActiveInvestigation
+            && (! $event->investigation_required || $event->hasCompletedInvestigation());
+
+        if (! $investigationOk) {
+            $blockers[] = $hasActiveInvestigation
+                ? 'Complete the active H&S investigation before closing this event.'
+                : 'Complete the required H&S investigation before closing this event.';
+        }
+
+        $recommendationsOk = true;
+        $completedInvestigations = $event->investigations()
+            ->where('status', HsInvestigation::STATUS_COMPLETED)
+            ->get();
+
+        foreach ($completedInvestigations as $investigation) {
+            $missing = $this->investigations->undispositionedRecommendationIndexes($investigation);
+            if ($missing === []) {
+                continue;
+            }
+
+            $recommendationsOk = false;
+            $numbers = collect($missing)
+                ->map(static fn (int $index): string => (string) ($index + 1))
+                ->implode(', ');
+            $blockers[] = "Decide the outcome of recommendation {$numbers} on investigation {$investigation->reference_number}.";
+        }
+
+        $unresolvedActionDisposition = HsRecommendationDisposition::query()
+            ->whereHas('investigation', fn ($query) => $query->where('hs_event_id', $event->id))
+            ->where('disposition', HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION)
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('hs_corrective_action_id')
+                    ->orWhereHas('correctiveAction', fn ($actionQuery) => $actionQuery
+                        ->whereNotIn('status', [
+                            HsCorrectiveAction::STATUS_VERIFIED,
+                            HsCorrectiveAction::STATUS_CLOSED,
+                        ]));
+            })
+            ->exists();
+        $actionsOk = ! $event->hasOpenCorrectiveActions() && ! $unresolvedActionDisposition;
+
+        if (! $actionsOk) {
             $blockers[] = 'All corrective actions must be verified or closed before this event can be closed.';
         }
 
-        return $blockers;
+        return [
+            'acceptance_ok' => $acceptanceOk,
+            'worksafe_ok' => $worksafeOk,
+            'investigation_ok' => $investigationOk,
+            'recommendations_ok' => $recommendationsOk,
+            'actions_ok' => $actionsOk,
+            'blockers' => $blockers,
+        ];
     }
 
     /**
      * Close an event through the governance gate.
      *
-     * Blocks unless every gate in {@see closeBlockers()} is met, except when an
-     * `$overrideReason` is supplied (logged for the audit trail). A closure
-     * summary is always required.
+     * Blocks unless every gate in {@see closeBlockers()} is met. Bypass requires
+     * both the dedicated override permission and a reason; the actor, reason and
+     * exact blockers are then written to the strict audit trail. A closure summary
+     * is always required.
      *
      * @throws \DomainException when the gate blocks and no override reason is given
      */
     public function closeEvent(HsEvent $event, string $summary, User $actor, ?string $overrideReason = null): HsEvent
     {
-        if ($event->status === HsEvent::STATUS_CLOSED) {
-            throw new \DomainException('This event is already closed.');
-        }
-
         $summary = trim($summary);
         if ($summary === '') {
             throw new \DomainException('A closure summary is required.');
         }
 
-        $blockers = $this->closeBlockers($event);
-        $override = $overrideReason !== null && trim($overrideReason) !== '';
+        return DB::transaction(function () use ($event, $summary, $actor, $overrideReason): HsEvent {
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            if ($locked->status === HsEvent::STATUS_CLOSED) {
+                throw new \DomainException('This event is already closed.');
+            }
 
-        if ($blockers !== [] && ! $override) {
-            throw new \DomainException(implode(' ', $blockers));
-        }
+            $blockers = $this->closeBlockers($locked);
+            $normalisedOverrideReason = filled($overrideReason) ? trim((string) $overrideReason) : null;
 
-        $event->update([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => $summary,
-        ]);
+            if ($blockers !== [] && $normalisedOverrideReason === null) {
+                throw new \DomainException(implode(' ', $blockers));
+            }
 
-        Log::info('HsEventService: event closed', [
-            'hs_event_id' => $event->id,
-            'reference' => $event->reference_number,
-            'actor' => $actor->id,
-            'overridden' => $override,
-            'override_reason' => $override ? trim((string) $overrideReason) : null,
-            'blockers_at_close' => $blockers,
-        ]);
+            if ($blockers !== [] && ! $actor->canDo('healthSafety.overrideClosure')) {
+                throw new \DomainException(
+                    'You do not have permission to override H&S closure blockers. Complete the listed work or ask an authorised manager.'
+                );
+            }
 
-        return $event;
+            $overridden = $blockers !== [];
+            $locked->update([
+                'status' => HsEvent::STATUS_CLOSED,
+                'closed_at' => now(),
+                'closed_by' => $actor->id,
+                'closure_summary' => $summary,
+            ]);
+
+            AuditLogger::logOrFail(
+                $overridden
+                    ? 'healthSafety.event.closureOverridden'
+                    : 'healthSafety.event.closed',
+                $locked,
+                [
+                    'actor_id' => $actor->id,
+                    'closure_summary' => $summary,
+                    'override_reason' => $overridden ? $normalisedOverrideReason : null,
+                    'blockers' => $blockers,
+                ],
+            );
+
+            Log::info('HsEventService: event closed', [
+                'hs_event_id' => $locked->id,
+                'reference' => $locked->reference_number,
+                'actor' => $actor->id,
+                'overridden' => $overridden,
+                'override_reason' => $overridden ? $normalisedOverrideReason : null,
+                'blockers_at_close' => $blockers,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
     }
 
     /* ------------------------------------------------------------------ */

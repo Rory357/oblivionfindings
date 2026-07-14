@@ -319,18 +319,42 @@ class HsEvent extends Model
     }
 
     /**
-     * Whether all corrective actions for this event are resolved (verified or closed).
-     * Returns true if there are no actions at all (vacuously true).
+     * Whether every recommendation has a coherent outcome and every resulting
+     * corrective action is verified or closed.
      */
     public function allCorrectiveActionsResolved(): bool
     {
-        $total = $this->correctiveActions()->count();
-
-        if ($total === 0) {
-            return true;
+        if ($this->hasOpenCorrectiveActions()) {
+            return false;
         }
 
-        return $this->openCorrectiveActions()->count() === 0;
+        $investigations = $this->investigations()
+            ->where('status', HsInvestigation::STATUS_COMPLETED)
+            ->with(['recommendationDispositions.correctiveAction'])
+            ->get();
+
+        foreach ($investigations as $investigation) {
+            $dispositions = $investigation->recommendationDispositions->keyBy('recommendation_index');
+
+            foreach (array_keys($investigation->recommendations ?? []) as $index) {
+                $disposition = $dispositions->get($index);
+                if (! $disposition) {
+                    return false;
+                }
+
+                if ($disposition->disposition === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
+                    $action = $disposition->correctiveAction;
+                    if (! $action || ! in_array($action->status, [
+                        HsCorrectiveAction::STATUS_VERIFIED,
+                        HsCorrectiveAction::STATUS_CLOSED,
+                    ], true)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

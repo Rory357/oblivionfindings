@@ -5,6 +5,7 @@ namespace Tests\Feature\HealthSafety;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -92,6 +93,154 @@ class HsEventSiteIsolationTest extends TestCase
             ->assertNotFound();
 
         $this->assertNotSame(HsEvent::STATUS_CLOSED, $hidden->fresh()->status);
+    }
+
+    public function test_site_bound_manager_cannot_mutate_another_sites_investigation_workflow(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.manage']);
+        $hiddenEvent = HsEvent::factory()->high()->create(['site_id' => $siteB->id]);
+        $hiddenInvestigation = HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $hiddenEvent->id,
+        ]);
+
+        $requests = [
+            ["/health-safety/events/{$hiddenEvent->id}/investigations", [
+                'methodology' => HsInvestigation::METHODOLOGY_5_WHYS,
+                'lead_investigator_id' => $user->id,
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/findings", [
+                'root_causes' => [['description' => 'Cross-site mutation must be blocked.']],
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/submit", []],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/return", [
+                'review_notes' => 'Cross-site mutation must be blocked.',
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/complete", []],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/recommendations/0/disposition", [
+                'disposition' => 'no_action',
+                'reason' => 'Cross-site mutation must be blocked.',
+            ]],
+        ];
+
+        foreach ($requests as [$path, $payload]) {
+            $this->actingAs($user)->post($path, $payload)->assertNotFound();
+        }
+
+        $this->assertSame(HsInvestigation::STATUS_COMPLETED, $hiddenInvestigation->fresh()->status);
+        $this->assertDatabaseMissing('hs_recommendation_dispositions', [
+            'hs_investigation_id' => $hiddenInvestigation->id,
+        ]);
+    }
+
+    public function test_site_bound_manager_cannot_mutate_another_sites_corrective_action_workflow(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.manage']);
+        $hiddenEvent = HsEvent::factory()->high()->create(['site_id' => $siteB->id]);
+        $hiddenInvestigation = HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $hiddenEvent->id,
+        ]);
+        $open = HsCorrectiveAction::factory()->create(['hs_event_id' => $hiddenEvent->id]);
+        $inProgress = HsCorrectiveAction::factory()->inProgress()->create(['hs_event_id' => $hiddenEvent->id]);
+        $completed = HsCorrectiveAction::factory()->completed()->create(['hs_event_id' => $hiddenEvent->id]);
+        $returnable = HsCorrectiveAction::factory()->completed()->create(['hs_event_id' => $hiddenEvent->id]);
+        $verified = HsCorrectiveAction::factory()->verified()->create(['hs_event_id' => $hiddenEvent->id]);
+
+        $requests = [
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions", [
+                'title' => 'Cross-site action',
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/seed-action", [
+                'recommendation_index' => 0,
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$open->id}/start", []],
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$inProgress->id}/complete", [
+                'completion_notes' => 'Cross-site mutation must be blocked.',
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$completed->id}/verify", [
+                'effectiveness_confirmed' => true,
+            ]],
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$verified->id}/close", []],
+            ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$returnable->id}/return", [
+                'reason' => 'Cross-site mutation must be blocked.',
+            ]],
+        ];
+
+        foreach ($requests as [$path, $payload]) {
+            $this->actingAs($user)->post($path, $payload)->assertNotFound();
+        }
+
+        $this->assertDatabaseMissing('hs_corrective_actions', [
+            'hs_event_id' => $hiddenEvent->id,
+            'title' => 'Cross-site action',
+        ]);
+        $this->assertSame(HsCorrectiveAction::STATUS_OPEN, $open->fresh()->status);
+        $this->assertSame(HsCorrectiveAction::STATUS_IN_PROGRESS, $inProgress->fresh()->status);
+        $this->assertSame(HsCorrectiveAction::STATUS_COMPLETED, $completed->fresh()->status);
+        $this->assertSame(HsCorrectiveAction::STATUS_COMPLETED, $returnable->fresh()->status);
+        $this->assertSame(HsCorrectiveAction::STATUS_VERIFIED, $verified->fresh()->status);
+    }
+
+    public function test_site_bound_manager_cannot_assign_investigation_or_action_work_to_another_sites_staff(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $manager = $this->siteBoundUser($siteA, ['hazards.manage']);
+        $otherSiteManager = $this->siteBoundUser($siteB, ['hazards.manage']);
+        $event = HsEvent::factory()->high()->create(['site_id' => $siteA->id]);
+
+        $this->actingAs($manager)
+            ->post("/health-safety/events/{$event->id}/investigations", [
+                'methodology' => HsInvestigation::METHODOLOGY_5_WHYS,
+                'lead_investigator_id' => $otherSiteManager->id,
+            ])
+            ->assertSessionHasErrors('lead_investigator_id');
+
+        $this->assertDatabaseMissing('hs_investigations', [
+            'hs_event_id' => $event->id,
+            'lead_investigator_id' => $otherSiteManager->id,
+        ]);
+
+        $this->actingAs($manager)
+            ->post("/health-safety/events/{$event->id}/investigations", [
+                'methodology' => HsInvestigation::METHODOLOGY_5_WHYS,
+                'lead_investigator_id' => $manager->id,
+                'team_member_ids' => [$otherSiteManager->id],
+            ])
+            ->assertSessionHasErrors('team_member_ids');
+
+        $this->actingAs($manager)
+            ->post("/health-safety/events/{$event->id}/corrective-actions", [
+                'title' => 'Site-specific safety action',
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'assigned_to_user_id' => $otherSiteManager->id,
+            ])
+            ->assertSessionHasErrors('assigned_to_user_id');
+
+        $action = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id]);
+        $this->actingAs($manager)
+            ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/start", [
+                'assigned_to_user_id' => $otherSiteManager->id,
+            ])
+            ->assertSessionHasErrors('assigned_to_user_id');
+
+        $this->assertSame(HsCorrectiveAction::STATUS_OPEN, $action->fresh()->status);
+
+        $investigation = HsInvestigation::factory()->withFindings()->create([
+            'hs_event_id' => $event->id,
+            'status' => HsInvestigation::STATUS_UNDER_REVIEW,
+        ]);
+        $this->actingAs($manager)
+            ->post("/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete", [
+                'approved_by_id' => $otherSiteManager->id,
+            ])
+            ->assertSessionHasErrors('approved_by_id');
+
+        $this->assertSame(HsInvestigation::STATUS_UNDER_REVIEW, $investigation->fresh()->status);
     }
 
     public function test_site_bound_manager_cannot_notify_or_acknowledge_worksafe_for_another_sites_event(): void

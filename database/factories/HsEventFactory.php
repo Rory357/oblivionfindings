@@ -18,6 +18,7 @@ class HsEventFactory extends Factory
         $eventCategory = HsEvent::CATEGORY_INCIDENT;
 
         return [
+            'organization_id' => 1,
             'reference_number' => HsEvent::generateReferenceNumber(),
             'source_type' => $sourceType,
             'source_id' => $sourceId,

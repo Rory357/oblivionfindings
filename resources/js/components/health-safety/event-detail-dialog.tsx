@@ -83,6 +83,17 @@ type JsonRec = {
     description?: string;
     priority?: string;
     target_area?: string;
+    disposition?: {
+        disposition: string;
+        reason: string | null;
+        corrective_action: {
+            id: number;
+            reference_number: string;
+            status: string;
+        } | null;
+        decided_by_name: string | null;
+        decided_at: string | null;
+    } | null;
 };
 
 export type EventInvestigation = {
@@ -272,12 +283,15 @@ export type EventDetail = {
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
     close_gate: {
+        acceptance_ok: boolean;
+        worksafe_ok: boolean;
         investigation_ok: boolean;
+        recommendations_ok: boolean;
         actions_ok: boolean;
         blockers: string[];
     };
     assignable_staff: Array<{ id: number; name: string }>;
-    can: { manage: boolean };
+    can: { manage: boolean; override_closure: boolean };
 };
 
 export type EventSectionKey =
@@ -460,6 +474,11 @@ type ActivePane =
     | { kind: 'inv_findings'; investigationId: number }
     | { kind: 'inv_complete'; investigationId: number }
     | { kind: 'inv_return'; investigationId: number }
+    | {
+          kind: 'inv_disposition';
+          investigationId: number;
+          recommendationIndex: number;
+      }
     | { kind: 'ca_add' }
     | { kind: 'ca_complete'; actionId: number }
     | { kind: 'ca_verify'; actionId: number }
@@ -818,9 +837,15 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
     const [attempted, setAttempted] = useState(false);
     const flashError = (usePage().props as { flash?: { error?: string } }).flash
         ?.error;
+    const canSubmit =
+        form.data.closure_summary.trim() !== '' &&
+        (!blocked ||
+            (d.can.override_closure &&
+                form.data.override_reason.trim() !== ''));
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (blocked && !d.can.override_closure) return;
         setAttempted(true);
         // A blocked closure comes back on a 302 as flash.error (not 422) — keep the
         // pane open so the user can record an override reason.
@@ -840,7 +865,7 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
             <StepHead
                 icon={CheckCircle2}
                 title="Close event"
-                blurb="A required investigation must be complete and every corrective action verified — or close with a logged override. A closure summary is always required."
+                blurb="H&S ownership, WorkSafe, investigation decisions and corrective actions must all be complete. A closure summary is always required."
             />
 
             {attempted && flashError ? (
@@ -855,8 +880,20 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
             {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">
                 <GateRow
+                    ok={gate?.acceptance_ok ?? true}
+                    label="H&S handover accepted where required"
+                />
+                <GateRow
+                    ok={gate?.worksafe_ok ?? true}
+                    label="WorkSafe notification recorded where required"
+                />
+                <GateRow
                     ok={gate?.investigation_ok ?? true}
                     label="Required investigation complete"
+                />
+                <GateRow
+                    ok={gate?.recommendations_ok ?? true}
+                    label="Every recommendation has a recorded outcome"
                 />
                 <GateRow
                     ok={gate?.actions_ok ?? true}
@@ -866,9 +903,17 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
 
             {blocked ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
-                    This event does not meet the closure gate yet. You can still
-                    close it by recording an override reason — the override is
-                    logged for the audit trail.
+                    <p className="font-semibold">Closure is blocked</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                        {gate.blockers.map((blocker) => (
+                            <li key={blocker}>{blocker}</li>
+                        ))}
+                    </ul>
+                    <p className="mt-2">
+                        {d.can.override_closure
+                            ? 'You have the separate override permission. Record the formal reason below; the actor, reason and blockers will be audited.'
+                            : 'Complete the listed work before closing. Only a separately authorised manager can override these gates.'}
+                    </p>
                 </InfoCard>
             ) : null}
 
@@ -887,7 +932,7 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 />
             </Field>
 
-            {blocked ? (
+            {blocked && d.can.override_closure ? (
                 <Field
                     label="Override reason"
                     required
@@ -909,7 +954,7 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button type="submit" disabled={form.processing || !canSubmit}>
                     Close event
                 </Button>
             </div>
@@ -926,6 +971,9 @@ function GateRow({ ok, label }: { ok: boolean; label: string }) {
                 <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
             )}
             <span className={ok ? 'text-foreground' : 'text-status-critical'}>
+                <span className="font-semibold">
+                    {ok ? 'Complete' : 'Blocked'}:
+                </span>{' '}
                 {label}
             </span>
         </div>
@@ -1217,6 +1265,15 @@ function PaneRenderer({
         case 'inv_return':
             return inv ? (
                 <ReturnInvestigationPane d={d} inv={inv} onDone={onDone} />
+            ) : null;
+        case 'inv_disposition':
+            return inv ? (
+                <RecommendationDispositionPane
+                    d={d}
+                    inv={inv}
+                    recommendationIndex={pane.recommendationIndex}
+                    onDone={onDone}
+                />
             ) : null;
         case 'ca_add':
             return <AddCorrectiveActionPane d={d} onDone={onDone} />;
@@ -1667,7 +1724,7 @@ function CompleteInvestigationPane({
             <StepHead
                 icon={CheckCircle2}
                 title="Complete investigation"
-                blurb="Approve and close the investigation. The event advances to Corrective action, where the recommendations become corrective actions."
+                blurb="Approve the investigation. Each recommendation must then receive an explicit outcome; only recommendations needing remediation become corrective actions."
             />
             <InfoCard icon={CheckCircle2} tone="info">
                 Completing requires recorded recommendations. You sign off as
@@ -1834,6 +1891,126 @@ function InvestigationControls({
                 </>
             ) : null}
         </div>
+    );
+}
+
+const RECOMMENDATION_OUTCOMES = [
+    { value: 'corrective_action', label: 'Raise a corrective action' },
+    { value: 'accepted_risk', label: 'Accept the residual risk' },
+    { value: 'duplicate', label: 'Covered by another recommendation' },
+    { value: 'no_action', label: 'No further action' },
+];
+
+function recommendationOutcomeLabel(value: string): string {
+    return (
+        {
+            corrective_action: 'Corrective action',
+            accepted_risk: 'Accepted risk',
+            duplicate: 'Duplicate',
+            no_action: 'No action',
+        }[value] ?? titleCase(value)
+    );
+}
+
+function RecommendationDispositionPane({
+    d,
+    inv,
+    recommendationIndex,
+    onDone,
+}: {
+    d: EventDetail;
+    inv: EventInvestigation;
+    recommendationIndex: number;
+    onDone: () => void;
+}) {
+    const recommendation = inv.recommendations?.[recommendationIndex];
+    const current = recommendation?.disposition;
+    const form = useForm<{ disposition: string; reason: string }>({
+        disposition: current?.disposition ?? '',
+        reason: current?.reason ?? '',
+    });
+    const raisesAction = form.data.disposition === 'corrective_action';
+    const needsReason = form.data.disposition !== '' && !raisesAction;
+
+    if (!recommendation) return null;
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.post(
+            `/health-safety/events/${d.id}/investigations/${inv.id}/recommendations/${recommendationIndex}/disposition`,
+            { preserveScroll: true, onSuccess: onDone },
+        );
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={ListChecks}
+                title={`Recommendation ${recommendationIndex + 1} outcome`}
+                blurb="Choose what will happen next. Every recommendation needs one clear, auditable outcome before H&S can close the event."
+            />
+            <ReviewCard icon={ListChecks} title="Recommendation">
+                <ReviewRow
+                    label="Recommendation"
+                    value={recommendation.description ?? 'Recommendation'}
+                />
+                <ReviewRow
+                    label="Priority"
+                    value={
+                        recommendation.priority
+                            ? titleCase(recommendation.priority)
+                            : 'Not set'
+                    }
+                />
+            </ReviewCard>
+            <Field label="Outcome" required error={form.errors.disposition}>
+                <SelectInput
+                    value={form.data.disposition}
+                    onChange={(value) => form.setData('disposition', value)}
+                    placeholder="Choose an outcome"
+                    ariaLabel="Outcome"
+                    options={RECOMMENDATION_OUTCOMES}
+                />
+            </Field>
+            {raisesAction ? (
+                <InfoCard icon={ListChecks} tone="info">
+                    Recording this outcome creates or reuses one linked
+                    corrective action. The action must then be completed and
+                    independently verified before closure.
+                </InfoCard>
+            ) : form.data.disposition ? (
+                <Field
+                    label="Reason"
+                    required
+                    error={form.errors.reason}
+                    hint="Recorded in the audit trail"
+                >
+                    <Textarea
+                        rows={4}
+                        value={form.data.reason}
+                        onChange={(event) =>
+                            form.setData('reason', event.target.value)
+                        }
+                        placeholder="Explain why this recommendation does not need a new corrective action."
+                    />
+                </Field>
+            ) : null}
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        !form.data.disposition ||
+                        (needsReason && !form.data.reason.trim())
+                    }
+                >
+                    Record outcome
+                </Button>
+            </div>
+        </form>
     );
 }
 
@@ -3142,20 +3319,12 @@ function InvestigationSection({
                                         {inv.recommendation_count})
                                     </p>
                                     <ul className="mt-1 space-y-1">
-                                        {inv.recommendations.map((r, i) => {
-                                            const seeded =
-                                                d.corrective_actions.some(
-                                                    (a) =>
-                                                        a.hs_investigation_id ===
-                                                            inv.id &&
-                                                        a.recommendation_index ===
-                                                            i,
-                                                );
-                                            return (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-start gap-2 text-sm"
-                                                >
+                                        {inv.recommendations.map((r, i) => (
+                                            <li
+                                                key={i}
+                                                className="rounded-lg border border-border bg-background/70 p-3 text-sm"
+                                            >
+                                                <div className="flex items-start gap-2">
                                                     {r.priority ? (
                                                         <span
                                                             className={`mt-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY[r.priority] ?? PRIORITY.medium}`}
@@ -3165,47 +3334,95 @@ function InvestigationSection({
                                                             )}
                                                         </span>
                                                     ) : null}
-                                                    <span className="flex-1 text-foreground">
+                                                    <span className="min-w-0 flex-1 text-foreground">
                                                         {r.description}
                                                     </span>
                                                     {canAct &&
                                                     inv.status ===
                                                         'completed' ? (
-                                                        seeded ? (
-                                                            <span
-                                                                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-status-success"
-                                                                title="A corrective action has been raised from this recommendation"
-                                                            >
-                                                                <CheckCircle2 className="h-3 w-3" />{' '}
-                                                                Action raised
-                                                            </span>
-                                                        ) : (
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="shrink-0"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        `/health-safety/events/${d.id}/investigations/${inv.id}/seed-action`,
-                                                                        {
-                                                                            recommendation_index:
-                                                                                i,
-                                                                        },
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Plus className="mr-1 h-3 w-3" />{' '}
-                                                                Seed action
-                                                            </Button>
-                                                        )
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="shrink-0"
+                                                            onClick={() =>
+                                                                onPane({
+                                                                    kind: 'inv_disposition',
+                                                                    investigationId:
+                                                                        inv.id,
+                                                                    recommendationIndex:
+                                                                        i,
+                                                                })
+                                                            }
+                                                        >
+                                                            {r.disposition
+                                                                ? 'Change outcome'
+                                                                : 'Choose outcome'}
+                                                        </Button>
                                                     ) : null}
-                                                </li>
-                                            );
-                                        })}
+                                                </div>
+                                                {r.disposition ? (
+                                                    <div className="mt-2 border-t border-border pt-2 text-xs">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-status-success-bg px-2 py-0.5 font-medium text-status-success">
+                                                                <CheckCircle2 className="h-3 w-3" />
+                                                                {recommendationOutcomeLabel(
+                                                                    r
+                                                                        .disposition
+                                                                        .disposition,
+                                                                )}
+                                                            </span>
+                                                            {r.disposition
+                                                                .corrective_action ? (
+                                                                <Link
+                                                                    href={`/health-safety/corrective-actions?event=${d.id}&action=${r.disposition.corrective_action.id}`}
+                                                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                                                >
+                                                                    {
+                                                                        r
+                                                                            .disposition
+                                                                            .corrective_action
+                                                                            .reference_number
+                                                                    }{' '}
+                                                                    ·{' '}
+                                                                    {titleCase(
+                                                                        r
+                                                                            .disposition
+                                                                            .corrective_action
+                                                                            .status,
+                                                                    )}
+                                                                </Link>
+                                                            ) : null}
+                                                        </div>
+                                                        {r.disposition
+                                                            .reason ? (
+                                                            <p className="mt-1 text-foreground">
+                                                                {
+                                                                    r
+                                                                        .disposition
+                                                                        .reason
+                                                                }
+                                                            </p>
+                                                        ) : null}
+                                                        <p className="mt-1 text-muted-foreground">
+                                                            Decided by{' '}
+                                                            {r.disposition
+                                                                .decided_by_name ??
+                                                                'H&S team'}
+                                                            {r.disposition
+                                                                .decided_at
+                                                                ? ` · ${formatDateTime(r.disposition.decided_at)}`
+                                                                : ''}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="mt-2 text-xs font-medium text-status-warning">
+                                                        Outcome needed before
+                                                        H&S closure
+                                                    </p>
+                                                )}
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             ) : null}

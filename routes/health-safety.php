@@ -62,6 +62,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{event}/investigations/{investigation}/submit', [HsInvestigationController::class, 'submit'])->name('events.investigations.submit');
         Route::post('/events/{event}/investigations/{investigation}/return', [HsInvestigationController::class, 'returnForRework'])->name('events.investigations.return');
         Route::post('/events/{event}/investigations/{investigation}/complete', [HsInvestigationController::class, 'complete'])->name('events.investigations.complete');
+        Route::post('/events/{event}/investigations/{investigation}/recommendations/{recommendationIndex}/disposition', [HsInvestigationController::class, 'disposition'])->name('events.investigations.recommendations.disposition');
         Route::post('/events/{event}/investigations/{investigation}/seed-action', [HsCorrectiveActionController::class, 'seedFromRecommendation'])->name('events.investigations.seed-action');
 
         // Corrective-action workflow (exposes HsCorrectiveActionService)

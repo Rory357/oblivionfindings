@@ -629,6 +629,36 @@ class UserSiteAccessService
     }
 
     /**
+     * Scope approved staff to the same tenant and, when present, the specific
+     * site carried by an H&S event. This is the canonical picker and mutation
+     * boundary for H&S ownership, investigation and corrective-action work.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyHsEventStaffScope(
+        Builder $query,
+        HsEvent $event,
+        ?User $viewer,
+        array $bypassPermissions = [],
+    ): Builder {
+        $query
+            ->staff()
+            ->whereNotNull($query->qualifyColumn('approved_at'));
+
+        if ($event->site_id !== null) {
+            $siteId = (int) $event->site_id;
+            $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+                $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
+                    $siteQuery->where('primary_site_id', $siteId)
+                        ->orWhereJsonContains('secondary_site_ids', $siteId);
+                });
+            });
+        }
+
+        return $this->applyStaffScope($query, $viewer, $bypassPermissions);
+    }
+
+    /**
      * Canonical eligibility for a Fleet handover recipient. Broad Fleet or
      * platform access never relaxes this record-level tenant/site invariant.
      */

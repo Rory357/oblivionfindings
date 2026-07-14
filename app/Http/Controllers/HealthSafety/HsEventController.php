@@ -504,7 +504,13 @@ class HsEventController extends Controller
         ]);
 
         $investigations = $hsEvent->investigations()
-            ->with(['leadInvestigator:id,name', 'reviewedBy:id,name', 'approvedBy:id,name'])
+            ->with([
+                'leadInvestigator:id,name',
+                'reviewedBy:id,name',
+                'approvedBy:id,name',
+                'recommendationDispositions.correctiveAction:id,reference_number,status',
+                'recommendationDispositions.decidedBy:id,name',
+            ])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (HsInvestigation $inv) => [
@@ -525,7 +531,7 @@ class HsEventController extends Controller
                 'root_causes' => $inv->root_causes,
                 'contributing_factors' => $inv->contributing_factors,
                 'findings_summary' => $inv->findings_summary,
-                'recommendations' => $inv->recommendations,
+                'recommendations' => $this->presentInvestigationRecommendations($inv),
                 'lessons_learned' => $inv->lessons_learned,
                 'reviewed_by_name' => $inv->reviewedBy?->name,
                 'approved_by_name' => $inv->approvedBy?->name,
@@ -676,6 +682,7 @@ class HsEventController extends Controller
             ],
             default => null,
         };
+        $closureGate = $this->events->closureGate($hsEvent);
 
         return [
             'id' => $hsEvent->id,
@@ -757,14 +764,43 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions,
             'risk_assessments' => $riskAssessments,
             'attachments' => $handoverAttachments,
-            'close_gate' => [
-                'investigation_ok' => ! $hsEvent->investigation_required || $hsEvent->hasCompletedInvestigation(),
-                'actions_ok' => ! $hsEvent->hasOpenCorrectiveActions(),
-                'blockers' => $this->events->closeBlockers($hsEvent),
-            ],
+            'close_gate' => $closureGate,
             'assignable_staff' => $assignableStaff,
-            'can' => ['manage' => $canManage],
+            'can' => [
+                'manage' => $canManage,
+                'override_closure' => $currentUser->canDo('healthSafety.overrideClosure'),
+            ],
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function presentInvestigationRecommendations(HsInvestigation $investigation): array
+    {
+        $dispositions = $investigation->recommendationDispositions->keyBy('recommendation_index');
+
+        return collect($investigation->recommendations ?? [])
+            ->map(function (array $recommendation, int $index) use ($dispositions): array {
+                $disposition = $dispositions->get($index);
+
+                return [
+                    ...$recommendation,
+                    'disposition' => $disposition ? [
+                        'disposition' => $disposition->disposition,
+                        'reason' => $disposition->reason,
+                        'corrective_action' => $disposition->correctiveAction ? [
+                            'id' => $disposition->correctiveAction->id,
+                            'reference_number' => $disposition->correctiveAction->reference_number,
+                            'status' => $disposition->correctiveAction->status,
+                        ] : null,
+                        'decided_by_name' => $disposition->decidedBy?->name,
+                        'decided_at' => $disposition->decided_at?->toIso8601String(),
+                    ] : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function downloadIncidentAttachment(
@@ -1041,21 +1077,10 @@ class HsEventController extends Controller
 
     private function handoverOwnerQuery(HsEvent $event, User $viewer): Builder
     {
-        $query = User::query()
-            ->staff()
-            ->whereNotNull('approved_at');
-
-        if ($event->site_id !== null) {
-            $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($event): void {
-                $profileQuery->where(function (Builder $siteQuery) use ($event): void {
-                    $siteQuery->where('primary_site_id', $event->site_id)
-                        ->orWhereJsonContains('secondary_site_ids', $event->site_id);
-                });
-            });
-        }
-
-        $this->siteAccess->applyStaffScope(
+        $query = User::query();
+        $this->siteAccess->applyHsEventStaffScope(
             $query,
+            $event,
             $viewer,
             $this->hsEventBypassPermissions(),
         );
