@@ -20,7 +20,7 @@
 - Commit after each task passes its task-specific verification.
 - After each implementation task, run a specification review and then a code-quality review before starting the next task.
 - Preserve existing `UserSiteAccessService` behaviour on the already-scoped dashboard, alert list, and alert workspace.
-- Do not trust prior “complete” notes as evidence; prove the R1–R20 ledger in the design.
+- Do not trust prior “complete” notes as evidence; prove the R1–R21 ledger in the design.
 
 ## File structure
 
@@ -593,46 +593,63 @@ git commit -m "fix(control-room): make lifecycle and sla truthful"
 - Modify: `app/Models/HsEvent.php`
 - Modify: `app/Services/HealthSafety/HsInvestigationService.php`
 - Modify: `app/Services/HealthSafety/HsEventService.php`
+- Modify: `app/Http/Controllers/HealthSafety/HsEventController.php`
 - Modify: `app/Http/Controllers/HealthSafety/HsInvestigationController.php`
+- Modify: `app/Http/Controllers/HealthSafety/HsCorrectiveActionController.php`
+- Modify: `app/Services/UserSiteAccessService.php`
+- Modify: `database/factories/HsEventFactory.php`
 - Modify: `database/seeders/RbacSeeder.php`
 - Modify: `routes/health-safety.php`
-- Modify: `resources/js/pages/health-safety/events/show.tsx`
+- Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
 - Test: `tests/Feature/HealthSafety/HsRecommendationDispositionTest.php`
 - Test: `tests/Feature/HealthSafety/HsEventClosureTest.php`
+- Test: `tests/Feature/HealthSafety/HsEventWorkflowTest.php`
+- Test: `tests/Feature/HealthSafety/HsEventSiteIsolationTest.php`
+- Test: `resources/js/components/health-safety/event-detail-dialog.test.tsx`
 
-- [ ] **Step 1: Write failing disposition and closure tests**
+- [x] **Step 1: Write failing disposition and closure tests**
 
 For every recommendation, require exactly one disposition: `corrective_action`, `accepted_risk`, `duplicate`, or `no_action`. Non-action dispositions require a reason. Corrective-action disposition requires the linked action. H&S closure also blocks awaiting acceptance and WorkSafe pending.
 
-- [ ] **Step 2: Run and verify the zero-actions false-positive**
+- [x] **Step 2: Run and verify the zero-actions false-positive**
 
 Expected: current `allCorrectiveActionsResolved()` allows closure with recommendations but zero actions.
 
-- [ ] **Step 3: Implement disposition service methods and endpoint**
+- [x] **Step 3: Implement disposition service methods and endpoint**
 
 ```php
 public function dispositionRecommendation(HsInvestigation $investigation, int $index, string $disposition, User $actor, ?string $reason = null): HsRecommendationDisposition;
 public function undispositionedRecommendationIndexes(HsInvestigation $investigation): array;
 ```
 
-- [ ] **Step 4: Add all closure blockers**
+- [x] **Step 4: Add all closure blockers**
 
 `HsEventService::closeBlockers()` returns blockers for unaccepted handover, pending WorkSafe, incomplete investigation, undispositioned recommendation, and unverified/open corrective action. Add the explicit `healthSafety.overrideClosure` permission; a reason alone never authorises bypass. Every authorised override records actor, reason, and blockers in the audit trail.
 
-- [ ] **Step 5: Render disposition controls and blockers**
+- [x] **Step 5: Render disposition controls and blockers**
 
 Each recommendation row shows its disposition, linked corrective action, actor/time, and a role-authorised action. The closure pane lists blockers in plain language.
 
-- [ ] **Step 6: Run governance tests**
+- [x] **Step 6: Run governance tests**
 
-Run: `php artisan test tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php`
+Run: `php artisan test tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsEventWorkflowTest.php tests/Feature/HealthSafety/HsEventSiteIsolationTest.php && npm test -- resources/js/components/health-safety/event-detail-dialog.test.tsx`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
-git add app/Models/HsInvestigation.php app/Models/HsEvent.php app/Services/HealthSafety app/Http/Controllers/HealthSafety routes/health-safety.php resources/js/pages/health-safety/events tests/Feature/HealthSafety
+git add app/Models/HsInvestigation.php app/Models/HsEvent.php app/Services/HealthSafety app/Http/Controllers/HealthSafety routes/health-safety.php resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx tests/Feature/HealthSafety
 git commit -m "feat(health-safety): disposition investigation recommendations"
 ```
+
+**Task 8 completion evidence — 2026-07-15**
+
+- Implementation commit: `9750a46b4066c0b5bd16abb7a18312ec0479955c`. The TypeScript correction discovered by this gate is isolated in `ae8d0067f23c0fe833b7ceb9b2421c4b7565baa9`.
+- RED proof reproduced the zero-action false-positive, missing recommendation outcome endpoint, reason/permission gaps, unscoped corrective-action mutations and cross-site assignee acceptance. The new site-isolation suite initially failed exactly the two missing controller boundaries before the shared eligibility fix.
+- Every completed recommendation now has one auditable outcome: corrective action, accepted risk, duplicate, or no action. Non-action outcomes require a reason; corrective-action outcomes create or reuse one canonical linked action. Rows show the decision, linked action, actor/time and one clear next action.
+- H&S closure now lists and enforces acceptance, WorkSafe, active/required investigation, recommendation and corrective-action gates. A reason alone never bypasses them; only `healthSafety.overrideClosure` plus a reason can do so, with actor, exact blockers and reason written through the strict transactional audit path.
+- Every investigation and corrective-action mutation now resolves the H&S event through the tenant/site boundary. Lead, team, approver and action-owner IDs reuse the same approved H&S event-site eligibility as the UI picker and do not disclose cross-site or nonexistent staff through a generic existence check.
+- Final post-format backend gate: 97 tests / 353 assertions. Desktop event-detail component gate: 8 tests. `npm run types`, PHP syntax lint for all touched PHP, Pint test mode, Prettier check and `git diff --check` all exited 0.
+- Root specification/code-quality re-review found no remaining Task 8 P0/P1. No browser E2E, mobile/responsive/WebView test, merge, push or deployment was performed; the five desktop journeys and final visual audit remain in Tasks 15–16.
 
 ---
 
@@ -1058,7 +1075,7 @@ Use a clean deterministic fixture run on port 4187 and the `chromium-desktop` pr
 
 Verify coordinator, support worker, incident reviewer, H&S owner, and H&S verifier. Confirm no out-of-scope row/picker/action, no dead link/403 advertised action, and H&S acceptance visible from all three modules.
 
-- [ ] **Step 5: Re-audit R1–R20 requirement by requirement**
+- [ ] **Step 5: Re-audit R1–R21 requirement by requirement**
 
 For every ledger row, cite a current test result, route/payload, database invariant, screenshot, or manual browser observation. Mark missing/indirect evidence as open and return to the owning task; do not mark completion from absence of findings.
 
@@ -1092,7 +1109,7 @@ git commit -m "docs(control-room): record unified journey completion audit"
 
 Do not declare the feature complete until all of the following are proven on the final commit:
 
-- R1–R20 are evidenced in the completion audit.
+- R1–R21 are evidenced in the completion audit.
 - No open P0/P1 remains in the fresh code/UI/workflow audit.
 - All five desktop incident journeys pass and land in H&S with correct acceptance and record invariants.
 - Incidents and H&S show the same WorkSafe state/count.
