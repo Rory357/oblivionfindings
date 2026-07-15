@@ -12,6 +12,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomDeskService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use Database\Factories\ControlRoomAlertFactory;
 use Database\Seeders\RbacSeeder;
@@ -152,9 +153,12 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('sla_compliance_pct', null)
-                ->where('sla_daily_trend.0.compliance_pct', null)
+                ->missing('analytics')
             );
+
+        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
+        $this->assertNull(data_get($dashboardAnalytics, 'sla.compliance_pct'));
+        $this->assertNull(data_get($dashboardAnalytics, 'sla_daily_trend.0.compliance_pct'));
 
         $this->actingAs($this->admin)
             ->get('/control-room/sla')
@@ -302,7 +306,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('alerts.data.0.id', $alert->id)
-                ->where('alerts.data.0.sla_status', 'red')
+                ->where('alerts.data.0.sla.status', 'breached')
             );
 
         $this->actingAs($this->admin)
@@ -384,16 +388,19 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             $sla->recordResponse($secondCycleStartedAt->copy()->addMinutes(20));
             $sla->recordResolution($secondCycleStartedAt->copy()->addMinutes(60));
 
+            $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
+            $this->assertSame(50.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
+            $this->assertSame([
+                ['date' => '2026-07-10', 'compliance_pct' => 100],
+                ['date' => '2026-07-12', 'compliance_pct' => 0],
+            ], data_get($dashboardAnalytics, 'sla_daily_trend'));
+
             $this->actingAs($this->admin)
                 ->get('/control-room')
                 ->assertOk()
                 ->assertInertia(fn ($page) => $page
-                    ->where('avg_response_minutes', fn ($value) => is_numeric($value) && (float) $value === 10.0)
-                    ->where('sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 50.0)
-                    ->where('sla_daily_trend', [
-                        ['date' => '2026-07-10', 'compliance_pct' => 100],
-                        ['date' => '2026-07-12', 'compliance_pct' => 0],
-                    ])
+                    ->missing('analytics')
+                    ->where('hero.last_24_hours.avg_response_minutes', null)
                 );
 
             $this->actingAs($this->admin)
@@ -448,17 +455,18 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
         );
         $poisonedSla->recordAcknowledge(now()->subMinutes(5));
 
+        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
+        $this->assertSame(100.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
+        $this->assertSame([[
+            'date' => now()->toDateString(),
+            'compliance_pct' => 100,
+        ]], data_get($dashboardAnalytics, 'sla_daily_trend'));
+
         $this->actingAs($this->admin)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 100.0)
-                ->where('sla_daily_trend', [[
-                    'date' => now()->toDateString(),
-                    'compliance_pct' => 100,
-                ]])
-                ->where('attention_flags', fn ($flags) => ! collect($flags)
-                    ->contains(fn (array $flag): bool => ($flag['metric'] ?? null) === 'sla_compliance'))
+                ->missing('analytics')
             );
 
         $this->actingAs($this->admin)

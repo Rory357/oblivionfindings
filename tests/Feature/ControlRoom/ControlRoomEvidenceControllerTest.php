@@ -6,8 +6,13 @@ use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\AlertWorkspaceService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ControlRoomEvidenceControllerTest extends TestCase
@@ -22,12 +27,17 @@ class ControlRoomEvidenceControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->alert = ControlRoomAlert::factory()->open()->create();
+        $site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
+        $this->alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $site->id,
+        ]);
     }
 
     public function test_index_requires_manage_permission(): void
@@ -120,7 +130,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
             ])
             ->assertRedirect();
 
-        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+        $detail = app(AlertWorkspaceService::class)
             ->build($this->admin, $this->alert->id);
 
         $item = $detail['evidence_packs'][0]['items'][0];
@@ -180,7 +190,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
 
     public function test_uploaded_item_can_be_downloaded(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('local');
+        Storage::fake('local');
 
         $pack = EvidencePack::create([
             'alert_id' => $this->alert->id,
@@ -192,7 +202,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/control-room/evidence/{$pack->id}/items", [
-                'file' => \Illuminate\Http\UploadedFile::fake()->image('door-photo.png'),
+                'file' => UploadedFile::fake()->image('door-photo.png'),
             ])
             ->assertRedirect();
 
@@ -263,7 +273,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
             'captured_by_user_id' => $this->admin->id,
         ]);
 
-        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+        $detail = app(AlertWorkspaceService::class)
             ->build($this->admin, $this->alert->id);
 
         $items = collect($detail['evidence_packs'][0]['items']);
