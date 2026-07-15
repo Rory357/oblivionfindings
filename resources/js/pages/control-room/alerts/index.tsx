@@ -1,5 +1,13 @@
-import { AlertWorkspaceDialog, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
-import { BulkAlertActionDialog, type BulkAlertMode } from '@/components/control-room/bulk-alert-action-dialog';
+import { AlertWorklist } from '@/components/control-room/alert-worklist/alert-worklist';
+import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
+import {
+    AlertWorkspaceDialog,
+    type AlertWorkspaceDetail,
+} from '@/components/control-room/alert-workspace-dialog';
+import {
+    BulkAlertActionDialog,
+    type BulkAlertMode,
+} from '@/components/control-room/bulk-alert-action-dialog';
 import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import { NewAlertWizard } from '@/components/control-room/new-alert-wizard';
 import { PageHero, PageLayout } from '@/components/page';
@@ -16,7 +24,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
@@ -55,6 +63,14 @@ interface AlertItem {
     notes: string | null;
 }
 
+type CanonicalAlertItem = AlertWorklistRow & {
+    alert_type: string;
+    escalation_level: number;
+    assigned_to: { id: number; name: string } | null;
+    client_name: string | null;
+    snoozed_until: string | null;
+};
+
 interface PaginationLink {
     url: string | null;
     label: string;
@@ -63,7 +79,7 @@ interface PaginationLink {
 
 interface Props {
     alerts: {
-        data: AlertItem[];
+        data: Array<AlertItem | CanonicalAlertItem>;
         links: PaginationLink[];
         current_page: number;
         last_page: number;
@@ -77,6 +93,7 @@ interface Props {
         assigned_to_me: number;
         unassigned: number;
         snoozed: number;
+        history?: number;
     };
     staff: Array<{ id: number; name: string; email: string }>;
     /** For the New-alert wizard (manual creation). */
@@ -187,16 +204,27 @@ export default function AlertsIndex({
     const [bulkMode, setBulkMode] = useState<BulkAlertMode | null>(null);
     // ?new=1 deep-links straight into the New-alert wizard (house pattern).
     const [newOpen, setNewOpen] = useState<boolean>(
-        () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1',
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).get('new') === '1',
     );
     const searchRef = useRef<HTMLInputElement>(null);
+    const isCanonicalWorklist = basePath === '/control-room/alerts';
 
     // Workspace-over-list: fetch only the `detail` prop and open the dialog
     // without navigating away; closing drops the param so `detail` goes null.
     const openWorkspace = (id: number) =>
-        router.get(basePath, { ...filters, alert: String(id) } as Record<string, string>, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            basePath,
+            { ...filters, alert: String(id) } as Record<string, string>,
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     const closeWorkspace = () =>
-        router.get(basePath, { ...filters } as Record<string, string>, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(basePath, { ...filters } as Record<string, string>, {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['detail'],
+        });
 
     // 30-second auto-refresh
     useEffect(() => {
@@ -241,13 +269,16 @@ export default function AlertsIndex({
         router.get(basePath, {}, { preserveState: true, preserveScroll: true });
     }, [basePath]);
 
-    const hasFilters = Object.values(filters).some((v) => v);
+    const hasFilters = Object.entries(filters).some(
+        ([key, value]) => value && !(key === 'lens' && value === 'active'),
+    );
 
     // ------------------------------------------------------------------
     // Sorting
     // ------------------------------------------------------------------
 
-    const currentSort = filters.sort || 'triggered_at';
+    const currentSort =
+        filters.sort || (isCanonicalWorklist ? 'priority' : 'triggered_at');
     const currentDir = filters.dir || 'desc';
 
     const toggleSort = useCallback(
@@ -308,38 +339,57 @@ export default function AlertsIndex({
     // ------------------------------------------------------------------
 
     const tabs = [
-        { label: 'All', count: stats.total, filter: {} },
-        { label: 'Open', count: stats.open, filter: { status: 'open' } },
+        {
+            label: isCanonicalWorklist ? 'Active' : 'All',
+            count: stats.total,
+            filter: isCanonicalWorklist ? { lens: 'active' } : {},
+        },
+        {
+            label: 'Open',
+            count: stats.open,
+            filter: { lens: 'active', status: 'open' },
+        },
         {
             label: 'Critical',
             count: stats.critical,
-            filter: { severity: 'critical' },
+            filter: { lens: 'active', severity: 'critical' },
         },
         {
             label: 'Assigned to Me',
             count: stats.assigned_to_me,
-            filter: { assigned_to: 'me' },
+            filter: { lens: 'my_queue', assigned_to: 'me' },
         },
         {
             label: 'Unassigned',
             count: stats.unassigned,
-            filter: { assigned_to: 'unassigned' },
+            filter: { lens: 'active', assigned_to: 'unassigned' },
         },
         {
             label: 'Snoozed',
             count: stats.snoozed ?? 0,
-            filter: { snoozed: '1' },
+            filter: { lens: 'snoozed', snoozed: '1' },
         },
+        ...(isCanonicalWorklist
+            ? [
+                  {
+                      label: 'History',
+                      count: stats.history ?? 0,
+                      filter: { lens: 'history' },
+                  },
+              ]
+            : []),
     ];
 
     const activeTab = (() => {
         if (filters.snoozed === '1') return 'Snoozed';
+        if (filters.lens === 'history') return 'History';
         if (filters.assigned_to === 'me') return 'Assigned to Me';
         if (filters.assigned_to === 'unassigned') return 'Unassigned';
         if (filters.status === 'open' && !filters.severity) return 'Open';
         if (filters.severity === 'critical' && !filters.status)
             return 'Critical';
-        if (!hasFilters) return 'All';
+        if (!hasFilters || filters.lens === 'active')
+            return isCanonicalWorklist ? 'Active' : 'All';
         return null;
     })();
 
@@ -370,7 +420,8 @@ export default function AlertsIndex({
                             { label: 'Unassigned', value: stats.unassigned },
                         ]}
                         actions={
-                            can.create && basePath === '/control-room/alerts' ? (
+                            can.create &&
+                            basePath === '/control-room/alerts' ? (
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -387,7 +438,10 @@ export default function AlertsIndex({
             >
                 {/* Command centre tabs (hidden for the reused integration-alerts view) */}
                 {basePath === '/control-room/alerts' ? (
-                    <CommandCentreTabs current="/control-room/alerts" badges={{ '/control-room/alerts': stats.open }} />
+                    <CommandCentreTabs
+                        current="/control-room/alerts"
+                        badges={{ '/control-room/alerts': stats.open }}
+                    />
                 ) : null}
 
                 {/* Quick filter tabs */}
@@ -569,237 +623,273 @@ export default function AlertsIndex({
                     </div>
                 )}
 
-                {/* Alerts table */}
-                <Card className="gap-0 overflow-x-auto rounded-lg p-0">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b bg-muted/50 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                <th className="w-10 px-3 py-3">
-                                    <Checkbox
-                                        checked={allOnPageSelected}
-                                        onCheckedChange={toggleAll}
-                                    />
-                                </th>
-                                <th
-                                    className="cursor-pointer px-3 py-3"
-                                    onClick={() => toggleSort('alert_type')}
-                                >
-                                    <span className="inline-flex items-center gap-1">
-                                        Alert Type{' '}
-                                        {renderSortIcon('alert_type')}
-                                    </span>
-                                </th>
-                                <th className="px-3 py-3">Source</th>
-                                <th
-                                    className="cursor-pointer px-3 py-3"
-                                    onClick={() => toggleSort('severity')}
-                                >
-                                    <span className="inline-flex items-center gap-1">
-                                        Severity {renderSortIcon('severity')}
-                                    </span>
-                                </th>
-                                <th
-                                    className="cursor-pointer px-3 py-3"
-                                    onClick={() => toggleSort('status')}
-                                >
-                                    <span className="inline-flex items-center gap-1">
-                                        Status {renderSortIcon('status')}
-                                    </span>
-                                </th>
-                                <th className="px-3 py-3">SLA</th>
-                                <th
-                                    className="cursor-pointer px-3 py-3"
-                                    onClick={() => toggleSort('triggered_at')}
-                                >
-                                    <span className="inline-flex items-center gap-1">
-                                        Triggered{' '}
-                                        {renderSortIcon('triggered_at')}
-                                    </span>
-                                </th>
-                                <th className="px-3 py-3">Assigned</th>
-                                <th className="px-3 py-3 text-right">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {alerts.data.length === 0 ? (
-                                <tr>
-                                    <td
-                                        colSpan={9}
-                                        className="px-3 py-16 text-center"
+                {/* Canonical worklist on the Control Room route; the integration
+                    route keeps its existing compatibility table until Task 13. */}
+                {isCanonicalWorklist ? (
+                    <AlertWorklist
+                        rows={alerts.data as CanonicalAlertItem[]}
+                        selected={selected}
+                        onSelectionChange={setSelected}
+                        onSort={toggleSort}
+                        onOpen={openWorkspace}
+                    />
+                ) : (
+                    <Card className="gap-0 overflow-x-auto rounded-lg p-0">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b bg-muted/50 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                    <th className="w-10 px-3 py-3">
+                                        <Checkbox
+                                            checked={allOnPageSelected}
+                                            onCheckedChange={toggleAll}
+                                        />
+                                    </th>
+                                    <th
+                                        className="cursor-pointer px-3 py-3"
+                                        onClick={() => toggleSort('alert_type')}
                                     >
-                                        <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-                                        <p className="text-sm text-muted-foreground">
-                                            No alerts found matching your
-                                            filters.
-                                        </p>
-                                    </td>
+                                        <span className="inline-flex items-center gap-1">
+                                            Alert Type{' '}
+                                            {renderSortIcon('alert_type')}
+                                        </span>
+                                    </th>
+                                    <th className="px-3 py-3">Source</th>
+                                    <th
+                                        className="cursor-pointer px-3 py-3"
+                                        onClick={() => toggleSort('severity')}
+                                    >
+                                        <span className="inline-flex items-center gap-1">
+                                            Severity{' '}
+                                            {renderSortIcon('severity')}
+                                        </span>
+                                    </th>
+                                    <th
+                                        className="cursor-pointer px-3 py-3"
+                                        onClick={() => toggleSort('status')}
+                                    >
+                                        <span className="inline-flex items-center gap-1">
+                                            Status {renderSortIcon('status')}
+                                        </span>
+                                    </th>
+                                    <th className="px-3 py-3">SLA</th>
+                                    <th
+                                        className="cursor-pointer px-3 py-3"
+                                        onClick={() =>
+                                            toggleSort('triggered_at')
+                                        }
+                                    >
+                                        <span className="inline-flex items-center gap-1">
+                                            Triggered{' '}
+                                            {renderSortIcon('triggered_at')}
+                                        </span>
+                                    </th>
+                                    <th className="px-3 py-3">Assigned</th>
+                                    <th className="px-3 py-3 text-right">
+                                        Actions
+                                    </th>
                                 </tr>
-                            ) : (
-                                alerts.data.map((alert, idx) => (
-                                    <tr
-                                        key={alert.id}
-                                        onClick={() => openWorkspace(alert.id)}
-                                        className={`cursor-pointer border-b border-l-4 transition-colors hover:bg-muted/40 ${
-                                            severityBorders[alert.severity] ??
-                                            'border-l-transparent'
-                                        } ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
-                                            selected.has(alert.id)
-                                                ? 'bg-primary/5'
-                                                : ''
-                                        }`}
-                                    >
+                            </thead>
+                            <tbody>
+                                {alerts.data.length === 0 ? (
+                                    <tr>
                                         <td
-                                            className="px-3 py-2.5"
-                                            onClick={(e) => e.stopPropagation()}
+                                            colSpan={9}
+                                            className="px-3 py-16 text-center"
                                         >
-                                            <Checkbox
-                                                checked={selected.has(alert.id)}
-                                                onCheckedChange={() =>
-                                                    toggleOne(alert.id)
-                                                }
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium">
-                                                    {alert.alert_type}
-                                                </span>
-                                                {alert.escalation_level &&
-                                                    alert.escalation_level >
-                                                        0 && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-status-warning/30 px-1 py-0 text-[10px] text-status-warning"
-                                                        >
-                                                            L
-                                                            {
-                                                                alert.escalation_level
-                                                            }
-                                                        </Badge>
-                                                    )}
-                                            </div>
-                                            {alert.client_name && (
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    {alert.client_name}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            <span className="text-xs text-muted-foreground capitalize">
-                                                {alert.source?.replace(
-                                                    '_',
-                                                    ' ',
-                                                )}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            <Badge
-                                                className={`inline-flex items-center gap-1 ${
-                                                    severityColors[
-                                                        alert.severity
-                                                    ] ??
-                                                    'bg-muted-foreground/80 text-white'
-                                                }`}
-                                            >
-                                                {severityIcon(alert.severity)}
-                                                {alert.severity}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            <Badge
-                                                variant="outline"
-                                                className={
-                                                    statusColors[
-                                                        alert.status
-                                                    ] ?? ''
-                                                }
-                                            >
-                                                {statusLabels[alert.status] ??
-                                                    alert.status}
-                                            </Badge>
-                                            {alert.snoozed_until &&
-                                            new Date(alert.snoozed_until) >
-                                                new Date() ? (
-                                                <span
-                                                    className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
-                                                    title={`Snoozed until ${new Date(alert.snoozed_until).toLocaleString()}`}
-                                                >
-                                                    <BellOff className="h-3 w-3" />
-                                                    Snoozed
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            {alert.sla_status ? (
-                                                <Circle
-                                                    className={`h-3 w-3 fill-current ${
-                                                        slaColors[
-                                                            alert.sla_status
-                                                        ] ??
-                                                        'text-muted-foreground'
-                                                    }`}
-                                                />
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">
-                                                    -
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            <span
-                                                className="flex items-center gap-1 text-xs text-muted-foreground"
-                                                title={
-                                                    alert.triggered_at
-                                                        ? new Date(
-                                                              alert.triggered_at,
-                                                          ).toLocaleString()
-                                                        : ''
-                                                }
-                                            >
-                                                <Clock className="h-3 w-3" />
-                                                {formatRelativeTime(
-                                                    alert.triggered_at,
-                                                )}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2.5">
-                                            {alert.assigned_to ? (
-                                                <span className="flex items-center gap-1 text-xs">
-                                                    <User className="h-3 w-3" />
-                                                    {alert.assigned_to.name}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground italic">
-                                                    Unassigned
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td
-                                            className="px-3 py-2.5"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div className="flex items-center justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 px-2 text-xs"
-                                                    onClick={() =>
-                                                        openWorkspace(alert.id)
-                                                    }
-                                                >
-                                                    <Eye className="mr-1 h-3 w-3" />
-                                                    Open
-                                                </Button>
-                                            </div>
+                                            <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                                            <p className="text-sm text-muted-foreground">
+                                                No alerts found matching your
+                                                filters.
+                                            </p>
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </Card>
+                                ) : (
+                                    (alerts.data as AlertItem[]).map(
+                                        (alert, idx) => (
+                                            <tr
+                                                key={alert.id}
+                                                onClick={() =>
+                                                    openWorkspace(alert.id)
+                                                }
+                                                className={`cursor-pointer border-b border-l-4 transition-colors hover:bg-muted/40 ${
+                                                    severityBorders[
+                                                        alert.severity
+                                                    ] ?? 'border-l-transparent'
+                                                } ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
+                                                    selected.has(alert.id)
+                                                        ? 'bg-primary/5'
+                                                        : ''
+                                                }`}
+                                            >
+                                                <td
+                                                    className="px-3 py-2.5"
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
+                                                    <Checkbox
+                                                        checked={selected.has(
+                                                            alert.id,
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleOne(alert.id)
+                                                        }
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">
+                                                            {alert.alert_type}
+                                                        </span>
+                                                        {alert.escalation_level &&
+                                                            alert.escalation_level >
+                                                                0 && (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-status-warning/30 px-1 py-0 text-[10px] text-status-warning"
+                                                                >
+                                                                    L
+                                                                    {
+                                                                        alert.escalation_level
+                                                                    }
+                                                                </Badge>
+                                                            )}
+                                                    </div>
+                                                    {alert.client_name && (
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            {alert.client_name}
+                                                        </p>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <span className="text-xs text-muted-foreground capitalize">
+                                                        {alert.source?.replace(
+                                                            '_',
+                                                            ' ',
+                                                        )}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <Badge
+                                                        className={`inline-flex items-center gap-1 ${
+                                                            severityColors[
+                                                                alert.severity
+                                                            ] ??
+                                                            'bg-muted-foreground/80 text-white'
+                                                        }`}
+                                                    >
+                                                        {severityIcon(
+                                                            alert.severity,
+                                                        )}
+                                                        {alert.severity}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            statusColors[
+                                                                alert.status
+                                                            ] ?? ''
+                                                        }
+                                                    >
+                                                        {statusLabels[
+                                                            alert.status
+                                                        ] ?? alert.status}
+                                                    </Badge>
+                                                    {alert.snoozed_until &&
+                                                    new Date(
+                                                        alert.snoozed_until,
+                                                    ) > new Date() ? (
+                                                        <span
+                                                            className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                                                            title={`Snoozed until ${new Date(alert.snoozed_until).toLocaleString()}`}
+                                                        >
+                                                            <BellOff className="h-3 w-3" />
+                                                            Snoozed
+                                                        </span>
+                                                    ) : null}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    {alert.sla_status ? (
+                                                        <Circle
+                                                            className={`h-3 w-3 fill-current ${
+                                                                slaColors[
+                                                                    alert
+                                                                        .sla_status
+                                                                ] ??
+                                                                'text-muted-foreground'
+                                                            }`}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <span
+                                                        className="flex items-center gap-1 text-xs text-muted-foreground"
+                                                        title={
+                                                            alert.triggered_at
+                                                                ? new Date(
+                                                                      alert.triggered_at,
+                                                                  ).toLocaleString()
+                                                                : ''
+                                                        }
+                                                    >
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatRelativeTime(
+                                                            alert.triggered_at,
+                                                        )}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    {alert.assigned_to ? (
+                                                        <span className="flex items-center gap-1 text-xs">
+                                                            <User className="h-3 w-3" />
+                                                            {
+                                                                alert
+                                                                    .assigned_to
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground italic">
+                                                            Unassigned
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td
+                                                    className="px-3 py-2.5"
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-xs"
+                                                            onClick={() =>
+                                                                openWorkspace(
+                                                                    alert.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Eye className="mr-1 h-3 w-3" />
+                                                            Open
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ),
+                                    )
+                                )}
+                            </tbody>
+                        </table>
+                    </Card>
+                )}
 
                 {/* Pagination */}
                 {alerts.links?.length > 3 && (
@@ -848,13 +938,16 @@ export default function AlertsIndex({
                     mode={bulkMode}
                     open
                     onClose={() => setBulkMode(null)}
-                    alerts={selectedAlerts.map((a) => ({
-                        id: a.id,
-                        alert_type: a.alert_type,
-                        severity: a.severity,
-                        status: a.status,
-                        client_name: a.client_name,
-                    }))}
+                    alerts={selectedAlerts.map((item) => {
+                        const alert = item as AlertItem | CanonicalAlertItem;
+                        return {
+                            id: alert.id,
+                            alert_type: alert.alert_type,
+                            severity: alert.severity,
+                            status: alert.status,
+                            client_name: alert.client_name,
+                        };
+                    })}
                     staff={staff}
                     onDone={() => setSelected(new Set())}
                 />
@@ -862,7 +955,11 @@ export default function AlertsIndex({
 
             {/* Workspace-over-list */}
             {detail ? (
-                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+                <AlertWorkspaceDialog
+                    detail={detail}
+                    open
+                    onClose={closeWorkspace}
+                />
             ) : null}
 
             {/* Manual alert creation — guided wizard. Mounted only while open so

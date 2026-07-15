@@ -14,10 +14,13 @@ use App\Models\FleetSignal;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorklistPresenter;
+use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,136 +33,81 @@ use InvalidArgumentException;
 
 class ControlRoomAlertController extends Controller
 {
-    /**
-     * SQL fragment for ordering severity: critical first, low last.
-     * Used by both priority sort and explicit severity sort.
-     */
-    private const SEVERITY_ORDER_SQL = "FIELD(severity, 'critical', 'high', 'medium', 'low')";
-
     private const TRANSACTION_ATTEMPTS = 3;
 
     /**
      * Display the alerts list with filters, sorting and stats.
      */
-    public function index(Request $request)
-    {
+    public function index(
+        Request $request,
+        AlertWorklistQuery $worklists,
+        AlertWorklistPresenter $presenter,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
-        $query = ControlRoomAlert::with([
-            'asset:id,name,asset_tag',
-            'assignedTo:id,name,email',
-            'client:id,first_name,last_name',
-            'sla',
-            'playbookRun:id,alert_id,playbook_id,status,current_step,completed_steps,total_steps',
-            'playbookRun.playbook:id,name,category',
-        ]);
+        $requestedLens = (string) $request->input('lens', 'active');
+        $status = (string) $request->input('status', '');
+        $lens = match (true) {
+            $request->input('snoozed') === '1' => 'snoozed',
+            in_array($status, ControlRoomAlert::TERMINAL_STATUSES, true) => 'history',
+            in_array($requestedLens, ['active', 'history', 'snoozed', 'my_queue', 'safety_handover'], true) => $requestedLens,
+            default => 'active',
+        };
+        $assignedTo = (string) $request->input('assigned_to', '');
+        $query = $worklists->forUser($user, array_filter([
+            'lens' => $lens,
+            'severity' => $request->input('severity'),
+            'source' => $request->input('source'),
+            'queue_id' => $request->input('queue_id'),
+            'assigned_to' => $assignedTo === 'me'
+                ? $user->id
+                : (is_numeric($assignedTo) ? (int) $assignedTo : null),
+            'q' => $request->input('search'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+        ], fn ($value) => filled($value)));
 
-        $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
-
-        // Filters
-        $status = $request->input('status');
-        if (filled($status) && $status !== 'all') {
-            $query->where('status', $status);
-        } else {
-            $query->actionable();
+        if ($status !== '' && $status !== 'all') {
+            $query->where('control_room_alerts.status', $status);
+        }
+        if ($assignedTo === 'unassigned') {
+            $query->whereNull('control_room_alerts.assigned_to_user_id');
         }
 
-        if ($severity = $request->input('severity')) {
-            $query->where('severity', $severity);
+        $sortField = (string) $request->input('sort', 'priority');
+        if (! in_array($sortField, ['priority', 'severity', 'triggered_at', 'status', 'alert_type'], true)) {
+            $sortField = 'priority';
         }
-
-        if ($source = $request->input('source')) {
-            $query->where('source', $source);
-        }
-
-        if ($assignedTo = $request->input('assigned_to')) {
-            if ($assignedTo === 'me') {
-                $query->where('assigned_to_user_id', $user->id);
-            } elseif ($assignedTo === 'unassigned') {
-                $query->whereNull('assigned_to_user_id');
-            } else {
-                $query->where('assigned_to_user_id', (int) $assignedTo);
+        $sortDir = $request->input('dir', 'desc');
+        $sortDir = $sortDir === 'asc' ? 'asc' : 'desc';
+        $sortLabel = 'Priority: SLA breach, severity, escalation, next deadline, oldest';
+        if ($sortField !== 'priority') {
+            $query->reorder();
+            if ($sortField === 'severity') {
+                $query->orderByRaw(
+                    'FIELD(control_room_alerts.severity, \'critical\', \'high\', \'medium\', \'low\') '.($sortDir === 'desc' ? 'ASC' : 'DESC'),
+                );
+                $sortLabel = 'Severity: '.($sortDir === 'desc' ? 'critical to low' : 'low to critical');
+            } elseif (in_array($sortField, ['triggered_at', 'status', 'alert_type'], true)) {
+                $query->orderBy('control_room_alerts.'.$sortField, $sortDir)
+                    ->orderBy('control_room_alerts.id');
+                $sortLabel = Str::headline($sortField).': '.$sortDir;
             }
         }
 
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('alert_type', 'like', "%{$search}%")
-                    ->orWhere('notes', 'like', "%{$search}%")
-                    ->orWhere('source', 'like', "%{$search}%");
-            });
-        }
-
-        if ($dateFrom = $request->input('date_from')) {
-            $query->where('triggered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
-        }
-
-        if ($dateTo = $request->input('date_to')) {
-            $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
-        }
-
-        // Snooze — the "Snoozed" tab shows currently-snoozed alerts; every other
-        // view hides them so the desk stays decluttered. An elapsed snooze
-        // returns the alert to the worklist automatically (scopes key off now()).
-        if ($request->input('snoozed') === '1') {
-            $query->snoozed();
-        } else {
-            $query->notSnoozed();
-        }
-
-        // Sorting — default is operational priority (severity → escalation → oldest first)
-        $sortField = $request->input('sort', 'priority');
-        $sortDir = $request->input('dir', 'desc');
-        $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type', 'priority'];
-
-        if ($sortField === 'priority' || ! in_array($sortField, $allowedSorts, true)) {
-            $this->applyOperationalPrioritySort($query);
-        } elseif ($sortField === 'severity') {
-            $query->orderByRaw(self::SEVERITY_ORDER_SQL.' '.($sortDir === 'desc' ? 'DESC' : 'ASC'));
-        } else {
-            $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
-        }
-
         $paginated = $query->paginate(30)->withQueryString();
+        $alerts = $paginated->through(function (ControlRoomAlert $alert) use ($presenter, $user): array {
+            $row = $presenter->present($alert, $user);
 
-        $alerts = $paginated->through(fn (ControlRoomAlert $alert) => [
-            'id' => $alert->id,
-            'source' => $alert->source,
-            'alert_type' => $alert->alert_type,
-            'severity' => $alert->severity,
-            'status' => $alert->status,
-            'escalation_level' => $alert->escalation_level,
-            'triggered_at' => optional($alert->triggered_at)->toISOString(),
-            'age_minutes' => $alert->triggered_at ? (int) $alert->triggered_at->diffInMinutes(now()) : null,
-            'asset' => $alert->asset ? [
-                'id' => $alert->asset->id,
-                'name' => $alert->asset->name,
-                'asset_tag' => $alert->asset->asset_tag,
-            ] : null,
-            'assigned_to' => $alert->assignedTo ? [
-                'id' => $alert->assignedTo->id,
-                'name' => $alert->assignedTo->name,
-            ] : null,
-            'client_name' => $alert->client
-                ? trim($alert->client->first_name.' '.$alert->client->last_name)
-                : null,
-            'sla_status' => $this->deriveSlaStatus($alert),
-            'snoozed_until' => optional($alert->snoozed_until)->toISOString(),
-            'notes' => $alert->notes ? Str::limit($alert->notes, 120) : null,
-            // Operator context — what this alert is about (from normalized_data)
-            'summary' => $this->extractAlertSummary($alert),
-            // Playbook progress — shows operator what action state this is in
-            'playbook' => $alert->playbookRun ? [
-                'name' => $alert->playbookRun->playbook?->name,
-                'status' => $alert->playbookRun->status,
-                'progress' => $alert->playbookRun->total_steps > 0
-                    ? (int) round(($alert->playbookRun->completed_steps / $alert->playbookRun->total_steps) * 100)
-                    : 0,
-                'current_step' => $alert->playbookRun->current_step,
-                'total_steps' => $alert->playbookRun->total_steps,
-            ] : null,
-        ]);
+            return array_merge($row, [
+                'alert_type' => $alert->alert_type,
+                'escalation_level' => (int) $alert->escalation_level,
+                'assigned_to' => $row['assignee'],
+                'client_name' => $row['person']['name'] ?? null,
+                'snoozed_until' => $alert->snoozed_until?->toIso8601String(),
+            ]);
+        });
 
         // Stats (unfiltered counts)
         $statsBase = ControlRoomAlert::query();
@@ -168,13 +116,14 @@ class ControlRoomAlertController extends Controller
         // The five tab counts mirror the worklist, which hides currently-snoozed
         // alerts — so they exclude snoozed too. Snoozed gets its own count/tab.
         $stats = [
-            'total' => (clone $statsBase)->notSnoozed()->count(),
+            'total' => (clone $statsBase)->actionable()->notSnoozed()->count(),
             'open' => (clone $statsBase)->notSnoozed()->where('status', 'open')->count(),
             'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->actionable()->count(),
             'in_triage' => (clone $statsBase)->where('status', 'triaging')->count(),
             'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->actionable()->count(),
             'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->actionable()->count(),
             'snoozed' => (clone $statsBase)->snoozed()->count(),
+            'history' => (clone $statsBase)->whereIn('status', ControlRoomAlert::TERMINAL_STATUSES)->count(),
             'sla_breached' => (clone $statsBase)->actionable()
                 ->whereHas('sla', fn ($q) => $q->breached())
                 ->count(),
@@ -215,7 +164,15 @@ class ControlRoomAlertController extends Controller
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
-            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),
+            'filters' => array_merge(
+                $request->only(['status', 'severity', 'source', 'queue_id', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),
+                ['lens' => $lens],
+            ),
+            'sort' => [
+                'field' => $sortField,
+                'direction' => $sortDir,
+                'label' => $sortLabel,
+            ],
             'stats' => $stats,
             'queues' => $queues,
             'staff' => $staff,
@@ -240,67 +197,68 @@ class ControlRoomAlertController extends Controller
         ]);
     }
 
-    /**
-     * Extract a human-readable summary from the alert context for operator scanning.
-     *
-     * Defensive fallback chain ensures operators almost never see a blank summary:
-     * 1. normalized_data.title (set by all signal services and bridge methods)
-     * 2. normalized_data.description (sometimes richer than title)
-     * 3. alert notes (manually added context)
-     * 4. alert_type as display name (always available, humanised)
-     *
-     * This degrades gracefully for any future emitter that omits context fields.
-     */
-    private function extractAlertSummary(ControlRoomAlert $alert): string
-    {
-        $ctx = $alert->context['normalized_data'] ?? $alert->context ?? [];
+    public function createIncident(
+        Request $request,
+        ControlRoomAlert $alert,
+        IncidentJourneyService $journeys,
+    ) {
+        $user = $request->user();
+        abort_unless(
+            $user
+                && $user->canDo('controlRoom.alerts.manage')
+                && $user->canDo('incidents.create'),
+            403,
+        );
+        $this->siteAccess()->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to create an incident from this alert.',
+        );
 
-        // 1. Signal/bridge normalised title
-        $title = $ctx['title'] ?? null;
-        if ($title && is_string($title) && trim($title) !== '') {
-            return Str::limit(trim($title), 100);
+        $data = $request->validate([
+            'type' => ['nullable', 'string', 'max:120'],
+            'severity' => ['nullable', 'string', 'in:low,medium,high,critical'],
+            'occurred_at' => ['nullable', 'date'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'requires_followup' => ['nullable', 'boolean'],
+            'location' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $journey = $journeys->submitFromAlert($alert, $data, $user);
+        $payload = [
+            'alert' => [
+                'id' => $journey->alert?->id,
+                'reference_number' => $journey->alert?->reference_number,
+            ],
+            'incident' => [
+                'id' => $journey->incident->id,
+                'reference_number' => $journey->incident->reference_number,
+                'status' => $journey->incident->status,
+                'href' => $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned')
+                    ? '/incidents?incident='.$journey->incident->id
+                    : null,
+            ],
+            'health_safety' => [
+                'id' => $journey->hsEvent?->id,
+                'reference_number' => $journey->hsEvent?->reference_number,
+                'status' => $journey->hsEvent?->status,
+                'handover_status' => $journey->hsEvent?->handover_status,
+                'href' => $user->canDo('hazards.view') && $journey->hsEvent
+                    ? '/health-safety/events/'.$journey->hsEvent->id
+                    : null,
+            ],
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json(['journey' => $payload]);
         }
 
-        // 2. Description (may contain more detail)
-        $desc = $ctx['description'] ?? null;
-        if ($desc && is_string($desc) && trim($desc) !== '') {
-            return Str::limit(trim($desc), 100);
-        }
-
-        // 3. Notes on the alert
-        if ($alert->notes && trim($alert->notes) !== '') {
-            return Str::limit(trim($alert->notes), 100);
-        }
-
-        // 4. Humanised alert_type as last resort (always available)
-        return str_replace(['.', '_'], ' ', ucfirst($alert->alert_type));
-    }
-
-    /**
-     * Apply operational priority sort: severity → escalation → oldest first.
-     *
-     * This is the default sort for the triage list. Ensures critical alerts
-     * are always at the top, heavily escalated alerts surface quickly, and
-     * within the same priority band the longest-waiting alert comes first.
-     */
-    private function applyOperationalPrioritySort($query): void
-    {
-        $query->orderByRaw(self::SEVERITY_ORDER_SQL.' ASC')   // critical first
-            ->orderByDesc('escalation_level')                   // most escalated first
-            ->orderBy('triggered_at', 'asc');                   // oldest first
-    }
-
-    /**
-     * Derive SLA status for a given alert (green/yellow/red/none).
-     */
-    private function deriveSlaStatus(ControlRoomAlert $alert): ?string
-    {
-        return match ($alert->sla?->getStatus()) {
-            'breached' => 'red',
-            'at_risk' => 'yellow',
-            'on_track', 'resolved' => 'green',
-            default => null,
-        };
+        return back()
+            ->with('success', 'Incident '.$journey->incident->reference_number.' created and handed to H&S.')
+            ->with('incident_journey', $payload);
     }
 
     /**

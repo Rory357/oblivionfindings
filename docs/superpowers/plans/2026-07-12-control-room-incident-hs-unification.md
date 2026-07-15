@@ -797,36 +797,46 @@ git commit -m "feat(control-room): rebuild dashboard as live desk"
 - Test: `tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php`
 - Test: `resources/js/components/control-room/alert-workspace/next-action.test.ts`
 
-- [ ] **Step 1: Write failing Active alerts tests**
+- [x] **Step 1: Write failing Active alerts tests**
 
 Assert default actionable lens, canonical ordering, visible summary/playbook/SLA text, sorting label parity, accessible sort buttons/checkbox names, and terminal records absent until an explicit history lens.
 
-- [ ] **Step 2: Write failing alert-to-incident route tests**
+- [x] **Step 2: Write failing alert-to-incident route tests**
 
 Route `POST /control-room/alerts/{alert}/create-incident` must be authorised, call `submitFromAlert()`, return official references, keep the same alert, and be idempotent.
 
-- [ ] **Step 3: Write failing Safety handover tests**
+- [x] **Step 3: Write failing Safety handover tests**
 
 Assert lenses Needs incident, Awaiting H&S, Accepted/investigating, Operational complete/governance continuing, and Complete. The controller must query canonical journeys with database pagination; it must not load all ClientIncident/MedicationError/SafeguardingConcern rows into PHP.
 
-- [ ] **Step 4: Implement list/workspace changes**
+- [x] **Step 4: Implement list/workspace changes**
 
 Render canonical rows and one recommended CTA. Keep sensor Confirm/Dismiss. Put assign/escalate/snooze/edit in secondary actions. The linked section offers `Create incident and hand over`, `Open incident`, or `Continue in H&S` based on actual links/capabilities.
 
-- [ ] **Step 5: Replace fake/raw references and dead instructions**
+- [x] **Step 5: Replace fake/raw references and dead instructions**
 
 Remove `CR-{id}`, `INC-{id}`, “Flag incident in Incident Tracker,” unconditional “Create Alert,” and the duplicate raw-domain detail dialog.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php && npm test -- resources/js/components/control-room/alert-workspace/next-action.test.ts`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Http/Controllers/ControlRoom app/Services/ControlRoom/AlertWorkspaceService.php routes/control-room.php resources/js/pages/control-room resources/js/components/control-room tests/Feature/ControlRoom
 git commit -m "feat(control-room): unify alerts and safety handovers"
 ```
+
+**Task 11 evidence (2026-07-15):**
+
+- RED proof first failed on the absent canonical `sla`/sort payload, missing alert-to-incident route, missing handover lens contract, missing `next-action.ts`, and missing accessible Alert worklist component. The completed tests cover the actionable/history boundary, shared priority order, summary/playbook/SLA context, official references, idempotent journey creation, all five handover states, and a 25-row database paginator.
+- Active alerts now render the shared canonical worklist with named selection/sort controls, readable priority and deadline reasons, playbook progress, official linked references, an explicit History lens, and one `Continue response` action. The integration-alerts reuse path retains its compatibility table until Task 13.
+- The Alert workspace now shows the official CR reference, one visible Control Room → incident → H&S journey, and one recommended action selected from sensor confirmation, `Create incident and hand over`, `Open incident`, or `Continue in H&S`. Assignment, escalation, snooze, editing, and sensor dismissal remain secondary controls. Fake `CR-{id}`/`INC-{id}` labels and the dead Incident Tracker instruction were removed from these surfaces.
+- Safety handovers replaces the old mixed-domain tracker UI with canonical alert-led journeys and the lenses Needs incident, Awaiting H&S, Accepted/in progress, Operations done/H&S open, and Complete. The primary journey query is site-scoped and database-paginated; the unused legacy response prop is a bounded 25-row-per-source compatibility preview rather than an unbounded PHP load.
+- The final Task 11 backend gate passed 89 tests / 607 assertions across the new Safety handover suite, legacy incident-controller coverage, and the complete alert-controller lifecycle. The wider regression correction gate passed 85 tests / 518 assertions, including the 15-query Desk budget, tenant isolation, site-precedence filtering, platform-only shifts, and fresh transaction-actor authorization.
+- Frontend focused proof passed 7 tests across next-action, accessible worklist, and linked H&S presentation. `npm run types`, focused ESLint, Pint, Prettier, PHP syntax and `git diff --check` exited cleanly.
+- No desktop browser E2E, mobile/responsive/WebView test, merge, push or deployment was performed. Browser proof remains scheduled for Tasks 15–16 after the remaining Control Room surfaces, universal `/tasks` integration, and five deterministic journeys are complete.
 
 ---
 

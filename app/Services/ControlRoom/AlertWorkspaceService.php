@@ -71,6 +71,7 @@ class AlertWorkspaceService
             'communications',
             'sla.slaDefinition',
             'client:id,first_name,last_name,site_id,organization_id',
+            'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,client_id,site_id,title',
             'device:id,type,latitude,longitude,location_description,site_id,client_id,asset_id',
             'tasks' => fn ($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
             'discussions' => fn ($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn ($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
@@ -112,9 +113,13 @@ class AlertWorkspaceService
         $unsafeDeviceReference = $alert->device_id !== null && $safeDevice === null;
         $safeContext = $this->provenance->sanitiseContextForRead($alert);
 
+        $linkedIncident = $alert->clientIncident;
+        $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+
         return [
             'alert' => [
                 'id' => $alert->id,
+                'reference_number' => $alert->reference_number,
                 'source' => $alert->source,
                 'alert_type' => $alert->alert_type,
                 'severity' => $alert->severity,
@@ -275,6 +280,10 @@ class AlertWorkspaceService
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
                 'escalate' => $user->canDo('controlRoom.alerts.escalate'),
                 'create' => $user->canDo('controlRoom.alerts.create'),
+                'create_incident' => $user->canDo('controlRoom.alerts.manage')
+                    && $user->canDo('incidents.create'),
+                'view_incident' => $canViewIncident,
+                'view_health_safety' => $user->canDo('hazards.view'),
             ],
             'staff' => $this->assignableStaff($user),
             'tasks' => $alert->tasks->map(fn ($t) => [
@@ -337,6 +346,16 @@ class AlertWorkspaceService
                 'categories' => ConfigOption::forGroup('category'),
                 'resolution_codes' => ConfigOption::forGroup('resolution_code'),
             ],
+            'linked_incident' => $linkedIncident ? [
+                'id' => $linkedIncident->id,
+                'reference_number' => $linkedIncident->reference_number,
+                'status' => $linkedIncident->status,
+                'severity' => $linkedIncident->severity,
+                'title' => $linkedIncident->title,
+                'href' => $canViewIncident
+                    ? '/incidents?incident='.$linkedIncident->id
+                    : null,
+            ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
         ];
     }
@@ -360,5 +379,4 @@ class AlertWorkspaceService
 
         return $staffQuery->get(['id', 'name', 'email']);
     }
-
 }
