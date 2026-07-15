@@ -5,9 +5,13 @@ namespace App\Http\Controllers\HealthSafety;
 use App\Http\Controllers\Controller;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
+use App\Models\User;
 use App\Services\HealthSafety\HsInvestigationService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Exposes the (already gated) HsInvestigationService over HTTP (E-Gap 3). Each
@@ -18,18 +22,35 @@ use Illuminate\Validation\Rule;
  */
 class HsInvestigationController extends Controller
 {
-    public function __construct(private readonly HsInvestigationService $service) {}
+    public function __construct(
+        private readonly HsInvestigationService $service,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     /** Start an investigation: create (methodology, lead, team) then move to in_progress. */
     public function store(Request $request, HsEvent $event)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
+
         $data = $request->validate([
             'methodology' => ['required', Rule::in(HsInvestigation::VALID_METHODOLOGIES)],
-            'lead_investigator_id' => ['required', 'integer', 'exists:users,id'],
+            'lead_investigator_id' => ['required', 'integer'],
             'team_member_ids' => ['nullable', 'array'],
-            'team_member_ids.*' => ['integer', 'exists:users,id'],
+            'team_member_ids.*' => ['integer'],
             'target_completion_date' => ['nullable', 'date'],
         ]);
+        $this->assertStaffAreAssignable(
+            $request,
+            $event,
+            [(int) $data['lead_investigator_id']],
+            'lead_investigator_id',
+        );
+        $this->assertStaffAreAssignable(
+            $request,
+            $event,
+            array_map('intval', $data['team_member_ids'] ?? []),
+            'team_member_ids',
+        );
 
         try {
             $investigation = $this->service->create($event, [
@@ -49,6 +70,7 @@ class HsInvestigationController extends Controller
     /** Record findings: causes, contributing factors, recommendations (→ findings_recorded). */
     public function recordFindings(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
         $data = $request->validate([
@@ -70,8 +92,9 @@ class HsInvestigationController extends Controller
     }
 
     /** Submit for review (findings_recorded → under_review). */
-    public function submit(HsEvent $event, HsInvestigation $investigation)
+    public function submit(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
         try {
@@ -86,6 +109,7 @@ class HsInvestigationController extends Controller
     /** Return for rework (under_review → in_progress) with reviewer notes. */
     public function returnForRework(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
         $data = $request->validate(['review_notes' => ['required', 'string', 'max:2000']]);
@@ -102,9 +126,18 @@ class HsInvestigationController extends Controller
     /** Complete (under_review → completed); auto-advances the event to corrective_action. */
     public function complete(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
-        $data = $request->validate(['approved_by_id' => ['nullable', 'integer', 'exists:users,id']]);
+        $data = $request->validate(['approved_by_id' => ['nullable', 'integer']]);
+        if (isset($data['approved_by_id'])) {
+            $this->assertStaffAreAssignable(
+                $request,
+                $event,
+                [(int) $data['approved_by_id']],
+                'approved_by_id',
+            );
+        }
 
         try {
             $this->service->complete($investigation, [
@@ -120,8 +153,83 @@ class HsInvestigationController extends Controller
         return back()->with('success', 'Investigation completed.');
     }
 
+    /** Record or revise the explicit outcome of one completed recommendation. */
+    public function disposition(
+        Request $request,
+        HsEvent $event,
+        HsInvestigation $investigation,
+        int $recommendationIndex,
+    ) {
+        $event = $this->resolveAccessibleEvent($request, $event);
+        $this->ensureBelongs($event, $investigation);
+
+        $data = $request->validate([
+            'disposition' => ['required', Rule::in(HsRecommendationDisposition::VALID_DISPOSITIONS)],
+            'reason' => [
+                'nullable',
+                'required_unless:disposition,'.HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                'string',
+                'max:2000',
+            ],
+        ]);
+
+        try {
+            $this->service->dispositionRecommendation(
+                $investigation,
+                $recommendationIndex,
+                $data['disposition'],
+                $request->user(),
+                $data['reason'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Recommendation outcome recorded.');
+    }
+
     private function ensureBelongs(HsEvent $event, HsInvestigation $investigation): void
     {
         abort_unless($investigation->hs_event_id === $event->id, 404);
+    }
+
+    private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
+    {
+        $query = HsEvent::query();
+        $this->siteAccess->applyHsEventScope($query, $request->user(), ['healthSafety.viewAllSites']);
+
+        return $query->findOrFail($event->id);
+    }
+
+    /** @param list<int> $staffIds */
+    private function assertStaffAreAssignable(
+        Request $request,
+        HsEvent $event,
+        array $staffIds,
+        string $field,
+    ): void {
+        $staffIds = array_values(array_unique(array_filter($staffIds, fn (int $id): bool => $id > 0)));
+        if ($staffIds === []) {
+            return;
+        }
+
+        $query = User::query()->whereIn('id', $staffIds);
+        $this->siteAccess->applyHsEventStaffScope(
+            $query,
+            $event,
+            $request->user(),
+            ['healthSafety.viewAllSites'],
+        );
+        $eligibleIds = $query->get()
+            ->filter(fn (User $staff): bool => $staff->canDo('hazards.manage'))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        if (array_diff($staffIds, $eligibleIds) !== []) {
+            throw ValidationException::withMessages([
+                $field => 'Choose approved H&S staff available for this event site.',
+            ]);
+        }
     }
 }

@@ -28,6 +28,7 @@ class ControlRoomMyTasksController extends Controller
             ->get()
             ->map(fn (ControlRoomAlert $a) => [
                 'id' => $a->id,
+                'reference_number' => $a->reference_number,
                 'source' => $a->source,
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
@@ -41,9 +42,9 @@ class ControlRoomMyTasksController extends Controller
                     'asset_tag' => $a->asset->asset_tag,
                 ] : null,
                 'client_name' => $a->client
-                    ? trim($a->client->first_name . ' ' . $a->client->last_name)
+                    ? trim($a->client->first_name.' '.$a->client->last_name)
                     : null,
-                'sla_status' => $a->sla ? (
+                'sla_status' => $a->sla?->isApplicable() ? (
                     ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached)
                         ? 'breached'
                         : (
@@ -59,7 +60,7 @@ class ControlRoomMyTasksController extends Controller
         // My Follow-ups: operator notes I created that need followup
         $myFollowups = OperatorNote::where('user_id', $user->id)
             ->where('requires_followup', true)
-            ->with(['alert:id,alert_type,severity,status'])
+            ->with(['alert:id,reference_number,alert_type,severity,status'])
             ->orderBy('followup_at')
             ->orderByDesc('created_at')
             ->limit(30)
@@ -72,6 +73,7 @@ class ControlRoomMyTasksController extends Controller
                 'created_at' => optional($n->created_at)->toISOString(),
                 'alert' => $n->alert ? [
                     'id' => $n->alert->id,
+                    'reference_number' => $n->alert->reference_number,
                     'alert_type' => $n->alert->alert_type,
                     'severity' => $n->alert->severity,
                     'status' => $n->alert->status,
@@ -83,7 +85,7 @@ class ControlRoomMyTasksController extends Controller
         $activeShift = Shift::where('status', 'active')
             ->where(function ($q) use ($user) {
                 $q->where('shift_lead_user_id', $user->id)
-                  ->orWhereJsonContains('team_members', $user->id);
+                    ->orWhereJsonContains('team_members', $user->id);
             })
             ->latest('starts_at')
             ->first();

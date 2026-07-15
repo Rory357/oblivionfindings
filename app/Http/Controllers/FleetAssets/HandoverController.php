@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetShiftHandover;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
@@ -21,7 +25,7 @@ class HandoverController extends Controller
         $auth = $request->user();
         $siteAccess = app(UserSiteAccessService::class);
 
-        if (!Schema::hasTable('fleet_shift_handovers')) {
+        if (! Schema::hasTable('fleet_shift_handovers')) {
             $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
             $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
 
@@ -30,21 +34,21 @@ class HandoverController extends Controller
                 ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
                 ->values();
 
-        return Inertia::render('fleet-assets/handovers/index', [
-            'handovers' => collect(),
-            'vehicles' => $vehicles,
-            'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
-            'stats' => [
-                'total' => 0,
-                'pending' => 0,
-                'disputed' => 0,
-                'completed_7d' => 0,
-            ],
-            'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess) : null,
-            'can' => [
-                'manage' => (bool) $auth?->canDo('fleet.manage'),
-            ],
-        ]);
+            return Inertia::render('fleet-assets/handovers/index', [
+                'handovers' => collect(),
+                'vehicles' => $vehicles,
+                'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
+                'stats' => [
+                    'total' => 0,
+                    'pending' => 0,
+                    'disputed' => 0,
+                    'completed_7d' => 0,
+                ],
+                'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess) : null,
+                'can' => [
+                    'manage' => (bool) $auth?->canDo('fleet.manage'),
+                ],
+            ]);
         }
 
         $query = FleetShiftHandover::query()
@@ -169,7 +173,11 @@ class HandoverController extends Controller
             ])
             ->values();
 
-        $userQuery = User::query()->orderBy('name');
+        $userQuery = User::query()
+            ->staff()
+            ->whereNotNull('approved_at')
+            ->whereHas('hrEmployeeProfile', fn (Builder $profileQuery) => $profileQuery->where('is_active', true))
+            ->orderBy('name');
         $siteAccess->applyStaffScope($userQuery, $auth, self::BYPASS_PERMISSIONS);
 
         $users = $userQuery
@@ -186,11 +194,9 @@ class HandoverController extends Controller
 
     public function store(Request $request)
     {
-        $auth = $request->user();
-
         $data = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
-            'incoming_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'incoming_user_id' => ['required', 'integer', 'exists:users,id'],
             'odometer_km' => ['nullable', 'integer', 'min:0'],
             'fuel_level' => ['nullable', 'string', 'in:full,3/4,1/2,1/4,empty'],
             'exterior_condition' => ['required', 'string', 'in:good,minor_damage,significant_damage'],
@@ -205,37 +211,106 @@ class HandoverController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $asset = Asset::findOrFail($data['asset_id']);
-        app(UserSiteAccessService::class)->assertCanAccessSiteId(
-            $auth,
-            $asset->site_id ? (int) $asset->site_id : ($asset->home_site_id ? (int) $asset->home_site_id : null),
-            self::BYPASS_PERMISSIONS,
-            'You are not authorized to create handovers for vehicles at this site.',
-        );
+        $handover = DB::transaction(function () use ($request, $data): FleetShiftHandover {
+            $siteAccess = app(UserSiteAccessService::class);
+            $actor = User::query()
+                ->whereKey($request->user()->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($actor->canDo('fleet.manage'), 403);
 
-        $handover = FleetShiftHandover::create([
-            'asset_id' => $data['asset_id'],
-            'outgoing_user_id' => $auth->id,
-            'incoming_user_id' => $data['incoming_user_id'] ?? null,
-            'odometer_km' => $data['odometer_km'] ?? null,
-            'fuel_level' => $data['fuel_level'] ?? null,
-            'exterior_condition' => $data['exterior_condition'],
-            'interior_condition' => $data['interior_condition'],
-            'keys_present' => $data['keys_present'] ?? true,
-            'documents_present' => $data['documents_present'] ?? true,
-            'first_aid_kit' => $data['first_aid_kit'] ?? true,
-            'fire_extinguisher' => $data['fire_extinguisher'] ?? true,
-            'damage_notes' => $data['damage_notes'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'status' => 'pending_acceptance',
-            'handed_over_at' => now(),
-        ]);
+            $assetQuery = Asset::query()
+                ->whereKey($data['asset_id'])
+                ->where('category', 'vehicle');
+            $this->applyAssetSiteScope($assetQuery, $actor, $siteAccess);
+            $asset = $assetQuery->lockForUpdate()->first();
+            abort_unless(
+                $asset,
+                403,
+                'You are not authorized to create handovers for vehicles at this site.',
+            );
 
-        AuditLogger::log('fleet.handover.create', $handover, [
-            'asset_id' => $data['asset_id'],
-            'outgoing_user_id' => $auth->id,
-            'incoming_user_id' => $data['incoming_user_id'] ?? null,
-        ]);
+            $siteId = $asset->site_id ?: $asset->home_site_id;
+            $site = $siteId
+                ? Site::query()->whereKey($siteId)->lockForUpdate()->first()
+                : null;
+            abort_unless(
+                $site,
+                403,
+                'You are not authorized to create handovers for vehicles at this site.',
+            );
+            $tenantId = is_numeric($site->tenant_id) ? (int) $site->tenant_id : null;
+            abort_unless(
+                $tenantId !== null
+                    && $tenantId > 0
+                    && (int) $actor->organization_id === $tenantId,
+                403,
+                'You are not authorized to create handovers for vehicles at this site.',
+            );
+            $siteAccess->assertCanAccessSiteId(
+                $actor,
+                (int) $site->id,
+                self::BYPASS_PERMISSIONS,
+                'You are not authorized to create handovers for vehicles at this site.',
+            );
+
+            $incomingUserId = (int) $data['incoming_user_id'];
+            $incomingQuery = User::query()->whereKey($incomingUserId);
+            $siteAccess->applyFleetRecipientEligibility(
+                $incomingQuery,
+                $tenantId,
+                (int) $site->id,
+            );
+            $incoming = $incomingQuery->lockForUpdate()->first();
+            abort_unless(
+                $incoming,
+                403,
+                'You are not authorized to hand this vehicle over to that user.',
+            );
+            $incomingProfile = HrEmployeeProfile::query()
+                ->where('user_id', $incoming->id)
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->where(function (Builder $profileSite) use ($site) {
+                    $profileSite->where('primary_site_id', $site->id)
+                        ->orWhereJsonContains('secondary_site_ids', (int) $site->id);
+                })
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $incomingProfile,
+                403,
+                'You are not authorized to hand this vehicle over to that user.',
+            );
+
+            $handover = FleetShiftHandover::query()->create([
+                'tenant_id' => $tenantId,
+                'asset_id' => $asset->id,
+                'outgoing_user_id' => $actor->id,
+                'incoming_user_id' => $incomingUserId,
+                'odometer_km' => $data['odometer_km'] ?? null,
+                'fuel_level' => $data['fuel_level'] ?? null,
+                'exterior_condition' => $data['exterior_condition'],
+                'interior_condition' => $data['interior_condition'],
+                'keys_present' => $data['keys_present'] ?? true,
+                'documents_present' => $data['documents_present'] ?? true,
+                'first_aid_kit' => $data['first_aid_kit'] ?? true,
+                'fire_extinguisher' => $data['fire_extinguisher'] ?? true,
+                'damage_notes' => $data['damage_notes'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'status' => 'pending_acceptance',
+                'handed_over_at' => now(),
+            ]);
+
+            AuditLogger::logOrFail('fleet.handover.create', $handover, [
+                'actor_id' => $actor->id,
+                'asset_id' => $asset->id,
+                'outgoing_user_id' => $actor->id,
+                'incoming_user_id' => $incomingUserId,
+            ]);
+
+            return $handover;
+        }, 3);
 
         return redirect()
             ->route('fleet-assets.handovers.show', $handover)
@@ -293,87 +368,179 @@ class HandoverController extends Controller
 
     public function accept(Request $request, FleetShiftHandover $handover)
     {
-        $this->assertCanAccessSpecificHandover(
-            $request->user(),
-            $handover,
-            'You are not authorized to accept handovers for vehicles at this site.',
-        );
+        $accepted = DB::transaction(function () use ($request, $handover): bool {
+            [$lockedHandover, $actor] = $this->lockedTransitionContext(
+                $request,
+                $handover,
+                'You are not authorized to accept handovers for vehicles at this site.',
+            );
 
-        if ($handover->status !== 'pending_acceptance') {
+            if ($lockedHandover->status !== 'pending_acceptance') {
+                return false;
+            }
+
+            $lockedHandover->update([
+                'status' => 'accepted',
+                'accepted_at' => now(),
+            ]);
+
+            AuditLogger::logOrFail('fleet.handover.accept', $lockedHandover, [
+                'actor_id' => $actor->id,
+                'accepted_by' => $actor->id,
+            ]);
+
+            return true;
+        }, 3);
+
+        if (! $accepted) {
             return back()->with('error', 'This handover has already been processed.');
         }
-
-        abort_unless(
-            $handover->incoming_user_id === $request->user()->id,
-            403,
-            'Only the incoming user can accept this handover.'
-        );
-
-        $handover->update([
-            'status' => 'accepted',
-            'accepted_at' => now(),
-        ]);
-
-        AuditLogger::log('fleet.handover.accept', $handover, [
-            'accepted_by' => $request->user()->id,
-        ]);
 
         return back()->with('success', 'Handover accepted.');
     }
 
     public function dispute(Request $request, FleetShiftHandover $handover)
     {
-        $this->assertCanAccessSpecificHandover(
-            $request->user(),
-            $handover,
-            'You are not authorized to dispute handovers for vehicles at this site.',
-        );
-
-        if ($handover->status !== 'pending_acceptance') {
-            return back()->with('error', 'This handover has already been processed.');
-        }
-
-        abort_unless(
-            $handover->incoming_user_id === $request->user()->id,
-            403,
-            'Only the incoming user can dispute this handover.'
-        );
-
         $data = $request->validate([
             'dispute_reason' => ['required', 'string', 'max:2000'],
         ]);
 
-        $handover->update([
-            'status' => 'disputed',
-            'notes' => ($handover->notes ? $handover->notes . "\n\n" : '') . 'DISPUTE: ' . $data['dispute_reason'],
-        ]);
+        $disputed = DB::transaction(function () use ($request, $handover, $data): bool {
+            [$lockedHandover, $actor] = $this->lockedTransitionContext(
+                $request,
+                $handover,
+                'You are not authorized to dispute handovers for vehicles at this site.',
+            );
 
-        AuditLogger::log('fleet.handover.dispute', $handover, [
-            'disputed_by' => $request->user()->id,
-            'reason' => $data['dispute_reason'],
-        ]);
+            if ($lockedHandover->status !== 'pending_acceptance') {
+                return false;
+            }
+
+            $lockedHandover->update([
+                'status' => 'disputed',
+                'notes' => ($lockedHandover->notes ? $lockedHandover->notes."\n\n" : '')
+                    .'DISPUTE: '.$data['dispute_reason'],
+            ]);
+
+            AuditLogger::logOrFail('fleet.handover.dispute', $lockedHandover, [
+                'actor_id' => $actor->id,
+                'disputed_by' => $actor->id,
+                'reason' => $data['dispute_reason'],
+            ]);
+
+            return true;
+        }, 3);
+
+        if (! $disputed) {
+            return back()->with('error', 'This handover has already been processed.');
+        }
 
         return back()->with('success', 'Handover disputed. Management has been notified.');
     }
 
+    /**
+     * @return array{FleetShiftHandover, User}
+     */
+    private function lockedTransitionContext(
+        Request $request,
+        FleetShiftHandover $handover,
+        string $message,
+    ): array {
+        $actor = User::query()
+            ->whereKey($request->user()->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $lockedHandover = FleetShiftHandover::query()
+            ->whereKey($handover->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $asset = Asset::query()
+            ->whereKey($lockedHandover->asset_id)
+            ->lockForUpdate()
+            ->first();
+        $siteId = $asset?->site_id ?: $asset?->home_site_id;
+        $site = $siteId
+            ? Site::query()->whereKey($siteId)->lockForUpdate()->first()
+            : null;
+        $outgoing = User::query()
+            ->whereKey($lockedHandover->outgoing_user_id)
+            ->lockForUpdate()
+            ->first();
+        $incoming = User::query()
+            ->whereKey($lockedHandover->incoming_user_id)
+            ->lockForUpdate()
+            ->first();
+        $tenantId = is_numeric($lockedHandover->tenant_id)
+            ? (int) $lockedHandover->tenant_id
+            : null;
+        $incomingProfile = $incoming
+            ? HrEmployeeProfile::query()
+                ->where('user_id', $incoming->id)
+                ->lockForUpdate()
+                ->first()
+            : null;
+
+        abort_unless(
+            $asset
+                && $site
+                && $tenantId !== null
+                && $tenantId > 0
+                && (int) $site->tenant_id === $tenantId
+                && $outgoing
+                && (int) $outgoing->organization_id === $tenantId
+                && $incoming
+                && (int) $incoming->organization_id === $tenantId
+                && $incomingProfile,
+            403,
+            $message,
+        );
+
+        $incomingEligibility = User::query()->whereKey($incoming->id);
+        app(UserSiteAccessService::class)->applyFleetRecipientEligibility(
+            $incomingEligibility,
+            $tenantId,
+            (int) $site->id,
+        );
+        abort_unless($incomingEligibility->exists(), 403, $message);
+
+        $lockedHandover->setRelation('asset', $asset);
+        $lockedHandover->setRelation('outgoingUser', $outgoing);
+        $lockedHandover->setRelation('incomingUser', $incoming);
+        $this->assertCanAccessSpecificHandover($actor, $lockedHandover, $message);
+        abort_unless(
+            (int) $lockedHandover->incoming_user_id === (int) $actor->id,
+            403,
+            'Only the incoming user can process this handover.',
+        );
+
+        return [$lockedHandover, $actor];
+    }
+
     protected function applyAssetSiteScope(
-        \Illuminate\Database\Eloquent\Builder $query,
+        Builder $query,
         User $user,
         UserSiteAccessService $siteAccess,
     ): void {
-        if ($siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)) {
+        if (
+            $siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)
+            && $siteAccess->isUnrestrictedPlatformUser($user)
+        ) {
             return;
         }
 
         $siteIds = $siteAccess->accessibleSiteIds($user, self::BYPASS_PERMISSIONS);
         if ($siteIds === []) {
             $query->whereRaw('1 = 0');
+
             return;
         }
 
         $query->where(function ($nested) use ($siteIds) {
             $nested->whereIn('site_id', $siteIds)
-                ->orWhereIn('home_site_id', $siteIds);
+                ->orWhere(function ($homeSite) use ($siteIds) {
+                    $homeSite->whereNull('site_id')
+                        ->whereIn('home_site_id', $siteIds);
+                });
         });
     }
 
@@ -382,24 +549,12 @@ class HandoverController extends Controller
         FleetShiftHandover $handover,
         string $message,
     ): void {
-        if ($this->userIsHandoverParticipant($user, $handover)) {
-            return;
-        }
-
         app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
             $user,
             $handover,
             self::BYPASS_PERMISSIONS,
             $message,
         );
-    }
-
-    protected function userIsHandoverParticipant(User $user, FleetShiftHandover $handover): bool
-    {
-        return in_array($user->id, [
-            $handover->outgoing_user_id,
-            $handover->incoming_user_id,
-        ], true);
     }
 
     /**

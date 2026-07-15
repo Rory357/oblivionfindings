@@ -488,28 +488,37 @@ class ClientMedicalController extends Controller
 
         try {
             if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
-                $scheduledFor = Carbon::parse($data['scheduled_for']);
-                $conflictingAdministration = ClientMedicationAdministration::query()
-                    ->where('client_id', $client->id)
-                    ->where('client_medication_id', $medication->id)
-                    ->whereBetween('scheduled_for', [
-                        $scheduledFor->copy()->subMinute(),
-                        $scheduledFor->copy()->addMinute(),
-                    ])
-                    ->latest('id')
-                    ->first();
+                $isDurableReplay = filled($data['client_request_uuid'] ?? null)
+                    && ClientMedicationAdministration::withTrashed()
+                        ->where('client_id', $client->id)
+                        ->where('client_medication_id', $medication->id)
+                        ->where('client_request_uuid', $data['client_request_uuid'])
+                        ->exists();
 
-                if ($conflictingAdministration) {
-                    $payload = $this->buildMedicationConflictPayload(
-                        $data,
-                        'Medication state changed before this offline administration could sync. Supervisor review is required.',
-                    );
+                if (! $isDurableReplay) {
+                    $scheduledFor = Carbon::parse($data['scheduled_for']);
+                    $conflictingAdministration = ClientMedicationAdministration::query()
+                        ->where('client_id', $client->id)
+                        ->where('client_medication_id', $medication->id)
+                        ->whereBetween('scheduled_for', [
+                            $scheduledFor->copy()->subMinute(),
+                            $scheduledFor->copy()->addMinute(),
+                        ])
+                        ->latest('id')
+                        ->first();
 
-                    if ($request->expectsJson()) {
-                        return response()->json($payload, 409);
+                    if ($conflictingAdministration) {
+                        $payload = $this->buildMedicationConflictPayload(
+                            $data,
+                            'Medication state changed before this offline administration could sync. Supervisor review is required.',
+                        );
+
+                        if ($request->expectsJson()) {
+                            return response()->json($payload, 409);
+                        }
+
+                        return back()->withInput()->with('error', $payload['error']);
                     }
-
-                    return back()->withInput()->with('error', $payload['error']);
                 }
             }
 
@@ -542,6 +551,26 @@ class ClientMedicalController extends Controller
 
             /** @var ClientMedicationAdministration $a */
             $a = $result['administration'];
+
+            if ($result['duplicate'] ?? false) {
+                $payload = $this->withMedicationSync([
+                    'success' => true,
+                    'administration' => [
+                        'id' => $a->id,
+                        'status' => $a->status,
+                        'administered_at' => $a->administered_at?->toIso8601String(),
+                    ],
+                    'safety_check' => $result['safety_check'] ?? null,
+                ], $data, 'duplicate', true, 'This medication request was already processed.');
+
+                $this->rememberMedicationSyncResponse('administration', $data, $payload);
+
+                if ($request->expectsJson()) {
+                    return response()->json($payload);
+                }
+
+                return back()->with('success', 'Already saved — no changes needed.');
+            }
 
             $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
             app(TimelineEmitter::class)->record([

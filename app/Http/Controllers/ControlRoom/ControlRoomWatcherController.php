@@ -4,13 +4,16 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\AlertWatcher;
 use App\Models\ControlRoomAlert;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
 class ControlRoomWatcherController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
     use RespondsToInertiaOrJson;
 
     /**
@@ -20,6 +23,7 @@ class ControlRoomWatcherController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $watchers = AlertWatcher::where('alert_id', $alert->id)
             ->with('user:id,name,email')
@@ -44,10 +48,12 @@ class ControlRoomWatcherController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
         ]);
+        $this->assertCanUseWatcher($user, (int) $data['user_id']);
 
         // Check not already watching
         $exists = AlertWatcher::where('alert_id', $alert->id)
@@ -89,6 +95,7 @@ class ControlRoomWatcherController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $existing = AlertWatcher::where('alert_id', $alert->id)
             ->where('user_id', $user->id)
@@ -119,6 +126,7 @@ class ControlRoomWatcherController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $watcher = AlertWatcher::where('alert_id', $alert->id)
             ->where('user_id', $userId)
@@ -141,5 +149,14 @@ class ControlRoomWatcherController extends Controller
         ]);
 
         return $this->inertiaOrJson($request, 'Watcher removed.');
+    }
+
+    private function assertCanUseWatcher(User $user, int $watcherUserId): void
+    {
+        $this->assertCanAccessStaff(
+            $user,
+            $watcherUserId,
+            'You are not authorized to add that staff member as a watcher.',
+        );
     }
 }

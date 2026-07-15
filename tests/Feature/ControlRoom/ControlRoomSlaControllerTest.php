@@ -6,7 +6,9 @@ use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,14 +20,23 @@ class ControlRoomSlaControllerTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
 
         $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
@@ -156,7 +167,9 @@ class ControlRoomSlaControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
 
         AlertSla::create([
             'alert_id' => $alert->id,
@@ -172,6 +185,7 @@ class ControlRoomSlaControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/sla/breaches')
                 ->has('breaches.data', 1)
+                ->where('breaches.data.0.alert_reference', $alert->reference_number)
                 ->where('stats.total', 1)
                 ->where('stats.acknowledge', 1)
             );

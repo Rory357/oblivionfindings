@@ -28,11 +28,7 @@ export function resetMedicationReadinessFixtures() {
 export function resetRosteringReadinessFixtures(
     options: { assignmentShiftStatus?: 'draft' | 'scheduled' } = {},
 ) {
-    runArtisan([
-        'db:seed',
-        '--class=RosteringProductionDemoSeeder',
-        '--force',
-    ]);
+    runArtisan(['db:seed', '--class=RosteringProductionDemoSeeder', '--force']);
 
     const assignmentShiftStatus = options.assignmentShiftStatus ?? 'scheduled';
 
@@ -183,6 +179,10 @@ export function runLaravelPhp(code: string) {
     } finally {
         rmSync(tempDir, { recursive: true, force: true });
     }
+}
+
+export function runLaravelJson<T>(code: string): T {
+    return JSON.parse(runLaravelPhp(code)) as T;
 }
 
 export async function loginAs(

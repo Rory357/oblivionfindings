@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
-use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomReportService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,10 +18,16 @@ use Inertia\Inertia;
 
 class ControlRoomStatsController extends Controller
 {
+    public function __construct(
+        protected ControlRoomReportService $reportService,
+    ) {}
+
     public function __invoke(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         $period = $request->input('period', '7d');
         if (! in_array($period, ['24h', '7d', '30d'])) {
@@ -31,54 +39,22 @@ class ControlRoomStatsController extends Controller
             '7d' => now()->subDays(7),
             '30d' => now()->subDays(30),
         };
+        $isUnrestrictedPlatformUser = $siteAccess->isUnrestrictedPlatformUser($user);
+        $accessibleSiteIds = $isUnrestrictedPlatformUser
+            ? null
+            : $siteAccess->accessibleSiteIds($user, $bypassPermissions);
+        $slaMetrics = $this->reportService->slaCompliance($startDate, now(), $accessibleSiteIds);
 
         $driver = DB::connection()->getDriverName();
 
         // --- KPIs ---
-        $avgAckExpr = $driver === 'sqlite'
-            ? "AVG((strftime('%s', acknowledged_at) - strftime('%s', triggered_at)) / 60.0)"
-            : 'AVG(TIMESTAMPDIFF(MINUTE, triggered_at, acknowledged_at))';
-
-        $avgResExpr = $driver === 'sqlite'
-            ? "AVG((strftime('%s', resolved_at) - strftime('%s', triggered_at)) / 3600.0)"
-            : 'AVG(TIMESTAMPDIFF(HOUR, triggered_at, resolved_at))';
-
-        $avgAcknowledgeMinutes = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereNotNull('acknowledged_at')
-            ->selectRaw($avgAckExpr . ' as avg_min')
-            ->value('avg_min');
-
-        $avgResolutionHours = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereNotNull('resolved_at')
-            ->selectRaw($avgResExpr . ' as avg_hrs')
-            ->value('avg_hrs');
-
-        $totalSla = AlertSla::whereHas('alert', fn ($q) => $q->where('triggered_at', '>=', $startDate))->count();
-        $compliantSla = $totalSla > 0
-            ? AlertSla::whereHas('alert', fn ($q) => $q->where('triggered_at', '>=', $startDate))
-                ->where(function ($q) {
-                    $q->where(function ($sq) {
-                        $sq->where('acknowledge_breached', false)
-                            ->orWhereNull('acknowledge_breached');
-                    })->where(function ($sq) {
-                        $sq->where('response_breached', false)
-                            ->orWhereNull('response_breached');
-                    })->where(function ($sq) {
-                        $sq->where('resolution_breached', false)
-                            ->orWhereNull('resolution_breached');
-                    });
-                })
-                ->count()
-            : 0;
-        $slaCompliancePct = $totalSla > 0 ? round(($compliantSla / $totalSla) * 100, 1) : 100;
-
-        $openAlerts = ControlRoomAlert::unresolved()->count();
-        $alertsToday = ControlRoomAlert::whereDate('triggered_at', today())->count();
+        $openAlerts = $this->scopedAlerts($user, $siteAccess)->actionable()->count();
+        $alertsToday = $this->scopedAlerts($user, $siteAccess)->whereDate('triggered_at', today())->count();
 
         $kpis = [
-            'avg_acknowledge_minutes' => round((float) $avgAcknowledgeMinutes, 1),
-            'avg_resolution_hours' => round((float) $avgResolutionHours, 1),
-            'sla_compliance_pct' => $slaCompliancePct,
+            'avg_acknowledge_minutes' => $slaMetrics['avg_acknowledge_minutes'],
+            'avg_resolution_hours' => $slaMetrics['avg_resolution_hours'],
+            'sla_compliance_pct' => $slaMetrics['compliance_pct'],
             'open_alerts' => $openAlerts,
             'alerts_today' => $alertsToday,
         ];
@@ -90,7 +66,8 @@ class ControlRoomStatsController extends Controller
                 ? "strftime('%Y-%m-%d %H:00', triggered_at)"
                 : "DATE_FORMAT(triggered_at, '%Y-%m-%d %H:00')";
 
-            $raw = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+            $raw = $this->scopedAlerts($user, $siteAccess)
+                ->where('triggered_at', '>=', $startDate)
                 ->selectRaw($dateExpr . ' as bucket, COUNT(*) as count')
                 ->groupByRaw($dateExpr)
                 ->pluck('count', 'bucket')
@@ -113,7 +90,8 @@ class ControlRoomStatsController extends Controller
 
             $days = $period === '7d' ? 7 : 30;
 
-            $raw = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+            $raw = $this->scopedAlerts($user, $siteAccess)
+                ->where('triggered_at', '>=', $startDate)
                 ->selectRaw($dateExpr . ' as bucket, COUNT(*) as count')
                 ->groupByRaw($dateExpr)
                 ->pluck('count', 'bucket')
@@ -131,7 +109,8 @@ class ControlRoomStatsController extends Controller
         }
 
         // --- Top 10 sources ---
-        $topSources = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+        $topSources = $this->scopedAlerts($user, $siteAccess)
+            ->where('triggered_at', '>=', $startDate)
             ->whereNotNull('source')
             ->select('source', DB::raw('COUNT(*) as count'))
             ->groupBy('source')
@@ -143,7 +122,8 @@ class ControlRoomStatsController extends Controller
             ->toArray();
 
         // --- Top 10 alert types ---
-        $topAlertTypes = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+        $topAlertTypes = $this->scopedAlerts($user, $siteAccess)
+            ->where('triggered_at', '>=', $startDate)
             ->whereNotNull('alert_type')
             ->select('alert_type', DB::raw('COUNT(*) as count'))
             ->groupBy('alert_type')
@@ -155,7 +135,8 @@ class ControlRoomStatsController extends Controller
             ->toArray();
 
         // --- Severity distribution (unresolved) ---
-        $severityDistribution = ControlRoomAlert::unresolved()
+        $severityDistribution = $this->scopedAlerts($user, $siteAccess)
+            ->actionable()
             ->select('severity', DB::raw('COUNT(*) as count'))
             ->groupBy('severity')
             ->pluck('count', 'severity')
@@ -166,7 +147,8 @@ class ControlRoomStatsController extends Controller
             ? "AVG((strftime('%s', acknowledged_at) - strftime('%s', assigned_at)) / 60.0)"
             : 'AVG(TIMESTAMPDIFF(MINUTE, assigned_at, acknowledged_at))';
 
-        $operators = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+        $operators = $this->scopedAlerts($user, $siteAccess)
+            ->where('triggered_at', '>=', $startDate)
             ->whereNotNull('assigned_to_user_id')
             ->select(
                 'assigned_to_user_id',
@@ -187,30 +169,57 @@ class ControlRoomStatsController extends Controller
             'avg_response_minutes' => round((float) $op->avg_response_minutes, 1),
         ])->values()->toArray();
 
-        // --- Shift comparison (last 5 completed) ---
-        $shiftComparison = Shift::where('status', 'completed')
-            ->whereNotNull('ends_at')
-            ->orderByDesc('ends_at')
-            ->limit(5)
-            ->get()
-            ->map(fn (Shift $s) => [
-                'name' => $s->name,
-                'duration_hours' => round($s->starts_at->diffInMinutes($s->ends_at) / 60, 1),
-                'alerts_created' => (int) $s->alerts_created,
-                'alerts_resolved' => (int) $s->alerts_resolved,
-                'alerts_escalated' => (int) $s->alerts_escalated,
-            ])
-            ->values()
-            ->toArray();
+        // Control Room shift counters are installation-wide snapshots and have
+        // no trustworthy site or tenant dimension.
+        $shiftComparison = $isUnrestrictedPlatformUser
+            ? Shift::where('status', 'completed')
+                ->whereNotNull('ends_at')
+                ->orderByDesc('ends_at')
+                ->limit(5)
+                ->get()
+                ->map(fn (Shift $s) => [
+                    'name' => $s->name,
+                    'duration_hours' => round($s->starts_at->diffInMinutes($s->ends_at) / 60, 1),
+                    'alerts_created' => (int) $s->alerts_created,
+                    'alerts_resolved' => (int) $s->alerts_resolved,
+                    'alerts_escalated' => (int) $s->alerts_escalated,
+                ])
+                ->values()
+                ->toArray()
+            : [];
 
         // --- Signal source health ---
-        $signalSources = SignalSource::orderBy('name')
+        $signalSourceQuery = SignalSource::query()->orderBy('name');
+        if ($accessibleSiteIds !== null) {
+            if ($accessibleSiteIds === []) {
+                $signalSourceQuery->whereRaw('1 = 0');
+            } else {
+                $signalSourceQuery
+                    ->where(function ($sourceQuery) use ($accessibleSiteIds) {
+                        $sourceQuery->whereHas('devices', fn ($deviceQuery) => $deviceQuery->whereIn('site_id', $accessibleSiteIds))
+                            ->orWhereHas('signals', fn (Builder $signalQuery) => $this->applySignalSiteScope(
+                                $signalQuery,
+                                $accessibleSiteIds,
+                            ));
+                    })
+                    ->withCount([
+                        'signals as accessible_signal_count_24h' => function ($signalQuery) use ($accessibleSiteIds) {
+                            $signalQuery->where('occurred_at', '>=', now()->subDay());
+                            $this->applySignalSiteScope($signalQuery, $accessibleSiteIds);
+                        },
+                    ]);
+            }
+        }
+
+        $signalSources = $signalSourceQuery
             ->get()
             ->map(fn (SignalSource $ss) => [
                 'name' => $ss->name,
                 'status' => $ss->status,
                 'last_heartbeat_at' => optional($ss->last_heartbeat_at)->toISOString(),
-                'signal_count_24h' => (int) $ss->signal_count_24h,
+                'signal_count_24h' => (int) ($accessibleSiteIds === null
+                    ? $ss->signal_count_24h
+                    : $ss->getAttribute('accessible_signal_count_24h')),
                 'is_healthy' => $ss->last_heartbeat_at && $ss->last_heartbeat_at->gte(now()->subMinutes(10)),
             ])
             ->values()
@@ -229,5 +238,44 @@ class ControlRoomStatsController extends Controller
             'shift_comparison' => $shiftComparison,
             'signal_sources' => $signalSources,
         ]);
+    }
+
+    protected function scopedAlerts(User $user, UserSiteAccessService $siteAccess)
+    {
+        $query = ControlRoomAlert::query();
+        $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
+
+        return $query;
+    }
+
+    /**
+     * A signal's own site is authoritative. Device site is only a fallback for
+     * legacy signals whose direct site provenance is absent.
+     *
+     * @param  array<int, int>  $siteIds
+     */
+    protected function applySignalSiteScope(Builder $query, array $siteIds): Builder
+    {
+        $siteColumn = $query->qualifyColumn('site_id');
+
+        return $query->where(function (Builder $siteScope) use ($siteColumn, $siteIds) {
+            $siteScope->whereIn($siteColumn, $siteIds)
+                ->orWhere(function (Builder $deviceFallback) use ($siteColumn, $siteIds) {
+                    $deviceFallback
+                        ->whereNull($siteColumn)
+                        ->whereHas('device', fn (Builder $deviceQuery) => $deviceQuery->whereIn(
+                            $deviceQuery->qualifyColumn('site_id'),
+                            $siteIds,
+                        ));
+                });
+        });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

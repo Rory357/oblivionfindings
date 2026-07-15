@@ -19,12 +19,18 @@ use App\Models\FleetWorkOrder;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Site;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function __invoke(Request $request)
     {
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
@@ -32,18 +38,76 @@ class DashboardController extends Controller
         // Resolve the user's site once — powers the "Vehicles at Your Site" widget
         // and the hero's ?scope=mine cluster lens.
         $user = $request->user();
-        $userSiteId = $user->site_id ?? null;
-
-        // Fallback: first assigned client's site. (The relation is
-        // assignedClients(), not clients() — the old check never matched.)
-        if (!$userSiteId && method_exists($user, 'assignedClients')) {
-            try {
-                $firstClient = $user->assignedClients()->first();
-                $userSiteId = $firstClient?->site_id ?? null;
-            } catch (\Throwable $e) {
-                // pivot may be absent in older schemas
+        $organizationId = $this->organizationId($user);
+        $tenantSiteIds = $organizationId === null
+            ? []
+            : Site::query()
+                ->where('tenant_id', $organizationId)
+                ->pluck('id')
+                ->map(fn ($siteId) => (int) $siteId)
+                ->all();
+        $profileSiteIds = array_values(array_intersect(
+            $this->siteAccess->accessibleSiteIds($user),
+            $tenantSiteIds,
+        ));
+        $hasTenantFleetAccess = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
+        $accessibleSiteIds = $hasTenantFleetAccess ? $tenantSiteIds : $profileSiteIds;
+        $applyAssetSiteScope = function ($query) use ($accessibleSiteIds, $hasFleetFields) {
+            if ($accessibleSiteIds === []) {
+                return $query->whereRaw('1 = 0');
             }
-        }
+
+            return $query->where(function ($siteQuery) use ($accessibleSiteIds, $hasFleetFields) {
+                $siteQuery->whereIn('site_id', $accessibleSiteIds);
+                if ($hasFleetFields) {
+                    $siteQuery->orWhere(function ($homeSite) use ($accessibleSiteIds) {
+                        $homeSite->whereNull('site_id')
+                            ->whereIn('home_site_id', $accessibleSiteIds);
+                    });
+                }
+            });
+        };
+        $accessibleAssetIds = $applyAssetSiteScope(Asset::query())
+            ->pluck('id')
+            ->map(fn ($assetId) => (int) $assetId)
+            ->all();
+        $accessibleClientIds = $organizationId === null || $accessibleSiteIds === []
+            ? []
+            : Client::query()
+                ->where('organization_id', $organizationId)
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->pluck('id')
+                ->map(fn ($clientId) => (int) $clientId)
+                ->all();
+        $userSiteId = $profileSiteIds[0] ?? null;
+
+        $applyAlertScope = function (Builder $query) use (
+            $accessibleSiteIds,
+            $accessibleClientIds,
+            $accessibleAssetIds,
+        ): Builder {
+            if ($accessibleSiteIds === []) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function (Builder $scope) use (
+                $accessibleSiteIds,
+                $accessibleClientIds,
+                $accessibleAssetIds,
+            ): void {
+                $scope->whereIn('site_id', $accessibleSiteIds)
+                    ->orWhere(function (Builder $clientFallback) use ($accessibleClientIds): void {
+                        $clientFallback->whereNull('site_id')
+                            ->whereNotNull('client_id')
+                            ->whereIn('client_id', $accessibleClientIds);
+                    })->orWhere(function (Builder $assetFallback) use ($accessibleAssetIds): void {
+                        $assetFallback->whereNull('site_id')
+                            ->whereNull('client_id')
+                            ->whereNotNull('asset_id')
+                            ->whereIn('asset_id', $accessibleAssetIds);
+                    });
+            });
+        };
 
         $hasSite = $userSiteId !== null;
         $scope = $request->query('scope') === 'mine' && $hasSite ? 'mine' : 'all';
@@ -54,26 +118,40 @@ class DashboardController extends Controller
         // tracker count for stats — actual device data comes from canonical Device model.
         $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
-            $eagerLoads[] = 'homeSite';
+            $eagerLoads['homeSite'] = fn ($query) => $organizationId === null
+                ? $query->whereRaw('1 = 0')
+                : $query->where('tenant_id', $organizationId);
         }
 
-        $vehicles = Asset::vehicles()
-            ->with($eagerLoads)
-            ->get();
+        $vehiclesQuery = $applyAssetSiteScope(Asset::vehicles()->with($eagerLoads));
+        $vehicles = $vehiclesQuery->get();
 
         $vehicleIds = $vehicles->pluck('id')->all();
 
         // Cluster lens — when scoped, the cluster counts (fleet status / today /
-        // resident movement) cover the user's site only. The attention strip,
-        // compliance badges and month strip stay org-wide by design.
+        // resident movement) cover the user's primary site only. Every other
+        // dashboard surface remains bounded by all sites the user may access.
         $clusterVehicles = $scoped
             ? $vehicles->filter(fn ($v) => (int) $v->site_id === (int) $userSiteId
                 || ($hasFleetFields && (int) $v->home_site_id === (int) $userSiteId))
             : $vehicles;
         $clusterVehicleIds = $clusterVehicles->pluck('id')->all();
-        $applyClusterScope = fn ($query, string $column = 'asset_id') => $scoped
-            ? $query->whereIn($column, $clusterVehicleIds)
-            : $query;
+        $applyAccessibleAssetScope = fn ($query, string $column = 'asset_id') => $query
+            ->whereIn($column, $accessibleAssetIds);
+        $applyAccessibleVehicleScope = fn ($query, string $column = 'asset_id') => $query
+            ->whereIn($column, $vehicleIds);
+        $applyClusterScope = fn ($query, string $column = 'asset_id') => $query
+            ->whereIn($column, $clusterVehicleIds);
+        $applyOutingTenantScope = function ($query) use ($organizationId) {
+            if ($organizationId === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function ($tenant) use ($organizationId) {
+                $tenant->where('tenant_id', $organizationId)
+                    ->orWhereNull('tenant_id');
+            });
+        };
 
         $totalVehicles = $vehicles->count();
         $onlineVehicles = $clusterVehicles->filter(fn ($v) => $v->fleetState?->status === 'online')->count();
@@ -83,40 +161,40 @@ class DashboardController extends Controller
         // already-loaded collection, no extra query.
         $vehiclesInMaintenance = $clusterVehicles->whereIn('status', ['maintenance', 'out_of_service'])->count();
 
-        // Compliance horizon for the hero badges (always org-wide) — same COUNT
-        // patterns as VehicleController::index so the two heroes read identically.
-        $wofDue30 = Asset::query()
+        // Compliance horizon for the hero badges — same COUNT patterns as
+        // VehicleController::index, constrained to the user's accessible sites.
+        $wofDue30 = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->wofExpiring(30)
             ->count();
-        $wofExpired = Asset::query()
+        $wofExpired = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('wof_expires_at')
             ->where('wof_expires_at', '<', now())
             ->count();
-        $regoDue30 = Asset::query()
+        $regoDue30 = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->registrationExpiring(30)
             ->count();
-        $regoExpired = Asset::query()
+        $regoExpired = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('registration_expires_at')
             ->where('registration_expires_at', '<', now())
             ->count();
-        $cofDue = Asset::query()
+        $cofDue = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<=', now()->addDays(30))
             ->where('cof_expires_at', '>=', now())
             ->count();
-        $cofExpired = Asset::query()
+        $cofExpired = $applyAssetSiteScope(Asset::query())
             ->where(fn ($q) => $q->vehicles())
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<', now())
             ->count();
         $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
         $insuranceExpiring = $hasInsuranceExpiry
-            ? Asset::query()
+            ? $applyAssetSiteScope(Asset::query())
                 ->where(fn ($q) => $q->vehicles())
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<=', now()->addDays(30))
@@ -124,7 +202,7 @@ class DashboardController extends Controller
                 ->count()
             : null;
         $insuranceExpired = $hasInsuranceExpiry
-            ? Asset::query()
+            ? $applyAssetSiteScope(Asset::query())
                 ->where(fn ($q) => $q->vehicles())
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<', now())
@@ -142,7 +220,7 @@ class DashboardController extends Controller
             : [];
 
         // Assets count by status
-        $assetStatusCounts = Asset::query()
+        $assetStatusCounts = $applyAssetSiteScope(Asset::query())
             ->selectRaw("status, COUNT(*) as count")
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -150,7 +228,7 @@ class DashboardController extends Controller
 
         // Maintenance stats (work orders by status)
         $maintenanceStats = Schema::hasTable('fleet_work_orders')
-            ? FleetWorkOrder::query()
+            ? $applyAccessibleAssetScope(FleetWorkOrder::query())
                 ->selectRaw("status, COUNT(*) as count")
                 ->groupBy('status')
                 ->pluck('count', 'status')
@@ -158,17 +236,17 @@ class DashboardController extends Controller
             : [];
 
         // Active alerts
-        $activeAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
-            ->count();
+        $activeAlertsQuery = $applyAlertScope(ControlRoomAlert::query()->actionable());
+        $activeAlerts = $activeAlertsQuery->count();
 
-        $criticalAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
-            ->where('severity', 'critical')
-            ->count();
+        $criticalAlertsQuery = $applyAlertScope(ControlRoomAlert::query()
+            ->actionable()
+            ->where('severity', 'critical'));
+        $criticalAlerts = $criticalAlertsQuery->count();
 
-        // Booking status counts — cluster tiles honour the lens; the org-wide
-        // overdue count additionally feeds the attention strip unscoped.
+        // Booking status counts — cluster tiles honour the lens. The attention
+        // strip covers every site the current user may access, never the whole
+        // current organisation when fleet.manage explicitly grants that bypass.
         $hasBookingsTable = Schema::hasTable('fleet_vehicle_bookings');
         $recentBookingsCount = $hasBookingsTable
             ? $applyClusterScope(FleetVehicleBooking::query()->whereIn('status', ['pending', 'approved']))
@@ -181,30 +259,37 @@ class DashboardController extends Controller
             : 0;
 
         $overdueCount = $hasBookingsTable
-            ? FleetVehicleBooking::query()
+            ? $applyAccessibleVehicleScope(FleetVehicleBooking::query())
                 ->where('status', 'checked_out')
                 ->where('ends_at', '<', now())
                 ->count()
             : 0;
 
-        $overdueCountScoped = ! $scoped ? $overdueCount : ($hasBookingsTable
+        $overdueCountScoped = $hasBookingsTable
             ? $applyClusterScope(
                 FleetVehicleBooking::query()
                     ->where('status', 'checked_out')
                     ->where('ends_at', '<', now())
             )->count()
-            : 0);
+            : 0;
 
         // Today's outings
         $hasOutingsTable = Schema::hasTable('fleet_outings');
         $todayOutings = $hasOutingsTable
-            ? FleetOuting::query()
+            ? $applyClusterScope($applyOutingTenantScope(FleetOuting::query()))
                 ->whereIn('status', ['planned', 'active'])
                 ->where(function ($q) {
                     $q->whereDate('planned_departure', today())
                       ->orWhere('status', 'active');
                 })
-                ->with(['asset:id,name', 'driver:id,name'])
+                ->with([
+                    'asset:id,name',
+                    'driver' => fn ($query) => $organizationId === null
+                        ? $query->whereRaw('1 = 0')
+                        : $query->where('organization_id', $organizationId)->select(['id', 'name']),
+                ])
+                ->withCount(['residents as accessible_resident_count' => fn ($query) => $query
+                    ->whereIn('client_id', $accessibleClientIds)])
                 ->limit(10)
                 ->get()
                 ->map(fn ($o) => [
@@ -215,14 +300,14 @@ class DashboardController extends Controller
                     'planned_departure' => optional($o->planned_departure)->toISOString(),
                     'asset' => $o->asset ? ['id' => $o->asset->id, 'name' => $o->asset->name] : null,
                     'driver' => $o->driver ? ['id' => $o->driver->id, 'name' => $o->driver->name] : null,
-                    'resident_count' => $o->residents()->count(),
+                    'resident_count' => (int) $o->accessible_resident_count,
                 ])
                 ->values()
             : collect();
 
         // Upcoming maintenance (service schedules due within 30 days)
         $upcomingMaintenanceCount = Schema::hasTable('fleet_service_schedules')
-            ? FleetServiceSchedule::query()
+            ? $applyAccessibleAssetScope(FleetServiceSchedule::query())
                 ->where('is_active', true)
                 ->where('next_due_at', '<=', now()->addDays(30))
                 ->where('next_due_at', '>=', now())
@@ -238,7 +323,7 @@ class DashboardController extends Controller
         // Fuel MTD
         $hasFuelTable = Schema::hasTable('fleet_fuel_logs');
         $fuelMtd = $hasFuelTable
-            ? FleetFuelLog::query()
+            ? $applyAccessibleVehicleScope(FleetFuelLog::query())
                 ->whereMonth('created_at', now()->month)
                 ->whereYear('created_at', now()->year)
                 ->sum('total_cost')
@@ -246,7 +331,7 @@ class DashboardController extends Controller
 
         // Distance MTD
         $distanceMtd = $hasTripsTable
-            ? FleetTrip::query()
+            ? $applyAccessibleVehicleScope(FleetTrip::query())
                 ->whereMonth('created_at', now()->month)
                 ->whereYear('created_at', now()->year)
                 ->sum('distance_km')
@@ -254,7 +339,7 @@ class DashboardController extends Controller
 
         // Recent signals
         $recentSignals = Schema::hasTable('fleet_signals')
-            ? FleetSignal::query()
+            ? $applyAccessibleVehicleScope(FleetSignal::query())
                 ->latest('occurred_at')
                 ->limit(10)
                 ->with('asset:id,name')
@@ -274,11 +359,11 @@ class DashboardController extends Controller
             : collect();
 
         // Recent alerts for table display
-        $recentAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
+        $recentAlertsQuery = $applyAlertScope(ControlRoomAlert::query()
+            ->actionable()
             ->latest()
-            ->limit(8)
-            ->get()
+            ->limit(8));
+        $recentAlerts = $recentAlertsQuery->get()
             ->map(fn ($a) => [
                 'id' => $a->id,
                 'title' => $a->title,
@@ -289,9 +374,10 @@ class DashboardController extends Controller
             ->values();
 
         // Fleet by Site
-        $sites = Site::query()
-            ->whereNotNull('name')
-            ->get(['id', 'name', 'type']);
+        $sitesQuery = Site::query()
+            ->whereIn('id', $accessibleSiteIds)
+            ->whereNotNull('name');
+        $sites = $sitesQuery->get(['id', 'name', 'type']);
 
         // Batch-load all vehicles grouped by site_id (avoids N+1 per site)
         $allSiteVehicles = Asset::vehicles()
@@ -304,7 +390,7 @@ class DashboardController extends Controller
 
         $alertCountsBySite = ControlRoomAlert::query()
             ->whereIn('control_room_alerts.asset_id', $allSiteVehicleIds)
-            ->whereNotIn('control_room_alerts.status', ['closed', 'resolved'])
+            ->whereIn('control_room_alerts.status', ControlRoomAlert::ACTIVE_STATUSES)
             ->join('assets', 'assets.id', '=', 'control_room_alerts.asset_id')
             ->selectRaw('assets.site_id, COUNT(*) as cnt')
             ->groupBy('assets.site_id')
@@ -336,10 +422,15 @@ class DashboardController extends Controller
 
         // After-hours trips (before 8am or after 6pm worker-timezone, last 7 days)
         $afterHoursTrips = $hasTripsTable
-            ? FleetTrip::query()
+            ? $applyAccessibleVehicleScope(FleetTrip::query())
                 ->where('started_at', '>=', now()->subDays(7))
                 ->afterHours()
-                ->with('asset:id,name', 'driverSession.user:id,name')
+                ->with([
+                    'asset:id,name',
+                    'driverSession.user' => fn ($query) => $organizationId === null
+                        ? $query->whereRaw('1 = 0')
+                        : $query->where('organization_id', $organizationId)->select(['id', 'name']),
+                ])
                 ->latest('started_at')
                 ->limit(10)->get()
                 ->map(fn ($t) => [
@@ -354,10 +445,11 @@ class DashboardController extends Controller
             : collect();
 
         // House locations
-        $houses = Site::query()
+        $housesQuery = Site::query()
+            ->whereIn('id', $accessibleSiteIds)
             ->where('type', 'house')
-            ->whereNotNull('latitude')
-            ->get(['id', 'name', 'address_line_1', 'latitude', 'longitude'])
+            ->whereNotNull('latitude');
+        $houses = $housesQuery->get(['id', 'name', 'address_line_1', 'latitude', 'longitude'])
             ->map(fn ($h) => [
                 'id' => $h->id,
                 'name' => $h->name,
@@ -366,11 +458,67 @@ class DashboardController extends Controller
                 'longitude' => $h->longitude,
             ])->values();
 
-        // Device health — canonical tracking devices.
-        $totalDevices = Device::where('domain', 'tracking')
+        // Device health — canonical tracking devices. A site-scoped user only
+        // sees devices with current provenance through an accessible asset,
+        // client, site, or vehicle assignment. Unattributed devices fail closed.
+        $scopeTrackingDevices = function ($query) use (
+            $organizationId,
+            $hasTenantFleetAccess,
+            $accessibleSiteIds,
+            $accessibleAssetIds,
+            $accessibleClientIds,
+        ) {
+            if ($organizationId === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->where('tenant_id', $organizationId);
+
+            if ($hasTenantFleetAccess) {
+                return $query;
+            }
+
+            if ($accessibleSiteIds === []) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function ($deviceQuery) use (
+                $accessibleSiteIds,
+                $accessibleAssetIds,
+                $accessibleClientIds,
+            ) {
+                $deviceQuery->whereHas('activeAssetLinks', fn ($links) => $links
+                    ->whereIn('asset_id', $accessibleAssetIds ?? []))
+                    ->orWhereHas('assignments', function ($assignments) use (
+                        $accessibleSiteIds,
+                        $accessibleAssetIds,
+                        $accessibleClientIds,
+                    ) {
+                        $assignments->active()
+                            ->where(function ($targets) use (
+                                $accessibleSiteIds,
+                                $accessibleAssetIds,
+                                $accessibleClientIds,
+                            ) {
+                                $targets->where(function ($sites) use ($accessibleSiteIds) {
+                                    $sites->where('assignable_type', DeviceAssignment::TARGET_SITE)
+                                        ->whereIn('assignable_id', $accessibleSiteIds);
+                                })->orWhere(function ($clients) use ($accessibleClientIds) {
+                                    $clients->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                                        ->whereIn('assignable_id', $accessibleClientIds ?? []);
+                                })->orWhere(function ($vehicles) use ($accessibleAssetIds) {
+                                    $vehicles->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+                                        ->whereIn('assignable_id', $accessibleAssetIds ?? []);
+                                });
+                            });
+                    });
+            });
+        };
+
+        $totalDevices = $scopeTrackingDevices(Device::where('domain', 'tracking'))
             ->whereIn('status', ['active', 'degraded'])
             ->count();
-        $onlineDevices = Device::where('domain', 'tracking')
+        $onlineDevices = $scopeTrackingDevices(Device::where('domain', 'tracking'))
             ->where('status', 'active')
             ->where('last_seen_at', '>', now()->subHours(2))
             ->count();
@@ -378,17 +526,21 @@ class DashboardController extends Controller
         // Resident movement cluster — all three tiles honour the lens. Site
         // attribution for residents goes through the client's site.
         $siteClientIds = $scoped
-            ? Client::query()->where('site_id', $userSiteId)->pluck('id')->all()
-            : null;
+            ? Client::query()
+                ->where('organization_id', $organizationId)
+                ->where('site_id', $userSiteId)
+                ->pluck('id')
+                ->all()
+            : $accessibleClientIds;
 
         // Tracked residents — canonical device assignments (client-assigned tracking devices).
         $trackedResidentsQuery = DeviceAssignment::query()
             ->active()
             ->where('assignable_type', 'client')
-            ->whereHas('device', fn ($q) => $q->where('domain', 'tracking'));
-        if ($siteClientIds !== null) {
-            $trackedResidentsQuery->whereIn('assignable_id', $siteClientIds);
-        }
+            ->whereHas('device', fn ($q) => $q
+                ->where('tenant_id', $organizationId)
+                ->where('domain', 'tracking'));
+        $trackedResidentsQuery->whereIn('assignable_id', $siteClientIds);
         $trackedResidents = $trackedResidentsQuery->count();
 
         // Open wandering alerts — same base filter as the resident-tracking
@@ -397,10 +549,9 @@ class DashboardController extends Controller
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id')
             ->whereIn('alert_type', ['geofence_breach', 'wandering'])
-            ->whereNotIn('status', ['closed', 'resolved']);
-        if ($siteClientIds !== null) {
-            $openWanderingQuery->whereIn('client_id', $siteClientIds);
-        }
+            ->actionable();
+        $openWanderingQuery->whereIn('client_id', $siteClientIds);
+        $applyAlertScope($openWanderingQuery);
         $openWanderingAlerts = $openWanderingQuery->count();
 
         // Today's resident transports — count pattern from ResidentTransportController.
@@ -410,7 +561,7 @@ class DashboardController extends Controller
 
         // Active outings (cluster tile — honours the lens)
         $activeOutings = $hasOutingsTable
-            ? $applyClusterScope(FleetOuting::query()
+            ? $applyClusterScope($applyOutingTenantScope(FleetOuting::query())
                 ->where(function ($q) {
                     $q->where('status', 'active')
                       ->orWhere(function ($q2) {
@@ -421,26 +572,26 @@ class DashboardController extends Controller
                 ->count()
             : 0;
 
-        // Outings past their planned return — org-wide for the attention strip,
-        // scoped variant for the Outings tile caption.
+        // Outings past their planned return — accessible sites for the
+        // attention strip, with a further cluster-lens variant for the tile.
         $outingsPastReturn = $hasOutingsTable
-            ? FleetOuting::query()
+            ? $applyAccessibleVehicleScope($applyOutingTenantScope(FleetOuting::query()))
                 ->where('status', 'active')
                 ->where('planned_return', '<', now())
                 ->count()
             : 0;
-        $outingsPastReturnScoped = ! $scoped ? $outingsPastReturn : ($hasOutingsTable
+        $outingsPastReturnScoped = $hasOutingsTable
             ? $applyClusterScope(
-                FleetOuting::query()
+                $applyOutingTenantScope(FleetOuting::query())
                     ->where('status', 'active')
                     ->where('planned_return', '<', now())
             )->count()
-            : 0);
+            : 0;
 
         // My site vehicles (for "Vehicles at Your Site" widget)
         $mySiteVehicles = collect();
-        if ($userSiteId && $hasFleetFields) {
-            $mySiteVehicles = Asset::vehicles()
+        if ($userSiteId && in_array((int) $userSiteId, $accessibleSiteIds, true) && $hasFleetFields) {
+            $mySiteVehicles = $applyAssetSiteScope(Asset::vehicles())
                 ->with('fleetState')
                 ->where(function ($q) use ($userSiteId) {
                     $q->where('home_site_id', $userSiteId)
@@ -477,7 +628,10 @@ class DashboardController extends Controller
                 'trackers' => \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
                     ->active()
                     ->forAsset($v->id)
-                    ->with('device:id,device_uid,name,provider,status')
+                    ->with(['device' => fn ($query) => $organizationId === null
+                        ? $query->whereRaw('1 = 0')
+                        : $query->where('tenant_id', $organizationId)
+                            ->select(['id', 'device_uid', 'name', 'provider', 'status'])])
                     ->get()
                     ->map(fn ($link) => [
                         'id' => $link->device?->id,
@@ -537,5 +691,14 @@ class DashboardController extends Controller
             'my_site_vehicles' => $mySiteVehicles,
             'today_outings' => $todayOutings,
         ]);
+    }
+
+    private function organizationId(?\App\Models\User $user): ?int
+    {
+        $organizationId = $user?->organization_id;
+
+        return is_numeric($organizationId) && (int) $organizationId > 0
+            ? (int) $organizationId
+            : null;
     }
 }

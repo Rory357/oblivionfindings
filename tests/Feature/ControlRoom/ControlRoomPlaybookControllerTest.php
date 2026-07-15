@@ -7,7 +7,10 @@ use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\AlertWorkspaceService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,17 +22,23 @@ class ControlRoomPlaybookControllerTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
         $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+
+        $this->site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
     }
 
     public function test_index_requires_view_permission(): void
@@ -219,7 +228,9 @@ class ControlRoomPlaybookControllerTest extends TestCase
             'type' => 'task',
         ]);
 
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/playbook/start", [
@@ -257,7 +268,9 @@ class ControlRoomPlaybookControllerTest extends TestCase
             'type' => 'task',
         ]);
 
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/playbook/start", [
@@ -265,7 +278,7 @@ class ControlRoomPlaybookControllerTest extends TestCase
             ])
             ->assertRedirect();
 
-        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+        $detail = app(AlertWorkspaceService::class)
             ->build($this->admin, $alert->id);
 
         $steps = $detail['playbook_run']['steps'];
@@ -295,7 +308,9 @@ class ControlRoomPlaybookControllerTest extends TestCase
             ]);
         }
 
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/playbook/start", ['playbook_id' => $playbook->id])
             ->assertRedirect();
@@ -324,7 +339,7 @@ class ControlRoomPlaybookControllerTest extends TestCase
         $this->assertSame('completed', $run->status);
 
         // The workspace payload derives the count from the step rows too.
-        $detail = app(\App\Services\ControlRoom\AlertWorkspaceService::class)
+        $detail = app(AlertWorkspaceService::class)
             ->build($this->admin, $alert->id);
         $this->assertSame(2, $detail['playbook_run']['completed_steps']);
     }
@@ -337,7 +352,9 @@ class ControlRoomPlaybookControllerTest extends TestCase
             'category' => 'safety',
             'is_active' => false,
         ]);
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/playbook/start", [

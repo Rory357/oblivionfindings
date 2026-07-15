@@ -30,9 +30,9 @@ import {
     User,
     UserCog,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 
-import { HsDetailDialog, type HsDetail } from './hs-detail-dialog';
+import { type HsDetail, HsDetailDialog } from './hs-detail-dialog';
 
 /* ------------------------------------------------------------------ */
 /*  Payload row types (match the WS1 HsDashboardService builders)      */
@@ -67,6 +67,7 @@ export type InvestigationRow = {
 
 export type NotifiableRow = {
     id: number;
+    event_reference: string;
     title: string | null;
     incident_type: string | null;
     status: string;
@@ -95,7 +96,11 @@ export type WorklistsPayload = {
     expiring: ExpiringRow[];
 };
 
-export type WorklistKey = 'corrective_actions' | 'investigations' | 'notifiable' | 'expiring';
+export type WorklistKey =
+    | 'corrective_actions'
+    | 'investigations'
+    | 'notifiable'
+    | 'expiring';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -132,7 +137,11 @@ function fmtDate(value?: string | null): string {
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function titleCase(value?: string | null): string {
@@ -149,14 +158,18 @@ const AVATAR_TONES = [
 
 function avatarTone(name: string): string {
     let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < name.length; i++)
+        h = (h * 31 + name.charCodeAt(i)) >>> 0;
     return AVATAR_TONES[h % AVATAR_TONES.length];
 }
 
 function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return '?';
-    return ((parts[0][0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    return (
+        (parts[0][0] ?? '') +
+        (parts.length > 1 ? parts[parts.length - 1][0] : '')
+    ).toUpperCase();
 }
 
 type NormRow = {
@@ -184,9 +197,20 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
     return rows.map((r) => ({
         key: `ca-${r.id}`,
         pill: {
-            label: r.days_overdue != null ? `${r.days_overdue}d overdue` : 'Overdue',
-            tone: ['high', 'critical', 'urgent'].includes((r.priority ?? '').toLowerCase()) ? 'critical' : 'warning',
-            icon: ['high', 'critical', 'urgent'].includes((r.priority ?? '').toLowerCase()) ? AlertTriangle : undefined,
+            label:
+                r.days_overdue != null
+                    ? `${r.days_overdue}d overdue`
+                    : 'Overdue',
+            tone: ['high', 'critical', 'urgent'].includes(
+                (r.priority ?? '').toLowerCase(),
+            )
+                ? 'critical'
+                : 'warning',
+            icon: ['high', 'critical', 'urgent'].includes(
+                (r.priority ?? '').toLowerCase(),
+            )
+                ? AlertTriangle
+                : undefined,
         },
         title: r.title ?? r.reference ?? `Corrective action #${r.id}`,
         sub: [r.reference, titleCase(r.priority)].filter(Boolean).join(' · '),
@@ -217,7 +241,10 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
                 { label: 'Priority', value: titleCase(r.priority) },
                 { label: 'Status', value: titleCase(r.status) },
                 { label: 'Due date', value: fmtDate(r.due_date) },
-                { label: 'Days overdue', value: r.days_overdue != null ? `${r.days_overdue}` : '—' },
+                {
+                    label: 'Days overdue',
+                    value: r.days_overdue != null ? `${r.days_overdue}` : '—',
+                },
                 { label: 'Owner', value: r.owner },
                 { label: 'Linked event', value: r.event_reference },
             ],
@@ -258,7 +285,10 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
                 { label: 'Reference', value: r.reference },
                 { label: 'Type', value: titleCase(r.type) },
                 { label: 'Status', value: titleCase(r.status) },
-                { label: 'Target completion', value: fmtDate(r.target_completion_date) },
+                {
+                    label: 'Target completion',
+                    value: fmtDate(r.target_completion_date),
+                },
                 { label: 'Overdue', value: r.is_overdue ? 'Yes' : 'No' },
                 { label: 'Lead investigator', value: r.owner },
                 { label: 'Linked event', value: r.event_reference },
@@ -270,7 +300,10 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
 function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
     return rows.map((r) => {
         const awaiting = r.status === 'pending';
-        const notifiedSub = [r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null, r.notified_at ? fmtDate(r.notified_at) : null]
+        const notifiedSub = [
+            r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null,
+            r.notified_at ? fmtDate(r.notified_at) : null,
+        ]
             .filter(Boolean)
             .join(' · ');
         return {
@@ -278,8 +311,11 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
             pill: awaiting
                 ? { label: 'Awaiting', tone: 'critical', icon: Clock }
                 : { label: titleCase(r.status), tone: 'success', icon: Check },
-            title: r.title ?? `Notifiable event #${r.id}`,
-            sub: awaiting ? 'Notify WorkSafe — action required' : notifiedSub || titleCase(r.incident_type),
+            title:
+                r.title ?? `${r.event_reference} · WorkSafe notifiable event`,
+            sub: awaiting
+                ? 'Notify WorkSafe — action required'
+                : notifiedSub || titleCase(r.incident_type),
             owner: null,
             due: null,
             clientId: null,
@@ -291,9 +327,10 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
             meta: titleCase(r.incident_type),
             detail: {
                 title: 'WorkSafe notifiable event',
-                description: 'HSWA 2015 notifiable event — records kept ≥ 5 years.',
+                description:
+                    'HSWA 2015 notifiable event — records kept ≥ 5 years.',
                 railIcon: ShieldAlert,
-                railTitle: r.title ?? `Notifiable #${r.id}`,
+                railTitle: r.title ?? r.event_reference,
                 railSub: titleCase(r.incident_type),
                 cardTitle: 'Notifiable event',
                 cardIcon: ShieldAlert,
@@ -301,12 +338,19 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
                 registerLabel: 'WorkSafe register',
                 rows: [
                     { label: 'Title', value: r.title },
+                    { label: 'H&S reference', value: r.event_reference },
                     { label: 'Type', value: titleCase(r.incident_type) },
                     { label: 'Status', value: titleCase(r.status) },
                     { label: 'Occurred', value: fmtDate(r.occurred_at) },
                     { label: 'Notified', value: fmtDate(r.notified_at) },
-                    { label: 'Deadline', value: fmtDate(r.notification_deadline) },
-                    { label: 'Site preserved', value: r.site_preserved ? 'Yes' : 'No' },
+                    {
+                        label: 'Deadline',
+                        value: fmtDate(r.notification_deadline),
+                    },
+                    {
+                        label: 'Site preserved',
+                        value: r.site_preserved ? 'Yes' : 'No',
+                    },
                     { label: 'WorkSafe ref', value: r.worksafe_ref },
                 ],
             },
@@ -320,8 +364,18 @@ function expiringRows(rows: ExpiringRow[]): NormRow[] {
         return {
             key: `exp-${r.type}-${i}`,
             pill: overdue
-                ? { label: r.days_until != null ? `Expired ${Math.abs(r.days_until)}d` : 'Overdue', tone: 'critical' }
-                : { label: r.days_until != null ? `${r.days_until} days` : 'Due', tone: 'warning' },
+                ? {
+                      label:
+                          r.days_until != null
+                              ? `Expired ${Math.abs(r.days_until)}d`
+                              : 'Overdue',
+                      tone: 'critical',
+                  }
+                : {
+                      label:
+                          r.days_until != null ? `${r.days_until} days` : 'Due',
+                      tone: 'warning',
+                  },
             title: r.label ?? r.type_label,
             sub: r.type_label,
             owner: null,
@@ -347,7 +401,10 @@ function expiringRows(rows: ExpiringRow[]): NormRow[] {
                     { label: 'Item', value: r.label },
                     { label: 'Type', value: r.type_label },
                     { label: 'Due date', value: fmtDate(r.due_date) },
-                    { label: 'Days until due', value: r.days_until != null ? `${r.days_until}` : '—' },
+                    {
+                        label: 'Days until due',
+                        value: r.days_until != null ? `${r.days_until}` : '—',
+                    },
                     { label: 'Site', value: r.site },
                 ],
             },
@@ -384,7 +441,8 @@ export function HsWorklists({
     // The WorkSafe register report is governance.view-gated; for register-only
     // roles (hazards.view) fall back to the non-gated events WorkSafe tab so the
     // worklist's register links (card, context menu, detail dialog) don't 403.
-    const canViewGovReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+    const canViewGovReports =
+        usePage<SharedData>().props.auth.can?.governance?.view ?? false;
     const worksafeRegisterUrl = canViewGovReports
         ? '/health-safety/reports/worksafe-register'
         : '/health-safety/events?tab=worksafe';
@@ -392,17 +450,37 @@ export function HsWorklists({
     const openCtx = (e: React.MouseEvent, row: NormRow) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [
-            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View detail', onClick: () => setDetail(row.detail) },
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'View detail',
+                onClick: () => setDetail(row.detail),
+            },
         ];
         if (row.clientId) {
-            items.push({ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/clients/${row.clientId}`) });
+            items.push({
+                icon: <User className="h-3.5 w-3.5" />,
+                label: 'View client',
+                onClick: () => router.visit(`/clients/${row.clientId}`),
+            });
         }
         if (row.staffId) {
-            items.push({ icon: <UserCog className="h-3.5 w-3.5" />, label: 'View staff', onClick: () => router.visit(`/staff/${row.staffId}`) });
+            items.push({
+                icon: <UserCog className="h-3.5 w-3.5" />,
+                label: 'View staff',
+                onClick: () => router.visit(`/staff/${row.staffId}`),
+            });
         }
         items.push({ sep: true });
-        items.push({ icon: <ExternalLink className="h-3.5 w-3.5" />, label: row.registerLabel, onClick: () => router.visit(row.registerUrl) });
-        items.push({ icon: <Printer className="h-3.5 w-3.5" />, label: 'Print', onClick: () => window.print() });
+        items.push({
+            icon: <ExternalLink className="h-3.5 w-3.5" />,
+            label: row.registerLabel,
+            onClick: () => router.visit(row.registerUrl),
+        });
+        items.push({
+            icon: <Printer className="h-3.5 w-3.5" />,
+            label: 'Print',
+            onClick: () => window.print(),
+        });
 
         setCtx({
             x: e.clientX,
@@ -445,7 +523,10 @@ export function HsWorklists({
             subtitle: 'HSWA 2015 · notified / awaiting',
             registerUrl: worksafeRegisterUrl,
             registerLabel: 'Register',
-            rows: notifiableRows(worklists.notifiable_events, worksafeRegisterUrl),
+            rows: notifiableRows(
+                worklists.notifiable_events,
+                worksafeRegisterUrl,
+            ),
             emptyText: 'No notifiable events on record.',
         },
         expiring: {
@@ -465,7 +546,12 @@ export function HsWorklists({
 
     return (
         <>
-            <div className={cn('grid gap-4', configs.length > 1 && 'lg:grid-cols-2')}>
+            <div
+                className={cn(
+                    'grid gap-4',
+                    configs.length > 1 && 'lg:grid-cols-2',
+                )}
+            >
                 {configs.map((cfg) => (
                     <Card key={cfg.key}>
                         <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
@@ -479,8 +565,12 @@ export function HsWorklists({
                                     <cfg.icon className="h-4 w-4" />
                                 </span>
                                 <div>
-                                    <CardTitle className="text-sm font-bold leading-tight">{cfg.title}</CardTitle>
-                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">{cfg.subtitle}</p>
+                                    <CardTitle className="text-sm leading-tight font-bold">
+                                        {cfg.title}
+                                    </CardTitle>
+                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                        {cfg.subtitle}
+                                    </p>
                                 </div>
                             </div>
                             {cfg.registerUrl ? (
@@ -495,7 +585,9 @@ export function HsWorklists({
                         </CardHeader>
                         <CardContent className="space-y-1.5">
                             {cfg.rows.length === 0 ? (
-                                <p className="py-6 text-center text-xs text-muted-foreground">{cfg.emptyText}</p>
+                                <p className="py-6 text-center text-xs text-muted-foreground">
+                                    {cfg.emptyText}
+                                </p>
                             ) : (
                                 cfg.rows.map((row) => (
                                     // eslint-disable-next-line no-restricted-syntax -- worklist row is a custom full-width selector card, not a shadcn Button.
@@ -512,12 +604,18 @@ export function HsWorklists({
                                                 PILL_CLASS[row.pill.tone],
                                             )}
                                         >
-                                            {row.pill.icon ? <row.pill.icon className="h-3 w-3" /> : null}
+                                            {row.pill.icon ? (
+                                                <row.pill.icon className="h-3 w-3" />
+                                            ) : null}
                                             {row.pill.label}
                                         </span>
                                         <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-[13px] font-medium text-foreground">{row.title}</span>
-                                            <span className="block truncate text-[11px] text-muted-foreground">{row.sub}</span>
+                                            <span className="block truncate text-[13px] font-medium text-foreground">
+                                                {row.title}
+                                            </span>
+                                            <span className="block truncate text-[11px] text-muted-foreground">
+                                                {row.sub}
+                                            </span>
                                         </span>
                                         <span className="flex shrink-0 items-center gap-2">
                                             {row.owner ? (
@@ -532,7 +630,9 @@ export function HsWorklists({
                                                 </span>
                                             ) : null}
                                             {row.due ? (
-                                                <span className="w-12 text-right text-[11px] tabular-nums text-muted-foreground">{row.due}</span>
+                                                <span className="w-12 text-right text-[11px] text-muted-foreground tabular-nums">
+                                                    {row.due}
+                                                </span>
                                             ) : null}
                                         </span>
                                     </button>
@@ -543,8 +643,15 @@ export function HsWorklists({
                 ))}
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
-            {detail ? <HsDetailDialog detail={detail} onClose={() => setDetail(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
+            {detail ? (
+                <HsDetailDialog
+                    detail={detail}
+                    onClose={() => setDetail(null)}
+                />
+            ) : null}
         </>
     );
 }

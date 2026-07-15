@@ -2,13 +2,22 @@
 
 namespace App\Models\ControlRoom;
 
+use App\Models\ControlRoomAlert;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class Shift extends Model
 {
+    public const HANDOVER_NONE = 'none';
+
+    public const HANDOVER_PREPARED = 'prepared';
+
+    public const HANDOVER_ACCEPTED = 'accepted';
+
     protected $table = 'control_room_shifts';
 
     protected $fillable = [
@@ -27,6 +36,11 @@ class Shift extends Model
         'priority_items',
         'handed_over_to_user_id',
         'handed_over_at',
+        'handover_status',
+        'handover_snapshot',
+        'handover_version',
+        'handover_prepared_at',
+        'handover_accepted_at',
     ];
 
     protected $casts = [
@@ -35,6 +49,11 @@ class Shift extends Model
         'handed_over_at' => 'datetime',
         'team_members' => 'array',
         'priority_items' => 'array',
+        'handover_status' => 'string',
+        'handover_snapshot' => 'array',
+        'handover_version' => 'integer',
+        'handover_prepared_at' => 'datetime',
+        'handover_accepted_at' => 'datetime',
     ];
 
     public function shiftLead(): BelongsTo
@@ -74,33 +93,22 @@ class Shift extends Model
 
     public static function startNew(User $shiftLead, ?string $name = null, array $teamMembers = []): self
     {
-        // End any active shifts
-        static::active()->update([
-            'status' => 'completed',
-            'ends_at' => now(),
-        ]);
+        return DB::transaction(function () use ($shiftLead, $name, $teamMembers): self {
+            if (static::query()->active()->lockForUpdate()->first(['id'])) {
+                throw ValidationException::withMessages([
+                    'shift' => 'Complete the active shift through an accepted handover before starting another.',
+                ]);
+            }
 
-        return static::create([
-            'name' => $name ?? 'Shift ' . now()->format('Y-m-d H:i'),
-            'starts_at' => now(),
-            'status' => 'active',
-            'shift_lead_user_id' => $shiftLead->id,
-            'team_members' => $teamMembers,
-            'open_alerts_at_start' => \App\Models\ControlRoomAlert::unresolved()->count(),
-        ]);
-    }
-
-    public function handover(User $toUser, string $notes, array $priorityItems = []): void
-    {
-        $this->update([
-            'status' => 'completed',
-            'ends_at' => now(),
-            'open_alerts_at_end' => \App\Models\ControlRoomAlert::unresolved()->count(),
-            'handover_notes' => $notes,
-            'priority_items' => $priorityItems,
-            'handed_over_to_user_id' => $toUser->id,
-            'handed_over_at' => now(),
-        ]);
+            return static::create([
+                'name' => $name ?? 'Shift '.now()->format('Y-m-d H:i'),
+                'starts_at' => now(),
+                'status' => 'active',
+                'shift_lead_user_id' => $shiftLead->id,
+                'team_members' => $teamMembers,
+                'open_alerts_at_start' => ControlRoomAlert::unresolved()->count(),
+            ]);
+        });
     }
 
     public function incrementCreated(): void
@@ -120,7 +128,7 @@ class Shift extends Model
 
     public function getDuration(): ?int
     {
-        if (!$this->ends_at) {
+        if (! $this->ends_at) {
             return $this->starts_at->diffInMinutes(now());
         }
 

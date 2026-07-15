@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,7 +23,7 @@ class ControlRoomMyTasksControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -71,6 +73,24 @@ class ControlRoomMyTasksControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('my_alerts', 1)
                 ->where('stats.my_open', 1)
+            );
+    }
+
+    public function test_residual_terminal_sla_is_omitted_from_my_alert_status(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->assignedTo($this->admin)->create();
+        AlertSla::query()->create([
+            'alert_id' => $alert->id,
+            'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+            'cycle_history' => [['ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH]],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/my-tasks')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('my_alerts.0.id', $alert->id)
+                ->where('my_alerts.0.sla_status', null)
             );
     }
 

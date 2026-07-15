@@ -8,6 +8,7 @@ use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -54,12 +55,17 @@ class ControlRoomShiftController extends Controller
                 'alerts_created' => $activeShift->alerts_created ?? 0,
                 'alerts_resolved' => $activeShift->alerts_resolved ?? 0,
                 'alerts_escalated' => $activeShift->alerts_escalated ?? 0,
-                'handover_notes' => $activeShift->handover_notes,
-                'priority_items' => $activeShift->priority_items ?? [],
+                'handover_status' => $activeShift->handover_status,
+                'handover_version' => $activeShift->handover_version,
+                'handover_prepared_at' => $activeShift->handover_prepared_at?->toISOString(),
+                'incoming_lead' => $activeShift->handedOverTo ? [
+                    'id' => $activeShift->handedOverTo->id,
+                    'name' => $activeShift->handedOverTo->name,
+                ] : null,
             ];
 
             $notes = OperatorNote::where('shift_id', $activeShift->id)
-                ->with('user:id,name')
+                ->with(['user:id,name', 'alert:id,reference_number'])
                 ->orderByDesc('is_pinned')
                 ->orderByDesc('created_at')
                 ->get()
@@ -71,6 +77,7 @@ class ControlRoomShiftController extends Controller
                     'requires_followup' => $note->requires_followup,
                     'followup_at' => $note->followup_at?->toISOString(),
                     'alert_id' => $note->alert_id,
+                    'alert_reference' => $note->alert?->reference_number,
                     'user' => $note->user ? [
                         'id' => $note->user->id,
                         'name' => $note->user->name,
@@ -113,14 +120,23 @@ class ControlRoomShiftController extends Controller
         // Staff list for selects
         $staff = User::staff()
             ->tap(fn ($staffQuery) => $siteAccess->applyStaffScope($staffQuery, $user, $bypassPermissions))
+            ->with(['roles.permissions:id,key', 'permissionOverrides:id,key'])
             ->orderBy('name')
             ->select('id', 'name')
             ->limit(200)
-            ->get()
-            ->map(fn (User $u) => [
-                'id' => $u->id,
-                'name' => $u->name,
+            ->get();
+        $eligibleLeads = $staff
+            ->filter(fn (User $candidate) => $candidate->canDo('controlRoom.alerts.manage'))
+            ->map(fn (User $candidate) => [
+                'id' => $candidate->id,
+                'name' => $candidate->name,
             ])
+            ->values()
+            ->all();
+        $staff = $staff->map(fn (User $u) => [
+            'id' => $u->id,
+            'name' => $u->name,
+        ])
             ->all();
 
         return Inertia::render('control-room/shifts', [
@@ -130,6 +146,7 @@ class ControlRoomShiftController extends Controller
             'openAlertsCount' => $openAlertsCount,
             'criticalAlertsCount' => $criticalAlertsCount,
             'staff' => $staff,
+            'eligibleLeads' => $eligibleLeads,
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
             ],
@@ -155,6 +172,7 @@ class ControlRoomShiftController extends Controller
             (int) $validated['shift_lead_user_id'],
             ...collect($validated['team_members'] ?? [])->map(fn ($id) => (int) $id)->all(),
         ]);
+        $this->assertCanLeadControlRoomShift($user, (int) $validated['shift_lead_user_id']);
 
         $shiftLead = User::findOrFail($validated['shift_lead_user_id']);
         $teamMembers = $validated['team_members'] ?? [];
@@ -172,92 +190,122 @@ class ControlRoomShiftController extends Controller
     }
 
     /**
-     * Perform shift handover.
+     * Autosave a resumable handover draft without changing shift ownership.
      */
-    public function handover(Request $request, Shift $shift)
-    {
+    public function saveHandoverDraft(
+        Request $request,
+        Shift $shift,
+        ControlRoomShiftHandoverService $handovers,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
-        // Narrative is optional — the wizard presents it that way and the confirm
-        // step renders "No handover notes provided" for an empty one.
         $validated = $request->validate([
             'handover_notes' => ['nullable', 'string', 'max:5000'],
-            'priority_items' => ['nullable', 'array'],
-            'priority_items.*' => ['string', 'max:500'],
             'incoming_shift_name' => ['nullable', 'string', 'max:255'],
-            'incoming_lead_user_id' => ['required', 'integer', 'exists:users,id'],
+            'incoming_lead_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'incoming_team_members' => ['nullable', 'array'],
             'incoming_team_members.*' => ['integer', 'exists:users,id'],
+            'reviewed_alert_ids' => ['nullable', 'array'],
+            'reviewed_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'priority_alert_ids' => ['nullable', 'array'],
+            'priority_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 
-        $this->assertCanUseShiftStaff($user, [
-            (int) $validated['incoming_lead_user_id'],
-            ...collect($validated['incoming_team_members'] ?? [])->map(fn ($id) => (int) $id)->all(),
-        ]);
-
-        $incomingLead = User::findOrFail($validated['incoming_lead_user_id']);
-        $handoverNotes = trim((string) ($validated['handover_notes'] ?? ''));
-
-        // Complete the current shift via handover
-        $shift->handover(
-            $incomingLead,
-            $handoverNotes,
-            $validated['priority_items'] ?? [],
-        );
-
-        // Create a handover operator note on the outgoing shift (only when
-        // there is a narrative to record).
-        if ($handoverNotes !== '') {
-            OperatorNote::create([
-                'shift_id' => $shift->id,
-                'user_id' => $user->id,
-                'type' => 'handover',
-                'content' => $handoverNotes,
-                'is_pinned' => false,
-                'requires_followup' => false,
-            ]);
+        $staffIds = collect($validated['incoming_team_members'] ?? [])
+            ->map(fn ($id) => (int) $id);
+        if (filled($validated['incoming_lead_user_id'] ?? null)) {
+            $staffIds->push((int) $validated['incoming_lead_user_id']);
+        }
+        $this->assertCanUseShiftStaff($user, $staffIds->all());
+        if (filled($validated['incoming_lead_user_id'] ?? null)) {
+            $this->assertCanLeadControlRoomShift($user, (int) $validated['incoming_lead_user_id']);
         }
 
-        // Start the new shift for the incoming team. Keep the name the operator
-        // typed on the handover wizard; fall back to a timestamped default.
-        $incomingShiftName = trim($validated['incoming_shift_name'] ?? '');
-        $newShift = Shift::startNew(
-            $incomingLead,
-            $incomingShiftName !== '' ? $incomingShiftName : 'Shift '.now()->format('Y-m-d H:i'),
-            $validated['incoming_team_members'] ?? [],
-        );
+        $expectedVersion = (int) $validated['expected_version'];
+        unset($validated['expected_version']);
 
-        AuditLogger::log('controlRoom.shift.handover', $shift, [
-            'outgoing_shift_id' => $shift->id,
-            'incoming_shift_id' => $newShift->id,
-            'incoming_lead_user_id' => $incomingLead->id,
-            'priority_items' => $validated['priority_items'] ?? [],
+        $handovers->saveDraft($shift, $validated, $user, $expectedVersion);
+
+        return redirect()->route('control-room.shifts.handover-page', $shift)
+            ->with('success', 'Handover draft saved.');
+    }
+
+    /**
+     * Freeze the outgoing lead's reviewed handover for the incoming lead.
+     */
+    public function handover(
+        Request $request,
+        Shift $shift,
+        ControlRoomShiftHandoverService $handovers,
+    ) {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $validated = $request->validate([
+            'incoming_lead_user_id' => ['required', 'integer', 'exists:users,id'],
+            'reviewed_alert_ids' => ['present', 'array'],
+            'reviewed_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 
+        $this->assertCanUseShiftStaff($user, [(int) $validated['incoming_lead_user_id']]);
+        $this->assertCanLeadControlRoomShift($user, (int) $validated['incoming_lead_user_id']);
+        $incomingLead = User::findOrFail($validated['incoming_lead_user_id']);
+
+        $handovers->prepare(
+            $shift,
+            $incomingLead,
+            $validated['reviewed_alert_ids'],
+            $user,
+            (int) $validated['expected_version'],
+        );
+
+        return redirect()->route('control-room.shifts.handover-page', $shift)
+            ->with('success', 'Handover prepared for '.$incomingLead->name.'.');
+    }
+
+    /**
+     * Accept a prepared handover and atomically switch the active shift.
+     */
+    public function acceptHandover(
+        Request $request,
+        Shift $shift,
+        ControlRoomShiftHandoverService $handovers,
+    ) {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $validated = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $handovers->accept($shift, $user, (int) $validated['expected_version']);
+
         return redirect()->route('control-room.shifts.index')
-            ->with('success', 'Handover completed successfully.');
+            ->with('success', 'Handover accepted. The incoming shift is now active.');
     }
 
     /**
      * Acknowledge a handover.
      */
-    public function acknowledgeHandover(Request $request, Shift $shift)
-    {
+    public function acknowledgeHandover(
+        Request $request,
+        Shift $shift,
+        ControlRoomShiftHandoverService $handovers,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
-        $shift->update([
-            'status' => 'active',
-        ]);
-
-        AuditLogger::log('controlRoom.shift.handoverAcknowledged', $shift, [
-            'shift_id' => $shift->id,
-            'acknowledged_by' => $user->id,
-        ]);
+        $handovers->accept(
+            $shift,
+            $user,
+            (int) ($request->input('expected_version') ?? $shift->fresh()->handover_version),
+        );
 
         return redirect()->route('control-room.shifts.index')
-            ->with('success', 'Handover acknowledged.');
+            ->with('success', 'Handover accepted. The incoming shift is now active.');
     }
 
     /**
@@ -320,6 +368,19 @@ class ControlRoomShiftController extends Controller
             $query->count() !== count($uniqueUserIds),
             403,
             'You are not authorized to select one or more staff members for this shift.',
+        );
+    }
+
+    protected function assertCanLeadControlRoomShift(User $user, int $leadUserId): void
+    {
+        $query = User::staff()->whereKey($leadUserId);
+        app(UserSiteAccessService::class)->applyStaffScope($query, $user, $this->alertBypassPermissions());
+
+        $lead = $query->first();
+        abort_unless(
+            $lead && $lead->canDo('controlRoom.alerts.manage'),
+            403,
+            'The selected shift lead is not eligible to manage a Control Room handover.',
         );
     }
 

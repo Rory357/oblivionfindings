@@ -9,10 +9,12 @@ use App\Models\ShiftTask;
 use App\Models\Timesheet;
 use App\Models\TimesheetClientAllocation;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * Legacy My Day helpers — now trimmed to the two safe, still-used actions:
@@ -402,41 +404,29 @@ class MyDayActionsController extends Controller
      * Distinct from {@see \App\Http\Controllers\ControlRoom\ControlRoomAlertController::acknowledge}
      * which is gated to CR operators with `controlRoom.alerts.manage`. Here we
      * gate strictly on the alert's assignee so a frontline worker can clear
-     * their own item without inheriting operator permissions. Transitions
-     * open → ack via the same lifecycle check; a no-op otherwise so repeated
-     * taps stay safe.
+     * their own item without inheriting operator permissions. The canonical
+     * lifecycle owns the open → ack mutation and reports stale actions without
+     * overwriting a newer operator state.
      */
-    public function acknowledgeAlert(Request $request, ControlRoomAlert $alert)
-    {
+    public function acknowledgeAlert(
+        Request $request,
+        ControlRoomAlert $alert,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($alert->assigned_to_user_id === $user->id, 403);
 
-        if ($alert->isTerminal()) {
-            return back();
+        try {
+            $acknowledged = $lifecycle->acknowledge($alert, $user, null, $user->id);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['alert' => $exception->getMessage()]);
         }
 
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
-            // Already ack'd / triaging — treat as a successful no-op so the
-            // frontline button stays idempotent.
-            return back()->with('success', 'Alert already acknowledged.');
-        }
-
-        $alert->update([
-            'status' => ControlRoomAlert::STATUS_ACK,
-            'acknowledged_at' => now(),
-            'acknowledged_by_user_id' => $user->id,
+        $acknowledged->forceFill([
             'snoozed_until' => null,
             'snoozed_by_user_id' => null,
-        ]);
-
-        $alert->sla?->recordAcknowledge();
-
-        AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
-            'alert_id' => $alert->id,
-            'acknowledged_by' => $user->id,
-            'via' => 'my-day',
-        ]);
+        ])->save();
 
         return back()->with('success', 'Alert acknowledged.');
     }
@@ -450,21 +440,15 @@ class MyDayActionsController extends Controller
      * shortest window. Critical alerts can't be snoozed — they must be
      * opened or acknowledged.
      */
-    public function snoozeAlert(Request $request, ControlRoomAlert $alert)
+    public function snoozeAlert(
+        Request $request,
+        ControlRoomAlert $alert,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
     {
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($alert->assigned_to_user_id === $user->id, 403);
-
-        if ($alert->isTerminal()) {
-            return back();
-        }
-
-        if (strtolower((string) $alert->severity) === 'critical') {
-            return back()->withErrors([
-                'alert' => 'Critical alerts can\'t be snoozed. Open or acknowledge it.',
-            ]);
-        }
 
         $window = $request->input('window', '15m');
         $until = match ($window) {
@@ -473,17 +457,11 @@ class MyDayActionsController extends Controller
             default => now()->addMinutes(15),
         };
 
-        $alert->update([
-            'snoozed_until' => $until,
-            'snoozed_by_user_id' => $user->id,
-        ]);
-
-        AuditLogger::log('controlRoom.alert.snooze', $alert, [
-            'alert_id' => $alert->id,
-            'snoozed_by' => $user->id,
-            'snoozed_until' => $until->toIso8601String(),
-            'window' => $window,
-        ]);
+        try {
+            $lifecycle->snoozeForAssignee($alert, $user, $until, $window);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['alert' => $exception->getMessage()]);
+        }
 
         return back()->with('success', 'Snoozed.');
     }

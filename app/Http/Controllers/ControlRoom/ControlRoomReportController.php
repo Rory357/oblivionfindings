@@ -32,7 +32,7 @@ class ControlRoomReportController extends Controller
         $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope);
         $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope);
         $workload = $this->reportService->workloadDistribution($from, $to, $reportSiteScope);
-        $playbooks = $this->reportService->playbookPerformance($from, $to);
+        $playbooks = $this->reportService->playbookPerformance($from, $to, $reportSiteScope);
 
         AuditLogger::log('controlRoom.reports.view', null, ['period' => $period]);
 
@@ -198,10 +198,7 @@ class ControlRoomReportController extends Controller
         $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
 
         if ($siteId) {
-            $query->where(function ($scopedQuery) use ($siteId) {
-                $scopedQuery->where('site_id', $siteId)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-            });
+            $siteAccess->applyAlertSiteScopeForSiteIds($query, [$siteId]);
         }
     }
 
@@ -221,7 +218,8 @@ class ControlRoomReportController extends Controller
             return $siteId;
         }
 
-        if ($siteAccess->canBypass($user, $bypassPermissions)) {
+        if ($siteAccess->canBypass($user, $bypassPermissions)
+            && $siteAccess->isUnrestrictedPlatformUser($user)) {
             return null;
         }
 

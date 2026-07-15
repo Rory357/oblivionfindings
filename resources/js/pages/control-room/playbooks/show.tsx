@@ -1,19 +1,10 @@
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import {
     Table,
     TableBody,
@@ -22,31 +13,24 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
-    ChevronDown,
-    ChevronUp,
     Clock,
     ExternalLink,
     Layers,
     Lock,
     Pencil,
-    Plus,
     Power,
-    Save,
     Search as SearchIcon,
     Shield,
     Star,
-    Trash2,
     Wrench,
-    X,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 
 // --- Types ---
 
@@ -184,14 +168,6 @@ const severityColors: Record<string, string> = {
     low: 'bg-status-success text-white',
 };
 
-function formatDate(isoString: string | null): string {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}
-
 function formatDuration(
     startIso: string | null,
     endIso: string | null,
@@ -245,43 +221,33 @@ export default function PlaybookShow({
             <div className="flex flex-col gap-6 p-6">
                 <PageShell>
                     {/* Header */}
-                    <PageHero variant="compact"
-                        title={
-                            <div className="flex items-center gap-3">
-                                <span>{playbook.name}</span>
-                                <Badge
-                                    variant="outline"
-                                    className={catConfig.color}
-                                >
-                                    <CatIcon className="mr-1 h-3 w-3" />
-                                    {categories[playbook.category] ??
-                                        playbook.category}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                    v{playbook.version}
-                                </Badge>
-                                {!playbook.is_active && (
-                                    <Badge
-                                        variant="outline"
-                                        className="bg-muted text-muted-foreground"
-                                    >
-                                        Inactive
-                                    </Badge>
-                                )}
-                            </div>
+                    <CommandCentrePage
+                        variant="compact"
+                        current="/control-room/playbooks"
+                        icon={CatIcon}
+                        title={playbook.name}
+                        description={
+                            playbook.description ??
+                            'Review this response procedure and its ordered steps.'
                         }
-                        description={playbook.description ?? undefined}
-                        backHref="/control-room/playbooks"
-                        backLabel="All Playbooks"
+                        status={`${categories[playbook.category] ?? playbook.category} · v${playbook.version} · ${playbook.is_active ? 'active' : 'inactive'}`}
                         actions={
                             can.manage ? (
                                 <div className="flex items-center gap-2">
                                     <ConfirmChip
-                                        label={playbook.is_active ? 'Deactivate' : 'Activate'}
+                                        label={
+                                            playbook.is_active
+                                                ? 'Deactivate'
+                                                : 'Activate'
+                                        }
                                         icon={Power}
                                         destructive={playbook.is_active}
                                         onConfirm={toggleActive}
-                                        title={playbook.is_active ? 'Stop this playbook auto-attaching to new alerts' : 'Make this playbook available'}
+                                        title={
+                                            playbook.is_active
+                                                ? 'Stop this playbook auto-attaching to new alerts'
+                                                : 'Make this playbook available'
+                                        }
                                     />
                                     <Button
                                         variant="outline"
@@ -294,411 +260,420 @@ export default function PlaybookShow({
                                 </div>
                             ) : undefined
                         }
-                    />
-
-                    {(
-                        /* ==================== VIEW MODE ==================== */
-                        <div className="space-y-6">
-                            {/* Info Cards Row */}
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {/* Trigger Conditions */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                                            Trigger Conditions
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-2">
-                                            <div>
-                                                <span className="text-xs font-medium text-muted-foreground">
-                                                    Alert Types
-                                                </span>
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                    {playbook
-                                                        .trigger_alert_types
-                                                        .length > 0 ? (
-                                                        playbook.trigger_alert_types.map(
-                                                            (t) => (
-                                                                <Badge
-                                                                    key={t}
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {t}
-                                                                </Badge>
-                                                            ),
-                                                        )
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            Any
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-medium text-muted-foreground">
-                                                    Severities
-                                                </span>
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                    {playbook.trigger_severities
-                                                        .length > 0 ? (
-                                                        playbook.trigger_severities.map(
-                                                            (s) => (
-                                                                <Badge
-                                                                    key={s}
-                                                                    className={`text-xs ${severityColors[s] ?? ''}`}
-                                                                >
-                                                                    {s}
-                                                                </Badge>
-                                                            ),
-                                                        )
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            Any
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 pt-1">
-                                                {playbook.auto_attach && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-status-success-bg text-xs text-status-success"
-                                                    >
-                                                        Auto-attach
-                                                    </Badge>
-                                                )}
-                                                {playbook.requires_approval && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-status-warning-bg text-xs text-status-warning"
-                                                    >
-                                                        Requires Approval
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* SLA Targets */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                                            SLA Targets
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">
-                                                    Acknowledge
-                                                </span>
-                                                <span className="font-mono text-sm font-medium">
-                                                    {playbook.sla_acknowledge_minutes
-                                                        ? `${playbook.sla_acknowledge_minutes} min`
-                                                        : '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">
-                                                    Response
-                                                </span>
-                                                <span className="font-mono text-sm font-medium">
-                                                    {playbook.sla_response_minutes
-                                                        ? `${playbook.sla_response_minutes} min`
-                                                        : '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">
-                                                    Resolution
-                                                </span>
-                                                <span className="font-mono text-sm font-medium">
-                                                    {playbook.sla_resolution_minutes
-                                                        ? `${playbook.sla_resolution_minutes} min`
-                                                        : '-'}
-                                                </span>
-                                            </div>
-                                            {playbook.escalation_after_minutes && (
-                                                <div className="flex items-center justify-between border-t pt-2">
-                                                    <span className="text-sm text-muted-foreground">
-                                                        Escalate after
+                    >
+                        {
+                            /* ==================== VIEW MODE ==================== */
+                            <div className="space-y-6">
+                                {/* Info Cards Row */}
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {/* Trigger Conditions */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                                Trigger Conditions
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                <div>
+                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                        Alert Types
                                                     </span>
-                                                    <span className="font-mono text-sm font-medium text-status-critical">
-                                                        {
-                                                            playbook.escalation_after_minutes
-                                                        }{' '}
-                                                        min
-                                                    </span>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {playbook
+                                                            .trigger_alert_types
+                                                            .length > 0 ? (
+                                                            playbook.trigger_alert_types.map(
+                                                                (t) => (
+                                                                    <Badge
+                                                                        key={t}
+                                                                        variant="outline"
+                                                                        className="text-xs"
+                                                                    >
+                                                                        {t}
+                                                                    </Badge>
+                                                                ),
+                                                            )
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Any
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Required Evidence */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                                            Required Evidence
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {playbook.required_evidence.length >
-                                        0 ? (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {playbook.required_evidence.map(
-                                                    (type) => (
+                                                <div>
+                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                        Severities
+                                                    </span>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {playbook
+                                                            .trigger_severities
+                                                            .length > 0 ? (
+                                                            playbook.trigger_severities.map(
+                                                                (s) => (
+                                                                    <Badge
+                                                                        key={s}
+                                                                        className={`text-xs ${severityColors[s] ?? ''}`}
+                                                                    >
+                                                                        {s}
+                                                                    </Badge>
+                                                                ),
+                                                            )
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Any
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-1">
+                                                    {playbook.auto_attach && (
                                                         <Badge
-                                                            key={type}
                                                             variant="outline"
-                                                            className="text-xs"
+                                                            className="bg-status-success-bg text-xs text-status-success"
                                                         >
-                                                            {type.replace(
-                                                                /_/g,
-                                                                ' ',
-                                                            )}
+                                                            Auto-attach
                                                         </Badge>
-                                                    ),
+                                                    )}
+                                                    {playbook.requires_approval && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-status-warning-bg text-xs text-status-warning"
+                                                        >
+                                                            Requires Approval
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* SLA Targets */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                                SLA Targets
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm">
+                                                        Acknowledge
+                                                    </span>
+                                                    <span className="font-mono text-sm font-medium">
+                                                        {playbook.sla_acknowledge_minutes
+                                                            ? `${playbook.sla_acknowledge_minutes} min`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm">
+                                                        Response
+                                                    </span>
+                                                    <span className="font-mono text-sm font-medium">
+                                                        {playbook.sla_response_minutes
+                                                            ? `${playbook.sla_response_minutes} min`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm">
+                                                        Resolution
+                                                    </span>
+                                                    <span className="font-mono text-sm font-medium">
+                                                        {playbook.sla_resolution_minutes
+                                                            ? `${playbook.sla_resolution_minutes} min`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+                                                {playbook.escalation_after_minutes && (
+                                                    <div className="flex items-center justify-between border-t pt-2">
+                                                        <span className="text-sm text-muted-foreground">
+                                                            Escalate after
+                                                        </span>
+                                                        <span className="font-mono text-sm font-medium text-status-critical">
+                                                            {
+                                                                playbook.escalation_after_minutes
+                                                            }{' '}
+                                                            min
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Required Evidence */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                                Required Evidence
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {playbook.required_evidence.length >
+                                            0 ? (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {playbook.required_evidence.map(
+                                                        (type) => (
+                                                            <Badge
+                                                                key={type}
+                                                                variant="outline"
+                                                                className="text-xs"
+                                                            >
+                                                                {type.replace(
+                                                                    /_/g,
+                                                                    ' ',
+                                                                )}
+                                                            </Badge>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">
+                                                    No evidence requirements
+                                                    specified.
+                                                </p>
+                                            )}
+                                            {playbook.created_by && (
+                                                <p className="mt-4 text-xs text-muted-foreground">
+                                                    Created by{' '}
+                                                    {playbook.created_by.name}
+                                                    {playbook.created_at &&
+                                                        ` on ${formatDateTime(playbook.created_at)}`}
+                                                </p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Steps */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Layers className="h-4 w-4" />
+                                            Steps ({playbook.steps.length})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {playbook.steps.length === 0 ? (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                                No steps defined.
+                                            </p>
                                         ) : (
-                                            <p className="text-sm text-muted-foreground">
-                                                No evidence requirements
-                                                specified.
-                                            </p>
+                                            <div className="space-y-3">
+                                                {playbook.steps.map((step) => (
+                                                    <div
+                                                        key={step.id}
+                                                        className="flex items-start gap-3 rounded-lg border p-3"
+                                                    >
+                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                                            {step.order}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">
+                                                                    {step.title}
+                                                                </span>
+                                                                <Badge
+                                                                    className={`text-xs ${stepTypeColors[step.type] ?? 'bg-muted text-foreground'}`}
+                                                                >
+                                                                    {stepTypes[
+                                                                        step
+                                                                            .type
+                                                                    ] ??
+                                                                        step.type}
+                                                                </Badge>
+                                                                {step.is_required && (
+                                                                    <span
+                                                                        className="flex items-center gap-0.5 text-xs text-status-warning"
+                                                                        title="Required"
+                                                                    >
+                                                                        <Star className="h-3 w-3" />
+                                                                        Required
+                                                                    </span>
+                                                                )}
+                                                                {step.is_blocking && (
+                                                                    <span
+                                                                        className="flex items-center gap-0.5 text-xs text-status-critical"
+                                                                        title="Blocking"
+                                                                    >
+                                                                        <Lock className="h-3 w-3" />
+                                                                        Blocking
+                                                                    </span>
+                                                                )}
+                                                                {step.time_limit_minutes && (
+                                                                    <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        {
+                                                                            step.time_limit_minutes
+                                                                        }
+                                                                        m
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {step.instructions && (
+                                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                                    {
+                                                                        step.instructions
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
-                                        {playbook.created_by && (
-                                            <p className="mt-4 text-xs text-muted-foreground">
-                                                Created by{' '}
-                                                {playbook.created_by.name}
-                                                {playbook.created_at &&
-                                                    ` on ${formatDate(playbook.created_at)}`}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Run History */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">
+                                            Run History
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {recentRuns.length === 0 ? (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                                No runs yet. This playbook has
+                                                not been executed.
                                             </p>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead>
+                                                                Alert
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Status
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Progress
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Started
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Completed
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Duration
+                                                            </TableHead>
+                                                            <TableHead>
+                                                                Started By
+                                                            </TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {recentRuns.map(
+                                                            (run) => (
+                                                                <TableRow
+                                                                    key={run.id}
+                                                                >
+                                                                    <TableCell>
+                                                                        {run.alert ? (
+                                                                            <Link
+                                                                                href={`/control-room/alerts/${run.alert_id}`}
+                                                                                className="flex items-center gap-1 text-sm hover:underline"
+                                                                            >
+                                                                                <span className="font-medium">
+                                                                                    #
+                                                                                    {
+                                                                                        run.alert_id
+                                                                                    }
+                                                                                </span>
+                                                                                <Badge
+                                                                                    className={`text-[10px] ${severityColors[run.alert.severity] ?? ''}`}
+                                                                                >
+                                                                                    {
+                                                                                        run
+                                                                                            .alert
+                                                                                            .severity
+                                                                                    }
+                                                                                </Badge>
+                                                                                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                                                            </Link>
+                                                                        ) : (
+                                                                            <span className="text-sm text-muted-foreground">
+                                                                                #
+                                                                                {
+                                                                                    run.alert_id
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className={`text-xs ${runStatusColors[run.status] ?? ''}`}
+                                                                        >
+                                                                            {run.status.replace(
+                                                                                /_/g,
+                                                                                ' ',
+                                                                            )}
+                                                                        </Badge>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
+                                                                                <div
+                                                                                    className="h-full rounded-full bg-primary transition-all"
+                                                                                    style={{
+                                                                                        width: `${run.progress}%`,
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                {
+                                                                                    run.completed_steps
+                                                                                }
+
+                                                                                /
+                                                                                {
+                                                                                    run.total_steps
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-sm">
+                                                                        {formatDateTime(
+                                                                            run.started_at,
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-sm">
+                                                                        {formatDateTime(
+                                                                            run.completed_at,
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell className="font-mono text-sm">
+                                                                        {formatDuration(
+                                                                            run.started_at,
+                                                                            run.completed_at,
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-sm">
+                                                                        {run
+                                                                            .started_by
+                                                                            ?.name ??
+                                                                            '-'}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ),
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>
                             </div>
-
-                            {/* Steps */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Layers className="h-4 w-4" />
-                                        Steps ({playbook.steps.length})
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {playbook.steps.length === 0 ? (
-                                        <p className="py-4 text-center text-sm text-muted-foreground">
-                                            No steps defined.
-                                        </p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {playbook.steps.map((step) => (
-                                                <div
-                                                    key={step.id}
-                                                    className="flex items-start gap-3 rounded-lg border p-3"
-                                                >
-                                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                                                        {step.order}
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium">
-                                                                {step.title}
-                                                            </span>
-                                                            <Badge
-                                                                className={`text-xs ${stepTypeColors[step.type] ?? 'bg-muted text-foreground'}`}
-                                                            >
-                                                                {stepTypes[
-                                                                    step.type
-                                                                ] ?? step.type}
-                                                            </Badge>
-                                                            {step.is_required && (
-                                                                <span
-                                                                    className="flex items-center gap-0.5 text-xs text-status-warning"
-                                                                    title="Required"
-                                                                >
-                                                                    <Star className="h-3 w-3" />
-                                                                    Required
-                                                                </span>
-                                                            )}
-                                                            {step.is_blocking && (
-                                                                <span
-                                                                    className="flex items-center gap-0.5 text-xs text-status-critical"
-                                                                    title="Blocking"
-                                                                >
-                                                                    <Lock className="h-3 w-3" />
-                                                                    Blocking
-                                                                </span>
-                                                            )}
-                                                            {step.time_limit_minutes && (
-                                                                <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                                                                    <Clock className="h-3 w-3" />
-                                                                    {
-                                                                        step.time_limit_minutes
-                                                                    }
-                                                                    m
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {step.instructions && (
-                                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                                {
-                                                                    step.instructions
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Run History */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Run History
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {recentRuns.length === 0 ? (
-                                        <p className="py-4 text-center text-sm text-muted-foreground">
-                                            No runs yet. This playbook has not
-                                            been executed.
-                                        </p>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>
-                                                            Alert
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Status
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Progress
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Started
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Completed
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Duration
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Started By
-                                                        </TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {recentRuns.map((run) => (
-                                                        <TableRow key={run.id}>
-                                                            <TableCell>
-                                                                {run.alert ? (
-                                                                    <Link
-                                                                        href={`/control-room/alerts/${run.alert_id}`}
-                                                                        className="flex items-center gap-1 text-sm hover:underline"
-                                                                    >
-                                                                        <span className="font-medium">
-                                                                            #
-                                                                            {
-                                                                                run.alert_id
-                                                                            }
-                                                                        </span>
-                                                                        <Badge
-                                                                            className={`text-[10px] ${severityColors[run.alert.severity] ?? ''}`}
-                                                                        >
-                                                                            {
-                                                                                run
-                                                                                    .alert
-                                                                                    .severity
-                                                                            }
-                                                                        </Badge>
-                                                                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                                                                    </Link>
-                                                                ) : (
-                                                                    <span className="text-sm text-muted-foreground">
-                                                                        #
-                                                                        {
-                                                                            run.alert_id
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className={`text-xs ${runStatusColors[run.status] ?? ''}`}
-                                                                >
-                                                                    {run.status.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-                                                                        <div
-                                                                            className="h-full rounded-full bg-primary transition-all"
-                                                                            style={{
-                                                                                width: `${run.progress}%`,
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {
-                                                                            run.completed_steps
-                                                                        }
-                                                                        /
-                                                                        {
-                                                                            run.total_steps
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="text-sm">
-                                                                {formatDate(
-                                                                    run.started_at,
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-sm">
-                                                                {formatDate(
-                                                                    run.completed_at,
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="font-mono text-sm">
-                                                                {formatDuration(
-                                                                    run.started_at,
-                                                                    run.completed_at,
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-sm">
-                                                                {run.started_by
-                                                                    ?.name ??
-                                                                    '-'}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+                        }
+                    </CommandCentrePage>
                 </PageShell>
             </div>
 
@@ -717,9 +692,12 @@ export default function PlaybookShow({
                         category: playbook.category,
                         auto_attach: playbook.auto_attach,
                         requires_approval: playbook.requires_approval,
-                        sla_acknowledge_minutes: playbook.sla_acknowledge_minutes?.toString() ?? '',
-                        sla_response_minutes: playbook.sla_response_minutes?.toString() ?? '',
-                        sla_resolution_minutes: playbook.sla_resolution_minutes?.toString() ?? '',
+                        sla_acknowledge_minutes:
+                            playbook.sla_acknowledge_minutes?.toString() ?? '',
+                        sla_response_minutes:
+                            playbook.sla_response_minutes?.toString() ?? '',
+                        sla_resolution_minutes:
+                            playbook.sla_resolution_minutes?.toString() ?? '',
                         required_evidence: playbook.required_evidence ?? [],
                         steps: playbook.steps.map((s) => ({
                             id: s.id,
@@ -728,7 +706,8 @@ export default function PlaybookShow({
                             instructions: s.instructions ?? '',
                             is_required: s.is_required,
                             is_blocking: s.is_blocking,
-                            time_limit_minutes: s.time_limit_minutes?.toString() ?? '',
+                            time_limit_minutes:
+                                s.time_limit_minutes?.toString() ?? '',
                         })),
                     }}
                 />

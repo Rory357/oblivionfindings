@@ -4,6 +4,7 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\BillingEntry;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\FirstAidRecord;
 use App\Models\HsCorrectiveAction;
@@ -58,20 +59,18 @@ class HsKpiService
      * Total hours worked in the window (the LTIFR/TRIFR denominator), optionally per site.
      * Defaults to a trailing 12-month window (standard annualised frequency-rate basis).
      *
-     * NOTE: `billing_entries` has no `site_id` column — per-site billing is keyed on
-     * `site_name_snapshot` (the point-in-time site name), matching how `ReportingService`
-     * groups worked hours. We resolve the site's current name to that snapshot column.
+     * Per-site rates use the immutable billing-entry site FK. The name snapshot is
+     * presentation/audit evidence only: names are mutable and not guaranteed unique.
      */
-    public function totalHoursWorked(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): float
+    public function totalHoursWorked(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): float
     {
         [$from, $to] = $this->rateWindow($from, $to);
 
-        return (float) BillingEntry::query()
-            ->whereBetween('service_date', [$from->toDateString(), $to->toDateString()])
-            ->when($siteId, function (Builder $q) use ($siteId) {
-                $q->where('site_name_snapshot', Site::whereKey($siteId)->value('name'));
-            })
-            ->sum('hours');
+        $query = BillingEntry::query()
+            ->whereBetween('service_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applySiteScope($query, $siteId);
+
+        return (float) $query->sum('hours');
     }
 
     /* ------------------------------------------------------------------ */
@@ -79,7 +78,7 @@ class HsKpiService
     /* ------------------------------------------------------------------ */
 
     /** Lost-Time Injury Frequency Rate = (lost-time injuries ÷ hours) × 1,000,000. */
-    public function ltifr(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): ?float
+    public function ltifr(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): ?float
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
@@ -87,10 +86,10 @@ class HsKpiService
             return null;
         }
 
-        $lostTime = WorkplaceInjury::withLostTime()
-            ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-            ->count();
+        $lostTimeQuery = WorkplaceInjury::withLostTime()
+            ->whereBetween('injury_date', [$from, $to]);
+        $this->applySiteScope($lostTimeQuery, $siteId);
+        $lostTime = $lostTimeQuery->count();
 
         return round($lostTime / $hours * self::FREQUENCY_BASE, 1);
     }
@@ -99,7 +98,7 @@ class HsKpiService
      * Total Recordable Injury Frequency Rate = (recordable injuries ÷ hours) × 1,000,000.
      * Recordable = medical-treatment + lost-time + notifiable (fatalities/serious). See rule below.
      */
-    public function trifr(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): ?float
+    public function trifr(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): ?float
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
@@ -113,7 +112,7 @@ class HsKpiService
     }
 
     /** Injury severity rate = (lost-time days ÷ hours) × 1,000,000. */
-    public function injurySeverityRate(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): ?float
+    public function injurySeverityRate(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): ?float
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
@@ -121,26 +120,26 @@ class HsKpiService
             return null;
         }
 
-        $lostDays = (int) WorkplaceInjury::query()
-            ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-            ->sum('lost_time_days');
+        $injuryQuery = WorkplaceInjury::query()
+            ->whereBetween('injury_date', [$from, $to]);
+        $this->applySiteScope($injuryQuery, $siteId);
+        $lostDays = (int) $injuryQuery->sum('lost_time_days');
 
         return round($lostDays / $hours * self::FREQUENCY_BASE, 1);
     }
 
     /** Whole days since the most recent lost-time injury (null if none on record). */
-    public function daysSinceLostTimeInjury(?int $siteId = null): ?int
+    public function daysSinceLostTimeInjury(int|array|null $siteId = null): ?int
     {
-        $last = WorkplaceInjury::withLostTime()
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-            ->max('injury_date');
+        $query = WorkplaceInjury::withLostTime();
+        $this->applySiteScope($query, $siteId);
+        $last = $query->max('injury_date');
 
         return $last ? (int) Carbon::parse($last)->diffInDays(now()) : null;
     }
 
     /** Recordable incidents (non-near-miss) reported in the window. */
-    public function incidentsInPeriod(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): int
+    public function incidentsInPeriod(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): int
     {
         return $this->incidentQuery($from, $to, $siteId)
             ->where('type', '!=', 'near_miss')
@@ -152,7 +151,7 @@ class HsKpiService
     /* ------------------------------------------------------------------ */
 
     /** Near misses reported in the window (proactive-reporting signal). */
-    public function nearMissesInPeriod(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): int
+    public function nearMissesInPeriod(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): int
     {
         return $this->incidentQuery($from, $to, $siteId)
             ->where('type', 'near_miss')
@@ -163,7 +162,7 @@ class HsKpiService
      * Near-miss : incident ratio = near misses ÷ recordable incidents (higher = healthier
      * reporting culture). Denominator uses recordable injuries over a trailing 12-month basis.
      */
-    public function nearMissToIncidentRatio(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): ?float
+    public function nearMissToIncidentRatio(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): ?float
     {
         [$rateFrom, $rateTo] = $this->rateWindow(null, null);
         $recordable = $this->recordableInjuriesQuery($rateFrom, $rateTo, $siteId)->count();
@@ -180,14 +179,14 @@ class HsKpiService
      * Corrective actions closed on time % = actions completed on/before due date ÷ actions
      * due in the window × 100. Optionally scoped to a site via the parent HsEvent.
      */
-    public function actionsClosedOnTimePct(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): ?float
+    public function actionsClosedOnTimePct(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): ?float
     {
         [$from, $to] = $this->countWindow($from, $to);
 
         $base = HsCorrectiveAction::query()
             ->whereNotNull('due_date')
-            ->whereBetween('due_date', [$from->toDateString(), $to->toDateString()])
-            ->when($siteId, fn (Builder $q) => $q->whereHas('hsEvent', fn (Builder $e) => $e->where('site_id', $siteId)));
+            ->whereBetween('due_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyRelatedSiteScope($base, 'hsEvent', $siteId);
 
         $due = (clone $base)->count();
         if ($due <= 0) {
@@ -207,9 +206,9 @@ class HsKpiService
      * over the H&S-linked HR compliance requirements. (No separate "audit" model exists yet,
      * so this is training compliance surfaced as the single design figure — see plan §10.)
      */
-    public function trainingAuditCompliancePct(): ?float
+    public function trainingAuditCompliancePct(int|array|null $siteId = null): ?float
     {
-        $requirementIds = HsTrainingRequirement::active()
+        $requirementIds = $this->trainingRequirementQuery($siteId)
             ->pluck('hr_compliance_requirement_id')
             ->filter()
             ->values();
@@ -218,12 +217,15 @@ class HsKpiService
             return null;
         }
 
-        $total = HrStaffComplianceStatus::whereIn('requirement_id', $requirementIds)->count();
+        $base = HrStaffComplianceStatus::query()->whereIn('requirement_id', $requirementIds);
+        $this->applyStaffSiteScope($base, $siteId);
+
+        $total = (clone $base)->count();
         if ($total <= 0) {
             return null;
         }
 
-        $nonCompliant = HrStaffComplianceStatus::whereIn('requirement_id', $requirementIds)
+        $nonCompliant = (clone $base)
             ->whereIn('status', ['expired', 'not_started'])
             ->count();
 
@@ -231,11 +233,12 @@ class HsKpiService
     }
 
     /** Currently open hazards (open + in_progress), optionally per site. */
-    public function openHazards(?int $siteId = null): int
+    public function openHazards(int|array|null $siteId = null): int
     {
-        return SiteHazard::whereIn('status', ['open', 'in_progress'])
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-            ->count();
+        $query = SiteHazard::whereIn('status', ['open', 'in_progress']);
+        $this->applySiteScope($query, $siteId);
+
+        return $query->count();
     }
 
     /**
@@ -245,7 +248,7 @@ class HsKpiService
      *
      * @return array{treatments:int,ambulance:int,hospital:int}
      */
-    public function firstAidActivity(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): array
+    public function firstAidActivity(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): array
     {
         [$from, $to] = $this->countWindow($from, $to);
         if (! Schema::hasTable('first_aid_records')) {
@@ -253,8 +256,8 @@ class HsKpiService
         }
 
         $base = FirstAidRecord::query()
-            ->whereBetween('treatment_date', [$from, $to])
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId));
+            ->whereBetween('treatment_date', [$from, $to]);
+        $this->applySiteScope($base, $siteId);
 
         return [
             'treatments' => (clone $base)->count(),
@@ -274,7 +277,7 @@ class HsKpiService
      *
      * @return array<int, array{month: string, ltifr: float|null, trifr: float|null}>
      */
-    public function monthlyFrequencyRates(int $months = 12, ?int $siteId = null): array
+    public function monthlyFrequencyRates(int $months = 12, int|array|null $siteId = null): array
     {
         $end = now()->endOfMonth();
         $rows = [];
@@ -284,10 +287,10 @@ class HsKpiService
             $windowStart = $monthEnd->copy()->subMonths(11)->startOfMonth();
 
             $hours = $this->totalHoursWorked($windowStart, $monthEnd, $siteId);
-            $lostTime = WorkplaceInjury::withLostTime()
-                ->whereBetween('injury_date', [$windowStart, $monthEnd])
-                ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-                ->count();
+            $lostTimeQuery = WorkplaceInjury::withLostTime()
+                ->whereBetween('injury_date', [$windowStart, $monthEnd]);
+            $this->applySiteScope($lostTimeQuery, $siteId);
+            $lostTime = $lostTimeQuery->count();
             $recordable = $this->recordableInjuriesQuery($windowStart, $monthEnd, $siteId)->count();
 
             $rows[] = [
@@ -306,7 +309,7 @@ class HsKpiService
      *
      * @return array{lagging: array<string, mixed>, leading: array<string, mixed>}
      */
-    public function leadingLagging(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): array
+    public function leadingLagging(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): array
     {
         return [
             'lagging' => [
@@ -319,7 +322,7 @@ class HsKpiService
             'leading' => [
                 'near_miss_ratio' => $this->nearMissToIncidentRatio($from, $to, $siteId),
                 'actions_on_time_pct' => $this->actionsClosedOnTimePct($from, $to, $siteId),
-                'training_pct' => $this->trainingAuditCompliancePct(),
+                'training_pct' => $this->trainingAuditCompliancePct($siteId),
                 'open_hazards' => $this->openHazards($siteId),
             ],
         ];
@@ -332,7 +335,7 @@ class HsKpiService
      *
      * @return array{near_misses: int, recordable: int}
      */
-    public function nearMissOperands(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): array
+    public function nearMissOperands(?CarbonInterface $from = null, ?CarbonInterface $to = null, int|array|null $siteId = null): array
     {
         [$from, $to] = $this->rateWindow($from, $to);
 
@@ -348,20 +351,20 @@ class HsKpiService
      *
      * @return array<int, array{week: string, open: int}>
      */
-    public function hazardBurndown(int $weeks = 6, ?int $siteId = null): array
+    public function hazardBurndown(int $weeks = 6, int|array|null $siteId = null): array
     {
         $rows = [];
         $end = now()->endOfWeek();
 
         for ($i = $weeks - 1; $i >= 0; $i--) {
             $weekEnd = $end->copy()->subWeeks($i);
-            $open = SiteHazard::query()
+            $query = SiteHazard::query()
                 ->where('created_at', '<=', $weekEnd)
                 ->where(function (Builder $q) use ($weekEnd) {
                     $q->whereNull('closed_at')->orWhere('closed_at', '>', $weekEnd);
-                })
-                ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
-                ->count();
+                });
+            $this->applySiteScope($query, $siteId);
+            $open = $query->count();
             $rows[] = ['week' => $weekEnd->toDateString(), 'open' => $open];
         }
 
@@ -376,26 +379,115 @@ class HsKpiService
      * WorkplaceInjury recordable rule (NZ/AU TRIFR): lost-time OR medical-treatment
      * (medical_centre/hospital/ambulance) OR notifiable. First-aid-only is NOT recordable.
      */
-    private function recordableInjuriesQuery(CarbonInterface $from, CarbonInterface $to, ?int $siteId): Builder
+    private function recordableInjuriesQuery(CarbonInterface $from, CarbonInterface $to, int|array|null $siteId): Builder
     {
-        return WorkplaceInjury::query()
+        $query = WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
             ->where(function (Builder $q) {
                 $q->where('lost_time_days', '>', 0)
                     ->orWhereIn('medical_treatment_type', self::RECORDABLE_TREATMENTS)
                     ->orWhere('worksafe_notifiable', true);
             });
+
+        return $this->applySiteScope($query, $siteId);
     }
 
-    /** ClientIncident in the window; site-scoped via the linked shift's site. */
-    private function incidentQuery(?CarbonInterface $from, ?CarbonInterface $to, ?int $siteId): Builder
+    /** ClientIncident in the window; site-scoped by its incident-time site snapshot. */
+    private function incidentQuery(?CarbonInterface $from, ?CarbonInterface $to, int|array|null $siteId): Builder
     {
         [$from, $to] = $this->countWindow($from, $to);
 
-        return ClientIncident::query()
-            ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn (Builder $q) => $q->whereHas('shift', fn (Builder $s) => $s->where('site_id', $siteId)));
+        $query = ClientIncident::query()
+            ->whereBetween('occurred_at', [$from, $to]);
+
+        return $this->applySiteScope($query, $siteId);
+    }
+
+    private function applyStaffSiteScope(Builder $query, int|array|null $siteId): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $query->whereHas('user.hrEmployeeProfile', function (Builder $profileQuery) use ($siteIds): void {
+            $profileQuery->whereIn('primary_site_id', $siteIds);
+            foreach ($siteIds as $id) {
+                $profileQuery->orWhereJsonContains('secondary_site_ids', $id);
+            }
+        });
+    }
+
+    private function trainingRequirementQuery(int|array|null $siteId): Builder
+    {
+        $query = HsTrainingRequirement::query()->active();
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+        $clientIds = Client::query()->whereIn('site_id', $siteIds)->pluck('id');
+
+        return $query->where(function (Builder $scope) use ($siteIds, $clientIds): void {
+            $scope->whereIn('scope_type', [
+                HsTrainingRequirement::SCOPE_GLOBAL,
+                HsTrainingRequirement::SCOPE_ROLE,
+            ]);
+
+            foreach ($siteIds as $id) {
+                $scope->orWhere(function (Builder $siteScope) use ($id): void {
+                    $siteScope->where('scope_type', HsTrainingRequirement::SCOPE_SITE)
+                        ->whereJsonContains('scope_site_ids', $id);
+                });
+            }
+
+            foreach ($clientIds as $clientId) {
+                $scope->orWhere(function (Builder $clientScope) use ($clientId): void {
+                    $clientScope->where('scope_type', HsTrainingRequirement::SCOPE_CLIENT)
+                        ->whereJsonContains('scope_client_ids', (int) $clientId);
+                });
+            }
+        });
+    }
+
+    private function applySiteScope(Builder $query, int|array|null $siteId, string $column = 'site_id'): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn($column), $siteIds);
+    }
+
+    private function applyRelatedSiteScope(
+        Builder $query,
+        string $relationship,
+        int|array|null $siteId,
+    ): Builder {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        return $query->whereHas(
+            $relationship,
+            fn (Builder $related) => $this->applySiteScope($related, $siteId),
+        );
+    }
+
+    /** @return array<int, int> */
+    private function normalizeSiteIds(int|array $siteId): array
+    {
+        return collect(is_array($siteId) ? $siteId : [$siteId])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Counts default to a trailing 30-day window. */

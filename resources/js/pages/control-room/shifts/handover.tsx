@@ -1,13 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Select,
     SelectContent,
@@ -15,29 +13,77 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
     ArrowRight,
     Check,
-    CheckCircle,
-    Clock,
-    MessageSquare,
-    Pin,
-    Plus,
-    ShieldAlert,
-    TrendingUp,
-    Trash2,
+    CheckCircle2,
+    Clock3,
+    ExternalLink,
+    RefreshCw,
+    ShieldCheck,
     Users,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-
-// --- TypeScript Interfaces ---
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface StaffMember {
     id: number;
     name: string;
+}
+
+interface AlertTask {
+    id: number;
+    title: string;
+    status: string;
+    due_at: string | null;
+}
+
+interface AlertSummary {
+    id: number;
+    reference_number: string | null;
+    summary: string;
+    severity: 'critical' | 'high' | string;
+    site: { id: number; name: string } | null;
+    person: { id: number; name: string } | null;
+    assignee: { id: number; name: string } | null;
+    sla: { status: string | null; next_deadline_at: string | null };
+    journey: {
+        incident_reference: string | null;
+        health_safety_reference: string | null;
+        handover_status: string | null;
+    };
+    next_action: { label: string; href: string };
+    href: string;
+    tasks: AlertTask[];
+}
+
+interface HandoverDraft {
+    handover_notes?: string;
+    incoming_shift_name?: string;
+    incoming_lead_user_id?: number | null;
+    incoming_team_members?: number[];
+    reviewed_alert_ids?: number[];
+    priority_alert_ids?: number[];
+}
+
+interface HandoverSnapshot {
+    prepared_by?: StaffMember;
+    prepared_at?: string;
+    handover_notes?: string;
+    incoming_shift?: {
+        id?: number;
+        name: string;
+        lead: StaffMember;
+        team_members: StaffMember[];
+    };
+    reviewed_alert_ids?: number[];
+    priority_alert_ids?: number[];
+    alerts?: AlertSummary[];
 }
 
 interface ShiftData {
@@ -53,13 +99,14 @@ interface ShiftData {
     alerts_resolved: number;
     alerts_escalated: number;
     duration_minutes: number | null;
-}
-
-interface AlertSummary {
-    id: number;
-    alert_type: string;
-    severity: string;
-    triggered_at: string | null;
+    handover_status: 'none' | 'prepared' | 'accepted';
+    handover_version: number;
+    handover_prepared_at: string | null;
+    handover_snapshot: HandoverSnapshot | null;
+    draft: HandoverDraft;
+    incoming_lead: StaffMember | null;
+    can_prepare: boolean;
+    can_accept: boolean;
 }
 
 interface OperatorNote {
@@ -83,737 +130,962 @@ interface Props {
     pinnedNotes: OperatorNote[];
     followupNotes: OperatorNote[];
     staff: StaffMember[];
+    eligibleLeads: StaffMember[];
 }
 
-// --- Helpers ---
-
-const STEPS = ['Summary', 'Notes', 'Incoming Team', 'Confirm'] as const;
+const STEPS = ['Urgent work', 'Context', 'Incoming team', 'Final review'];
 
 function formatDuration(minutes: number | null): string {
-    if (minutes === null || minutes === undefined) return '-';
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h === 0) return `${m}m`;
-    return `${h}h ${m}m`;
+    if (minutes === null) return 'Not available';
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+
+    return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
 }
 
-function formatDateTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+function alertReference(alert: AlertSummary): string {
+    return alert.reference_number ?? `Alert ${alert.id}`;
 }
 
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m ago`;
-    return `${Math.floor(diffHours / 24)}d ${diffHours % 24}h ago`;
-}
-
-function severityBadgeClass(severity: string): string {
-    switch (severity) {
-        case 'critical':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'high':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'medium':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-}
-
-// --- Step Indicator ---
-
-function StepIndicator({ currentStep }: { currentStep: number }) {
+function StepIndicator({ current }: { current: number }) {
     return (
-        <nav aria-label="Handover steps" className="mb-8">
-            <ol className="flex items-center justify-center gap-2">
-                {STEPS.map((label, index) => {
-                    const isCompleted = index < currentStep;
-                    const isCurrent = index === currentStep;
-
-                    return (
-                        <li key={label} className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
-                                <span
-                                    className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-medium transition-colors ${
-                                        isCompleted
-                                            ? 'border-primary bg-primary text-primary-foreground'
-                                            : isCurrent
-                                              ? 'border-primary bg-primary/10 text-primary'
-                                              : 'border-muted-foreground/30 bg-muted text-muted-foreground'
-                                    }`}
-                                >
-                                    {isCompleted ? (
-                                        <Check className="h-4 w-4" />
-                                    ) : (
-                                        index + 1
-                                    )}
-                                </span>
-                                <span
-                                    className={`hidden text-sm font-medium sm:inline ${
-                                        isCurrent
-                                            ? 'text-foreground'
-                                            : isCompleted
-                                              ? 'text-primary'
-                                              : 'text-muted-foreground'
-                                    }`}
-                                >
-                                    {label}
-                                </span>
-                            </div>
-                            {index < STEPS.length - 1 && (
-                                <div
-                                    className={`hidden h-0.5 w-8 sm:block lg:w-16 ${
-                                        isCompleted ? 'bg-primary' : 'bg-muted-foreground/20'
-                                    }`}
-                                />
+        <nav aria-label="Shift handover progress" className="mb-6">
+            <ol className="grid grid-cols-4 gap-3">
+                {STEPS.map((step, index) => (
+                    <li
+                        key={step}
+                        aria-current={index === current ? 'step' : undefined}
+                        className={`rounded-lg border px-3 py-2 text-sm ${
+                            index === current
+                                ? 'border-primary bg-primary/5 font-semibold text-foreground'
+                                : index < current
+                                  ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                  : 'text-muted-foreground'
+                        }`}
+                    >
+                        <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs">
+                            {index < current ? (
+                                <Check className="h-3 w-3" />
+                            ) : (
+                                index + 1
                             )}
-                        </li>
-                    );
-                })}
+                        </span>
+                        {step}
+                    </li>
+                ))}
             </ol>
         </nav>
     );
 }
 
-// --- Main Component ---
+function AlertReviewRow({
+    alert,
+    reviewed,
+    priority,
+    editable,
+    onReviewedChange,
+    onPriorityChange,
+}: {
+    alert: AlertSummary;
+    reviewed: boolean;
+    priority: boolean;
+    editable: boolean;
+    onReviewedChange?: (checked: boolean) => void;
+    onPriorityChange?: (checked: boolean) => void;
+}) {
+    return (
+        <article className="rounded-xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-6">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                            variant="outline"
+                            className={
+                                alert.severity === 'critical'
+                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
+                            }
+                        >
+                            {alert.severity === 'critical'
+                                ? 'Critical'
+                                : 'High'}
+                        </Badge>
+                        <Link
+                            href={alert.href}
+                            className="font-semibold text-primary hover:underline"
+                        >
+                            {alertReference(alert)}
+                            <ExternalLink className="ml-1 inline h-3.5 w-3.5" />
+                        </Link>
+                        {priority && <Badge>Carry-forward priority</Badge>}
+                    </div>
+                    <p className="mt-2 font-medium text-foreground">
+                        {alert.summary}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {[
+                            alert.person?.name,
+                            alert.site?.name,
+                            alert.assignee?.name,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ') ||
+                            'No person, site, or owner recorded'}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        SLA: {alert.sla.status ?? 'No SLA state'} ·{' '}
+                        {alert.tasks.length} open{' '}
+                        {alert.tasks.length === 1 ? 'task' : 'tasks'}
+                        {alert.journey.incident_reference
+                            ? ` · ${alert.journey.incident_reference}`
+                            : ''}
+                        {alert.journey.health_safety_reference
+                            ? ` · ${alert.journey.health_safety_reference}`
+                            : ''}
+                    </p>
+                    {alert.tasks.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-sm">
+                            {alert.tasks.map((task) => (
+                                <li
+                                    key={task.id}
+                                    className="flex items-center gap-2"
+                                >
+                                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                    {task.title}
+                                    <span className="text-muted-foreground">
+                                        {task.due_at
+                                            ? `Due ${formatDateTime(task.due_at)}`
+                                            : 'No due time'}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                {editable && (
+                    <div className="w-48 shrink-0 space-y-3 border-l pl-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Checkbox
+                                aria-label={`Reviewed ${alertReference(alert)}`}
+                                checked={reviewed}
+                                onCheckedChange={(value) =>
+                                    onReviewedChange?.(value === true)
+                                }
+                            />
+                            Reviewed
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                                aria-label={`Carry ${alertReference(alert)} as a priority`}
+                                checked={priority}
+                                disabled={!reviewed}
+                                onCheckedChange={(value) =>
+                                    onPriorityChange?.(value === true)
+                                }
+                            />
+                            Carry as priority
+                        </label>
+                    </div>
+                )}
+            </div>
+        </article>
+    );
+}
 
-export default function ShiftHandover({
-    shift,
-    openAlertsCount,
-    criticalAlertsCount,
-    highAlertsCount,
-    criticalAlerts,
-    highAlerts,
-    pinnedNotes,
-    followupNotes,
-    staff,
-}: Props) {
+export default function ShiftHandover(props: Props) {
+    const {
+        shift,
+        openAlertsCount,
+        criticalAlertsCount,
+        highAlertsCount,
+        criticalAlerts,
+        highAlerts,
+        pinnedNotes,
+        followupNotes,
+        staff,
+        eligibleLeads,
+    } = props;
+    const urgentAlerts = useMemo(
+        () => [...criticalAlerts, ...highAlerts],
+        [criticalAlerts, highAlerts],
+    );
     const [currentStep, setCurrentStep] = useState(0);
+    const [handoverNotes, setHandoverNotes] = useState(
+        shift.draft.handover_notes ?? '',
+    );
+    const [incomingShiftName, setIncomingShiftName] = useState(
+        shift.draft.incoming_shift_name ?? '',
+    );
+    const [incomingLeadUserId, setIncomingLeadUserId] = useState(
+        shift.draft.incoming_lead_user_id
+            ? String(shift.draft.incoming_lead_user_id)
+            : '',
+    );
+    const [incomingTeamMembers, setIncomingTeamMembers] = useState<number[]>(
+        shift.draft.incoming_team_members ?? [],
+    );
+    const [reviewedAlertIds, setReviewedAlertIds] = useState<number[]>(
+        shift.draft.reviewed_alert_ids ?? [],
+    );
+    const [priorityAlertIds, setPriorityAlertIds] = useState<number[]>(
+        shift.draft.priority_alert_ids ?? [],
+    );
+    const [version, setVersion] = useState(shift.handover_version);
+    const versionRef = useRef(shift.handover_version);
+    const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving'>(
+        'saved',
+    );
     const [submitting, setSubmitting] = useState(false);
+    const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+    const initialRender = useRef(true);
 
-    // Step 2: Handover notes state
-    const [handoverNotes, setHandoverNotes] = useState('');
-    const [priorityItems, setPriorityItems] = useState<string[]>([]);
-    const [newPriorityItem, setNewPriorityItem] = useState('');
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        if (!shift.can_prepare || shift.handover_status !== 'none') return;
 
-    // Step 3: Incoming shift state
-    const [incomingShiftName, setIncomingShiftName] = useState('');
-    const [incomingLeadUserId, setIncomingLeadUserId] = useState('');
-    const [incomingTeamMembers, setIncomingTeamMembers] = useState<number[]>([]);
+        setSaveState('unsaved');
+        const timer = window.setTimeout(() => {
+            setSaveState('saving');
+            router.patch(
+                `/control-room/shifts/${shift.id}/handover/draft`,
+                {
+                    handover_notes: handoverNotes,
+                    incoming_shift_name: incomingShiftName,
+                    incoming_lead_user_id: incomingLeadUserId
+                        ? Number(incomingLeadUserId)
+                        : null,
+                    incoming_team_members: incomingTeamMembers,
+                    reviewed_alert_ids: reviewedAlertIds,
+                    priority_alert_ids: priorityAlertIds,
+                    expected_version: versionRef.current,
+                },
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    only: ['shift'],
+                    onSuccess: (page) => {
+                        const updated = (
+                            page.props as unknown as { shift: ShiftData }
+                        ).shift;
+                        versionRef.current = updated.handover_version;
+                        setVersion(updated.handover_version);
+                        setSaveState('saved');
+                        setConflictMessage(null);
+                    },
+                    onError: (errors) => {
+                        setSaveState('unsaved');
+                        setConflictMessage(
+                            String(
+                                errors.handover_version ??
+                                    errors.handover ??
+                                    'The draft could not be saved. Review the fields and try again.',
+                            ),
+                        );
+                    },
+                },
+            );
+        }, 700);
 
-    const addPriorityItem = () => {
-        const trimmed = newPriorityItem.trim();
-        if (trimmed) {
-            setPriorityItems((prev) => [...prev, trimmed]);
-            setNewPriorityItem('');
+        return () => window.clearTimeout(timer);
+    }, [
+        handoverNotes,
+        incomingLeadUserId,
+        incomingShiftName,
+        incomingTeamMembers,
+        priorityAlertIds,
+        reviewedAlertIds,
+        shift.can_prepare,
+        shift.handover_status,
+        shift.id,
+    ]);
+
+    const setReviewed = (alertId: number, checked: boolean) => {
+        setReviewedAlertIds((current) =>
+            checked
+                ? [...new Set([...current, alertId])]
+                : current.filter((id) => id !== alertId),
+        );
+        if (!checked) {
+            setPriorityAlertIds((current) =>
+                current.filter((id) => id !== alertId),
+            );
         }
     };
 
-    const removePriorityItem = (index: number) => {
-        setPriorityItems((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const toggleTeamMember = (userId: number) => {
-        setIncomingTeamMembers((prev) =>
-            prev.includes(userId)
-                ? prev.filter((id) => id !== userId)
-                : [...prev, userId],
+    const setPriority = (alertId: number, checked: boolean) => {
+        setPriorityAlertIds((current) =>
+            checked
+                ? [...new Set([...current, alertId])]
+                : current.filter((id) => id !== alertId),
         );
     };
 
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        if (submitting) return;
-        setSubmitting(true);
+    const toggleTeamMember = (userId: number) => {
+        setIncomingTeamMembers((current) =>
+            current.includes(userId)
+                ? current.filter((id) => id !== userId)
+                : [...current, userId],
+        );
+    };
 
+    const allUrgentReviewed = urgentAlerts.every((alert) =>
+        reviewedAlertIds.includes(alert.id),
+    );
+    const readyToPrepare =
+        Boolean(incomingLeadUserId) &&
+        allUrgentReviewed &&
+        saveState === 'saved';
+
+    const prepare = () => {
+        if (!readyToPrepare || submitting) return;
+        setSubmitting(true);
         router.post(
             `/control-room/shifts/${shift.id}/handover`,
             {
-                handover_notes: handoverNotes,
-                priority_items: priorityItems,
-                incoming_shift_name: incomingShiftName || undefined,
-                incoming_lead_user_id: incomingLeadUserId ? Number(incomingLeadUserId) : undefined,
-                incoming_team_members: incomingTeamMembers,
+                incoming_lead_user_id: Number(incomingLeadUserId),
+                reviewed_alert_ids: reviewedAlertIds,
+                expected_version: version,
             },
             {
+                preserveScroll: true,
+                onError: (errors) => {
+                    setConflictMessage(
+                        String(
+                            errors.handover_version ??
+                                errors.reviewed_alert_ids ??
+                                errors.handover ??
+                                'The handover could not be prepared.',
+                        ),
+                    );
+                },
                 onFinish: () => setSubmitting(false),
             },
         );
     };
 
-    const goNext = () => setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
-    const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0));
+    const accept = () => {
+        if (!shift.can_accept || submitting) return;
+        setSubmitting(true);
+        router.post(
+            `/control-room/shifts/${shift.id}/accept-handover`,
+            { expected_version: shift.handover_version },
+            {
+                onError: (errors) =>
+                    setConflictMessage(
+                        String(
+                            errors.handover_version ??
+                                errors.handover ??
+                                'The handover could not be accepted.',
+                        ),
+                    ),
+                onFinish: () => setSubmitting(false),
+            },
+        );
+    };
 
-    // All critical + high alerts combined for display
-    const urgentAlerts = [...criticalAlerts, ...highAlerts];
+    if (shift.handover_status === 'prepared' && shift.handover_snapshot) {
+        const snapshot = shift.handover_snapshot;
+        const alerts = snapshot.alerts ?? [];
+        const priorities = new Set(snapshot.priority_alert_ids ?? []);
+
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Control Room', href: '/control-room' },
+                    { title: 'Shifts', href: '/control-room/shifts' },
+                    { title: 'Prepared handover', href: '#' },
+                ]}
+            >
+                <Head title={`Prepared handover - ${shift.name}`} />
+                <PageShell>
+                    <PageHero
+                        variant="compact"
+                        title="Prepared shift handover"
+                        description={`${shift.name} remains active until ${shift.incoming_lead?.name ?? 'the incoming lead'} accepts this snapshot.`}
+                        backHref="/control-room/shifts"
+                        backLabel="Back to Control Room shifts"
+                    />
+
+                    {conflictMessage && (
+                        <div
+                            role="alert"
+                            className="mb-5 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical"
+                        >
+                            {conflictMessage} Reload this page before trying
+                            again.
+                        </div>
+                    )}
+
+                    <Card className="mb-6 border-status-warning/30 bg-status-warning-bg/30">
+                        <CardContent className="flex items-center justify-between gap-8 py-5">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck className="h-5 w-5 text-status-warning" />
+                                    <h2 className="font-semibold">
+                                        Prepared, not yet transferred
+                                    </h2>
+                                    <Badge variant="outline">Prepared</Badge>
+                                </div>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Prepared by{' '}
+                                    {snapshot.prepared_by?.name ??
+                                        'the outgoing lead'}{' '}
+                                    on {formatDateTime(snapshot.prepared_at)}.
+                                    Incoming lead:{' '}
+                                    <strong>
+                                        {snapshot.incoming_shift?.lead.name}
+                                    </strong>
+                                    .
+                                </p>
+                            </div>
+                            {shift.can_accept ? (
+                                <Button
+                                    size="lg"
+                                    onClick={accept}
+                                    disabled={submitting}
+                                >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    {submitting
+                                        ? 'Accepting…'
+                                        : 'Accept and start my shift'}
+                                </Button>
+                            ) : (
+                                <p className="max-w-xs text-right text-sm text-muted-foreground">
+                                    Waiting for{' '}
+                                    {snapshot.incoming_shift?.lead.name} to
+                                    review and accept.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <div className="mb-6 grid grid-cols-3 gap-4">
+                        <Card>
+                            <CardContent className="py-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Incoming shift
+                                </p>
+                                <p className="font-semibold">
+                                    {snapshot.incoming_shift?.name}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="py-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Urgent alerts reviewed
+                                </p>
+                                <p className="font-semibold">{alerts.length}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="py-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Carry-forward priorities
+                                </p>
+                                <p className="font-semibold">
+                                    {priorities.size}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle>Outgoing context</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm whitespace-pre-wrap">
+                                {snapshot.handover_notes ||
+                                    'No additional handover notes.'}
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <section aria-labelledby="snapshot-alerts-title">
+                        <div className="mb-3 flex items-center justify-between">
+                            <div>
+                                <h2
+                                    id="snapshot-alerts-title"
+                                    className="text-lg font-semibold"
+                                >
+                                    Frozen urgent-work snapshot
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Open a row to continue in the canonical
+                                    alert workspace.
+                                </p>
+                            </div>
+                            <Button asChild variant="outline">
+                                <Link href="/tasks">Open universal tasks</Link>
+                            </Button>
+                        </div>
+                        <div className="space-y-3">
+                            {alerts.map((alert) => (
+                                <AlertReviewRow
+                                    key={alert.id}
+                                    alert={alert}
+                                    reviewed
+                                    priority={priorities.has(alert.id)}
+                                    editable={false}
+                                />
+                            ))}
+                            {alerts.length === 0 && (
+                                <Card>
+                                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                                        No critical or high alerts were open
+                                        when this handover was prepared.
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    </section>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Control Room', href: '/control-room' },
                 { title: 'Shifts', href: '/control-room/shifts' },
-                { title: 'Handover', href: '#' },
+                { title: 'Prepare handover', href: '#' },
             ]}
         >
-            <Head title={`Handover - ${shift.name}`} />
+            <Head title={`Prepare handover - ${shift.name}`} />
             <PageShell>
-                <PageHero variant="compact"
-                    title="Shift Handover"
-                    description={`Hand over ${shift.name} to the incoming team.`}
+                <PageHero
+                    variant="compact"
+                    title="Prepare shift handover"
+                    description="Review live urgent work, name the incoming lead, and save a clear handover. The outgoing shift remains active until acceptance."
                     backHref="/control-room/shifts"
-                    backLabel="Back to Shifts"
+                    backLabel="Back to Control Room shifts"
                 />
 
-                <StepIndicator currentStep={currentStep} />
+                {!shift.can_prepare && (
+                    <div className="mb-5 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm">
+                        Only the outgoing shift lead,{' '}
+                        {shift.shift_lead?.name ?? 'currently unassigned'}, can
+                        prepare this handover.
+                    </div>
+                )}
+                {conflictMessage && (
+                    <div
+                        role="alert"
+                        className="mb-5 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical"
+                    >
+                        {conflictMessage}
+                    </div>
+                )}
 
-                {/* Step 1: Outgoing Shift Summary */}
+                <div className="mb-5 flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
+                    <div className="flex items-center gap-3 text-sm">
+                        <Clock3 className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                            {shift.name} ·{' '}
+                            {formatDuration(shift.duration_minutes)} ·{' '}
+                            {openAlertsCount} active alerts
+                        </span>
+                    </div>
+                    <div
+                        className="flex items-center gap-2 text-sm"
+                        aria-live="polite"
+                    >
+                        {saveState === 'saving' && (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                        )}
+                        {saveState === 'saved' && (
+                            <Check className="h-4 w-4 text-status-success" />
+                        )}
+                        <span>
+                            {saveState === 'saving'
+                                ? 'Saving…'
+                                : saveState === 'saved'
+                                  ? 'Saved'
+                                  : 'Unsaved changes'}
+                        </span>
+                    </div>
+                </div>
+
+                <StepIndicator current={currentStep} />
+
                 {currentStep === 0 && (
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5" />
-                                    Outgoing Shift Summary
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Review every critical and high alert
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <CardContent>
+                                <div className="mb-4 grid grid-cols-3 gap-4 text-sm">
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Shift Name</p>
-                                        <p className="font-medium">{shift.name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Duration</p>
-                                        <p className="font-medium">
-                                            {formatDuration(shift.duration_minutes)}
+                                        <span className="text-muted-foreground">
+                                            Critical
+                                        </span>
+                                        <p className="text-xl font-semibold">
+                                            {criticalAlertsCount}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Shift Lead</p>
-                                        <p className="font-medium">
-                                            {shift.shift_lead?.name ?? 'Unassigned'}
+                                        <span className="text-muted-foreground">
+                                            High
+                                        </span>
+                                        <p className="text-xl font-semibold">
+                                            {highAlertsCount}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Team Members</p>
-                                        <p className="font-medium">
-                                            {shift.team_members.length > 0
-                                                ? shift.team_members.map((m) => m.name).join(', ')
-                                                : 'None'}
+                                        <span className="text-muted-foreground">
+                                            Reviewed
+                                        </span>
+                                        <p className="text-xl font-semibold">
+                                            {
+                                                reviewedAlertIds.filter((id) =>
+                                                    urgentAlerts.some(
+                                                        (alert) =>
+                                                            alert.id === id,
+                                                    ),
+                                                ).length
+                                            }
+                                            /{urgentAlerts.length}
                                         </p>
                                     </div>
                                 </div>
+                                <div className="space-y-3">
+                                    {urgentAlerts.map((alert) => (
+                                        <AlertReviewRow
+                                            key={alert.id}
+                                            alert={alert}
+                                            reviewed={reviewedAlertIds.includes(
+                                                alert.id,
+                                            )}
+                                            priority={priorityAlertIds.includes(
+                                                alert.id,
+                                            )}
+                                            editable={shift.can_prepare}
+                                            onReviewedChange={(checked) =>
+                                                setReviewed(alert.id, checked)
+                                            }
+                                            onPriorityChange={(checked) =>
+                                                setPriority(alert.id, checked)
+                                            }
+                                        />
+                                    ))}
+                                    {urgentAlerts.length === 0 && (
+                                        <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-5 text-sm text-status-success">
+                                            No critical or high alerts are
+                                            waiting for handover.
+                                        </div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
-
-                        {/* Metrics grid */}
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg">
-                                            <TrendingUp className="h-5 w-5 text-status-info" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Alerts Created</p>
-                                            <p className="text-2xl font-bold">{shift.alerts_created}</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg">
-                                            <CheckCircle className="h-5 w-5 text-status-success" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Alerts Resolved</p>
-                                            <p className="text-2xl font-bold">{shift.alerts_resolved}</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg">
-                                            <AlertTriangle className="h-5 w-5 text-status-warning" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Alerts Escalated</p>
-                                            <p className="text-2xl font-bold">{shift.alerts_escalated}</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-critical-bg">
-                                            <ShieldAlert className="h-5 w-5 text-status-critical" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Open Now</p>
-                                            <p className="text-2xl font-bold">{openAlertsCount}</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Critical / High alerts list */}
-                        {urgentAlerts.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
-                                        Critical &amp; High Severity Alerts ({criticalAlertsCount + highAlertsCount})
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {urgentAlerts.map((alert) => (
-                                            <div
-                                                key={alert.id}
-                                                className="flex items-center justify-between rounded-lg border px-4 py-2"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={severityBadgeClass(alert.severity)}
-                                                    >
-                                                        {alert.severity}
-                                                    </Badge>
-                                                    <span className="text-sm font-medium">
-                                                        {alert.alert_type}
-                                                    </span>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatRelativeTime(alert.triggered_at)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
                         <div className="flex justify-end">
-                            <Button onClick={goNext}>
-                                Next
+                            <Button onClick={() => setCurrentStep(1)}>
+                                Continue to context
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
                         </div>
                     </div>
                 )}
 
-                {/* Step 2: Handover Notes */}
                 {currentStep === 1 && (
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5" />
-                                    Handover Notes
+                                <CardTitle>
+                                    What must the incoming lead know?
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-5">
                                 <div>
                                     <Label htmlFor="handover-notes">
-                                        Handover Narrative <span className="font-normal text-muted-foreground">(optional)</span>
+                                        Operational context
                                     </Label>
+                                    <p className="mb-2 text-sm text-muted-foreground">
+                                        Record decisions, dependencies, or a
+                                        change of plan. Linked alert rows carry
+                                        the actual work.
+                                    </p>
                                     <Textarea
                                         id="handover-notes"
+                                        rows={8}
                                         value={handoverNotes}
-                                        onChange={(e) => setHandoverNotes(e.target.value)}
-                                        placeholder="Summarise key events, ongoing situations, and anything the incoming team needs to know..."
-                                        rows={6}
-                                        className="mt-1.5"
+                                        disabled={!shift.can_prepare}
+                                        onChange={(event) =>
+                                            setHandoverNotes(event.target.value)
+                                        }
+                                        placeholder="Example: Family has been contacted. Continue 15-minute welfare updates until the on-call manager arrives."
                                     />
                                 </div>
 
-                                {/* Priority Items */}
-                                <div>
-                                    <Label>Priority Items</Label>
-                                    <p className="mb-2 text-sm text-muted-foreground">
-                                        Items that need immediate attention from the incoming team.
-                                    </p>
-                                    {priorityItems.length > 0 && (
-                                        <ul className="mb-3 space-y-2">
-                                            {priorityItems.map((item, index) => (
-                                                <li
-                                                    key={index}
-                                                    className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2"
+                                {(pinnedNotes.length > 0 ||
+                                    followupNotes.length > 0) && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="rounded-lg border p-4">
+                                            <h3 className="font-medium">
+                                                Pinned notes
+                                            </h3>
+                                            {pinnedNotes.map((note) => (
+                                                <p
+                                                    key={note.id}
+                                                    className="mt-2 text-sm"
                                                 >
-                                                    <span className="flex-1 text-sm">{item}</span>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removePriorityItem(index)}
-                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </li>
+                                                    {note.content}
+                                                </p>
                                             ))}
-                                        </ul>
-                                    )}
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newPriorityItem}
-                                            onChange={(e) => setNewPriorityItem(e.target.value)}
-                                            placeholder="Add a priority item..."
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    addPriorityItem();
-                                                }
-                                            }}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={addPriorityItem}
-                                        >
-                                            <Plus className="mr-1 h-4 w-4" />
-                                            Add
-                                        </Button>
+                                            {pinnedNotes.length === 0 && (
+                                                <p className="mt-2 text-sm text-muted-foreground">
+                                                    None
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="rounded-lg border p-4">
+                                            <h3 className="font-medium">
+                                                Follow-up notes
+                                            </h3>
+                                            {followupNotes.map((note) => (
+                                                <p
+                                                    key={note.id}
+                                                    className="mt-2 text-sm"
+                                                >
+                                                    {note.content}
+                                                </p>
+                                            ))}
+                                            {followupNotes.length === 0 && (
+                                                <p className="mt-2 text-sm text-muted-foreground">
+                                                    None
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </CardContent>
                         </Card>
-
-                        {/* Pinned Notes */}
-                        {pinnedNotes.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Pin className="h-4 w-4" />
-                                        Pinned Operator Notes
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {pinnedNotes.map((note) => (
-                                            <div
-                                                key={note.id}
-                                                className="rounded-lg border bg-status-warning-bg p-3"
-                                            >
-                                                <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                                    <span className="font-medium">
-                                                        {note.user?.name ?? 'Unknown'}
-                                                    </span>
-                                                    <span>&middot;</span>
-                                                    <span>{formatDateTime(note.created_at)}</span>
-                                                </div>
-                                                <p className="text-sm">{note.content}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Follow-up Notes */}
-                        {followupNotes.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Clock className="h-4 w-4" />
-                                        Notes Requiring Follow-up
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {followupNotes.map((note) => (
-                                            <div
-                                                key={note.id}
-                                                className="rounded-lg border bg-status-info-bg p-3"
-                                            >
-                                                <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                                    <span className="font-medium">
-                                                        {note.user?.name ?? 'Unknown'}
-                                                    </span>
-                                                    <span>&middot;</span>
-                                                    <span>{formatDateTime(note.created_at)}</span>
-                                                    {note.followup_at && (
-                                                        <>
-                                                            <span>&middot;</span>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="bg-status-info-bg text-status-info border-status-info/30 text-xs"
-                                                            >
-                                                                Follow-up: {formatDateTime(note.followup_at)}
-                                                            </Badge>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm">{note.content}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
                         <div className="flex justify-between">
-                            <Button variant="outline" onClick={goBack}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back
+                            <Button
+                                variant="outline"
+                                onClick={() => setCurrentStep(0)}
+                            >
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
                             </Button>
-                            <Button onClick={goNext}>
-                                Next
+                            <Button onClick={() => setCurrentStep(2)}>
+                                Continue to incoming team
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
                         </div>
                     </div>
                 )}
 
-                {/* Step 3: Incoming Shift Setup */}
                 {currentStep === 2 && (
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Users className="h-5 w-5" />
-                                    Incoming Shift Setup
+                                    <Users className="h-5 w-5" /> Incoming
+                                    ownership
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <Label htmlFor="incoming-shift-name">
-                                        New Shift Name
-                                    </Label>
-                                    <Input
-                                        id="incoming-shift-name"
-                                        value={incomingShiftName}
-                                        onChange={(e) => setIncomingShiftName(e.target.value)}
-                                        placeholder={`e.g. Night Shift ${new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
-                                        className="mt-1.5"
-                                    />
+                            <CardContent className="space-y-5">
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <Label htmlFor="incoming-shift-name">
+                                            Incoming shift name
+                                        </Label>
+                                        <Input
+                                            id="incoming-shift-name"
+                                            className="mt-2"
+                                            value={incomingShiftName}
+                                            disabled={!shift.can_prepare}
+                                            onChange={(event) =>
+                                                setIncomingShiftName(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="Night response desk"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="incoming-lead">
+                                            Incoming lead
+                                        </Label>
+                                        <Select
+                                            value={incomingLeadUserId}
+                                            disabled={!shift.can_prepare}
+                                            onValueChange={
+                                                setIncomingLeadUserId
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="incoming-lead"
+                                                className="mt-2"
+                                            >
+                                                <SelectValue placeholder="Select the person who must accept" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {eligibleLeads.map((person) => (
+                                                    <SelectItem
+                                                        key={person.id}
+                                                        value={String(
+                                                            person.id,
+                                                        )}
+                                                    >
+                                                        {person.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            Only this person can accept and
+                                            activate the incoming shift.
+                                        </p>
+                                    </div>
                                 </div>
-
                                 <div>
-                                    <Label htmlFor="incoming-lead">
-                                        Incoming Shift Lead
-                                    </Label>
-                                    <Select
-                                        value={incomingLeadUserId}
-                                        onValueChange={setIncomingLeadUserId}
-                                    >
-                                        <SelectTrigger id="incoming-lead" className="mt-1.5">
-                                            <SelectValue placeholder="Select shift lead..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {staff.map((s) => (
-                                                <SelectItem
-                                                    key={s.id}
-                                                    value={String(s.id)}
-                                                >
-                                                    {s.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label>Incoming Team Members</Label>
-                                    <p className="mb-2 text-sm text-muted-foreground">
-                                        Select the staff members joining the incoming shift.
-                                    </p>
-                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                        {staff.map((s) => (
+                                    <Label>Incoming team members</Label>
+                                    <div className="mt-2 grid grid-cols-3 gap-2">
+                                        {staff.map((person) => (
                                             <label
-                                                key={s.id}
-                                                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
-                                                    incomingTeamMembers.includes(s.id)
-                                                        ? 'border-primary bg-primary/5'
-                                                        : 'hover:bg-muted/50'
-                                                }`}
+                                                key={person.id}
+                                                className="flex items-center gap-2 rounded-lg border p-3 text-sm"
                                             >
                                                 <Checkbox
-                                                    checked={incomingTeamMembers.includes(s.id)}
-                                                    onCheckedChange={() => toggleTeamMember(s.id)}
+                                                    checked={incomingTeamMembers.includes(
+                                                        person.id,
+                                                    )}
+                                                    disabled={
+                                                        !shift.can_prepare
+                                                    }
+                                                    onCheckedChange={() =>
+                                                        toggleTeamMember(
+                                                            person.id,
+                                                        )
+                                                    }
                                                 />
-                                                <span className="text-sm">{s.name}</span>
+                                                {person.name}
                                             </label>
                                         ))}
                                     </div>
-                                    {staff.length === 0 && (
-                                        <p className="text-sm text-muted-foreground italic">
-                                            No staff members available.
-                                        </p>
-                                    )}
                                 </div>
                             </CardContent>
                         </Card>
-
                         <div className="flex justify-between">
-                            <Button variant="outline" onClick={goBack}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back
+                            <Button
+                                variant="outline"
+                                onClick={() => setCurrentStep(1)}
+                            >
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
                             </Button>
-                            <Button onClick={goNext}>
-                                Next
+                            <Button
+                                disabled={!incomingLeadUserId}
+                                onClick={() => setCurrentStep(3)}
+                            >
+                                Continue to final review
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
                         </div>
                     </div>
                 )}
 
-                {/* Step 4: Confirmation & Submit */}
                 {currentStep === 3 && (
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <CheckCircle className="h-5 w-5" />
-                                    Handover Confirmation
+                                <CardTitle>
+                                    Prepare, then wait for acceptance
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                {/* Outgoing summary */}
-                                <div>
-                                    <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Outgoing Shift
-                                    </h4>
-                                    <div className="rounded-lg border bg-muted/30 p-4">
-                                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Shift</p>
-                                                <p className="text-sm font-medium">{shift.name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Created</p>
-                                                <p className="text-sm font-medium">{shift.alerts_created}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Resolved</p>
-                                                <p className="text-sm font-medium">{shift.alerts_resolved}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Open Alerts</p>
-                                                <p className="text-sm font-medium">{openAlertsCount}</p>
-                                            </div>
-                                        </div>
+                            <CardContent className="space-y-5">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="rounded-lg border p-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            Incoming lead
+                                        </p>
+                                        <p className="font-semibold">
+                                            {eligibleLeads.find(
+                                                (person) =>
+                                                    String(person.id) ===
+                                                    incomingLeadUserId,
+                                            )?.name ?? 'Not selected'}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border p-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            Urgent work reviewed
+                                        </p>
+                                        <p className="font-semibold">
+                                            {reviewedAlertIds.length}/
+                                            {urgentAlerts.length}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border p-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            Linked priorities
+                                        </p>
+                                        <p className="font-semibold">
+                                            {priorityAlertIds.length}
+                                        </p>
                                     </div>
                                 </div>
-
-                                {/* Handover notes preview */}
-                                <div>
-                                    <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Handover Notes
-                                    </h4>
-                                    <div className="rounded-lg border bg-muted/30 p-4">
-                                        {handoverNotes ? (
-                                            <p className="text-sm whitespace-pre-wrap">
-                                                {handoverNotes.length > 500
-                                                    ? `${handoverNotes.slice(0, 500)}...`
-                                                    : handoverNotes}
-                                            </p>
-                                        ) : (
-                                            <p className="text-sm italic text-muted-foreground">
-                                                No handover notes provided.
-                                            </p>
-                                        )}
-                                    </div>
+                                <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                                    <p className="font-medium">
+                                        What happens next
+                                    </p>
+                                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+                                        <li>
+                                            This reviewed snapshot is frozen.
+                                        </li>
+                                        <li>
+                                            The outgoing shift stays active.
+                                        </li>
+                                        <li>
+                                            The selected incoming lead reviews
+                                            and accepts.
+                                        </li>
+                                        <li>
+                                            Acceptance completes this shift and
+                                            starts the next one once.
+                                        </li>
+                                    </ol>
                                 </div>
-
-                                {/* Priority items */}
-                                {priorityItems.length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                                            Priority Items ({priorityItems.length})
-                                        </h4>
-                                        <ul className="space-y-1 rounded-lg border bg-muted/30 p-4">
-                                            {priorityItems.map((item, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-start gap-2 text-sm"
-                                                >
-                                                    <span className="mt-0.5 text-primary">&bull;</span>
-                                                    {item}
-                                                </li>
-                                            ))}
-                                        </ul>
+                                {!allUrgentReviewed && (
+                                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
+                                        Return to Urgent work and review every
+                                        critical and high alert.
                                     </div>
                                 )}
-
-                                {/* Incoming shift info */}
-                                <div>
-                                    <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Incoming Shift
-                                    </h4>
-                                    <div className="rounded-lg border bg-muted/30 p-4">
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Shift Name</p>
-                                                <p className="text-sm font-medium">
-                                                    {incomingShiftName || 'Auto-generated'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Lead</p>
-                                                <p className="text-sm font-medium">
-                                                    {incomingLeadUserId
-                                                        ? staff.find(
-                                                              (s) => String(s.id) === incomingLeadUserId,
-                                                          )?.name ?? 'Unknown'
-                                                        : 'Not assigned'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Team</p>
-                                                <p className="text-sm font-medium">
-                                                    {incomingTeamMembers.length > 0
-                                                        ? staff
-                                                              .filter((s) =>
-                                                                  incomingTeamMembers.includes(s.id),
-                                                              )
-                                                              .map((s) => s.name)
-                                                              .join(', ')
-                                                        : 'No members selected'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </CardContent>
                         </Card>
-
                         <div className="flex justify-between">
-                            <Button type="button" variant="outline" onClick={goBack}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back
+                            <Button
+                                variant="outline"
+                                onClick={() => setCurrentStep(2)}
+                            >
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
                             </Button>
                             <Button
-                                type="submit"
                                 size="lg"
-                                disabled={submitting}
+                                disabled={
+                                    !readyToPrepare ||
+                                    submitting ||
+                                    !shift.can_prepare
+                                }
+                                onClick={prepare}
                             >
-                                {submitting ? 'Completing Handover...' : 'Complete Handover'}
+                                {submitting
+                                    ? 'Preparing…'
+                                    : saveState !== 'saved'
+                                      ? 'Waiting for draft to save…'
+                                      : 'Prepare for incoming acceptance'}
                             </Button>
                         </div>
-                    </form>
+                    </div>
                 )}
             </PageShell>
         </AppLayout>

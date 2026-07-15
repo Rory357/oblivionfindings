@@ -7,14 +7,18 @@ use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetChecklistTemplate;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class DailyCheckController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
+        $user = $request->user();
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
 
         // Get vehicles, optionally filtered to user's site
@@ -98,9 +102,10 @@ class DailyCheckController extends Controller
                 ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
-        $openAlerts = ControlRoomAlert::query()->whereNotIn('status', ['closed', 'resolved'])->count();
-        $criticalAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
+        $alertQuery = ControlRoomAlert::query()->actionable();
+        $this->siteAccess->applyAlertScope($alertQuery, $user, ['fleet.manage']);
+        $openAlerts = (clone $alertQuery)->count();
+        $criticalAlerts = (clone $alertQuery)
             ->where('severity', 'critical')
             ->count();
 

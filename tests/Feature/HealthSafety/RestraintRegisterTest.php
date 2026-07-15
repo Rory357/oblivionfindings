@@ -112,7 +112,7 @@ class RestraintRegisterTest extends TestCase
             ->assertInertia(fn (Assert $p) => $p
                 ->where('detail.kind', 'event')
                 ->where('detail.id', $event->id)
-                ->where('detail.reference', fn ($r) => str_starts_with($r, 'RE-'))
+                ->where('detail.reference', fn ($r) => str_starts_with($r, RestraintEvent::REFERENCE_PREFIX.'-'))
                 ->has('detail.flags')
             );
     }

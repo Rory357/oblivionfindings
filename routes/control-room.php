@@ -102,6 +102,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.triage');
 
+        Route::post('/control-room/alerts/{alert}/create-incident', [ControlRoomAlertController::class, 'createIncident'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.create-incident');
+
         Route::post('/control-room/alerts/{alert}/resolve', [ControlRoomAlertController::class, 'resolve'])
             ->whereNumber('alert')
             ->name('control-room.alerts.resolve');
@@ -109,6 +113,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/close', [ControlRoomAlertController::class, 'close'])
             ->whereNumber('alert')
             ->name('control-room.alerts.close');
+
+        Route::post('/control-room/alerts/{alert}/reopen-for-incident', [ControlRoomAlertController::class, 'reopenForIncident'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.reopen-for-incident');
 
         Route::post('/control-room/alerts/{alert}/note', [ControlRoomAlertController::class, 'addNote'])
             ->whereNumber('alert')
@@ -137,6 +145,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.tasks.update');
         Route::post('/control-room/tasks/{task}/status', [ControlRoomTaskController::class, 'updateStatus'])
             ->name('control-room.tasks.status');
+        Route::post('/control-room/tasks/{task}/transfer-to-health-safety', [ControlRoomTaskController::class, 'transferToHealthSafety'])
+            ->whereNumber('task')
+            ->name('control-room.tasks.transfer-to-health-safety');
         Route::delete('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
             ->name('control-room.tasks.destroy');
         Route::post('/control-room/alerts/{alert}/tasks/reorder', [ControlRoomTaskController::class, 'reorder'])
@@ -206,8 +217,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.shifts.store');
         Route::get('/control-room/shifts/{shift}/handover', [ControlRoomHandoverController::class, 'show'])
             ->name('control-room.shifts.handover-page');
+        Route::patch('/control-room/shifts/{shift}/handover/draft', [ControlRoomShiftController::class, 'saveHandoverDraft'])
+            ->name('control-room.shifts.handover-draft');
         Route::post('/control-room/shifts/{shift}/handover', [ControlRoomShiftController::class, 'handover'])
             ->name('control-room.shifts.handover');
+        Route::post('/control-room/shifts/{shift}/accept-handover', [ControlRoomShiftController::class, 'acceptHandover'])
+            ->name('control-room.shifts.accept-handover');
         Route::post('/control-room/shifts/{shift}/acknowledge-handover', [ControlRoomShiftController::class, 'acknowledgeHandover'])
             ->name('control-room.shifts.acknowledge-handover');
         Route::post('/control-room/shifts/{shift}/note', [ControlRoomShiftController::class, 'addNote'])

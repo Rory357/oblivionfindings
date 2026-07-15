@@ -3,14 +3,21 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MedicationSignalService;
+use App\Services\MedicationIncidentIntegrationService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -190,6 +197,102 @@ class WorkerMedsRecordDoseTest extends TestCase
             'status' => 'refused',
             'reason_code' => 'refused',
         ]);
+    }
+
+    public function test_offline_refusal_replay_repairs_a_failed_post_commit_incident_hook_without_duplicates(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], [
+            'high_risk' => true,
+            'controlled_drug' => false,
+            'witness_required' => false,
+        ]);
+        $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
+        {
+            public int $attempts = 0;
+
+            public function emit(
+                string $signalType,
+                int $clientId,
+                string $severity,
+                string $message,
+                array $context = [],
+                bool $requiredDelivery = false,
+            ): void {
+                if ($signalType === self::TYPE_REFUSED_DOSE && $this->attempts++ === 0) {
+                    throw new \RuntimeException('Forced worker refusal hook failure');
+                }
+
+                parent::emit($signalType, $clientId, $severity, $message, $context, $requiredDelivery);
+            }
+        };
+        $this->app->instance(
+            MedicationIncidentIntegrationService::class,
+            new MedicationIncidentIntegrationService(
+                $signals,
+                app(IncidentJourneyService::class),
+            ),
+        );
+        $requestUuid = 'worker-refusal-hook-repair';
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'scheduled_for' => now()->toIso8601String(),
+            'status' => 'refused',
+            'reason_code' => 'refused',
+            'reason' => 'Client declined after a second offer.',
+            'administered_at' => now()->toIso8601String(),
+            'client_request_uuid' => $requestUuid,
+            'captured_offline_at' => now()->toIso8601String(),
+            'origin_device_id' => 'worker-meds-board',
+            'queued_offline' => true,
+        ];
+        $this->withoutExceptionHandling();
+        $firstException = null;
+
+        try {
+            $this->actingAs($this->worker)
+                ->from('/meds/today')
+                ->post('/meds/today/record', $payload);
+        } catch (\Throwable $caught) {
+            $firstException = $caught;
+        }
+
+        $this->assertInstanceOf(\RuntimeException::class, $firstException);
+        $this->assertSame('Forced worker refusal hook failure', $firstException->getMessage());
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', $payload)
+            ->assertRedirect('/meds/today')
+            ->assertSessionHas('warning');
+        Cache::forget("offline:idempotency:dose:{$requestUuid}");
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', $payload)
+            ->assertRedirect('/meds/today')
+            ->assertSessionHas('warning');
+
+        $this->assertSame(3, $signals->attempts);
+        $this->assertSame(
+            $requestUuid,
+            ClientMedicationAdministration::query()->sole()->client_request_uuid,
+        );
+        $this->assertSame(
+            'refused_dose',
+            data_get(ClientIncident::query()->sole()->metadata, 'medication_incident_source.kind'),
+        );
+        $this->assertSame(MedicationSignalService::TYPE_REFUSED_DOSE, Signal::query()->sole()->signal_type_code);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertSame(
+            ClientIncident::query()->sole()->id,
+            (int) data_get(ControlRoomAlert::query()->sole()->context, 'incident_id'),
+        );
     }
 
     public function test_withheld_dose_accepts_the_omitted_in_error_reason_code(): void

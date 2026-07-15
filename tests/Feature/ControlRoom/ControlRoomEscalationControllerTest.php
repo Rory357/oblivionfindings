@@ -5,7 +5,9 @@ namespace Tests\Feature\ControlRoom;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Factories\ControlRoomAlertFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,11 +19,15 @@ class ControlRoomEscalationControllerTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(\Database\Seeders\RbacSeeder::class);
+
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -48,8 +54,8 @@ class ControlRoomEscalationControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        ControlRoomAlert::factory()->open()->create(['queue_id' => $tier1->id]);
-        ControlRoomAlert::factory()->open()->create(['queue_id' => $tier1->id]);
+        $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
+        $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/escalations')
@@ -63,7 +69,7 @@ class ControlRoomEscalationControllerTest extends TestCase
 
     public function test_acknowledge_from_queue_marks_alert_acknowledged(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = $this->alertFactory()->open()->create();
 
         $this->actingAs($this->admin)
             ->post("/control-room/escalations/{$alert->id}/acknowledge")
@@ -76,7 +82,7 @@ class ControlRoomEscalationControllerTest extends TestCase
 
     public function test_acknowledge_from_queue_blocks_resolved_alert(): void
     {
-        $alert = ControlRoomAlert::factory()->resolved()->create();
+        $alert = $this->alertFactory()->resolved()->create();
 
         $this->actingAs($this->admin)
             ->post("/control-room/escalations/{$alert->id}/acknowledge")
@@ -85,7 +91,7 @@ class ControlRoomEscalationControllerTest extends TestCase
 
     public function test_assign_to_me_assigns_alert_to_current_user(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = $this->alertFactory()->open()->create();
 
         $this->actingAs($this->admin)
             ->post("/control-room/escalations/{$alert->id}/assign-to-me")
@@ -99,7 +105,7 @@ class ControlRoomEscalationControllerTest extends TestCase
         $tier1 = TriageQueue::create(['name' => 'Tier 1', 'code' => 't1', 'tier' => 1, 'is_active' => true]);
         $tier2 = TriageQueue::create(['name' => 'Tier 2', 'code' => 't2', 'tier' => 2, 'is_active' => true]);
 
-        $alert = ControlRoomAlert::factory()->open()->create(['queue_id' => $tier1->id]);
+        $alert = $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
 
         $this->actingAs($this->admin)
             ->post("/control-room/escalations/{$alert->id}/move", [
@@ -108,6 +114,38 @@ class ControlRoomEscalationControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame($tier2->id, $alert->fresh()->queue_id);
+    }
+
+    public function test_move_to_queue_rejects_an_inactive_destination_queue(): void
+    {
+        $tier1 = TriageQueue::create(['name' => 'Tier 1', 'code' => 'move-active-current', 'tier' => 1, 'is_active' => true]);
+        $inactiveTier2 = TriageQueue::create(['name' => 'Tier 2', 'code' => 'move-inactive-target', 'tier' => 2, 'is_active' => false]);
+        $alert = $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/escalations/{$alert->id}/move", [
+                'target_queue_id' => $inactiveTier2->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('alert');
+
+        $this->assertSame($tier1->id, $alert->fresh()->queue_id);
+    }
+
+    public function test_move_to_queue_rejects_an_inactive_current_queue(): void
+    {
+        $inactiveTier1 = TriageQueue::create(['name' => 'Tier 1', 'code' => 'move-inactive-current', 'tier' => 1, 'is_active' => false]);
+        $tier2 = TriageQueue::create(['name' => 'Tier 2', 'code' => 'move-active-target', 'tier' => 2, 'is_active' => true]);
+        $alert = $this->alertFactory()->open()->create(['queue_id' => $inactiveTier1->id]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/escalations/{$alert->id}/move", [
+                'target_queue_id' => $tier2->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('alert');
+
+        $this->assertSame($inactiveTier1->id, $alert->fresh()->queue_id);
     }
 
     public function test_bulk_escalate_promotes_alerts_to_next_queue(): void
@@ -121,7 +159,7 @@ class ControlRoomEscalationControllerTest extends TestCase
             'escalate_to_queue_id' => $tier2->id,
         ]);
 
-        $alert = ControlRoomAlert::factory()->open()->create(['queue_id' => $tier1->id]);
+        $alert = $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
 
         $this->actingAs($this->admin)
             ->post('/control-room/escalations/bulk-escalate', [
@@ -138,6 +176,85 @@ class ControlRoomEscalationControllerTest extends TestCase
         $this->assertSame('Queue backlog — needs tier 2 eyes', end($history)['reason']);
     }
 
+    public function test_bulk_escalation_history_records_the_same_clamped_level_that_is_persisted(): void
+    {
+        $tier2 = TriageQueue::create(['name' => 'Tier 2', 'code' => 'clamp-t2', 'tier' => 2, 'is_active' => true]);
+        $tier1 = TriageQueue::create([
+            'name' => 'Tier 1',
+            'code' => 'clamp-t1',
+            'tier' => 1,
+            'is_active' => true,
+            'escalate_to_queue_id' => $tier2->id,
+        ]);
+        $alert = $this->alertFactory()->open()->create([
+            'queue_id' => $tier1->id,
+            'escalation_level' => ControlRoomAlert::MAX_ESCALATION_LEVEL,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/escalations/bulk-escalate', [
+                'alert_ids' => [$alert->id],
+                'reason' => 'Move to the next specialist queue.',
+            ])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $history = collect($alert->context['escalation_history'] ?? [])->last();
+
+        $this->assertSame($tier2->id, $alert->queue_id);
+        $this->assertSame(ControlRoomAlert::MAX_ESCALATION_LEVEL, $alert->escalation_level);
+        $this->assertSame($alert->escalation_level, $history['level'] ?? null);
+    }
+
+    public function test_bulk_escalation_skips_inactive_current_and_destination_queues(): void
+    {
+        $activeDestination = TriageQueue::create([
+            'name' => 'Active destination',
+            'code' => 'bulk-active-destination',
+            'tier' => 2,
+            'is_active' => true,
+        ]);
+        $inactiveCurrent = TriageQueue::create([
+            'name' => 'Inactive current',
+            'code' => 'bulk-inactive-current',
+            'tier' => 1,
+            'is_active' => false,
+            'escalate_to_queue_id' => $activeDestination->id,
+        ]);
+        $inactiveDestination = TriageQueue::create([
+            'name' => 'Inactive destination',
+            'code' => 'bulk-inactive-destination',
+            'tier' => 2,
+            'is_active' => false,
+        ]);
+        $activeCurrent = TriageQueue::create([
+            'name' => 'Active current',
+            'code' => 'bulk-active-current',
+            'tier' => 1,
+            'is_active' => true,
+            'escalate_to_queue_id' => $inactiveDestination->id,
+        ]);
+        $inactiveCurrentAlert = $this->alertFactory()->open()->create([
+            'queue_id' => $inactiveCurrent->id,
+        ]);
+        $inactiveDestinationAlert = $this->alertFactory()->open()->create([
+            'queue_id' => $activeCurrent->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/escalations/bulk-escalate', [
+                'alert_ids' => [$inactiveCurrentAlert->id, $inactiveDestinationAlert->id],
+                'reason' => 'Attempted bulk escalation through inactive configuration.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame($inactiveCurrent->id, $inactiveCurrentAlert->fresh()->queue_id);
+        $this->assertSame($activeCurrent->id, $inactiveDestinationAlert->fresh()->queue_id);
+        $this->assertSame(0, (int) $inactiveCurrentAlert->fresh()->escalation_level);
+        $this->assertSame(0, (int) $inactiveDestinationAlert->fresh()->escalation_level);
+    }
+
     public function test_bulk_escalate_validates_alert_ids(): void
     {
         $this->actingAs($this->admin)
@@ -147,12 +264,17 @@ class ControlRoomEscalationControllerTest extends TestCase
 
     public function test_bulk_escalate_requires_a_reason(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = $this->alertFactory()->open()->create();
 
         $this->actingAs($this->admin)
             ->post('/control-room/escalations/bulk-escalate', [
                 'alert_ids' => [$alert->id],
             ])
             ->assertSessionHasErrors('reason');
+    }
+
+    private function alertFactory(): ControlRoomAlertFactory
+    {
+        return ControlRoomAlert::factory()->state(['site_id' => $this->site->id]);
     }
 }

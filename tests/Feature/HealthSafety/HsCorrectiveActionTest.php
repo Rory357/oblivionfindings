@@ -368,8 +368,12 @@ class HsCorrectiveActionTest extends TestCase
     {
         $event = HsEvent::factory()->high()->create();
 
-        // No actions = vacuously true
+        // No recommendations or actions = no corrective-action work to resolve.
         $this->assertTrue($event->allCorrectiveActionsResolved());
+
+        HsInvestigation::factory()->completed()->create(['hs_event_id' => $event->id]);
+        $event->refresh();
+        $this->assertFalse($event->allCorrectiveActionsResolved());
 
         // Add open action
         HsCorrectiveAction::factory()->inProgress()->create(['hs_event_id' => $event->id]);
@@ -385,6 +389,6 @@ class HsCorrectiveActionTest extends TestCase
         $ref2 = HsCorrectiveAction::generateReferenceNumber();
 
         $this->assertNotEquals($ref1, $ref2);
-        $this->assertStringStartsWith('CA-' . now()->year . '-', $ref2);
+        $this->assertStringStartsWith('CA-'.now()->year.'-', $ref2);
     }
 }

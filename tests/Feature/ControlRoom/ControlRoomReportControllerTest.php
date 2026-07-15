@@ -4,7 +4,10 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Factories\ControlRoomAlertFactory;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,19 +21,36 @@ class ControlRoomReportControllerTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
 
-        $this->coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->coordinator = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'role' => 'coordinator',
+            'approved_at' => now(),
+        ]);
         $this->coordinator->roles()->attach(Role::where('name', 'coordinator')->first());
 
-        $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->supportWorker = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
     }
 
@@ -57,16 +77,19 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_reports_accessible_by_support_worker_with_view_any_permission(): void
+    public function test_reports_blocked_for_support_worker_without_report_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_reports_blocked_for_user_without_permission(): void
     {
-        $noPermUser = User::factory()->create(['approved_at' => now()]);
+        $noPermUser = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'approved_at' => now(),
+        ]);
 
         $this->actingAs($noPermUser)
             ->get('/control-room/reports')
@@ -146,8 +169,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_reports_stats_include_expected_fields(): void
     {
-        ControlRoomAlert::factory()->open()->count(3)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->resolved()->count(2)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->open()->count(3)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->resolved()->count(2)->create(['triggered_at' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports')
@@ -180,9 +203,9 @@ class ControlRoomReportControllerTest extends TestCase
     public function test_reports_count_alerts_in_period(): void
     {
         // Create alerts within the 30-day window
-        ControlRoomAlert::factory()->count(5)->create(['triggered_at' => now()->subDays(10)]);
+        $this->alertFactory()->count(5)->create(['triggered_at' => now()->subDays(10)]);
         // Create alerts outside the 30-day window
-        ControlRoomAlert::factory()->count(3)->create(['triggered_at' => now()->subDays(60)]);
+        $this->alertFactory()->count(3)->create(['triggered_at' => now()->subDays(60)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports?period=30d')
@@ -194,8 +217,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_reports_by_severity_breakdown(): void
     {
-        ControlRoomAlert::factory()->critical()->count(2)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->low()->count(3)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->critical()->count(2)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->low()->count(3)->create(['triggered_at' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports')
@@ -208,8 +231,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_reports_by_source_breakdown(): void
     {
-        ControlRoomAlert::factory()->fromFleet()->count(4)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->fromCompliance()->count(2)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->fromFleet()->count(4)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->fromCompliance()->count(2)->create(['triggered_at' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports')
@@ -222,8 +245,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_reports_escalation_count(): void
     {
-        ControlRoomAlert::factory()->escalated(2)->count(3)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->count(5)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->escalated(2)->count(3)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->count(5)->create(['triggered_at' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports')
@@ -235,9 +258,12 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_reports_top_assignees(): void
     {
-        $assignee = User::factory()->create(['approved_at' => now()]);
-        ControlRoomAlert::factory()->assignedTo($assignee)->count(5)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->count(3)->create(['triggered_at' => now()->subDays(5)]);
+        $assignee = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'approved_at' => now(),
+        ]);
+        $this->alertFactory()->assignedTo($assignee)->count(5)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->count(3)->create(['triggered_at' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/control-room/reports')
@@ -263,11 +289,11 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_export_accessible_by_support_worker_with_view_any_permission(): void
+    public function test_export_blocked_for_support_worker_without_report_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports/export')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_export_returns_csv(): void
@@ -294,8 +320,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_export_includes_alerts_in_period(): void
     {
-        ControlRoomAlert::factory()->count(3)->create(['triggered_at' => now()->subDays(5)]);
-        ControlRoomAlert::factory()->count(2)->create(['triggered_at' => now()->subDays(60)]);
+        $this->alertFactory()->count(3)->create(['triggered_at' => now()->subDays(5)]);
+        $this->alertFactory()->count(2)->create(['triggered_at' => now()->subDays(60)]);
 
         $response = $this->actingAs($this->admin)
             ->get('/control-room/reports/export?period=30d');
@@ -317,8 +343,8 @@ class ControlRoomReportControllerTest extends TestCase
 
     public function test_export_respects_7d_period(): void
     {
-        ControlRoomAlert::factory()->count(2)->create(['triggered_at' => now()->subDays(3)]);
-        ControlRoomAlert::factory()->count(3)->create(['triggered_at' => now()->subDays(15)]);
+        $this->alertFactory()->count(2)->create(['triggered_at' => now()->subDays(3)]);
+        $this->alertFactory()->count(3)->create(['triggered_at' => now()->subDays(15)]);
 
         $response = $this->actingAs($this->admin)
             ->get('/control-room/reports/export?period=7d');
@@ -327,5 +353,12 @@ class ControlRoomReportControllerTest extends TestCase
         $lines = array_filter(explode("\n", trim($content)));
 
         $this->assertCount(3, $lines); // Header + 2 data rows
+    }
+
+    private function alertFactory(): ControlRoomAlertFactory
+    {
+        return ControlRoomAlert::factory()->state([
+            'site_id' => $this->site->id,
+        ]);
     }
 }

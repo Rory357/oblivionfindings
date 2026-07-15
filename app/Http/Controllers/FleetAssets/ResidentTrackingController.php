@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -14,9 +15,15 @@ use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkPendingCommand;
+use App\Models\Site;
+use App\Models\User;
+use App\Services\ConsentValidationService;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Tracking\GeofenceStatusService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -25,60 +32,100 @@ use Inertia\Inertia;
 
 class ResidentTrackingController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
     public function __construct(
         private readonly DeviceRegistryService $registry,
         private readonly DeviceAssignmentService $assignmentService,
         private readonly GeofenceStatusService $geofenceStatus,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $tenantId = $user?->tenant_id ?? 1;
+        $organizationId = $this->organizationId($user);
+
+        // Client and device queries share the same tenant boundary. Users and
+        // clients carry organization_id; sites and devices carry tenant_id.
+        $authorizedClientIds = $this->getAuthorizedClientIds($user);
 
         // Get tracking devices actively assigned to clients (canonical).
         $clientDevices = Device::query()
+            ->when(
+                $organizationId === null,
+                fn (Builder $query) => $query->whereRaw('1 = 0'),
+                fn (Builder $query) => $query->where('tenant_id', $organizationId),
+            )
             ->where('domain', 'tracking')
-            ->whereHas('assignments', function ($q) {
-                $q->active()->where('assignable_type', 'client');
+            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
+                ->whereNotIn('asset_id', $this->accessibleAssetIds($user)))
+            ->whereHas('assignments', function ($q) use ($authorizedClientIds) {
+                $q->active()
+                    ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                    ->whereIn('assignable_id', $authorizedClientIds);
             })
-            ->with(['assignments' => fn ($q) => $q->active()->where('assignable_type', 'client')])
+            ->with(['assignments' => fn ($q) => $q
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                ->whereIn('assignable_id', $authorizedClientIds)])
             ->get();
 
-        // Get client IDs the user is authorized to see.
-        $authorizedClientIds = $this->getAuthorizedClientIds($user);
-
-        // Filter to authorized clients.
-        $clientDevices = $clientDevices->filter(function (Device $device) use ($authorizedClientIds) {
-            $assignment = $device->assignments->first();
-            if (! $assignment) {
-                return false;
-            }
-
-            return $authorizedClientIds === null || in_array($assignment->assignable_id, $authorizedClientIds);
-        });
-
-        // Load client data (with house geofence relation for per-resident zone check).
-        $clientIds = $clientDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->values();
-        $clients = Client::with(['site:id,name', 'houseGeofence'])->whereIn('id', $clientIds)->get()->keyBy('id');
-
-        // Load every active geofence (dashboard renders all of them).
+        // Site-authoritative geofences. Asset provenance is only a fallback
+        // when the geofence itself has no site_id.
         $geofences = collect();
         try {
             if (Schema::hasTable('asset_geofences')) {
-                $geofences = AssetGeofence::where('is_active', true)->get();
+                $geofences = $this->applyGeofenceScope(
+                    AssetGeofence::query()->where('is_active', true),
+                    $user,
+                )->get();
             }
         } catch (\Throwable) {
             $geofences = collect();
         }
 
+        // Load client data. The house geofence relation is constrained to the
+        // same site-safe set used by the map, so nested payloads cannot leak a
+        // contradictory foreign fence.
+        $clientIds = $clientDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->values();
+        $allowedGeofenceIds = $geofences->pluck('id')->all();
+        $clients = Client::with([
+            'site' => fn ($query) => $query
+                ->where('tenant_id', $organizationId)
+                ->select(['id', 'name']),
+            'houseGeofence' => fn ($query) => $query->whereIn('asset_geofences.id', $allowedGeofenceIds),
+        ])
+            ->where('organization_id', $organizationId)
+            ->whereIn('id', $clientIds)
+            ->get()
+            ->keyBy('id');
+        $consentedClientIds = $this->trackingConsentQuery()
+            ->whereIn('client_id', $authorizedClientIds)
+            ->pluck('client_id')
+            ->map(fn ($clientId) => (int) $clientId)
+            ->unique()
+            ->values()
+            ->all();
+        $clientDevices = $clientDevices
+            ->filter(fn (Device $device) => in_array(
+                (int) $device->assignments->first()?->assignable_id,
+                $consentedClientIds,
+                true,
+            ));
+
         // Load active outings.
         $activeOutingClientIds = [];
         try {
             if (Schema::hasTable('fleet_outings') && Schema::hasTable('fleet_outing_residents')) {
+                $activeOutingIds = $this->applyOutingScope(
+                    FleetOuting::query()->where('status', 'active'),
+                    $user,
+                    $authorizedClientIds,
+                )->pluck('id');
                 $activeOutingClientIds = DB::table('fleet_outing_residents')
-                    ->join('fleet_outings', 'fleet_outings.id', '=', 'fleet_outing_residents.outing_id')
-                    ->where('fleet_outings.status', 'active')
+                    ->whereIn('outing_id', $activeOutingIds)
+                    ->whereIn('client_id', $authorizedClientIds)
                     ->pluck('fleet_outing_residents.client_id')
                     ->toArray();
             }
@@ -111,17 +158,21 @@ class ResidentTrackingController extends Controller
         $safetyScore = $totalTracked > 0 ? round(($inGeofence / max($totalTracked, 1)) * 100, 1) : 0;
         $avgBattery = $totalTracked > 0 ? round($residents->avg(fn ($r) => $r['battery'] ?? 0), 0) : 0;
 
-        $totalClients = $authorizedClientIds === null
-            ? Client::where('status', 'active')->count()
-            : count($authorizedClientIds);
+        $totalClientQuery = Client::query()
+            ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->whereIn('id', $authorizedClientIds);
+        $totalClients = $totalClientQuery->count();
         $untracked = max(0, $totalClients - $totalTracked);
 
         // Recent alerts (unchanged).
         $recentAlerts = [];
         try {
             if (Schema::hasTable('control_room_alerts')) {
-                $recentAlerts = ControlRoomAlert::whereIn('source', ['tracker', 'resident_tracker', 'geofence'])
-                    ->latest()->limit(5)->get()
+                $recentAlertQuery = ControlRoomAlert::whereIn('source', ['tracker', 'resident_tracker', 'geofence'])
+                    ->actionable()
+                    ->whereIn('client_id', $consentedClientIds);
+                $recentAlerts = $recentAlertQuery->latest()->limit(5)->get()
                     ->map(function ($alert) {
                         $client = $alert->client_id ? Client::find($alert->client_id) : null;
 
@@ -143,12 +194,23 @@ class ResidentTrackingController extends Controller
         $activeOutings = [];
         try {
             if (Schema::hasTable('fleet_outings')) {
-                $activeOutings = FleetOuting::where('status', 'active')
-                    ->with(['clients', 'asset'])->latest()->limit(10)->get()
+                $activeOutings = $this->applyOutingScope(
+                    FleetOuting::query()->where('status', 'active'),
+                    $user,
+                    $authorizedClientIds,
+                )
+                    ->with([
+                        'asset' => fn ($query) => $query
+                            ->whereIn('assets.id', $this->accessibleAssetIds($user))
+                            ->select(['id', 'name']),
+                    ])
+                    ->withCount(['clients as authorized_resident_count' => fn ($query) => $query
+                        ->whereIn('clients.id', $authorizedClientIds)])
+                    ->latest()->limit(10)->get()
                     ->map(fn ($o) => [
                         'id' => $o->id, 'title' => $o->title ?? 'Outing',
                         'destination' => $o->destination ?? 'Unknown',
-                        'resident_count' => $o->clients->count(),
+                        'resident_count' => (int) $o->authorized_resident_count,
                         'departed_at' => $o->actual_departure?->toISOString() ?? $o->planned_departure?->toISOString(),
                         'vehicle_name' => $o->asset?->name ?? null,
                     ])->toArray();
@@ -161,7 +223,7 @@ class ResidentTrackingController extends Controller
         $mapGeofences = $this->buildMapGeofences($geofences);
 
         $focusClientId = $request->integer('focus') ?: null;
-        if ($focusClientId && $authorizedClientIds !== null && ! in_array($focusClientId, $authorizedClientIds, true)) {
+        if ($focusClientId && ! in_array($focusClientId, $consentedClientIds, true)) {
             $focusClientId = null;
         }
 
@@ -173,8 +235,9 @@ class ResidentTrackingController extends Controller
             if (Schema::hasTable('control_room_alerts')) {
                 $alertBase = ControlRoomAlert::query()
                     ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
-                    ->whereNotNull('client_id');
-                $activeAlertCount = (clone $alertBase)->whereNotIn('status', ['closed', 'resolved'])->count();
+                    ->whereNotNull('client_id')
+                    ->whereIn('client_id', $consentedClientIds);
+                $activeAlertCount = (clone $alertBase)->actionable()->count();
                 $wandering7d = (clone $alertBase)
                     ->whereIn('alert_type', ['geofence_breach', 'wandering'])
                     ->where('triggered_at', '>=', now()->subDays(7))
@@ -214,7 +277,9 @@ class ResidentTrackingController extends Controller
             'focus_client_id' => $focusClientId,
             // Wandering-alerts tab payload (merged from the retired
             // /fleet-assets/wandering-alerts page) — only when the tab is open.
-            'wandering' => $tab === 'wandering' ? $this->wanderingPayload($request) : null,
+            'wandering' => $tab === 'wandering'
+                ? $this->wanderingPayload($request, $consentedClientIds)
+                : null,
             // Assign-tracker modal payload (retired /resident-tracking/assign
             // page) — only when opened via ?new=1.
             'assign' => $request->boolean('new') ? $this->assignPayload($user) : null,
@@ -229,7 +294,7 @@ class ResidentTrackingController extends Controller
      * Wandering-alerts tab payload — ported from the retired
      * WanderingAlertController index.
      */
-    private function wanderingPayload(Request $request): array
+    private function wanderingPayload(Request $request, array $consentedClientIds): array
     {
         if (! Schema::hasTable('control_room_alerts')) {
             return [
@@ -242,11 +307,12 @@ class ResidentTrackingController extends Controller
         $query = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id');
+        $query->whereIn('client_id', $consentedClientIds);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         } else {
-            $query->whereNotIn('status', ['closed', 'resolved']);
+            $query->actionable();
         }
 
         $alerts = $query->latest('triggered_at')
@@ -255,10 +321,15 @@ class ResidentTrackingController extends Controller
 
         // Load client data.
         $clientIds = $alerts->getCollection()->pluck('client_id')->unique()->filter();
-        $clients = Client::whereIn('id', $clientIds)->get()->keyBy('id');
+        $clients = Client::query()
+            ->where('organization_id', $this->organizationId($request->user()))
+            ->whereIn('id', $clientIds)
+            ->get()
+            ->keyBy('id');
 
         // Canonical tracking devices assigned to these clients for last-known location.
         $devicesByClient = Device::query()
+            ->where('tenant_id', $this->organizationId($request->user()))
             ->where('domain', 'tracking')
             ->whereHas('assignments', function ($q) use ($clientIds) {
                 $q->active()
@@ -300,6 +371,7 @@ class ResidentTrackingController extends Controller
         $alertBase = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id');
+        $alertBase->whereIn('client_id', $consentedClientIds);
 
         return [
             'alerts' => [
@@ -312,7 +384,7 @@ class ResidentTrackingController extends Controller
                 ],
             ],
             'stats' => [
-                'active_alerts' => (clone $alertBase)->whereNotIn('status', ['closed', 'resolved'])->count(),
+                'active_alerts' => (clone $alertBase)->actionable()->count(),
                 'resolved_today' => (clone $alertBase)->where('status', 'resolved')->whereDate('resolved_at', today())->count(),
                 'total_this_week' => (clone $alertBase)->where('triggered_at', '>=', now()->startOfWeek())->count(),
             ],
@@ -335,22 +407,29 @@ class ResidentTrackingController extends Controller
     /**
      * Assign-tracker modal payload — ported from the retired assign page.
      */
-    private function assignPayload($user): array
+    private function assignPayload(User $user): array
     {
         $authorizedClientIds = $this->getAuthorizedClientIds($user);
+        $organizationId = $this->organizationId($user);
+        $accessibleAssetIds = $this->accessibleAssetIds($user);
+        $canManageTenant = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
 
         // Clients already tracked (have an active tracking device assignment).
         $trackedClientIds = DeviceAssignment::query()
             ->active()
             ->where('assignable_type', 'client')
-            ->whereHas('device', fn ($q) => $q->where('domain', 'tracking'))
+            ->whereIn('assignable_id', $authorizedClientIds)
+            ->whereHas('device', fn ($q) => $q
+                ->where('tenant_id', $organizationId)
+                ->where('domain', 'tracking'))
             ->pluck('assignable_id')
             ->toArray();
 
-        $clientQuery = Client::where('status', 'active')->orderBy('first_name');
-        if ($authorizedClientIds !== null) {
-            $clientQuery->whereIn('id', $authorizedClientIds);
-        }
+        $clientQuery = Client::query()
+            ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->whereIn('id', $authorizedClientIds)
+            ->orderBy('first_name');
         $availableClients = $clientQuery->get()->map(fn ($c) => [
             'id' => $c->id,
             'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
@@ -359,10 +438,18 @@ class ResidentTrackingController extends Controller
         ]);
 
         // Available trackers (tracking devices not assigned to anyone).
-        $availableTrackers = Device::query()
+        $availableTrackerQuery = Device::query()
+            ->where('tenant_id', $organizationId)
             ->where('domain', 'tracking')
             ->whereNotIn('status', ['decommissioned', 'lost'])
             ->whereDoesntHave('assignments', fn ($q) => $q->active())
+            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
+                ->whereNotIn('asset_id', $accessibleAssetIds));
+        if (! $canManageTenant) {
+            $availableTrackerQuery->whereHas('activeAssetLinks', fn ($links) => $links
+                ->whereIn('asset_id', $accessibleAssetIds));
+        }
+        $availableTrackers = $availableTrackerQuery
             ->orderBy('name')
             ->get()
             ->map(fn (Device $d) => [
@@ -377,15 +464,33 @@ class ResidentTrackingController extends Controller
             ]);
 
         // Currently assigned trackers.
-        $assignedDevices = Device::query()
+        $assignedDeviceQuery = Device::query()
+            ->where('tenant_id', $organizationId)
             ->where('domain', 'tracking')
-            ->whereHas('assignments', fn ($q) => $q->active()->where('assignable_type', 'client'))
-            ->with(['assignments' => fn ($q) => $q->active()->where('assignable_type', 'client')])
+            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
+                ->whereNotIn('asset_id', $accessibleAssetIds))
+            ->whereHas('assignments', fn ($q) => $q
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                ->whereIn('assignable_id', $authorizedClientIds));
+        $assignedDeviceQuery->with(['assignments' => fn ($q) => $q
+            ->active()
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->whereIn('assignable_id', $authorizedClientIds)]);
+        $assignedDevices = $assignedDeviceQuery
             ->orderBy('name')
             ->get();
 
         $assignedClientIds = $assignedDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->all();
-        $assignedClients = Client::with('site:id,name')->whereIn('id', $assignedClientIds)->get()->keyBy('id');
+        $assignedClients = Client::with([
+            'site' => fn ($query) => $query
+                ->where('tenant_id', $organizationId)
+                ->select(['id', 'name']),
+        ])
+            ->where('organization_id', $organizationId)
+            ->whereIn('id', $assignedClientIds)
+            ->get()
+            ->keyBy('id');
 
         $assignedTrackers = $assignedDevices->map(function (Device $d) use ($assignedClients) {
             $assignment = $d->assignments->first();
@@ -425,24 +530,44 @@ class ResidentTrackingController extends Controller
             'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
         ]);
 
-        $device = Device::findOrFail($data['tracker_id']);
-
-        $consentId = $data['consent_id']
-            ?? ClientConsent::query()
-                ->where('client_id', $data['client_id'])
-                ->where('status', 'given')
-                ->whereNull('withdrawn_at')
-                ->latest('given_at')
-                ->value('id');
+        $user = $request->user();
+        $organizationId = $this->organizationId($user);
+        abort_unless($organizationId !== null, 403);
 
         try {
-            $this->assignmentService->assign(
-                device: $device,
-                assignableType: 'client',
-                assignableId: $data['client_id'],
-                assignedByUserId: $request->user()->id,
-                consentId: $consentId,
-            );
+            DB::transaction(function () use ($data, $user, $organizationId): void {
+                $client = Client::query()
+                    ->where('organization_id', $organizationId)
+                    ->whereIn('id', $this->getAuthorizedClientIds($user))
+                    ->lockForUpdate()
+                    ->find($data['client_id']);
+                abort_unless($client, 403);
+
+                $device = Device::query()
+                    ->where('tenant_id', $organizationId)
+                    ->where('domain', 'tracking')
+                    ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
+                        ->whereNotIn('asset_id', $this->accessibleAssetIds($user)))
+                    ->lockForUpdate()
+                    ->find($data['tracker_id']);
+                abort_unless($device, 403);
+
+                if ($device->assignments()->active()->lockForUpdate()->first()) {
+                    throw ValidationException::withMessages([
+                        'tracker_id' => 'This tracker is already assigned. Unassign it before assigning it to another resident.',
+                    ]);
+                }
+
+                $consentId = $this->resolveTrackingConsentId($client, $data['consent_id'] ?? null);
+
+                $this->assignmentService->assign(
+                    device: $device,
+                    assignableType: DeviceAssignment::TARGET_CLIENT,
+                    assignableId: $client->id,
+                    assignedByUserId: $user->id,
+                    consentId: $consentId,
+                );
+            });
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['tracker_id' => $e->getMessage()]);
         }
@@ -451,9 +576,36 @@ class ResidentTrackingController extends Controller
             ->with('success', 'Tracker assigned to resident.');
     }
 
-    public function unassign(Device $device)
+    public function unassign(Request $request, Device $device)
     {
-        $this->assignmentService->release($device, auth()->id());
+        $user = $request->user();
+        $organizationId = $this->organizationId($user);
+        abort_unless($organizationId !== null, 403);
+
+        DB::transaction(function () use ($device, $user, $organizationId): void {
+            $lockedDevice = Device::query()
+                ->where('tenant_id', $organizationId)
+                ->lockForUpdate()
+                ->find($device->id);
+            abort_unless($lockedDevice, 403);
+
+            $activeClientAssignment = $lockedDevice->assignments()
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $activeClientAssignment
+                    && in_array(
+                        (int) $activeClientAssignment->assignable_id,
+                        $this->getAuthorizedClientIds($user),
+                        true,
+                    ),
+                403,
+            );
+
+            $this->assignmentService->release($lockedDevice, $user->id);
+        });
 
         return redirect()->route('fleet-assets.resident-tracking.index', ['new' => 1])
             ->with('success', 'Tracker unassigned from resident.');
@@ -461,11 +613,14 @@ class ResidentTrackingController extends Controller
 
     public function history(Request $request, Client $client)
     {
-        $tenantId = $client->tenant_id ?? 1;
+        $user = $request->user();
+        $this->assertCanAccessClient($user, $client);
+        $this->assertHasActiveTrackingConsent($client);
+        $organizationId = $this->organizationId($user);
 
         // Canonical device lookup.
         $device = $this->registry
-            ->forClient($tenantId, $client->id)
+            ->forClient($organizationId, $client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -497,7 +652,18 @@ class ResidentTrackingController extends Controller
             ->unique()
             ->values();
 
-        $resident = $device ? $this->buildResidentPayload($device, $client->loadMissing(['site:id,name', 'houseGeofence']), []) : null;
+        $client->loadMissing(['site' => fn ($query) => $query
+            ->where('tenant_id', $organizationId)
+            ->select(['id', 'name'])]);
+        $houseGeofence = $client->house_geofence_id
+            ? $this->applyGeofenceScope(
+                AssetGeofence::query()->whereKey($client->house_geofence_id),
+                $request->user(),
+            )->first()
+            : null;
+        $client->setRelation('houseGeofence', $houseGeofence);
+
+        $resident = $device ? $this->buildResidentPayload($device, $client, []) : null;
 
         return Inertia::render('fleet-assets/resident-tracking/history', [
             'client' => [
@@ -549,12 +715,13 @@ class ResidentTrackingController extends Controller
 
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
     {
-        $authorizedClientIds = $this->getAuthorizedClientIds($request->user());
-        abort_unless($authorizedClientIds === null || in_array($client->id, $authorizedClientIds, true), 403);
+        $user = $request->user();
+        $this->assertCanAccessClient($user, $client);
+        $this->assertHasActiveTrackingConsent($client);
+        $organizationId = $this->organizationId($user);
 
-        $tenantId = $client->tenant_id ?? 1;
         $device = $this->registry
-            ->forClient($tenantId, $client->id)
+            ->forClient($organizationId, $client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -564,80 +731,274 @@ class ResidentTrackingController extends Controller
             ]);
         }
 
-        $locateNow->queueForDevice($device, $request->user());
+        $locateNow->queueForDevice($device, $user);
 
         return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
     }
 
-    public function acknowledgePanic(Request $request, Client $client)
+    public function acknowledgePanic(
+        Request $request,
+        Client $client,
+        ControlRoomAlertLifecycleService $lifecycle,
+    )
     {
-        $authorizedClientIds = $this->getAuthorizedClientIds($request->user());
-        abort_unless($authorizedClientIds === null || in_array($client->id, $authorizedClientIds, true), 403);
+        $user = $request->user();
+        $this->assertCanAccessClient($user, $client);
+        $this->assertHasActiveTrackingConsent($client);
 
-        $this->acknowledgePanicForClient($client, $request->user()?->id);
+        $this->acknowledgePanicForClient($client, $user, $lifecycle);
 
         return back()->with('success', 'Panic acknowledged.');
     }
 
-    private function acknowledgePanicForClient(Client $client, ?int $userId): void
-    {
-        $tenantId = $client->tenant_id ?? 1;
-        $device = $this->registry
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+    private function acknowledgePanicForClient(
+        Client $client,
+        User $actor,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ): void {
+        DB::transaction(function () use ($client, $actor, $lifecycle): void {
+            $organizationId = $this->organizationId($actor);
+            abort_unless($organizationId !== null, 403);
+            $device = $this->registry
+                ->forClient($organizationId, $client->id)
+                ->where('domain', 'tracking')
+                ->first();
 
-        if ($device) {
-            $meta = $device->meta ?? [];
-            $meta['panic_active'] = false;
-            $meta['panic_acknowledged_at'] = now()->toISOString();
-            $meta['panic_acknowledged_by'] = $userId;
-            $device->forceFill(['meta' => $meta])->save();
-        }
+            if ($device) {
+                $meta = $device->meta ?? [];
+                $meta['panic_active'] = false;
+                $meta['panic_acknowledged_at'] = now()->toISOString();
+                $meta['panic_acknowledged_by'] = $actor->id;
+                $device->forceFill(['meta' => $meta])->save();
+            }
 
-        if (Schema::hasTable('control_room_alerts')) {
-            ControlRoomAlert::query()
-                ->where('client_id', $client->id)
-                ->whereIn('source', ['tracker', 'resident_tracker'])
-                ->whereIn('status', ['open', 'triaging'])
-                ->update([
-                    'status' => 'ack',
-                    'acknowledged_at' => now(),
-                    'acknowledged_by_user_id' => $userId,
-                ]);
-        }
+            if (Schema::hasTable('control_room_alerts')) {
+                ControlRoomAlert::query()
+                    ->where('client_id', $client->id)
+                    ->whereIn('source', ['tracker', 'resident_tracker'])
+                    ->where('status', ControlRoomAlert::STATUS_OPEN)
+                    ->get()
+                    ->each(fn (ControlRoomAlert $alert) => $lifecycle->acknowledge($alert, $actor));
+            }
+        });
     }
 
-    private function getAuthorizedClientIds($user): ?array
+    private function applyGeofenceScope(Builder $query, User $user): Builder
     {
-        if (
-            in_array($user->role, ['admin', 'super-admin', 'manager'], true)
-            || $user->canDo('clients.viewAny')
-            || $user->canDo('fleet.viewAny')
-            || $user->canDo('assets.viewAny')
-        ) {
-            return null;
+        $siteIds = $this->accessibleSiteIds($user);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
         }
 
-        $clientIds = [];
+        $assetIds = $this->accessibleAssetIds($user);
 
-        if (Schema::hasTable('client_user')) {
-            $pivotIds = DB::table('client_user')
-                ->where('user_id', $user->id)
-                ->pluck('client_id')
-                ->toArray();
-            $clientIds = array_merge($clientIds, $pivotIds);
+        return $query->where(function (Builder $scope) use ($siteIds, $assetIds) {
+            $scope->whereIn('site_id', $siteIds)
+                ->orWhere(function (Builder $fallback) use ($assetIds) {
+                    $fallback->whereNull('site_id')
+                        ->where(function (Builder $assets) use ($assetIds) {
+                            $assets->whereHas('asset', fn (Builder $asset) => $asset
+                                ->whereIn('assets.id', $assetIds))
+                                ->orWhereHas('assignedAssets', fn (Builder $asset) => $asset
+                                    ->whereIn('assets.id', $assetIds));
+                        });
+                });
+        });
+    }
+
+    /**
+     * @param  array<int, int>  $authorizedClientIds
+     */
+    private function applyOutingScope(
+        Builder $query,
+        User $user,
+        array $authorizedClientIds,
+    ): Builder
+    {
+        $organizationId = $this->organizationId($user);
+        $assetIds = $this->accessibleAssetIds($user);
+        $clientIds = $authorizedClientIds;
+        if ($assetIds === [] && $clientIds === []) {
+            return $query->whereRaw('1 = 0');
         }
 
-        if ($user->site_id) {
-            $siteClientIds = Client::where('site_id', $user->site_id)
-                ->where('status', 'active')
-                ->pluck('id')
-                ->toArray();
-            $clientIds = array_merge($clientIds, $siteClientIds);
+        return $query
+            ->where(function (Builder $tenant) use ($organizationId): void {
+                $tenant->where('tenant_id', $organizationId)
+                    ->orWhereNull('tenant_id');
+            })
+            ->whereIn('asset_id', $assetIds)
+            ->whereHas('clients', fn (Builder $clients) => $clients
+                ->whereIn('clients.id', $clientIds)
+                ->where('clients.organization_id', $organizationId));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function accessibleAssetIds(User $user): array
+    {
+        $siteIds = $this->accessibleSiteIds($user);
+        if ($siteIds === []) {
+            return [];
         }
 
-        return array_unique($clientIds);
+        $hasHomeSite = Schema::hasColumn('assets', 'home_site_id');
+
+        return Asset::query()
+            ->where(function (Builder $sites) use ($siteIds, $hasHomeSite) {
+                $sites->whereIn('site_id', $siteIds);
+                if ($hasHomeSite) {
+                    $sites->orWhere(function (Builder $homeSite) use ($siteIds): void {
+                        $homeSite->whereNull('site_id')
+                            ->whereIn('home_site_id', $siteIds);
+                    });
+                }
+            })
+            ->pluck('id')
+            ->map(fn ($assetId) => (int) $assetId)
+            ->all();
+    }
+
+    private function getAuthorizedClientIds(User $user): array
+    {
+        $organizationId = $this->organizationId($user);
+        if ($organizationId === null) {
+            return [];
+        }
+
+        $tenantSiteIds = $this->tenantSiteIds($user);
+        if ($tenantSiteIds === []) {
+            return [];
+        }
+
+        $query = Client::query()
+            ->where('organization_id', $organizationId);
+
+        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
+            $query->where(function (Builder $sites) use ($tenantSiteIds): void {
+                $sites->whereIn('site_id', $tenantSiteIds)
+                    ->orWhereNull('site_id');
+            });
+        } else {
+            $query->whereIn('site_id', $this->accessibleSiteIds($user));
+        }
+
+        return $query
+            ->pluck('id')
+            ->map(fn ($clientId) => (int) $clientId)
+            ->all();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function tenantSiteIds(User $user): array
+    {
+        $organizationId = $this->organizationId($user);
+        if ($organizationId === null) {
+            return [];
+        }
+
+        return Site::query()
+            ->where('tenant_id', $organizationId)
+            ->pluck('id')
+            ->map(fn ($siteId) => (int) $siteId)
+            ->all();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function accessibleSiteIds(User $user): array
+    {
+        $tenantSiteIds = $this->tenantSiteIds($user);
+        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
+            return $tenantSiteIds;
+        }
+
+        return array_values(array_intersect(
+            $this->siteAccess->accessibleSiteIds($user),
+            $tenantSiteIds,
+        ));
+    }
+
+    private function organizationId(?User $user): ?int
+    {
+        $organizationId = $user?->organization_id;
+
+        return is_numeric($organizationId) && (int) $organizationId > 0
+            ? (int) $organizationId
+            : null;
+    }
+
+    private function assertCanAccessClient(User $user, Client $client): void
+    {
+        $organizationId = $this->organizationId($user);
+        abort_unless(
+            $organizationId !== null
+                && (int) $client->organization_id === $organizationId
+                && in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
+            403,
+        );
+    }
+
+    private function assertHasActiveTrackingConsent(Client $client): void
+    {
+        abort_unless($this->validTrackingConsentQuery($client)->exists(), 403);
+    }
+
+    private function resolveTrackingConsentId(Client $client, ?int $requestedConsentId): int
+    {
+        $candidate = $requestedConsentId
+            ? ClientConsent::query()->find($requestedConsentId)
+            : ConsentValidationService::latestValidTrackingConsentForClient($client);
+
+        $consent = $candidate
+            ? $this->validTrackingConsentQuery($client)
+                ->whereKey($candidate->id)
+                ->lockForUpdate()
+                ->first()
+            : null;
+
+        if (! $consent) {
+            throw ValidationException::withMessages([
+                'consent_id' => $requestedConsentId
+                    ? 'The selected tracking consent is not active for this resident.'
+                    : 'Assigning a resident tracker requires active location tracking consent.',
+            ]);
+        }
+
+        return (int) $consent->id;
+    }
+
+    private function validTrackingConsentQuery(Client $client): Builder
+    {
+        return $this->trackingConsentQuery()->where('client_id', $client->id);
+    }
+
+    private function trackingConsentQuery(): Builder
+    {
+        return ClientConsent::query()
+            ->where('status', 'given')
+            ->whereNull('withdrawn_at')
+            ->whereNull('superseded_by_consent_id')
+            ->where(function (Builder $expiry): void {
+                $expiry->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->whereHas('consentType', function (Builder $type): void {
+                $type->where('active', true)
+                    ->where(function (Builder $tracking): void {
+                        $tracking->whereIn('name', [
+                            'Fleet Tracking',
+                            'Personal Tracker (Wandering Risk)',
+                            'Asset Location Tracking (Safety)',
+                        ])->orWhere('name', 'like', '%Tracking%')
+                            ->orWhere('name', 'like', '%Tracker%')
+                            ->orWhere('name', 'like', '%Location%');
+                    });
+            });
     }
 
     private function latestLocateCommandStatus(Device $device): ?string

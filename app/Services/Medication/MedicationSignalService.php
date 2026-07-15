@@ -3,12 +3,15 @@
 namespace App\Services\Medication;
 
 use App\Enums\AlertSeverity;
-use App\Models\ControlRoomAlert;
+use App\Exceptions\MedicationSignalDeliveryException;
+use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
-use App\Models\ControlRoom\SignalType;
-use App\Services\AuditLogger;
+use App\Models\ControlRoomAlert;
+use App\Models\MedicationError;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -27,17 +30,29 @@ class MedicationSignalService
 {
     // --- Signal type codes ---
     public const TYPE_OVERDUE = 'medication_overdue';
+
     public const TYPE_MISSED_DOSE = 'medication_missed_dose';
+
     public const TYPE_LATE_DOSE = 'medication_late_dose';
+
     public const TYPE_PRN_OVER_LIMIT = 'medication_prn_over_limit';
+
     public const TYPE_CONTROLLED_DISCREPANCY = 'medication_controlled_discrepancy';
+
     public const TYPE_REFUSED_DOSE = 'medication_refused_dose';
+
     public const TYPE_REFUSAL_ESCALATION = 'medication_refusal_escalation';
+
     public const TYPE_UNSAFE_CORRECTION = 'medication_unsafe_correction';
+
     public const TYPE_CONTROLLED_LOSS = 'medication_controlled_loss';
+
     public const TYPE_TRANSIT_EXCEPTION = 'medication_transit_exception';
+
     public const TYPE_EXPIRED = 'medication_expired';
+
     public const TYPE_STOCK_OUT = 'medication_stock_out';
+
     public const TYPE_ERROR = 'medication_error';
 
     // --- Canonical severity mapping ---
@@ -62,16 +77,19 @@ class MedicationSignalService
 
     public function __construct(
         protected SignalProcessingService $signalProcessor,
-    ) {}
+        protected ?ControlRoomAlertLifecycleService $lifecycle = null,
+    ) {
+        $this->lifecycle ??= app(ControlRoomAlertLifecycleService::class);
+    }
 
     /**
      * Emit a medication signal into the Control Room pipeline.
      *
-     * @param string $signalType One of the TYPE_* constants
-     * @param int $clientId Client affected
-     * @param string $severity Canonical severity (low/medium/high/critical)
-     * @param string $message Operator-facing summary
-     * @param array $context Additional medication context for traceability
+     * @param  string  $signalType  One of the TYPE_* constants
+     * @param  int  $clientId  Client affected
+     * @param  string  $severity  Canonical severity (low/medium/high/critical)
+     * @param  string  $message  Operator-facing summary
+     * @param  array  $context  Additional medication context for traceability
      */
     public function emit(
         string $signalType,
@@ -79,8 +97,12 @@ class MedicationSignalService
         string $severity,
         string $message,
         array $context = [],
+        bool $requiredDelivery = false,
     ): void {
-        $source = $this->getSignalSource();
+        $signal = null;
+        $hasIncidentClaim = $this->hasIncidentClaim($context);
+        $mustSucceed = $hasIncidentClaim || $requiredDelivery;
+        $incidentIdentity = $context['incident_id'] ?? null;
 
         $idempotencyKey = $this->buildIdempotencyKey(
             $signalType,
@@ -88,44 +110,127 @@ class MedicationSignalService
             $context,
         );
 
-        $signalData = [
-            'signal_source_id' => $source?->id,
-            'signal_type_code' => $signalType,
-            'idempotency_key' => $idempotencyKey,
-            'site_id' => $context['site_id'] ?? null,
-            'client_id' => $clientId,
-            'severity_hint' => $severity,
-            'occurred_at' => $context['occurred_at'] ?? now(),
-            'payload' => [],
-            'normalized_data' => array_merge([
-                'title' => $message,
-                'description' => $message,
-                'source_module' => 'medication',
-                'signal_type' => $signalType,
-                'client_id' => $clientId,
-            ], $context),
-        ];
-
         try {
-            $signal = $this->signalProcessor->ingest($signalData);
-            $alert = $this->signalProcessor->process($signal);
+            $operation = function () use (
+                $signalType,
+                $clientId,
+                $severity,
+                $message,
+                $context,
+                $idempotencyKey,
+                $hasIncidentClaim,
+                $mustSucceed,
+                $incidentIdentity,
+                &$signal,
+            ): void {
+                $source = $this->getSignalSource();
 
-            if ($alert) {
-                Log::info('MedicationSignalService: alert created', [
-                    'signal_type' => $signalType,
-                    'alert_id' => $alert->id,
-                    'severity' => $severity,
+                if ($mustSucceed && $source === null) {
+                    throw new \RuntimeException(
+                        $hasIncidentClaim
+                            ? 'Medication signal source is unavailable for an incident journey.'
+                            : 'Medication signal source is unavailable for required operational delivery.',
+                    );
+                }
+
+                $signalData = [
+                    'signal_source_id' => $source?->id,
+                    'signal_type_code' => $signalType,
+                    'idempotency_key' => $idempotencyKey,
+                    'site_id' => $context['site_id'] ?? null,
                     'client_id' => $clientId,
-                ]);
+                    'severity_hint' => $severity,
+                    'occurred_at' => $context['occurred_at'] ?? now(),
+                    'payload' => [],
+                    'normalized_data' => array_merge([
+                        'title' => $message,
+                        'description' => $message,
+                        'source_module' => 'medication',
+                        'signal_type' => $signalType,
+                        'client_id' => $clientId,
+                    ], $context),
+                ];
+
+                $signal = $this->signalProcessor->ingest($signalData);
+                $alert = $this->signalProcessor->process($signal);
+
+                if ($alert === null && $mustSucceed) {
+                    $signal->refresh();
+
+                    throw new MedicationSignalDeliveryException(
+                        $signal->id === null ? null : (int) $signal->id,
+                        $signalType,
+                        (string) ($signal->status ?: 'not_delivered'),
+                    );
+                }
+
+                if ($alert !== null && $hasIncidentClaim) {
+                    $this->enrichSignalIncidentEvidence($signal, (int) $incidentIdentity, $alert);
+                }
+
+                if ($alert) {
+                    Log::info('MedicationSignalService: alert created', [
+                        'signal_type' => $signalType,
+                        'alert_id' => $alert->id,
+                        'severity' => $severity,
+                        'client_id' => $clientId,
+                    ]);
+                }
+            };
+
+            if ($mustSucceed) {
+                DB::transaction($operation);
+            } else {
+                $operation();
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable $exception) {
+            if ($mustSucceed) {
+                $this->signalSource = null;
+                if ($hasIncidentClaim) {
+                    Log::error('incident_journey_repair_required', [
+                        'incident_id' => $this->incidentIdentityForLog($incidentIdentity),
+                        'incident_id_type' => get_debug_type($incidentIdentity),
+                        'signal_id' => $signal?->id,
+                        'signal_type' => $signalType,
+                        'signal_client_id' => $clientId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                } else {
+                    Log::error('medication_operational_alert_delivery_failed', [
+                        'medication_error_id' => $context['medication_error_id'] ?? null,
+                        'signal_id' => $signal?->id,
+                        'signal_type' => $signalType,
+                        'signal_client_id' => $clientId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+
+                throw $exception;
+            }
+
             Log::error('MedicationSignalService: signal emission failed', [
                 'signal_type' => $signalType,
                 'client_id' => $clientId,
                 'severity' => $severity,
-                'error' => $e->getMessage(),
+                'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function hasIncidentClaim(array $context): bool
+    {
+        return array_key_exists('incident_id', $context)
+            && $context['incident_id'] !== null
+            && $context['incident_id'] !== '';
+    }
+
+    private function incidentIdentityForLog(mixed $identity): int|string|float|bool|null
+    {
+        return is_scalar($identity) || $identity === null
+            ? $identity
+            : '['.get_debug_type($identity).']';
     }
 
     /**
@@ -138,9 +243,9 @@ class MedicationSignalService
      * Near-miss, minor, and moderate errors are tracked in the MedicationError
      * record and investigation workflow but do NOT enter Control Room.
      *
-     * @param \App\Models\MedicationError $error The medication error record
+     * @param  MedicationError  $error  The medication error record
      */
-    public function emitError(\App\Models\MedicationError $error): void
+    public function emitError(MedicationError $error): void
     {
         // Only major/critical medication errors are operational alerts
         if (! in_array($error->severity, ['major', 'critical'], true)) {
@@ -159,9 +264,10 @@ class MedicationSignalService
             self::TYPE_ERROR,
             $error->client_id,
             $severityMap[$error->severity],
-            'Medication error: ' . str_replace('_', ' ', $error->error_type)
-                . ($medication ? " — {$medication->name}" : ''),
+            'Medication error: '.str_replace('_', ' ', $error->error_type)
+                .($medication ? " — {$medication->name}" : ''),
             [
+                'incident_id' => $error->client_incident_id,
                 'medication_error_id' => $error->id,
                 'client_medication_id' => $error->client_medication_id,
                 'medication_name' => $medication?->name,
@@ -175,7 +281,49 @@ class MedicationSignalService
                 'controlled_drug' => $medication?->controlled_drug ?? false,
                 'high_risk' => $medication?->high_risk ?? false,
             ],
+            requiredDelivery: true,
         );
+    }
+
+    public function attachExistingErrorSignalToIncident(MedicationError $error): ?ControlRoomAlert
+    {
+        if ($error->client_incident_id === null) {
+            return null;
+        }
+
+        $signal = Signal::query()
+            ->where('idempotency_key', $this->buildIdempotencyKey(
+                self::TYPE_ERROR,
+                (int) $error->client_id,
+                [
+                    'medication_error_id' => $error->id,
+                    'client_medication_id' => $error->client_medication_id,
+                ],
+            ))
+            ->lockForUpdate()
+            ->first();
+        $alertId = $signal?->alert_id ?? $signal?->correlated_alert_id;
+
+        if ($signal === null || $alertId === null) {
+            return null;
+        }
+
+        $alert = ControlRoomAlert::query()
+            ->whereKey($alertId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($alert === null) {
+            return null;
+        }
+
+        $this->enrichSignalIncidentEvidence(
+            $signal,
+            (int) $error->client_incident_id,
+            $alert,
+        );
+
+        return $alert->fresh();
     }
 
     /**
@@ -192,7 +340,7 @@ class MedicationSignalService
         $occurredAt = isset($context['occurred_at'])
             ? Carbon::parse($context['occurred_at'])
             : now();
-        $window = $occurredAt->format('Y-m-d H:') . (intdiv((int) $occurredAt->format('i'), 30) * 30);
+        $window = $occurredAt->format('Y-m-d H:').(intdiv((int) $occurredAt->format('i'), 30) * 30);
         $medicationId = $context['client_medication_id'] ?? null;
         [$entityType, $entityId] = $this->relatedEntityIdentity($context);
 
@@ -203,8 +351,11 @@ class MedicationSignalService
             $medicationId ?? 'all',
             $entityType ?? 'check',
             $entityId ?? 'check',
-            $window,
         ];
+
+        if ($entityType === null) {
+            $parts[] = $window;
+        }
 
         return hash('sha256', implode('|', $parts));
     }
@@ -213,13 +364,14 @@ class MedicationSignalService
     {
         foreach ([
             'medication_error_id' => 'medication_error',
-            'loss_report_id' => 'loss_report',
-            'transport_log_id' => 'transport_log',
             'discrepancy_id' => 'discrepancy',
+            'loss_report_id' => 'loss_report',
             'followup_id' => 'followup',
             'correction_id' => 'correction',
             'administration_id' => 'administration',
-            'client_medication_id' => 'medication',
+            'transport_log_id' => 'transport_log',
+            'prn_attempt_id' => 'prn_attempt',
+            'incident_id' => 'client_incident',
         ] as $key => $type) {
             if (filled($context[$key] ?? null)) {
                 return [$type, $context[$key]];
@@ -227,6 +379,23 @@ class MedicationSignalService
         }
 
         return [null, null];
+    }
+
+    private function enrichSignalIncidentEvidence(
+        Signal $signal,
+        int $incidentId,
+        ?ControlRoomAlert $alert = null,
+    ): void {
+        $signal->forceFill([
+            'normalized_data' => array_replace(
+                (array) $signal->normalized_data,
+                ['incident_id' => $incidentId],
+            ),
+        ])->saveQuietly();
+
+        if ($alert !== null) {
+            $signal->markProcessed($alert, 'Medication signal enriched with incident evidence');
+        }
     }
 
     /**
@@ -268,7 +437,7 @@ class MedicationSignalService
         $query = ControlRoomAlert::query()
             ->with('sla')
             ->unresolved()
-            ->where('source', 'medication')
+            ->whereIn('source', ['medication', 'incident'])
             ->whereRaw(
                 "JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?",
                 [$signalType]
@@ -286,40 +455,27 @@ class MedicationSignalService
         }
 
         $alerts = $query->get();
-        $resolvedAt = now();
-        $resolvedBy = $metadata['resolved_by_user_id'] ?? null;
-        $resolutionMetadata = $metadata;
-        unset($resolutionMetadata['resolved_by_user_id']);
+        $resolved = 0;
 
         foreach ($alerts as $alert) {
-            $context = $alert->context ?? [];
-            $resolution = array_merge([
-                'resolved_at' => $resolvedAt->toISOString(),
-                'reason' => $reason,
-                'source' => $resolutionSource,
-            ], $resolutionMetadata);
-            $history = $context['resolution_history'] ?? [];
-            $history[] = $resolution;
-
-            $alert->update([
-                'status' => ControlRoomAlert::STATUS_RESOLVED,
-                'resolved_at' => $resolvedAt,
-                'resolved_by_user_id' => $resolvedBy,
-                'notes' => $reason,
-                'context' => array_merge($context, [
-                    'resolution' => $resolution,
-                    'resolution_history' => $history,
-                ]),
-            ]);
-
-            $alert->sla?->recordResolution();
-
-            AuditLogger::log('controlRoom.alert.resolve', $alert, [
-                'source' => 'medication_signal_pipeline',
-                'resolution_source' => $resolutionSource,
-            ]);
+            try {
+                $this->lifecycle->resolveAutomatically(
+                    $alert,
+                    $reason,
+                    'medication_workflow',
+                    $resolutionSource,
+                    $metadata,
+                );
+                $resolved++;
+            } catch (\InvalidArgumentException $e) {
+                Log::warning('MedicationSignalService: alert resolution was gated', [
+                    'alert_id' => $alert->id,
+                    'resolution_source' => $resolutionSource,
+                    'reason' => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $alerts->count();
+        return $resolved;
     }
 }

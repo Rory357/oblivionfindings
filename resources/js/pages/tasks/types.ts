@@ -1,6 +1,7 @@
 /* Shared types + helpers for the All Tasks queue (page + drawer).
  * Mirrors app/Services/Tasks/TaskItem::toArray(). */
 import type { StatusVariant } from '@/components/ui/status-badge';
+import { formatDate } from '@/lib/datetime';
 
 export type NamedRef = { id: number; name: string };
 
@@ -28,6 +29,19 @@ export type TaskBucket = 'open' | 'in_progress' | 'done';
 
 export type TaskSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
+export interface IncidentJourney {
+    key: string;
+    source: string;
+    occurred_at: string | null;
+    references: {
+        control_room: string | null;
+        incident: string | null;
+        health_safety: string | null;
+    };
+    person: NamedRef | null;
+    site: NamedRef | null;
+}
+
 export interface TaskItem {
     id: string;
     source: string;
@@ -45,6 +59,9 @@ export interface TaskItem {
     link: string | null;
     type: string | null;
     description: string | null;
+    journey?: IncidentJourney | null;
+    sourceContext?: string | null;
+    actionLabel?: string;
     overdue: boolean;
 }
 
@@ -64,17 +81,24 @@ export function humanise(raw: string): string {
 /** Relative due label + tone class. Overdue rows read critical. */
 export function dueInfo(item: TaskItem): { label: string; className: string } {
     if (!item.dueAt) return { label: '—', className: 'text-muted-foreground' };
-    const days = Math.ceil((new Date(item.dueAt).getTime() - Date.now()) / 86_400_000);
+    const days = Math.ceil(
+        (new Date(item.dueAt).getTime() - Date.now()) / 86_400_000,
+    );
     if (item.overdue) {
         return {
             label: days >= 0 ? 'Overdue' : `${Math.abs(days)}d overdue`,
             className: 'font-semibold text-status-critical',
         };
     }
-    if (days <= 0) return { label: 'Due today', className: 'font-semibold text-status-warning' };
-    if (days <= 7) return { label: `Due in ${days}d`, className: 'text-status-warning' };
+    if (days <= 0)
+        return {
+            label: 'Due today',
+            className: 'font-semibold text-status-warning',
+        };
+    if (days <= 7)
+        return { label: `Due in ${days}d`, className: 'text-status-warning' };
     return {
-        label: new Date(item.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }),
+        label: formatDate(item.dueAt),
         className: 'text-muted-foreground',
     };
 }

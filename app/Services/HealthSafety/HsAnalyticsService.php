@@ -17,6 +17,7 @@ use App\Models\StaffTrainingRecord;
 use App\Models\WorkplaceInjury;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -51,7 +52,7 @@ class HsAnalyticsService
      * @param  string  $lens  governance|manager|frontline
      * @return array<string,mixed>
      */
-    public function build(?int $siteId, CarbonInterface $from, CarbonInterface $to, string $lens): array
+    public function build(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, string $lens): array
     {
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
@@ -82,7 +83,7 @@ class HsAnalyticsService
                 'by_outcome' => $this->firstAidByOutcome($siteId, $from, $to),
             ],
             'hazard_data' => $this->hazardsByRisk($siteId),
-            'site_comparison' => $this->siteComparison($from, $to),
+            'site_comparison' => $this->siteComparison($from, $to, $siteId),
             'trends' => $trends,
             'hero_stats' => $heroStats,
             'scorecard' => $scorecard,
@@ -102,11 +103,14 @@ class HsAnalyticsService
      * site-scoped via the substance's storage locations. Single source shared
      * with the register hero and the dashboard expiring feed.
      */
-    private function sdsExpiringCount(?int $siteId): int
+    private function sdsExpiringCount(int|array|null $siteId): int
     {
         return SafetyDataSheet::query()
             ->expiringWithin(30)
-            ->when($siteId, fn ($q) => $q->whereHas('hazardousSubstance.storageLocations', fn ($s) => $s->where('site_id', $siteId)))
+            ->when($siteId !== null, fn ($q) => $q->whereHas(
+                'hazardousSubstance.storageLocations',
+                fn ($locationQuery) => $this->applySiteScope($locationQuery, $siteId),
+            ))
             ->count();
     }
 
@@ -117,17 +121,17 @@ class HsAnalyticsService
      * @param  Collection<string,array{month:string,ltifr:float|null,trifr:float|null}>  $freq
      * @return array<int,array<string,mixed>>
      */
-    private function buildTrends(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $months, Collection $freq): array
+    private function buildTrends(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, array $months, Collection $freq): array
     {
         $incidents = $this->incidentCountsByMonth($siteId, $from, $to);
         $hazOpened = $this->hazardOpenedByMonth($siteId, $from, $to);
         $hazClosed = $this->hazardClosedByMonth($siteId, $from, $to);
         $runningOpen = $this->hazardRunningOpen($siteId, $from, $months, $hazOpened, $hazClosed);
 
-        $ca = $this->correctiveActionByMonth($from, $to);
-        $compliance = $this->complianceByMonth($months);
-        $engagement = $this->engagementByMonth($from, $to);
-        $consultation = $this->consultationByMonth($from, $to);
+        $ca = $this->correctiveActionByMonth($siteId, $from, $to);
+        $compliance = $this->complianceByMonth($months, $siteId);
+        $engagement = $this->engagementByMonth($siteId, $from, $to);
+        $consultation = $this->consultationByMonth($siteId, $from, $to);
         $worksafe = $this->worksafeByMonth($siteId, $from, $to);
 
         return collect($months)->map(function (string $m) use (
@@ -163,11 +167,11 @@ class HsAnalyticsService
     // ── Injuries ────────────────────────────────────────────────────────
 
     /** @return array<int,array{type:string,count:int}> */
-    private function injuriesByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function injuriesByType(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('injury_type as type, COUNT(*) as count')
             ->groupBy('injury_type')
             ->orderByDesc('count')
@@ -177,12 +181,12 @@ class HsAnalyticsService
     }
 
     /** @return array<int,array{body_part:string,count:int}> */
-    private function injuriesByBodyPart(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function injuriesByBodyPart(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
             ->whereNotNull('body_part_affected')
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('body_part_affected as body_part, COUNT(*) as count')
             ->groupBy('body_part_affected')
             ->orderByDesc('count')
@@ -199,7 +203,7 @@ class HsAnalyticsService
      *
      * @return array<int,array{type:string,count:int}>
      */
-    private function firstAidByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function firstAidByType(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         if (! Schema::hasTable('first_aid_records')) {
             return [];
@@ -208,7 +212,7 @@ class HsAnalyticsService
         return FirstAidRecord::query()
             ->whereBetween('treatment_date', [$from, $to])
             ->whereNotNull('injury_illness_type')
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('injury_illness_type as type, COUNT(*) as count')
             ->groupBy('injury_illness_type')
             ->orderByDesc('count')
@@ -223,7 +227,7 @@ class HsAnalyticsService
      *
      * @return array<int,array{outcome:string,count:int}>
      */
-    private function firstAidByOutcome(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function firstAidByOutcome(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         if (! Schema::hasTable('first_aid_records')) {
             return [];
@@ -232,7 +236,7 @@ class HsAnalyticsService
         return FirstAidRecord::query()
             ->whereBetween('treatment_date', [$from, $to])
             ->whereNotNull('treatment_outcome')
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('treatment_outcome as outcome, COUNT(*) as count')
             ->groupBy('treatment_outcome')
             ->orderByDesc('count')
@@ -243,16 +247,12 @@ class HsAnalyticsService
 
     // ── Incidents ───────────────────────────────────────────────────────
 
-    /**
-     * client_incidents has NO site_id — scope through client.site_id.
-     *
-     * @return array<string,array{total:int,near_miss:int}>
-     */
-    private function incidentCountsByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    /** @return array<string,array{total:int,near_miss:int}> */
+    private function incidentCountsByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = ClientIncident::query()
             ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw("DATE_FORMAT(occurred_at, '%Y-%m') as m, SUM(type = 'near_miss') as nm, COUNT(*) as total")
             ->groupBy('m')
             ->get();
@@ -266,11 +266,11 @@ class HsAnalyticsService
     }
 
     /** @return array<int,array{type:string,count:int}> */
-    private function incidentsByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function incidentsByType(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return ClientIncident::query()
             ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('type, COUNT(*) as count')
             ->groupBy('type')
             ->orderByDesc('count')
@@ -280,11 +280,11 @@ class HsAnalyticsService
     }
 
     /** @return array<int,array{severity:string,count:int}> */
-    private function incidentsBySeverity(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function incidentsBySeverity(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return ClientIncident::query()
             ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('severity, COUNT(*) as count')
             ->groupBy('severity')
             ->orderByDesc('count')
@@ -294,7 +294,7 @@ class HsAnalyticsService
     }
 
     /** Ordered desc with running cumulative % for the Pareto line. @return array<int,array<string,mixed>> */
-    private function rootCausePareto(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function rootCausePareto(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $counts = [];
         $this->rootCauseInvestigations($siteId, $from, $to)->each(function (HsInvestigation $investigation) use (&$counts) {
@@ -319,14 +319,14 @@ class HsAnalyticsService
         })->values()->all();
     }
 
-    private function rootCauseInvestigations(?int $siteId, CarbonInterface $from, CarbonInterface $to): Collection
+    private function rootCauseInvestigations(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): Collection
     {
         return HsInvestigation::query()
             ->with('hsEvent:id,site_id,occurred_at')
             ->whereNotNull('root_causes')
             ->whereHas('hsEvent', fn ($q) => $q
                 ->whereBetween('occurred_at', [$from, $to])
-                ->when($siteId, fn ($eventQuery) => $eventQuery->where('site_id', $siteId)))
+                ->when($siteId !== null, fn ($eventQuery) => $this->applySiteScope($eventQuery, $siteId)))
             ->get(['id', 'hs_event_id', 'root_causes']);
     }
 
@@ -352,7 +352,7 @@ class HsAnalyticsService
     }
 
     /** @return array<int,int> */
-    private function incidentIdsForRootCause(?int $siteId, CarbonInterface $from, CarbonInterface $to, string $cause): array
+    private function incidentIdsForRootCause(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, string $cause): array
     {
         $cause = trim($cause);
         if ($cause === '') {
@@ -365,7 +365,7 @@ class HsAnalyticsService
             ->whereHas('hsEvent', fn ($q) => $q
                 ->where('source_type', ClientIncident::class)
                 ->whereBetween('occurred_at', [$from, $to])
-                ->when($siteId, fn ($eventQuery) => $eventQuery->where('site_id', $siteId)))
+                ->when($siteId !== null, fn ($eventQuery) => $this->applySiteScope($eventQuery, $siteId)))
             ->get(['id', 'hs_event_id', 'root_causes'])
             ->filter(fn (HsInvestigation $investigation) => in_array($cause, $this->investigationRootCauseLabels($investigation), true))
             ->map(fn (HsInvestigation $investigation) => (int) $investigation->hsEvent?->source_id)
@@ -412,11 +412,11 @@ class HsAnalyticsService
     // ── Hazards ─────────────────────────────────────────────────────────
 
     /** @return array<string,int> */
-    private function hazardOpenedByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function hazardOpenedByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return SiteHazard::query()
             ->whereBetween('created_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as m, COUNT(*) as c")
             ->groupBy('m')
             ->pluck('c', 'm')
@@ -425,12 +425,12 @@ class HsAnalyticsService
     }
 
     /** @return array<string,int> */
-    private function hazardClosedByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function hazardClosedByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         return SiteHazard::query()
             ->whereNotNull('closed_at')
             ->whereBetween('closed_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') as m, COUNT(*) as c")
             ->groupBy('m')
             ->pluck('c', 'm')
@@ -447,11 +447,11 @@ class HsAnalyticsService
      * @param  array<string,int>  $closed
      * @return array<string,int>
      */
-    private function hazardRunningOpen(?int $siteId, CarbonInterface $from, array $months, array $opened, array $closed): array
+    private function hazardRunningOpen(int|array|null $siteId, CarbonInterface $from, array $months, array $opened, array $closed): array
     {
         $baseline = SiteHazard::query()
             ->where('created_at', '<', $from)
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->where(fn ($q) => $q->whereNull('closed_at')->orWhere('closed_at', '>=', $from))
             ->count();
 
@@ -466,11 +466,11 @@ class HsAnalyticsService
     }
 
     /** @return array<int,array{risk_rating:string,count:int}> open hazards by risk */
-    private function hazardsByRisk(?int $siteId): array
+    private function hazardsByRisk(int|array|null $siteId): array
     {
         return SiteHazard::query()
             ->whereIn('status', ['open', 'in_progress'])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->selectRaw('risk_rating, COUNT(*) as count')
             ->groupBy('risk_rating')
             ->get()
@@ -478,14 +478,18 @@ class HsAnalyticsService
             ->all();
     }
 
-    // ── Corrective actions (org-wide governance metric) ─────────────────
+    // ── Corrective actions ──────────────────────────────────────────────
 
     /** @return array<string,array{avg_days:float|null,pct_on_time:float|null}> */
-    private function correctiveActionByMonth(CarbonInterface $from, CarbonInterface $to): array
+    private function correctiveActionByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = HsCorrectiveAction::query()
             ->whereNotNull('completed_at')
             ->whereBetween('completed_at', [$from, $to])
+            ->when($siteId !== null, fn ($query) => $query->whereHas(
+                'hsEvent',
+                fn ($eventQuery) => $this->applySiteScope($eventQuery, $siteId),
+            ))
             ->selectRaw("DATE_FORMAT(completed_at, '%Y-%m') as m")
             ->selectRaw('AVG(DATEDIFF(completed_at, created_at)) as avg_days')
             ->selectRaw('SUM(CASE WHEN due_date IS NOT NULL AND DATE(completed_at) <= due_date THEN 1 ELSE 0 END) as on_time')
@@ -513,9 +517,19 @@ class HsAnalyticsService
      * @param  array<int,string>  $months
      * @return array<string,int|null>
      */
-    private function complianceByMonth(array $months): array
+    private function complianceByMonth(array $months, int|array|null $siteId): array
     {
+        $siteIds = $siteId === null ? [] : $this->normalizeSiteIds($siteId);
         $records = StaffTrainingRecord::query()
+            ->when($siteId !== null, fn ($query) => $query->whereHas(
+                'user.hrEmployeeProfile',
+                function ($profileQuery) use ($siteIds): void {
+                    $profileQuery->whereIn('primary_site_id', $siteIds);
+                    foreach ($siteIds as $id) {
+                        $profileQuery->orWhereJsonContains('secondary_site_ids', $id);
+                    }
+                },
+            ))
             ->get(['status', 'enrolled_at', 'completed_at', 'completion_date', 'expires_at']);
 
         $out = [];
@@ -547,13 +561,17 @@ class HsAnalyticsService
         return $out;
     }
 
-    // ── Worker participation (org-wide HSWA engagement duty) ─────────────
+    // ── Worker participation (HSWA engagement duty) ─────────────────────
 
     /** Engagement % = committee meetings held ÷ scheduled, per month. @return array<string,int|null> */
-    private function engagementByMonth(CarbonInterface $from, CarbonInterface $to): array
+    private function engagementByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = HsCommitteeMeeting::query()
             ->whereBetween('scheduled_at', [$from, $to])
+            ->when($siteId !== null, fn ($query) => $query->whereHas(
+                'committee',
+                fn ($committeeQuery) => $this->applySiteScope($committeeQuery, $siteId),
+            ))
             ->selectRaw("DATE_FORMAT(scheduled_at, '%Y-%m') as m, SUM(status = 'completed') as done, COUNT(*) as total")
             ->groupBy('m')
             ->get();
@@ -567,10 +585,11 @@ class HsAnalyticsService
     }
 
     /** Consultation completion % = actioned/closed ÷ total, per month. @return array<string,int|null> */
-    private function consultationByMonth(CarbonInterface $from, CarbonInterface $to): array
+    private function consultationByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = HsConsultation::query()
             ->whereBetween('consultation_date', [$from, $to])
+            ->when($siteId !== null, fn ($query) => $this->applySiteScope($query, $siteId))
             ->selectRaw("DATE_FORMAT(consultation_date, '%Y-%m') as m, SUM(status IN ('actioned', 'closed')) as done, COUNT(*) as total")
             ->groupBy('m')
             ->get();
@@ -586,12 +605,12 @@ class HsAnalyticsService
     // ── WorkSafe notifiable (HSWA s.56) ─────────────────────────────────
 
     /** @return array<string,array{notified:int,awaiting:int}> */
-    private function worksafeByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function worksafeByMonth(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = NotifiableIncident::query()
             ->where('notification_authority', 'worksafe')
             ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, $this->worksafeSiteScope($siteId))
+            ->when($siteId !== null, $this->worksafeSiteScope($siteId))
             ->selectRaw("DATE_FORMAT(occurred_at, '%Y-%m') as m, SUM(status = 'pending') as awaiting, SUM(status <> 'pending') as notified")
             ->groupBy('m')
             ->get();
@@ -605,7 +624,7 @@ class HsAnalyticsService
     }
 
     /** @return array{notified:int,awaiting:int} */
-    private function worksafeTotals(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function worksafeTotals(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $scope = $this->worksafeSiteScope($siteId);
 
@@ -614,83 +633,91 @@ class HsAnalyticsService
                 ->where('notification_authority', 'worksafe')
                 ->where('status', '!=', 'pending')
                 ->whereBetween('occurred_at', [$from, $to])
-                ->when($siteId, $scope)
+                ->when($siteId !== null, $scope)
                 ->count(),
             // Awaiting is a live state — not window-bound.
             'awaiting' => (int) NotifiableIncident::query()
                 ->where('notification_authority', 'worksafe')
                 ->where('status', 'pending')
-                ->when($siteId, $scope)
+                ->when($siteId !== null, $scope)
                 ->count(),
         ];
     }
 
     /**
      * WorkSafe notification is an org-level PCBU obligation. When a site is
-     * selected we attribute an event via its linked incident's client site;
+     * selected we attribute an event via its linked incident-time site snapshot;
      * events with no linked incident can't be site-attributed, so they drop
      * out of the site-scoped view (and only appear org-wide). NotifiableIncident
-     * has no site_id, hence the relatedIncident → client 2-hop.
+     * has no site_id, hence the relatedIncident relationship.
      */
-    private function worksafeSiteScope(?int $siteId): \Closure
+    private function worksafeSiteScope(int|array|null $siteId): \Closure
     {
-        return fn ($q) => $q->whereHas('relatedIncident', fn ($i) => $i->whereHas('client', fn ($c) => $c->where('site_id', $siteId)));
+        return fn ($q) => $q->whereHas(
+            'relatedIncident',
+            fn ($incidentQuery) => $this->applySiteScope($incidentQuery, $siteId),
+        );
     }
 
     // ── Site league + heatmap (the site-scoping bug fix) ────────────────
 
     /** @return array<int,array<string,mixed>> */
-    private function siteComparison(CarbonInterface $from, CarbonInterface $to): array
+    private function siteComparison(CarbonInterface $from, CarbonInterface $to, int|array|null $siteId = null): array
     {
-        // Incidents per site — the FIX: client_incidents has no site_id, so
-        // join clients and group by clients.site_id (one query, not N).
         $incidentsBySite = ClientIncident::query()
-            ->join('clients', 'clients.id', '=', 'client_incidents.client_id')
             ->whereBetween('occurred_at', [$from, $to])
-            ->groupBy('clients.site_id')
-            ->selectRaw('clients.site_id as site_id, COUNT(*) as c')
+            ->whereNotNull('site_id')
+            ->when($siteId !== null, fn ($query) => $this->applySiteScope($query, $siteId))
+            ->groupBy('site_id')
+            ->selectRaw('site_id, COUNT(*) as c')
             ->pluck('c', 'site_id');
 
         $openHazardsBySite = SiteHazard::query()
             ->whereIn('status', ['open', 'in_progress'])
+            ->when($siteId !== null, fn ($query) => $this->applySiteScope($query, $siteId))
             ->groupBy('site_id')
             ->selectRaw('site_id, COUNT(*) as c')
             ->pluck('c', 'site_id');
 
         $lostDaysBySite = WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
+            ->when($siteId !== null, fn ($query) => $this->applySiteScope($query, $siteId))
             ->groupBy('site_id')
             ->selectRaw('site_id, SUM(lost_time_days) as d')
             ->pluck('d', 'site_id');
 
-        $drillBySite = $this->drillStatusBySite();
+        $drillBySite = $this->drillStatusBySite($siteId);
 
-        return Site::query()->orderBy('name')->get(['id', 'name'])->map(function ($site) use (
-            $incidentsBySite, $openHazardsBySite, $lostDaysBySite, $drillBySite
-        ) {
-            $incidents = (int) ($incidentsBySite[$site->id] ?? 0);
-            $openHazards = (int) ($openHazardsBySite[$site->id] ?? 0);
-            $drillStatus = $drillBySite[$site->id] ?? 'overdue';
+        return Site::query()
+            ->when($siteId !== null, fn ($query) => $this->applySiteScope($query, $siteId, 'id'))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(function ($site) use (
+                $incidentsBySite, $openHazardsBySite, $lostDaysBySite, $drillBySite
+            ) {
+                $incidents = (int) ($incidentsBySite[$site->id] ?? 0);
+                $openHazards = (int) ($openHazardsBySite[$site->id] ?? 0);
+                $drillStatus = $drillBySite[$site->id] ?? 'overdue';
 
-            $score = 100;
-            $score -= min($incidents * 5, 30);
-            $score -= min($openHazards * 10, 30);
-            $score -= $drillStatus === 'overdue' ? 20 : ($drillStatus === 'due_soon' ? 10 : 0);
+                $score = 100;
+                $score -= min($incidents * 5, 30);
+                $score -= min($openHazards * 10, 30);
+                $score -= $drillStatus === 'overdue' ? 20 : ($drillStatus === 'due_soon' ? 10 : 0);
 
-            return [
-                'id' => $site->id,
-                'name' => $site->name,
-                'total_incidents' => $incidents,
-                'open_hazards' => $openHazards,
-                'lost_time_days' => (int) ($lostDaysBySite[$site->id] ?? 0),
-                // Per-site LTIFR/TRIFR from HsKpiService (12-month annualised
-                // basis, BillingEntry hours, floored) — identical to the dashboard.
-                'ltifr' => $this->kpi->ltifr(null, null, $site->id),
-                'trifr' => $this->kpi->trifr(null, null, $site->id),
-                'drill_status' => $drillStatus,
-                'compliance_score' => max(0, $score),
-            ];
-        })->all();
+                return [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'total_incidents' => $incidents,
+                    'open_hazards' => $openHazards,
+                    'lost_time_days' => (int) ($lostDaysBySite[$site->id] ?? 0),
+                    // Per-site LTIFR/TRIFR from HsKpiService (12-month annualised
+                    // basis, BillingEntry hours, floored) — identical to the dashboard.
+                    'ltifr' => $this->kpi->ltifr(null, null, $site->id),
+                    'trifr' => $this->kpi->trifr(null, null, $site->id),
+                    'drill_status' => $drillStatus,
+                    'compliance_score' => max(0, $score),
+                ];
+            })->all();
     }
 
     /**
@@ -700,9 +727,9 @@ class HsAnalyticsService
      * the register hero, dashboard KPI and site profile also use (so the numbers
      * reconcile across every surface).
      */
-    private function drillStatusBySite(): array
+    private function drillStatusBySite(int|array|null $siteId = null): array
     {
-        return app(DrillComplianceService::class)->statusBySite();
+        return app(DrillComplianceService::class)->statusBySite($siteId);
     }
 
     // ── Hero stats + scorecard ──────────────────────────────────────────
@@ -711,7 +738,7 @@ class HsAnalyticsService
      * @param  array<int,array<string,mixed>>  $trends
      * @return array<string,mixed>
      */
-    private function heroStats(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
+    private function heroStats(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
     {
         // Headline frequency/leading numbers come from HsKpiService so they
         // match the dashboard exactly (12-month annualised basis + floor); the
@@ -730,7 +757,7 @@ class HsAnalyticsService
                 $this->deltaFor($trends, 'near_miss_ratio', lowerIsBetter: false)
             ),
             'compliance_pct' => array_merge(
-                ['value' => $this->kpi->trainingAuditCompliancePct()],
+                ['value' => $this->kpi->trainingAuditCompliancePct($siteId)],
                 $this->deltaFor($trends, 'compliance_pct', lowerIsBetter: false)
             ),
         ];
@@ -770,7 +797,7 @@ class HsAnalyticsService
      * @param  array<int,array<string,mixed>>  $trends
      * @return array{leading:array<int,array<string,mixed>>,lagging:array<int,array<string,mixed>>}
      */
-    private function scorecard(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
+    private function scorecard(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
     {
         $ll = $this->kpi->leadingLagging($from, $to, $siteId);
         $lag = $ll['lagging'];
@@ -778,7 +805,7 @@ class HsAnalyticsService
         $latest = collect($trends)->last() ?? [];
 
         $lostDays = (int) WorkplaceInjury::query()->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->sum('lost_time_days');
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))->sum('lost_time_days');
 
         $d = fn (string $key, bool $lower): array => $this->deltaFor($trends, $key, $lower);
 
@@ -789,7 +816,7 @@ class HsAnalyticsService
             ['key' => 'worker_engagement', 'label' => 'Worker participation', 'value' => $latest['worker_engagement'] ?? null, 'suffix' => '%', ...$d('worker_engagement', false)],
             ['key' => 'open_hazards', 'label' => 'Open hazards', 'value' => $lead['open_hazards'], 'suffix' => '', ...$d('hazards_open', true)],
             ['key' => 'worker_consultation', 'label' => 'Consultation completion', 'value' => $latest['worker_consultation'] ?? null, 'suffix' => '%', ...$d('worker_consultation', false)],
-            ['key' => 'procedure_review_pct', 'label' => 'Procedure review compliance', 'value' => $this->procedureReviewPct(), 'suffix' => '%', 'delta' => null, 'dir' => 'flat'],
+            ['key' => 'procedure_review_pct', 'label' => 'Procedure review compliance', 'value' => $this->procedureReviewPct($siteId), 'suffix' => '%', 'delta' => null, 'dir' => 'flat'],
         ];
 
         $lagging = [
@@ -806,17 +833,18 @@ class HsAnalyticsService
 
     /**
      * % of approved Safe Work Procedures still within their review date (or with no
-     * date set) — a leading control-of-documents indicator. Org-wide (procedures are
-     * policy-level, not site-scoped). Null when there are no approved procedures.
+     * date set) — a leading control-of-documents indicator. Site views include
+     * procedures explicitly assigned to the site plus organisation-wide procedures.
      */
-    private function procedureReviewPct(): ?int
+    private function procedureReviewPct(int|array|null $siteId): ?int
     {
-        $approved = SafeWorkProcedure::query()->where('status', 'approved')->count();
+        $approvedQuery = $this->applicableProcedureQuery($siteId);
+        $approved = (clone $approvedQuery)->count();
         if ($approved === 0) {
             return null;
         }
 
-        $inWindow = SafeWorkProcedure::query()->where('status', 'approved')
+        $inWindow = (clone $approvedQuery)
             ->where(fn ($q) => $q->whereNull('review_date')->orWhere('review_date', '>=', Carbon::today()))
             ->count();
 
@@ -826,24 +854,28 @@ class HsAnalyticsService
     // ── Period summary + role note ──────────────────────────────────────
 
     /** @return array<string,mixed> */
-    private function periodSummary(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    private function periodSummary(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $incidents = (int) ClientIncident::query()->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))->count();
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))->count();
         $nearMisses = (int) ClientIncident::query()->where('type', 'near_miss')->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))->count();
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))->count();
         $openHazards = (int) SiteHazard::query()->whereIn('status', ['open', 'in_progress'])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count();
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))->count();
 
         // Corrective-action on-time % via HsKpiService — matches the scorecard
         // and is site-scoped (through the parent HsEvent).
         $actionsOnTime = $this->kpi->actionsClosedOnTimePct($from, $to, $siteId);
 
         // Drills are a per-site governance metric — scope to the selected site.
-        $drillStatuses = $this->drillStatusBySite();
+        $drillStatuses = $this->drillStatusBySite($siteId);
         if ($siteId !== null) {
-            $drillsTotal = 1;
-            $drillsComplete = ($drillStatuses[$siteId] ?? null) === 'compliant' ? 1 : 0;
+            $siteIds = $this->normalizeSiteIds($siteId);
+            $drillsTotal = count($siteIds);
+            $drillsComplete = count(array_filter(
+                $siteIds,
+                fn (int $id) => ($drillStatuses[$id] ?? null) === 'compliant',
+            ));
         } else {
             $drillsTotal = (int) Site::query()->count();
             $drillsComplete = count(array_filter($drillStatuses, fn ($s) => $s === 'compliant'));
@@ -879,7 +911,7 @@ class HsAnalyticsService
      * @param  array<string,mixed>  $filters
      * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
      */
-    public function exportRows(string $view, ?int $siteId, CarbonInterface $from, CarbonInterface $to, array $filters = []): array
+    public function exportRows(string $view, int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, array $filters = []): array
     {
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
@@ -888,7 +920,7 @@ class HsAnalyticsService
         return match ($view) {
             'injuries' => $this->exportInjuries($siteId, $from, $to, $siteNames, $filters),
             'hazards' => $this->exportHazards($siteId, $from, $to, $siteNames, $filters),
-            'sites' => $this->exportSites($from, $to),
+            'sites' => $this->exportSites($from, $to, $siteId),
             'root_cause' => [
                 'name' => 'root_cause',
                 'headers' => ['Cause', 'Count', '% of total', 'Cumulative %'],
@@ -905,7 +937,7 @@ class HsAnalyticsService
      * @param  array<string,mixed>  $filters
      * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
      */
-    private function exportIncidents(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
+    private function exportIncidents(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $incidentIdsForCause = ! empty($filters['cause'])
             ? $this->incidentIdsForRootCause($siteId, $from, $to, (string) $filters['cause'])
@@ -914,7 +946,7 @@ class HsAnalyticsService
         $rows = ClientIncident::query()
             ->with('client:id,first_name,last_name,site_id')
             ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->when(! empty($filters['type']), fn ($q) => $q->where('type', $filters['type']))
             ->when(! empty($filters['severity']), fn ($q) => $q->where('severity', $filters['severity']))
             ->when($incidentIdsForCause !== null, fn ($q) => $q->whereIn('id', $incidentIdsForCause ?: [0]))
@@ -931,7 +963,7 @@ class HsAnalyticsService
                 $i->type,
                 $i->severity,
                 $i->status,
-                $siteNames[$i->client?->site_id] ?? '—',
+                $siteNames[$i->site_id] ?? '—',
                 trim(($i->client?->first_name ?? '').' '.($i->client?->last_name ?? '')) ?: '—',
                 implode(', ', $rootCausesByIncident[(int) $i->id] ?? []) ?: '—',
             ])->all(),
@@ -942,11 +974,11 @@ class HsAnalyticsService
      * @param  array<string,mixed>  $filters
      * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
      */
-    private function exportInjuries(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
+    private function exportInjuries(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $rows = WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->when(! empty($filters['type']), fn ($q) => $q->where('injury_type', $filters['type']))
             ->when(! empty($filters['body_part']), fn ($q) => $q->where('body_part_affected', $filters['body_part']))
             ->orderByDesc('injury_date')
@@ -973,11 +1005,11 @@ class HsAnalyticsService
      * @param  array<string,mixed>  $filters
      * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
      */
-    private function exportHazards(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
+    private function exportHazards(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $rows = SiteHazard::query()
             ->whereBetween('created_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when($siteId !== null, fn ($q) => $this->applySiteScope($q, $siteId))
             ->when(! empty($filters['risk']), fn ($q) => $q->where('risk_rating', $filters['risk']))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->orderByDesc('created_at')
@@ -1000,7 +1032,7 @@ class HsAnalyticsService
     }
 
     /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
-    private function exportSites(CarbonInterface $from, CarbonInterface $to): array
+    private function exportSites(CarbonInterface $from, CarbonInterface $to, int|array|null $siteId): array
     {
         return [
             'name' => 'site_league',
@@ -1014,11 +1046,54 @@ class HsAnalyticsService
                 $s['trifr'] ?? '—',
                 $s['compliance_score'],
                 $s['drill_status'],
-            ], $this->siteComparison($from, $to)),
+            ], $this->siteComparison($from, $to, $siteId)),
         ];
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
+
+    private function applySiteScope(Builder $query, int|array|null $siteId, string $column = 'site_id'): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn($column), $siteIds);
+    }
+
+    private function applicableProcedureQuery(int|array|null $siteId): Builder
+    {
+        $query = SafeWorkProcedure::query()->where('status', 'approved');
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = $this->normalizeSiteIds($siteId);
+
+        return $query->where(function (Builder $scope) use ($siteIds): void {
+            $scope->whereJsonLength('applicable_sites', 0)
+                ->orWhereNull('applicable_sites');
+
+            foreach ($siteIds as $id) {
+                $scope->orWhereJsonContains('applicable_sites', $id);
+            }
+        });
+    }
+
+    /** @return array<int, int> */
+    private function normalizeSiteIds(int|array $siteId): array
+    {
+        return collect(is_array($siteId) ? $siteId : [$siteId])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     /** @return array<int,string> e.g. ['2025-07', …, '2026-06'] */
     private function monthsBetween(CarbonInterface $from, CarbonInterface $to): array

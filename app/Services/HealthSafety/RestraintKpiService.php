@@ -27,7 +27,7 @@ class RestraintKpiService
      *
      * @return array<string,int>
      */
-    public function summary(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    public function summary(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $eventsInPeriod = $this->scopedEvents($siteId)->whereBetween('started_at', [$from, $to]);
 
@@ -54,7 +54,7 @@ class RestraintKpiService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function unreviewedWorklist(?int $siteId, int $limit = 8): array
+    public function unreviewedWorklist(int|array|null $siteId, int $limit = 8): array
     {
         return $this->scopedEvents($siteId)
             ->with(['client:id,first_name,last_name'])
@@ -80,7 +80,7 @@ class RestraintKpiService
      *
      * @return array<string,array<int,array{label:string,count:int}>>
      */
-    public function breakdowns(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    public function breakdowns(int|array|null $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $events = $this->scopedEvents($siteId)->whereBetween('started_at', [$from, $to]);
 
@@ -109,23 +109,27 @@ class RestraintKpiService
         ];
     }
 
-    private function scopedEvents(?int $siteId): Builder
+    private function scopedEvents(int|array|null $siteId): Builder
     {
-        return RestraintEvent::query()
-            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId));
+        $query = RestraintEvent::query();
+
+        return $this->applySiteScope($query, $siteId);
     }
 
-    private function scopedPlans(?int $siteId): Builder
+    private function scopedPlans(int|array|null $siteId): Builder
     {
         return BehaviourSupportPlan::query()
-            ->when($siteId, fn (Builder $q) => $q->whereHas('client', fn (Builder $c) => $c->where('site_id', $siteId)));
+            ->when($siteId !== null, fn (Builder $q) => $q->whereHas(
+                'client',
+                fn (Builder $clientQuery) => $this->applySiteScope($clientQuery, $siteId),
+            ));
     }
 
     /**
      * Clients who have had a restraint event but have no active behaviour support
      * plan — a least-restrictive-practice governance gap.
      */
-    private function clientsWithEventsButNoActivePlan(?int $siteId): int
+    private function clientsWithEventsButNoActivePlan(int|array|null $siteId): int
     {
         $clientIdsWithEvents = $this->scopedEvents($siteId)
             ->whereNotNull('client_id')
@@ -143,5 +147,23 @@ class RestraintKpiService
             ->pluck('client_id');
 
         return $clientIdsWithEvents->diff($clientsWithActivePlan)->count();
+    }
+
+    private function applySiteScope(Builder $query, int|array|null $siteId): Builder
+    {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = collect(is_array($siteId) ? $siteId : [$siteId])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn('site_id'), $siteIds);
     }
 }

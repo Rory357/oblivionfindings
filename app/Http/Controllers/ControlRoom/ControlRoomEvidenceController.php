@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoomAlert;
@@ -14,6 +15,8 @@ use ZipArchive;
 
 class ControlRoomEvidenceController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
+
     /**
      * List evidence packs for an alert with their items.
      */
@@ -21,6 +24,7 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $packs = EvidencePack::where('alert_id', $alert->id)
             ->with(['evidenceItems' => fn ($q) => $q->orderBy('created_at', 'desc')])
@@ -57,6 +61,7 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'],
@@ -87,6 +92,7 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $pack->alert);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Cannot add items to a completed or exported pack.']);
@@ -115,6 +121,7 @@ class ControlRoomEvidenceController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
         $pack = $item->evidencePack;
+        $this->assertCanAccessAlert($user, $pack->alert);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Cannot remove items from a completed or exported pack.']);
@@ -149,10 +156,12 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $pack = $item->evidencePack;
+        $this->assertCanAccessAlert($user, $pack->alert);
 
         abort_unless($item->storage_path && Storage::disk('local')->exists($item->storage_path), 404);
 
-        AuditLogger::log('controlRoom.evidence.itemDownloaded', $item->evidencePack->alert, [
+        AuditLogger::log('controlRoom.evidence.itemDownloaded', $pack->alert, [
             'pack_id' => $item->evidence_pack_id,
             'item_id' => $item->id,
         ]);
@@ -172,6 +181,7 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $pack->alert);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Only packs with status "collecting" can be completed.']);
@@ -193,21 +203,22 @@ class ControlRoomEvidenceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $pack->alert);
 
         if ($pack->status !== 'complete') {
             return back()->withErrors(['pack' => 'Only completed packs can be exported.']);
         }
 
         $items = $pack->evidenceItems()->get();
-        $zipFilename = 'evidence-pack-' . $pack->id . '-' . now()->format('Ymd-His') . '.zip';
-        $zipPath = storage_path('app/temp/' . $zipFilename);
+        $zipFilename = 'evidence-pack-'.$pack->id.'-'.now()->format('Ymd-His').'.zip';
+        $zipPath = storage_path('app/temp/'.$zipFilename);
 
         // Ensure temp directory exists
-        if (!is_dir(storage_path('app/temp'))) {
+        if (! is_dir(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             return back()->withErrors(['export' => 'Failed to create ZIP archive.']);
         }
@@ -216,15 +227,15 @@ class ControlRoomEvidenceController extends Controller
         $manifest = "Evidence Pack: {$pack->title}\n";
         $manifest .= "Pack ID: {$pack->id}\n";
         $manifest .= "Alert ID: {$pack->alert_id}\n";
-        $manifest .= "Exported: " . now()->toDateTimeString() . "\n";
+        $manifest .= 'Exported: '.now()->toDateTimeString()."\n";
         $manifest .= "Exported by: {$user->name}\n";
-        $manifest .= str_repeat('-', 50) . "\n\n";
+        $manifest .= str_repeat('-', 50)."\n\n";
 
         foreach ($items as $item) {
             $manifest .= "Item #{$item->id}: {$item->type}\n";
-            $manifest .= "  Title: " . ($item->title ?? 'N/A') . "\n";
-            $manifest .= "  Description: " . ($item->description ?? 'N/A') . "\n";
-            $manifest .= "  Created: " . $item->created_at?->toDateTimeString() . "\n";
+            $manifest .= '  Title: '.($item->title ?? 'N/A')."\n";
+            $manifest .= '  Description: '.($item->description ?? 'N/A')."\n";
+            $manifest .= '  Created: '.$item->created_at?->toDateTimeString()."\n";
 
             if ($item->storage_path && Storage::disk('local')->exists($item->storage_path)) {
                 $filename = basename($item->storage_path);
@@ -236,7 +247,7 @@ class ControlRoomEvidenceController extends Controller
                 $manifest .= "  External System: {$item->external_system}\n";
                 $manifest .= "  External Ref: {$item->external_ref}\n";
                 if ($item->metadata) {
-                    $manifest .= "  Metadata: " . json_encode($item->metadata, JSON_PRETTY_PRINT) . "\n";
+                    $manifest .= '  Metadata: '.json_encode($item->metadata, JSON_PRETTY_PRINT)."\n";
                 }
             }
 
@@ -248,7 +259,7 @@ class ControlRoomEvidenceController extends Controller
 
         $pack->update([
             'status' => 'exported',
-            'export_path' => 'temp/' . $zipFilename,
+            'export_path' => 'temp/'.$zipFilename,
             'exported_at' => now(),
             'exported_by_user_id' => $user->id,
         ]);
@@ -345,7 +356,7 @@ class ControlRoomEvidenceController extends Controller
         $item = EvidenceItem::create([
             'evidence_pack_id' => $pack->id,
             'type' => 'cctv_bookmark',
-            'title' => 'CCTV Bookmark - Camera ' . $data['camera_id'],
+            'title' => 'CCTV Bookmark - Camera '.$data['camera_id'],
             'external_system' => 'cctv',
             'external_ref' => $data['camera_id'],
             'metadata' => [

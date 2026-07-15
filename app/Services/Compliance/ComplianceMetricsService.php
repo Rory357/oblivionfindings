@@ -205,9 +205,9 @@ class ComplianceMetricsService
 
     public function controlRoomSummary(): array
     {
-        $unresolved = fn () => ControlRoomAlert::query()->whereNotIn('status', ['resolved', 'closed']);
+        $actionableAlerts = fn () => ControlRoomAlert::query()->actionable();
 
-        $recentAlerts = $unresolved()
+        $recentAlerts = $actionableAlerts()
             ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 WHEN severity = 'high' THEN 1 WHEN severity = 'medium' THEN 2 ELSE 3 END")
             ->orderByDesc('triggered_at')
             ->limit(6)
@@ -234,9 +234,9 @@ class ComplianceMetricsService
             ->all();
 
         return [
-            'open' => $unresolved()->count(),
-            'critical' => $unresolved()->where('severity', 'critical')->count(),
-            'escalated' => $unresolved()->where('escalation_level', '>', 0)->count(),
+            'open' => $actionableAlerts()->count(),
+            'critical' => $actionableAlerts()->where('severity', 'critical')->count(),
+            'escalated' => $actionableAlerts()->where('escalation_level', '>', 0)->count(),
             'recentAlerts' => $recentAlerts,
             'alertTrend' => $alertTrend,
         ];

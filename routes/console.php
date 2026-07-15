@@ -46,8 +46,10 @@ use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\FleetAutoAlertJob;
+use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
+use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
 use App\Jobs\PollItMailboxJob;
 use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
@@ -68,6 +70,20 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// Recover Control Room alert notification outbox rows that were committed
+// before a transient queue/worker failure could deliver them.
+app(Schedule::class)
+    ->job(new RecoverControlRoomAlertNotificationsJob)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+// Client incidents are the durable intent for governance registration. Recover
+// any eligible committed row missed by its immediate after-commit dispatch.
+app(Schedule::class)
+    ->job(new RecoverIncidentGovernanceEscalationsJob)
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
 
 // Daily break-glass summary (internal ops): 08:00 NZ time
 app(Schedule::class)

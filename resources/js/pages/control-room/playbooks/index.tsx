@@ -1,3 +1,4 @@
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import { PlaybookWizard } from '@/components/control-room/playbook-wizard';
 import PageShell from '@/components/page-shell';
@@ -5,34 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatRelative } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     BookOpen,
     CheckCircle,
-    ChevronDown,
-    ChevronUp,
     Clock,
     Layers,
     Play,
@@ -40,10 +26,9 @@ import {
     Power,
     Search as SearchIcon,
     Shield,
-    Trash2,
     Wrench,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 
 // --- Types ---
 
@@ -116,21 +101,6 @@ const stepTypeColors: Record<string, string> = {
     approval: 'bg-status-warning-bg text-status-warning',
 };
 
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return 'Never';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-}
-
 // --- Component ---
 
 export default function PlaybooksIndex({
@@ -146,7 +116,9 @@ export default function PlaybooksIndex({
 
     // ?new=1 deep-links straight into the playbook wizard (house pattern).
     const [wizardOpen, setWizardOpen] = useState<boolean>(
-        () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1',
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).get('new') === '1',
     );
 
     const applyFilter = (key: string, value: string) => {
@@ -195,211 +167,232 @@ export default function PlaybooksIndex({
 
             <div className="flex flex-col gap-6 p-6">
                 <PageShell>
-                    <PageHero
+                    <CommandCentrePage
+                        variant="compact"
+                        current="/control-room/playbooks"
                         icon={BookOpen}
                         title="Playbooks"
-                        description="Create and manage response procedure playbooks for consistent incident handling."
-                        stats={[
-                            { label: 'Total playbooks', value: playbooks.length },
-                            { label: 'Active', value: playbooks.filter((p) => p.is_active).length },
-                            { label: 'Total runs', value: playbooks.reduce((sum, p) => sum + p.runs_count, 0) },
-                        ]}
+                        description="Create and manage response procedures that guide consistent alert handling."
+                        status="Response procedure workspace"
+                        freshness={`${playbooks.filter((playbook) => playbook.is_active).length} active`}
                         actions={
                             can.manage ? (
-                                <Button onClick={() => setWizardOpen(true)}>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setWizardOpen(true)}
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
-                                    Create Playbook
+                                    Create playbook
                                 </Button>
                             ) : undefined
                         }
-                    />
-
-                    {/* Category Tabs */}
-                    <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/50 p-1">
-                        {categoryTabs.map((tab) => (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                key={tab.key}
-                                onClick={() => handleCategoryTab(tab.key)}
-                                className={`h-auto rounded-md px-3 py-1.5 text-sm font-medium ${
-                                    activeCategory === tab.key
-                                        ? 'bg-background text-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                }`}
-                            >
-                                {tab.label}
-                            </Button>
-                        ))}
-                    </div>
-
-                    {/* Active/Inactive Filter */}
-                    <div className="flex items-center gap-3">
-                        <Select
-                            value={filters.is_active ?? 'all'}
-                            onValueChange={(v) => applyFilter('is_active', v)}
-                        >
-                            <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All Playbooks
-                                </SelectItem>
-                                <SelectItem value="1">Active Only</SelectItem>
-                                <SelectItem value="0">Inactive Only</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <span className="text-sm text-muted-foreground">
-                            {playbooks.length} playbook
-                            {playbooks.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
-
-                    {/* Playbook Grid */}
-                    {playbooks.length === 0 ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="py-12 text-center">
-                                    <BookOpen className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-                                    <p className="text-sm text-muted-foreground">
-                                        No playbooks found.
-                                    </p>
-                                    {can.manage && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="mt-3"
-                                            onClick={() =>
-                                                setWizardOpen(true)
-                                            }
-                                        >
-                                            <Plus className="mr-1 h-3 w-3" />
-                                            Create your first playbook
-                                        </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {playbooks.map((pb) => {
-                                const catConfig =
-                                    categoryConfig[pb.category] ??
-                                    categoryConfig.maintenance;
-                                const CatIcon = catConfig.icon;
-                                return (
-                                    <Card
-                                        key={pb.id}
-                                        className={`transition-colors hover:shadow-md ${!pb.is_active ? 'opacity-60' : ''}`}
-                                    >
-                                        <CardHeader className="pb-3">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <Link
-                                                        href={`/control-room/playbooks/${pb.id}`}
-                                                        className="font-semibold hover:underline"
-                                                    >
-                                                        {pb.name}
-                                                    </Link>
-                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                catConfig.color
-                                                            }
-                                                        >
-                                                            <CatIcon className="mr-1 h-3 w-3" />
-                                                            {categories[
-                                                                pb.category
-                                                            ] ?? pb.category}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            v{pb.version}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                                {can.manage && (
-                                                    <ConfirmChip
-                                                        label={pb.is_active ? 'Deactivate' : 'Activate'}
-                                                        icon={Power}
-                                                        destructive={pb.is_active}
-                                                        onConfirm={() => toggleActive(pb)}
-                                                        title={pb.is_active ? `Stop ${pb.name} auto-attaching to new alerts` : `Make ${pb.name} available`}
-                                                    />
-                                                )}
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {pb.description && (
-                                                <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-                                                    {pb.description}
-                                                </p>
-                                            )}
-                                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                <span className="flex items-center gap-1">
-                                                    <Layers className="h-3 w-3" />
-                                                    {pb.steps_count} step
-                                                    {pb.steps_count !== 1
-                                                        ? 's'
-                                                        : ''}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Play className="h-3 w-3" />
-                                                    {pb.runs_count} run
-                                                    {pb.runs_count !== 1
-                                                        ? 's'
-                                                        : ''}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatRelativeTime(
-                                                        pb.last_run_at,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            {(pb.sla_acknowledge_minutes ||
-                                                pb.sla_response_minutes ||
-                                                pb.sla_resolution_minutes) && (
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {pb.sla_acknowledge_minutes && (
-                                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                                                            ACK{' '}
-                                                            {
-                                                                pb.sla_acknowledge_minutes
-                                                            }
-                                                            m
-                                                        </span>
-                                                    )}
-                                                    {pb.sla_response_minutes && (
-                                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                                                            RESP{' '}
-                                                            {
-                                                                pb.sla_response_minutes
-                                                            }
-                                                            m
-                                                        </span>
-                                                    )}
-                                                    {pb.sla_resolution_minutes && (
-                                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                                                            RES{' '}
-                                                            {
-                                                                pb.sla_resolution_minutes
-                                                            }
-                                                            m
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
+                    >
+                        {/* Category Tabs */}
+                        <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/50 p-1">
+                            {categoryTabs.map((tab) => (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    key={tab.key}
+                                    onClick={() => handleCategoryTab(tab.key)}
+                                    className={`h-auto rounded-md px-3 py-1.5 text-sm font-medium ${
+                                        activeCategory === tab.key
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </Button>
+                            ))}
                         </div>
-                    )}
+
+                        {/* Active/Inactive Filter */}
+                        <div className="flex items-center gap-3">
+                            <Select
+                                value={filters.is_active ?? 'all'}
+                                onValueChange={(v) =>
+                                    applyFilter('is_active', v)
+                                }
+                            >
+                                <SelectTrigger className="w-40">
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All Playbooks
+                                    </SelectItem>
+                                    <SelectItem value="1">
+                                        Active Only
+                                    </SelectItem>
+                                    <SelectItem value="0">
+                                        Inactive Only
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <span className="text-sm text-muted-foreground">
+                                {playbooks.length} playbook
+                                {playbooks.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+
+                        {/* Playbook Grid */}
+                        {playbooks.length === 0 ? (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="py-12 text-center">
+                                        <BookOpen className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                                        <p className="text-sm text-muted-foreground">
+                                            No playbooks found.
+                                        </p>
+                                        {can.manage && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-3"
+                                                onClick={() =>
+                                                    setWizardOpen(true)
+                                                }
+                                            >
+                                                <Plus className="mr-1 h-3 w-3" />
+                                                Create your first playbook
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {playbooks.map((pb) => {
+                                    const catConfig =
+                                        categoryConfig[pb.category] ??
+                                        categoryConfig.maintenance;
+                                    const CatIcon = catConfig.icon;
+                                    return (
+                                        <Card
+                                            key={pb.id}
+                                            className={`transition-colors hover:shadow-md ${!pb.is_active ? 'opacity-60' : ''}`}
+                                        >
+                                            <CardHeader className="pb-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <Link
+                                                            href={`/control-room/playbooks/${pb.id}`}
+                                                            className="font-semibold hover:underline"
+                                                        >
+                                                            {pb.name}
+                                                        </Link>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={
+                                                                    catConfig.color
+                                                                }
+                                                            >
+                                                                <CatIcon className="mr-1 h-3 w-3" />
+                                                                {categories[
+                                                                    pb.category
+                                                                ] ??
+                                                                    pb.category}
+                                                            </Badge>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-xs"
+                                                            >
+                                                                v{pb.version}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                    {can.manage && (
+                                                        <ConfirmChip
+                                                            label={
+                                                                pb.is_active
+                                                                    ? 'Deactivate'
+                                                                    : 'Activate'
+                                                            }
+                                                            icon={Power}
+                                                            destructive={
+                                                                pb.is_active
+                                                            }
+                                                            onConfirm={() =>
+                                                                toggleActive(pb)
+                                                            }
+                                                            title={
+                                                                pb.is_active
+                                                                    ? `Stop ${pb.name} auto-attaching to new alerts`
+                                                                    : `Make ${pb.name} available`
+                                                            }
+                                                        />
+                                                    )}
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {pb.description && (
+                                                    <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
+                                                        {pb.description}
+                                                    </p>
+                                                )}
+                                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    <span className="flex items-center gap-1">
+                                                        <Layers className="h-3 w-3" />
+                                                        {pb.steps_count} step
+                                                        {pb.steps_count !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Play className="h-3 w-3" />
+                                                        {pb.runs_count} run
+                                                        {pb.runs_count !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatRelative(
+                                                            pb.last_run_at,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                {(pb.sla_acknowledge_minutes ||
+                                                    pb.sla_response_minutes ||
+                                                    pb.sla_resolution_minutes) && (
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        {pb.sla_acknowledge_minutes && (
+                                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                                                                ACK{' '}
+                                                                {
+                                                                    pb.sla_acknowledge_minutes
+                                                                }
+                                                                m
+                                                            </span>
+                                                        )}
+                                                        {pb.sla_response_minutes && (
+                                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                                                                RESP{' '}
+                                                                {
+                                                                    pb.sla_response_minutes
+                                                                }
+                                                                m
+                                                            </span>
+                                                        )}
+                                                        {pb.sla_resolution_minutes && (
+                                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                                                                RES{' '}
+                                                                {
+                                                                    pb.sla_resolution_minutes
+                                                                }
+                                                                m
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </CommandCentrePage>
                 </PageShell>
             </div>
 

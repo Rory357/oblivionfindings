@@ -41,7 +41,7 @@ class HsEventWorkflowTest extends TestCase
     public function test_investigation_lifecycle_advances_event_to_corrective_action(): void
     {
         $officer = $this->hsOfficer();
-        $lead = User::factory()->create();
+        $lead = $officer;
         $event = HsEvent::factory()->high()->create();
 
         $this->actingAs($officer)->from('/health-safety/events')
@@ -77,7 +77,7 @@ class HsEventWorkflowTest extends TestCase
     public function test_forbidden_investigation_transition_surfaces_gate_error(): void
     {
         $officer = $this->hsOfficer();
-        $lead = User::factory()->create();
+        $lead = $officer;
         $event = HsEvent::factory()->high()->create();
 
         $this->actingAs($officer)->from('/health-safety/events')
@@ -145,7 +145,7 @@ class HsEventWorkflowTest extends TestCase
     public function test_seed_corrective_action_from_recommendation(): void
     {
         $officer = $this->hsOfficer();
-        $lead = User::factory()->create();
+        $lead = $officer;
         $event = HsEvent::factory()->high()->create();
 
         // Build a completed investigation with one recommendation.

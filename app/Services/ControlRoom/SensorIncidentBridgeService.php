@@ -6,7 +6,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -16,13 +16,20 @@ use InvalidArgumentException;
  * A non-interactive sensor detection (e.g. a `fall_detected` Signal → ControlRoomAlert)
  * is triaged by an operator:
  *  - CONFIRM  → create a ClientIncident (source=sensor, interactive=false), carrying the
- *               signal evidence, bidirectionally linked to the alert; the
- *               ClientIncidentObserver then opens the HsEvent and back-links it.
+ *               signal evidence, with the canonical journey service linking the
+ *               alert, incident, and H&S event in one transaction.
  *  - DISMISS  → log a false-positive reason on the alert (for sensor tuning) and
  *               suppress its signals. No incident is created.
  */
 class SensorIncidentBridgeService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
+    public function __construct(
+        private readonly IncidentJourneyService $journeys,
+        private readonly ControlRoomAlertLifecycleService $lifecycle,
+    ) {}
+
     /**
      * Confirm a sensor alert into a ClientIncident. Idempotent: if the alert is
      * already linked to an incident, that incident is returned unchanged.
@@ -31,53 +38,44 @@ class SensorIncidentBridgeService
      */
     public function confirm(ControlRoomAlert $alert, User $operator, array $overrides = []): ClientIncident
     {
-        if (! empty($alert->context['incident_id'])) {
-            return ClientIncident::findOrFail($alert->context['incident_id']);
-        }
-
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_CONFIRMED)) {
-            throw new InvalidArgumentException("Alert {$alert->id} cannot be confirmed from status '{$alert->status}'.");
-        }
-
         return DB::transaction(function () use ($alert, $operator, $overrides) {
-            $signal = $alert->signals()->latest('occurred_at')->first();
-            $evidence = $this->buildEvidence($alert, $signal);
+            $lockedAlert = ControlRoomAlert::query()
+                ->whereKey($alert->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (! $this->lifecycle->isDetectionAlert($lockedAlert)) {
+                throw new InvalidArgumentException("Alert {$lockedAlert->id} is not a sensor alert.");
+            }
+            $isConfirmedRepair = $lockedAlert->status === ControlRoomAlert::STATUS_CONFIRMED;
+            if (! $isConfirmedRepair && ! $lockedAlert->canTransitionTo(ControlRoomAlert::STATUS_CONFIRMED)) {
+                throw new InvalidArgumentException(
+                    "Alert {$lockedAlert->id} cannot be confirmed from status '{$lockedAlert->status}'.",
+                );
+            }
 
-            $incident = ClientIncident::create([
-                'client_id' => $alert->client_id,
-                'reported_by' => $operator->id,
-                'type' => $overrides['type'] ?? $this->inferType($signal),
-                'source' => 'sensor',
-                'severity' => $overrides['severity'] ?? $this->mapSeverity($alert->severity),
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'occurred_at' => $signal?->occurred_at ?? $alert->triggered_at ?? now(),
+            $signal = $lockedAlert->signals()->latest('occurred_at')->first();
+            $evidence = $this->buildEvidence($lockedAlert, $signal);
+            $type = $overrides['type'] ?? $this->inferType($signal);
+            $journey = $this->journeys->submitFromAlert($lockedAlert, [
+                'client_id' => $lockedAlert->client_id,
+                'site_id' => $lockedAlert->site_id,
+                'type' => $type,
+                'severity' => $overrides['severity'] ?? $this->mapSeverity($lockedAlert->severity),
+                'occurred_at' => $signal?->occurred_at ?? $lockedAlert->triggered_at ?? now(),
                 'description' => $overrides['note'] ?? $this->describe($signal),
-                'title' => ($overrides['type'] ?? $this->inferType($signal)) . ' incident',
-                'control_room_alert_id' => $alert->id,
+                'title' => ucfirst(str_replace('_', ' ', $type)).' incident',
                 'metadata' => ['sensor_evidence' => $evidence],
-            ]);
+            ], $operator);
+            $incident = $journey->incident;
 
-            $context = $alert->context ?? [];
-            $context['incident_id'] = $incident->id;
-            $context['confirmed_by'] = $operator->name;
-            $context['confirmed_at'] = now()->toISOString();
+            if ($isConfirmedRepair) {
+                return $incident;
+            }
 
-            $alert->update([
-                'status' => ControlRoomAlert::STATUS_CONFIRMED,
-                'context' => $context,
-                'acknowledged_at' => $alert->acknowledged_at ?? now(),
-                'acknowledged_by_user_id' => $alert->acknowledged_by_user_id ?? $operator->id,
-            ]);
-
-            AuditLogger::log('controlRoom.alert.confirm', $alert, [
-                'alert_id' => $alert->id,
-                'incident_id' => $incident->id,
-                'confirmed_by' => $operator->id,
-            ]);
+            $this->lifecycle->confirmSensor($lockedAlert->refresh(), $operator);
 
             return $incident;
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     /**
@@ -86,34 +84,7 @@ class SensorIncidentBridgeService
      */
     public function dismiss(ControlRoomAlert $alert, string $reason, User $operator): void
     {
-        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_DISMISSED)) {
-            throw new InvalidArgumentException("Alert {$alert->id} cannot be dismissed from status '{$alert->status}'.");
-        }
-
-        DB::transaction(function () use ($alert, $reason, $operator) {
-            $context = $alert->context ?? [];
-            $context['dismissed_reason'] = $reason;
-            $context['dismissed_by'] = $operator->name;
-            $context['dismissed_at'] = now()->toISOString();
-
-            $alert->update([
-                'status' => ControlRoomAlert::STATUS_DISMISSED,
-                'resolution_code' => 'false_positive',
-                'context' => $context,
-                'resolved_at' => now(),
-                'resolved_by_user_id' => $operator->id,
-            ]);
-
-            foreach ($alert->signals as $signal) {
-                $signal->markSuppressed("false_positive: {$reason}");
-            }
-
-            AuditLogger::log('controlRoom.alert.dismiss', $alert, [
-                'alert_id' => $alert->id,
-                'reason' => $reason,
-                'dismissed_by' => $operator->id,
-            ]);
-        });
+        $this->lifecycle->dismissSensor($alert, $operator, $reason);
     }
 
     /**
@@ -149,7 +120,8 @@ class SensorIncidentBridgeService
     {
         if ($signal?->signal_type_code === 'fall_detected') {
             $confidence = $signal->payload['confidence'] ?? null;
-            return 'Fall detected by sensor' . ($confidence !== null ? " (confidence {$confidence})" : '') . ', confirmed by the operator.';
+
+            return 'Fall detected by sensor'.($confidence !== null ? " (confidence {$confidence})" : '').', confirmed by the operator.';
         }
 
         return 'Sensor detection confirmed by the operator.';

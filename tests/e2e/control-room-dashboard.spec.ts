@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { collectConsoleErrors, expectNoConsoleErrors, loginAsStaff } from './helpers';
+import { collectConsoleErrors, expectNoConsoleErrors } from './helpers';
+import {
+    loginAsFixture,
+    seedIncidentHandoverFixtures,
+} from './incident-handover-helpers';
 
 /**
  * Control Room dashboard — filtering, KPI navigation, and quick-stat drilldown.
@@ -10,38 +14,38 @@ import { collectConsoleErrors, expectNoConsoleErrors, loginAsStaff } from './hel
  */
 
 test.describe('control room — dashboard interactions', () => {
+    let operator: ReturnType<
+        typeof seedIncidentHandoverFixtures
+    >['users']['operator'];
+
+    test.beforeAll(() => {
+        operator = seedIncidentHandoverFixtures().users.operator;
+    });
+
     test.beforeEach(async ({ page }) => {
-        await loginAsStaff(page);
+        await loginAsFixture(page, operator);
         await page.goto('/control-room');
         await expect(
-            page.getByRole('heading', { name: 'Control Room', level: 1 }),
+            page.getByRole('heading', { name: 'Control Room Desk', level: 1 }),
         ).toBeVisible();
     });
 
-    test('Critical KPI card links to the severity-filtered list', async ({ page }, testInfo) => {
-        test.skip(
-            !testInfo.project.name.includes('desktop'),
-            'Hover/click drilldown is only meaningful on desktop layout.',
-        );
-
+    test('continuity summary opens the H&S handover register', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
 
-        await page.getByRole('link', { name: /Critical/ }).first().click();
-        await expect(page).toHaveURL(/severity=critical/);
+        await page.getByRole('link', { name: /H&S waiting/ }).click();
+        await expect(page).toHaveURL(/\/health-safety\/events/);
 
         expectNoConsoleErrors(errors);
     });
 
-    test('severity filter dropdown applies a query param', async ({ page }, testInfo) => {
-        test.skip(
-            !testInfo.project.name.includes('desktop'),
-            'Filter dropdown only renders on desktop viewport.',
-        );
-
+    test('severity filter applies a query param', async ({ page }) => {
         const errors = collectConsoleErrors(page);
 
-        await page.getByRole('combobox').nth(1).click(); // status combobox is index 0; severity is index 1
-        await page.getByRole('option', { name: 'High' }).click();
+        await page.getByLabel('Severity').selectOption('high');
+        await page.getByRole('button', { name: 'Apply' }).click();
 
         await expect(page).toHaveURL(/severity=high/);
 
@@ -51,81 +55,84 @@ test.describe('control room — dashboard interactions', () => {
     test('search submits and persists in URL', async ({ page }) => {
         const errors = collectConsoleErrors(page);
 
-        const searchInput = page.getByPlaceholder('Search alerts...');
+        const searchInput = page.getByPlaceholder(
+            'Reference, incident, H&S or summary',
+        );
         await searchInput.fill('fire');
         await searchInput.press('Enter');
 
-        await expect(page).toHaveURL(/search=fire/);
+        await expect(page).toHaveURL(/q=fire/);
 
         expectNoConsoleErrors(errors);
     });
 
-    test('clear filters returns to clean URL', async ({ page }, testInfo) => {
-        test.skip(
-            !testInfo.project.name.includes('desktop'),
-            'Clear button visibility is desktop-only.',
-        );
-
+    test('clearing the search returns to the live desk URL', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
 
-        const searchInput = page.getByPlaceholder('Search alerts...');
+        const searchInput = page.getByPlaceholder(
+            'Reference, incident, H&S or summary',
+        );
         await searchInput.fill('test-query');
         await searchInput.press('Enter');
-        await expect(page).toHaveURL(/search=test-query/);
+        await expect(page).toHaveURL(/q=test-query/);
 
-        await page.getByRole('button', { name: /^Clear$/ }).click();
-        await expect(page).toHaveURL(/\/control-room\/?$/);
+        await searchInput.fill('');
+        await searchInput.press('Enter');
+        await expect(page).toHaveURL(/\/control-room\?period=7d$/);
 
         expectNoConsoleErrors(errors);
     });
 
-    test('quick-stat row navigates back into filtered list', async ({ page }, testInfo) => {
-        test.skip(
-            !testInfo.project.name.includes('desktop'),
-            'Quick-stat grid is desktop-first.',
-        );
-
+    test('owner filter scopes the priority worklist to unassigned alerts', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
 
-        await page.getByRole('button', { name: /Unassigned/ }).first().click();
+        await page.getByLabel('Owner').selectOption('unassigned');
+        await page.getByRole('button', { name: 'Apply' }).click();
         await expect(page).toHaveURL(/assigned_to=unassigned/);
 
         expectNoConsoleErrors(errors);
     });
 
-    test('empty-alerts state renders when filters return zero rows', async ({ page }) => {
+    test('empty-alerts state renders when filters return zero rows', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
 
-        const searchInput = page.getByPlaceholder('Search alerts...');
+        const searchInput = page.getByPlaceholder(
+            'Reference, incident, H&S or summary',
+        );
         await searchInput.fill('this-string-should-never-match-zzzz-9876');
         await searchInput.press('Enter');
 
         await expect(
-            page.getByText(/No alerts found matching your filters\./i),
+            page.getByText(/No priority work matches these filters/i),
         ).toBeVisible();
 
         expectNoConsoleErrors(errors);
     });
 
-    test('navigation buttons in the page header reach their target pages', async ({
+    test('workspace navigation reaches the operational destinations', async ({
         page,
-    }, testInfo) => {
-        test.skip(
-            !testInfo.project.name.includes('desktop'),
-            'Header chip buttons collapse on mobile.',
-        );
-
+    }) => {
+        test.setTimeout(60_000);
         const errors = collectConsoleErrors(page);
+        const workspace = page.getByRole('navigation', {
+            name: 'Control Room workspace',
+        });
 
-        await page.getByRole('link', { name: /^Map$/ }).click();
-        await expect(page).toHaveURL(/\/control-room\/map$/);
+        await workspace.getByRole('link', { name: /^Active alerts/ }).click();
+        await expect(page).toHaveURL(/\/control-room\/alerts$/);
         await page.goBack();
 
-        await page.getByRole('link', { name: /^Shifts$/ }).click();
+        await workspace.getByRole('link', { name: /^Shifts/ }).click();
         await expect(page).toHaveURL(/\/control-room\/shifts$/);
         await page.goBack();
 
-        await page.getByRole('link', { name: /^Queues$/ }).click();
+        await workspace.getByRole('link', { name: /^Escalations/ }).click();
         await expect(page).toHaveURL(/\/control-room\/escalations$/);
 
         expectNoConsoleErrors(errors);

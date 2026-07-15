@@ -3,9 +3,10 @@
 namespace App\Services\ControlRoom;
 
 use App\Enums\AlertSeverity;
+use App\Models\ClientIncident;
 use App\Models\ClientMedicationAdministration;
-use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertQueue;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Playbook;
@@ -18,22 +19,38 @@ use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetOuting;
+use App\Models\FleetResidentTransport;
+use App\Models\FleetSignal;
+use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleStateSnapshot;
 use App\Models\ShiftSignal;
 use App\Services\AuditLogger;
-use App\Services\ControlRoom\ControlRoomNotificationService;
+use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\ShiftSignalService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SignalProcessingService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
+    private const INCIDENT_CORRELATION_CAPABILITY = 'incident_correlation';
+
+    private const TRUSTED_INCIDENT_SOURCE_SLUGS = ['medication'];
+
     public function __construct(
         protected ControlRoomNotificationService $notifications,
         protected ?ShiftSignalService $shiftSignals = null,
-    )
-    {
+        protected ?IncidentJourneyService $journeys = null,
+        protected ?ControlRoomAlertLifecycleService $lifecycle = null,
+    ) {
         $this->shiftSignals ??= app(ShiftSignalService::class);
+        $this->journeys ??= app(IncidentJourneyService::class);
+        $this->lifecycle ??= app(ControlRoomAlertLifecycleService::class);
     }
 
     /**
@@ -67,11 +84,12 @@ class SignalProcessingService
         $existing = Signal::where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
             Log::debug('Signal deduplicated', ['idempotency_key' => $data['idempotency_key']]);
+
             return $existing;
         }
 
         // Resolve signal type
-        if (!empty($data['signal_type_code']) && $data['signal_type_code'] !== 'unknown') {
+        if (! empty($data['signal_type_code']) && $data['signal_type_code'] !== 'unknown') {
             $signalType = SignalType::findByCode($data['signal_type_code']);
             if ($signalType) {
                 $data['signal_type_id'] = $signalType->id;
@@ -80,7 +98,7 @@ class SignalProcessingService
         }
 
         // Record signal source activity
-        if (!empty($data['signal_source_id'])) {
+        if (! empty($data['signal_source_id'])) {
             $source = SignalSource::find($data['signal_source_id']);
             $source?->recordSignal();
         }
@@ -93,7 +111,7 @@ class SignalProcessingService
             $signal = Signal::create(array_merge($data, [
                 'status' => 'pending',
             ]));
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             // Handle race condition: another process created the signal between check and create
             if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
                 $signal = Signal::where('idempotency_key', $data['idempotency_key'])->firstOrFail();
@@ -120,14 +138,36 @@ class SignalProcessingService
     public function process(Signal $signal): ?ControlRoomAlert
     {
         if ($signal->status !== 'pending') {
-            return $signal->alert;
+            return $signal->status === 'processed'
+                ? ($signal->alert ?? $signal->correlatedAlert)
+                : null;
         }
 
         return DB::transaction(function () use ($signal) {
             // Check if in maintenance window
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
+
                 return null;
+            }
+
+            $incident = $this->trustedIncidentForSignal($signal);
+            if ($incident !== null) {
+                $existingAlert = $this->exactAlertForIncident($incident);
+                if ($existingAlert !== null) {
+                    $signal->markCorrelated($existingAlert);
+                    $this->addSignalToAlert($signal, $existingAlert);
+
+                    $existingAlert = $this->journeys
+                        ->attachAlertToIncident($incident, $existingAlert->fresh())
+                        ->alert;
+
+                    if ($existingAlert === null) {
+                        throw new \RuntimeException('The canonical incident journey lost its operational alert.');
+                    }
+
+                    return $existingAlert;
+                }
             }
 
             // Find matching rules
@@ -135,25 +175,46 @@ class SignalProcessingService
 
             if ($rules->isEmpty()) {
                 // No rules match - create alert with defaults
-                return $this->createAlertFromSignal($signal);
+                return $this->createAlertForSignal($signal, null, $incident);
             }
 
             // Use the highest priority (lowest number) rule
             $rule = $rules->first();
 
             // Check for deduplication
-            if ($rule->deduplicate) {
+            if ($rule->deduplicate && $incident === null) {
                 $existingAlert = $this->findCorrelatedAlert($signal, $rule);
                 if ($existingAlert) {
                     $signal->markCorrelated($existingAlert);
                     $this->addSignalToAlert($signal, $existingAlert);
+
                     return $existingAlert;
                 }
             }
 
             // Create new alert
-            return $this->createAlertFromSignal($signal, $rule);
-        });
+            return $this->createAlertForSignal($signal, $rule, $incident);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    private function createAlertForSignal(
+        Signal $signal,
+        ?SignalRule $rule,
+        ?ClientIncident $incident,
+    ): ControlRoomAlert {
+        $alert = $this->createAlertFromSignal($signal, $rule);
+
+        if ($incident !== null) {
+            $alert = $this->journeys
+                ->attachAlertToIncident($incident, $alert)
+                ->alert;
+
+            if ($alert === null) {
+                throw new \RuntimeException('The canonical incident journey did not return its operational alert.');
+            }
+        }
+
+        return $alert;
     }
 
     /**
@@ -345,7 +406,236 @@ class SignalProcessingService
             $query->where('site_id', $signal->site_id);
         }
 
-        return $query->latest('triggered_at')->first();
+        if ($signal->signalSource?->slug !== 'lone_worker') {
+            $query->latest('triggered_at')->lockForUpdate();
+
+            return $query->first();
+        }
+
+        $sessionId = $this->canonicalPositiveId($normalizedData['lone_worker_session_id'] ?? null);
+        $workerId = $this->canonicalPositiveId($normalizedData['worker_user_id'] ?? null);
+        $siteId = $this->canonicalPositiveId($signal->site_id);
+        if ($sessionId === null
+            || $workerId === null
+            || $siteId === null
+            || ($normalizedData['source_module'] ?? null) !== 'lone_worker'
+            || ($normalizedData['signal_type'] ?? null) !== $signal->signal_type_code
+            || $this->canonicalPositiveId($normalizedData['site_id'] ?? null) !== $siteId
+            || ! array_key_exists('client_id', $normalizedData)
+        ) {
+            return null;
+        }
+
+        if ($signal->client_id !== null && ! $this->hasCanonicalPositiveIntegerIdentity($signal->client_id)) {
+            return null;
+        }
+        $clientId = $signal->client_id === null ? null : (int) $signal->client_id;
+        if (! $this->nullableCanonicalIdMatches($normalizedData['client_id'], $clientId)) {
+            return null;
+        }
+
+        $query
+            ->where('source', 'lone_worker')
+            ->where('alert_type', $this->resolveAlertType($signal, $rule))
+            ->where('site_id', $siteId)
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?",
+                [$signal->signal_type_code],
+            )
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.source_module')) = ?",
+                ['lone_worker'],
+            )
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.signal_type')) = ?",
+                [$signal->signal_type_code],
+            )
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.lone_worker_session_id')) = ?",
+                [(string) $sessionId],
+            )
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.worker_user_id')) = ?",
+                [(string) $workerId],
+            )
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.site_id')) = ?",
+                [(string) $siteId],
+            );
+        if ($clientId === null) {
+            $query
+                ->whereNull('client_id')
+                ->whereRaw(
+                    "JSON_TYPE(JSON_EXTRACT(context, '$.normalized_data.client_id')) = 'NULL'",
+                );
+        } else {
+            $query
+                ->where('client_id', $clientId)
+                ->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.client_id')) = ?",
+                    [(string) $clientId],
+                );
+        }
+
+        $candidate = $query->latest('triggered_at')->lockForUpdate()->first();
+
+        return $candidate && $this->loneWorkerCandidateMatchesSignal($candidate, $signal, $rule)
+            ? $candidate
+            : null;
+    }
+
+    /**
+     * Lone-worker alert ownership is immutable. Never correlate a new signal to
+     * a candidate whose persisted canonical tuple belongs to another session.
+     */
+    private function loneWorkerCandidateMatchesSignal(
+        ControlRoomAlert $candidate,
+        Signal $signal,
+        SignalRule $rule,
+    ): bool {
+        $incoming = $signal->normalized_data;
+        $candidateContext = $candidate->context;
+        $candidateNormalized = data_get($candidateContext, 'normalized_data');
+        if (! is_array($incoming)
+            || ! is_array($candidateContext)
+            || ! is_array($candidateNormalized)
+            || ($incoming['source_module'] ?? null) !== 'lone_worker'
+            || ($candidateNormalized['source_module'] ?? null) !== 'lone_worker'
+            || $candidate->source !== 'lone_worker'
+            || $candidate->alert_type !== $this->resolveAlertType($signal, $rule)
+            || ($candidateContext['signal_type_code'] ?? null) !== $signal->signal_type_code
+            || ($incoming['signal_type'] ?? null) !== $signal->signal_type_code
+            || ($candidateNormalized['signal_type'] ?? null) !== $signal->signal_type_code
+        ) {
+            return false;
+        }
+
+        $sessionId = $this->canonicalPositiveId($incoming['lone_worker_session_id'] ?? null);
+        $workerId = $this->canonicalPositiveId($incoming['worker_user_id'] ?? null);
+        $siteId = $this->canonicalPositiveId($signal->site_id);
+        if ($sessionId === null
+            || $workerId === null
+            || $siteId === null
+            || $this->canonicalPositiveId($incoming['site_id'] ?? null) !== $siteId
+            || $this->canonicalPositiveId($candidate->site_id) !== $siteId
+            || $this->canonicalPositiveId($candidateNormalized['lone_worker_session_id'] ?? null) !== $sessionId
+            || $this->canonicalPositiveId($candidateNormalized['worker_user_id'] ?? null) !== $workerId
+            || $this->canonicalPositiveId($candidateNormalized['site_id'] ?? null) !== $siteId
+        ) {
+            return false;
+        }
+
+        if ($signal->client_id !== null && ! $this->hasCanonicalPositiveIntegerIdentity($signal->client_id)) {
+            return false;
+        }
+        $clientId = $signal->client_id === null ? null : (int) $signal->client_id;
+
+        return array_key_exists('client_id', $incoming)
+            && array_key_exists('client_id', $candidateNormalized)
+            && $this->nullableCanonicalIdMatches($incoming['client_id'], $clientId)
+            && $this->nullableCanonicalIdMatches($candidate->client_id, $clientId)
+            && $this->nullableCanonicalIdMatches($candidateNormalized['client_id'], $clientId);
+    }
+
+    private function canonicalPositiveId(mixed $identity): ?int
+    {
+        return $this->hasCanonicalPositiveIntegerIdentity($identity)
+            ? (int) $identity
+            : null;
+    }
+
+    private function nullableCanonicalIdMatches(mixed $actual, ?int $expected): bool
+    {
+        return $expected === null
+            ? $actual === null
+            : $this->canonicalPositiveId($actual) === $expected;
+    }
+
+    private function trustedIncidentForSignal(Signal $signal): ?ClientIncident
+    {
+        $incidentId = data_get($signal->normalized_data, 'incident_id');
+        if ($incidentId === null || $incidentId === '') {
+            return null;
+        }
+
+        if (! $this->hasCanonicalPositiveIntegerIdentity($incidentId)) {
+            throw new \DomainException('Incident signal correlation requires a valid incident.');
+        }
+
+        $source = $signal->signalSource;
+        $capabilities = $source?->capabilities ?? [];
+        $isTrustedSource = $source !== null
+            && $source->status === 'active'
+            && $source->vendor === 'internal'
+            && (
+                in_array($source->slug, self::TRUSTED_INCIDENT_SOURCE_SLUGS, true)
+                || in_array(self::INCIDENT_CORRELATION_CAPABILITY, $capabilities, true)
+            );
+
+        if (! $isTrustedSource) {
+            throw new \DomainException('Incident signal correlation requires a trusted source.');
+        }
+
+        $incident = ClientIncident::query()
+            ->whereKey((int) $incidentId)
+            ->first();
+
+        if ($incident === null
+            || $signal->client_id === null
+            || (int) $incident->client_id !== (int) $signal->client_id
+        ) {
+            throw new \DomainException('Incident signal correlation does not match the signal client.');
+        }
+
+        return $incident;
+    }
+
+    private function hasCanonicalPositiveIntegerIdentity(mixed $identity): bool
+    {
+        if (is_int($identity)) {
+            return $identity > 0;
+        }
+
+        return is_string($identity)
+            && preg_match('/^[1-9][0-9]*$/D', $identity) === 1
+            && (string) (int) $identity === $identity;
+    }
+
+    private function exactAlertForIncident(ClientIncident $incident): ?ControlRoomAlert
+    {
+        if ($incident->control_room_alert_id !== null) {
+            $direct = ControlRoomAlert::query()
+                ->whereKey($incident->control_room_alert_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($direct !== null) {
+                return $direct;
+            }
+        }
+
+        $claims = ControlRoomAlert::query()
+            ->where(function ($query) use ($incident) {
+                $query->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(context, '$.incident_id')) = ?",
+                    [(string) $incident->id]
+                )->orWhereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.incident_id')) = ?",
+                    [(string) $incident->id]
+                );
+            })
+            ->lockForUpdate()
+            ->get();
+
+        if ($claims->count() > 1) {
+            throw new \DomainException(
+                'Incident signal correlation is ambiguous: multiple alerts claim the same incident.',
+            );
+        }
+
+        $alert = $claims->first();
+
+        return $alert;
     }
 
     /**
@@ -445,7 +735,7 @@ class SignalProcessingService
     /**
      * Ingest a signal from a fleet signal, enriching with operational context.
      */
-    public function ingestFromFleetSignal(\App\Models\FleetSignal $fleetSignal): Signal
+    public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
         // Eager-load relationships for context enrichment
         $fleetSignal->loadMissing([
@@ -461,18 +751,22 @@ class SignalProcessingService
 
         // Build fleet context for the alert
         $fleetContext = $this->buildFleetContext($fleetSignal);
+        $privacyBlocked = (bool) data_get($fleetSignal->payload, 'privacy_blocked', false);
+        if ($privacyBlocked) {
+            $fleetContext = $this->privacySafeFleetContext($fleetContext);
+        }
 
         // Map fleet source to control room signal source
-        $fleetSource = \App\Models\ControlRoom\SignalSource::where('slug', 'queclink_fleet')->first();
+        $fleetSource = SignalSource::where('slug', 'queclink_fleet')->first();
 
-        $signalTypeCode = 'fleet_' . str_replace('.', '_', $fleetSignal->signal_type);
+        $signalTypeCode = 'fleet_'.str_replace('.', '_', $fleetSignal->signal_type);
 
         $data = [
             'signal_source_id' => $fleetSource?->id,
             'signal_type_code' => $signalTypeCode,
             'asset_id' => $fleetSignal->asset_id,
             'site_id' => $fleetSignal->asset?->home_site_id,
-            'external_ref' => 'fleet_signal_' . $fleetSignal->id,
+            'external_ref' => 'fleet_signal_'.$fleetSignal->id,
             'severity_hint' => $fleetSignal->severity_hint ?? 'medium',
             'occurred_at' => $fleetSignal->occurred_at,
             'payload' => array_merge($fleetSignal->payload ?? [], [
@@ -480,8 +774,9 @@ class SignalProcessingService
             ]),
             'normalized_data' => [
                 'fleet_signal_id' => $fleetSignal->id,
-                'trip_id' => $fleetSignal->trip_id,
-                'driver_session_id' => $fleetSignal->driver_session_id,
+                'trip_id' => $privacyBlocked ? null : $fleetSignal->trip_id,
+                'driver_session_id' => $privacyBlocked ? null : $fleetSignal->driver_session_id,
+                'privacy_blocked' => $privacyBlocked,
                 'fleet_context' => $fleetContext,
             ],
         ];
@@ -599,7 +894,7 @@ class SignalProcessingService
     /**
      * Build enriched fleet context for control room alerts.
      */
-    protected function buildFleetContext(\App\Models\FleetSignal $signal): array
+    protected function buildFleetContext(FleetSignal $signal): array
     {
         $context = [];
 
@@ -642,7 +937,7 @@ class SignalProcessingService
 
         // Linked booking and outing (reduced to IDs, status, and non-PII labels)
         if ($signal->asset_id) {
-            $activeBooking = \App\Models\FleetVehicleBooking::query()
+            $activeBooking = FleetVehicleBooking::query()
                 ->where('asset_id', $signal->asset_id)
                 ->where('status', 'checked_out')
                 ->first();
@@ -654,7 +949,7 @@ class SignalProcessingService
                     'booked_by_user_id' => $activeBooking->user_id,
                 ];
 
-                $outing = \App\Models\FleetOuting::query()
+                $outing = FleetOuting::query()
                     ->where('booking_id', $activeBooking->id)
                     ->where('status', 'active')
                     ->withCount('residents')
@@ -670,7 +965,7 @@ class SignalProcessingService
             }
 
             // Active transport (count + IDs only — names removed)
-            $activeTransport = \App\Models\FleetResidentTransport::query()
+            $activeTransport = FleetResidentTransport::query()
                 ->where('asset_id', $signal->asset_id)
                 ->where('status', 'in_progress')
                 ->first();
@@ -682,11 +977,11 @@ class SignalProcessingService
 
         // Vehicle state (last known position — already consent-gated)
         if ($signal->asset_id) {
-            $state = \App\Models\FleetVehicleStateSnapshot::query()
+            $state = FleetVehicleStateSnapshot::query()
                 ->where('asset_id', $signal->asset_id)
                 ->first();
 
-            if ($state && $state->latitude && !$state->consent_blocked) {
+            if ($state && $state->latitude && ! $state->consent_blocked) {
                 $context['location'] = [
                     'lat' => (float) $state->latitude,
                     'lng' => (float) $state->longitude,
@@ -697,6 +992,28 @@ class SignalProcessingService
         }
 
         return $context;
+    }
+
+    /**
+     * A privacy-blocked telemetry frame may still raise a safety alarm, but an
+     * asynchronously processed outbox must not rebuild person/trip/location
+     * context after the ingest transaction has scrubbed it. Retain only stable
+     * equipment identifiers needed to recognise the affected asset.
+     */
+    protected function privacySafeFleetContext(array $context): array
+    {
+        $vehicle = $context['vehicle'] ?? null;
+        if (! is_array($vehicle)) {
+            return [];
+        }
+
+        return [
+            'vehicle' => array_filter([
+                'id' => $vehicle['id'] ?? null,
+                'asset_tag' => $vehicle['asset_tag'] ?? null,
+                'registration' => $vehicle['registration'] ?? null,
+            ], fn ($value): bool => $value !== null && $value !== ''),
+        ];
     }
 
     /**
@@ -864,6 +1181,15 @@ class SignalProcessingService
 
     protected function resolveAlertType(Signal $signal, ?SignalRule $rule = null): string
     {
+        if ($signal->signalSource?->slug === 'lone_worker') {
+            $canonicalLoneWorkerType = LoneWorkerSignalService::canonicalAlertType(
+                (string) $signal->signal_type_code,
+            );
+            if ($canonicalLoneWorkerType !== null) {
+                return $canonicalLoneWorkerType;
+            }
+        }
+
         $derivedRuleAlertType = null;
         if ($rule && is_string($rule->name) && str_ends_with(strtolower($rule->name), ' rule')) {
             $derivedRuleAlertType = preg_replace('/\s+rule$/i', '', $rule->name);
@@ -889,32 +1215,13 @@ class SignalProcessingService
         string $resolutionSource,
         array $metadata = [],
     ): void {
-        if (in_array($alert->status, ['resolved', 'closed'], true)) {
-            return;
-        }
-
-        $resolvedAt = now();
-        $context = $alert->context ?? [];
-        $resolution = array_merge([
-            'resolved_at' => $resolvedAt->toISOString(),
-            'reason' => $reason,
-            'source' => $resolutionSource,
-        ], $metadata);
-        $history = $context['resolution_history'] ?? [];
-        $history[] = $resolution;
-
-        $alert->update([
-            'status' => 'resolved',
-            'resolved_at' => $resolvedAt,
-            'resolved_by_user_id' => null,
-            'notes' => $reason,
-            'context' => array_merge($context, [
-                'resolution' => $resolution,
-                'resolution_history' => $history,
-            ]),
-        ]);
-
-        $alert->sla?->recordResolution();
+        $alert = $this->lifecycle->resolveAutomatically(
+            $alert,
+            $reason,
+            $resolutionSource,
+            $resolutionSource,
+            $metadata,
+        );
 
         if (
             $alert->source === 'shift_operations'
@@ -930,11 +1237,6 @@ class SignalProcessingService
                 'action' => $metadata['action'] ?? null,
             ]);
         }
-
-        AuditLogger::log('controlRoom.alert.resolve', $alert, [
-            'source' => 'shift_signal_pipeline',
-            'resolution_source' => $resolutionSource,
-        ]);
     }
 
     protected function correlationAlertTypes(Signal $signal, ?SignalRule $rule = null): array

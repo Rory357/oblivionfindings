@@ -1,3 +1,5 @@
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router } from '@inertiajs/react';
@@ -740,11 +741,17 @@ function SlaCard({
                         )}
                         {canManage && (
                             <ConfirmChip
-                                label={sla.is_active ? 'Deactivate' : 'Activate'}
+                                label={
+                                    sla.is_active ? 'Deactivate' : 'Activate'
+                                }
                                 icon={Power}
                                 destructive={sla.is_active}
                                 onConfirm={() => onToggleActive(sla)}
-                                title={sla.is_active ? 'Stop applying this SLA to new alerts' : 'Apply this SLA to new alerts'}
+                                title={
+                                    sla.is_active
+                                        ? 'Stop applying this SLA to new alerts'
+                                        : 'Apply this SLA to new alerts'
+                                }
                             />
                         )}
                         {!canManage && (
@@ -817,12 +824,11 @@ function SlaCard({
                                 Severities:
                             </span>
                             {sla.severities.map((s) => (
-                                <Badge
+                                <AlertStatusChip
                                     key={s}
-                                    className={`text-[10px] ${severityColors[s] ?? ''}`}
-                                >
-                                    {s}
-                                </Badge>
+                                    kind="severity"
+                                    value={s}
+                                />
                             ))}
                         </div>
                     )}
@@ -1006,16 +1012,14 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
         >
             <Head title="SLA Management - Control Room" />
             <PageShell>
-                <PageHero
+                <CommandCentrePage
+                    variant="compact"
+                    current="/control-room/sla"
                     icon={Timer}
-                    title="SLA Management"
-                    description="Configure service level agreements for alert acknowledgement, response, and resolution times."
-                    stats={[
-                        { label: 'Total SLAs', value: slaDefinitions.length },
-                        { label: 'Active', value: activeCount },
-                        { label: 'Alerts matched', value: totalAlerts },
-                        { label: 'Inactive', value: slaDefinitions.length - activeCount },
-                    ]}
+                    title="SLA performance"
+                    description="Configure response targets and review acknowledgement, response, and resolution performance."
+                    status="Service-level workspace"
+                    freshness={`${activeCount} active agreements`}
                     actions={
                         <div className="flex items-center gap-2">
                             <Link href="/control-room/sla/breaches">
@@ -1036,91 +1040,96 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                             )}
                         </div>
                     }
-                />
-
-                {/* Summary Cards */}
-                <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Total SLAs
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {slaDefinitions.length}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Active
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-success">
-                                {activeCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Total Alerts Matched
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">{totalAlerts}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Inactive
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-muted-foreground">
-                                {slaDefinitions.length - activeCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* SLA Cards Grid */}
-                {slaDefinitions.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <Shield className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                            <p className="text-lg font-medium text-muted-foreground">
-                                No SLA definitions configured
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Create your first SLA definition to begin
-                                tracking alert response times.
-                            </p>
-                            {can.manage && (
-                                <Button className="mt-4" onClick={handleCreate}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create SLA
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {slaDefinitions.map((sla) => (
-                            <SlaCard
-                                key={sla.id}
-                                sla={sla}
-                                canManage={can.manage}
-                                onEdit={handleEdit}
-                                onToggleActive={handleToggleActive}
-                            />
-                        ))}
+                >
+                    {/* Summary Cards */}
+                    <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Total SLAs
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold">
+                                    {slaDefinitions.length}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Active
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold text-status-success">
+                                    {activeCount}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Total Alerts Matched
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold">
+                                    {totalAlerts}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Inactive
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold text-muted-foreground">
+                                    {slaDefinitions.length - activeCount}
+                                </p>
+                            </CardContent>
+                        </Card>
                     </div>
-                )}
+
+                    {/* SLA Cards Grid */}
+                    {slaDefinitions.length === 0 ? (
+                        <Card>
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <Shield className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                                <p className="text-lg font-medium text-muted-foreground">
+                                    No SLA definitions configured
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Create your first SLA definition to begin
+                                    tracking alert response times.
+                                </p>
+                                {can.manage && (
+                                    <Button
+                                        className="mt-4"
+                                        onClick={handleCreate}
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create SLA
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {slaDefinitions.map((sla) => (
+                                <SlaCard
+                                    key={sla.id}
+                                    sla={sla}
+                                    canManage={can.manage}
+                                    onEdit={handleEdit}
+                                    onToggleActive={handleToggleActive}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </CommandCentrePage>
             </PageShell>
 
             {/* Create/Edit Dialog */}

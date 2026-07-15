@@ -11,8 +11,9 @@ class AttendanceServiceDoesNotWriteShiftStatusDirectlyTest extends TestCase
         $source = file_get_contents(app_path('Domain/Hr/Services/AttendanceService.php'));
 
         $this->assertStringContainsString('ShiftLifecycleService::class', $source);
-        $this->assertStringNotContainsString("'status' => 'in_progress'", $source);
-        $this->assertStringNotContainsString("'status' => 'completed'", $source);
+        $this->assertStringNotContainsString('$shift->update([', $source);
+        $this->assertStringNotContainsString('$shift->forceFill([', $source);
         $this->assertStringNotContainsString('->shift->update([', $source);
+        $this->assertStringNotContainsString('->shift->forceFill([', $source);
     }
 }

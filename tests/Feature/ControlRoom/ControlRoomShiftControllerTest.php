@@ -8,6 +8,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,7 +30,7 @@ class ControlRoomShiftControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->coordinator = $this->makeRoleUser('coordinator');
         $this->visibleWorker = $this->makeRoleUser('support_worker');
@@ -114,11 +115,13 @@ class ControlRoomShiftControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->coordinator)
-            ->post("/control-room/shifts/{$shift->id}/handover", [
+            ->patch("/control-room/shifts/{$shift->id}/handover/draft", [
                 'handover_notes' => 'Scope test handover',
-                'priority_items' => ['Check outstanding alert'],
                 'incoming_lead_user_id' => $this->hiddenWorker->id,
                 'incoming_team_members' => [$this->visibleWorker->id],
+                'reviewed_alert_ids' => [],
+                'priority_alert_ids' => [],
+                'expected_version' => $shift->fresh()->handover_version,
             ])
             ->assertForbidden();
     }
@@ -129,25 +132,21 @@ class ControlRoomShiftControllerTest extends TestCase
             'name' => 'Outgoing Shift',
             'starts_at' => now()->subHours(8),
             'status' => 'active',
-            'shift_lead_user_id' => $this->visibleWorker->id,
+            'shift_lead_user_id' => $this->coordinator->id,
             'team_members' => [$this->visibleWorker->id],
         ]);
 
-        $this->actingAs($this->coordinator)
-            ->post("/control-room/shifts/{$shift->id}/handover", [
-                'handover_notes' => 'Quiet night — nothing outstanding.',
-                'incoming_shift_name' => 'Sunrise Team',
-                'incoming_lead_user_id' => $this->visibleWorker->id,
-                'incoming_team_members' => [$this->visibleWorker->id],
-            ])
-            ->assertRedirect(route('control-room.shifts.index'));
+        $this->prepareAndAccept($shift, [
+            'handover_notes' => 'Quiet night — nothing outstanding.',
+            'incoming_shift_name' => 'Sunrise Team',
+        ]);
 
-        // The outgoing shift is completed and a new active shift carries the typed name.
+        // Acceptance completes outgoing ownership and activates the named shift.
         $this->assertSame('completed', $shift->fresh()->status);
         $this->assertDatabaseHas('control_room_shifts', [
             'name' => 'Sunrise Team',
             'status' => 'active',
-            'shift_lead_user_id' => $this->visibleWorker->id,
+            'shift_lead_user_id' => $this->coordinator->id,
         ]);
     }
 
@@ -157,20 +156,13 @@ class ControlRoomShiftControllerTest extends TestCase
             'name' => 'Outgoing Shift',
             'starts_at' => now()->subHours(8),
             'status' => 'active',
-            'shift_lead_user_id' => $this->visibleWorker->id,
+            'shift_lead_user_id' => $this->coordinator->id,
             'team_members' => [$this->visibleWorker->id],
         ]);
 
-        // The wizard presents the narrative as optional — an empty one must not
-        // bounce the whole handover at the final step.
-        $this->actingAs($this->coordinator)
-            ->post("/control-room/shifts/{$shift->id}/handover", [
-                'incoming_shift_name' => 'Quiet Night Crew',
-                'incoming_lead_user_id' => $this->visibleWorker->id,
-                'incoming_team_members' => [$this->visibleWorker->id],
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect(route('control-room.shifts.index'));
+        $this->prepareAndAccept($shift, [
+            'incoming_shift_name' => 'Quiet Night Crew',
+        ]);
 
         $this->assertSame('completed', $shift->fresh()->status);
         $this->assertDatabaseHas('control_room_shifts', ['name' => 'Quiet Night Crew', 'status' => 'active']);
@@ -188,17 +180,13 @@ class ControlRoomShiftControllerTest extends TestCase
             'name' => 'Outgoing Shift',
             'starts_at' => now()->subHours(8),
             'status' => 'active',
-            'shift_lead_user_id' => $this->visibleWorker->id,
+            'shift_lead_user_id' => $this->coordinator->id,
             'team_members' => [$this->visibleWorker->id],
         ]);
 
-        $this->actingAs($this->coordinator)
-            ->post("/control-room/shifts/{$shift->id}/handover", [
-                'handover_notes' => 'Quiet night — nothing outstanding.',
-                'incoming_lead_user_id' => $this->visibleWorker->id,
-                'incoming_team_members' => [$this->visibleWorker->id],
-            ])
-            ->assertRedirect(route('control-room.shifts.index'));
+        $this->prepareAndAccept($shift, [
+            'handover_notes' => 'Quiet night — nothing outstanding.',
+        ]);
 
         $newShift = Shift::query()->where('status', 'active')->latest('id')->first();
         $this->assertNotNull($newShift);
@@ -237,5 +225,40 @@ class ControlRoomShiftControllerTest extends TestCase
                 'secondary_site_ids' => [],
             ],
         );
+    }
+
+    /** @param array<string, mixed> $draftOverrides */
+    protected function prepareAndAccept(Shift $shift, array $draftOverrides = []): void
+    {
+        $draft = array_replace([
+            'handover_notes' => '',
+            'incoming_shift_name' => '',
+            'incoming_lead_user_id' => $this->coordinator->id,
+            'incoming_team_members' => [$this->visibleWorker->id],
+            'reviewed_alert_ids' => [],
+            'priority_alert_ids' => [],
+            'expected_version' => $shift->fresh()->handover_version,
+        ], $draftOverrides);
+
+        $this->actingAs($this->coordinator)
+            ->patch("/control-room/shifts/{$shift->id}/handover/draft", $draft)
+            ->assertSessionHasNoErrors();
+
+        $shift->refresh();
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->coordinator->id,
+                'reviewed_alert_ids' => [],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $shift->refresh();
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/shifts/{$shift->id}/accept-handover", [
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('control-room.shifts.index'));
     }
 }

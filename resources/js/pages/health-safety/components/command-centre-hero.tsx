@@ -109,7 +109,7 @@ export function CommandCentreHero({
     filters,
     sites,
     expiring,
-    notifiableEvents,
+    worksafePending,
     activeAlerts,
     openSafeguarding,
     fleetUnresolved,
@@ -122,7 +122,7 @@ export function CommandCentreHero({
     filters: HeroFilters;
     sites: Array<{ id: number; name: string }>;
     expiring: Array<{ type: string }>;
-    notifiableEvents: Array<{ status: string }>;
+    worksafePending: number;
     activeAlerts: number;
     openSafeguarding: number;
     fleetUnresolved: number;
@@ -146,9 +146,6 @@ export function CommandCentreHero({
     const lagging = leadingLagging.lagging;
     const leading = leadingLagging.leading;
 
-    const notifiableAwaiting = notifiableEvents.filter(
-        (n) => n.status === 'pending',
-    ).length;
     const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
     const drillsDue = expiring.filter((e) => e.type === 'drill').length;
     const ppeDue = expiring.filter(
@@ -265,7 +262,7 @@ export function CommandCentreHero({
                     {lagging.incidents} incidents
                 </HeroSummaryMetric>
                 <HeroSummaryMetric tone="critical">
-                    {notifiableAwaiting} WorkSafe-notifiable
+                    {worksafePending} WorkSafe-notifiable
                 </HeroSummaryMetric>
                 <HeroSummaryMetric tone="warning">
                     {leading.open_hazards} hazards open
@@ -354,7 +351,7 @@ export function CommandCentreHero({
                         {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
                     </p>
                     <HeroComplianceBadges
-                        worksafeAwaiting={notifiableAwaiting}
+                        worksafeAwaiting={worksafePending}
                         sdsExpiring={sdsExpiring}
                         drillsDue={drillsDue}
                     />

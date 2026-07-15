@@ -1,3 +1,5 @@
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
 import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -29,10 +31,10 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Settings2, Trash2, X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 // --- TypeScript Interfaces ---
@@ -187,13 +189,6 @@ const roleOptions = [
     'on_call_manager',
 ] as const;
 
-const severityColors: Record<string, string> = {
-    low: 'bg-muted text-foreground',
-    medium: 'bg-status-warning-bg text-status-warning',
-    high: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-};
-
 const statusColors: Record<string, string> = {
     active: 'bg-status-success-bg text-status-success',
     inactive: 'bg-muted text-muted-foreground',
@@ -212,38 +207,12 @@ const outboxStatusColors: Record<string, string> = {
     dead_letter: 'bg-status-critical-bg text-status-critical',
 };
 
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return 'Never';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m ago`;
-    return `${diffDays}d ago`;
-}
-
 function heartbeatColor(isoString: string | null): string {
     if (!isoString) return 'text-status-critical';
     const diffMins = (Date.now() - new Date(isoString).getTime()) / 60000;
     if (diffMins < 5) return 'text-status-success';
     if (diffMins < 10) return 'text-status-warning';
     return 'text-status-critical';
-}
-
-function formatDateTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 }
 
 function toLocalDatetimeValue(isoString: string | null): string {
@@ -1242,995 +1211,1028 @@ export default function ControlRoomSettings({
         <AppLayout>
             <Head title="Control Room Settings" />
             <PageShell>
-                <PageHero variant="compact"
+                <CommandCentrePage
+                    variant="compact"
+                    current="/control-room/settings"
+                    icon={Settings2}
                     title="Settings"
-                    description="Configure signal rules, triage queues, sources, and maintenance windows."
-                />
-
-                <Tabs
-                    defaultValue={tab}
-                    onValueChange={handleTabChange}
-                    className="mt-6"
+                    description="Configure signal rules, triage queues, sources, maintenance windows, and ticket options."
+                    status="Configuration workspace"
                 >
-                    <TabsList>
-                        <TabsTrigger value="rules">Signal Rules</TabsTrigger>
-                        <TabsTrigger value="queues">Triage Queues</TabsTrigger>
-                        <TabsTrigger value="sources">
-                            Signal Sources
-                        </TabsTrigger>
-                        <TabsTrigger value="maintenance">
-                            Maintenance
-                        </TabsTrigger>
-                        <TabsTrigger value="signal-outbox">
-                            Signal Outbox
-                        </TabsTrigger>
-                        <TabsTrigger value="ticket-options">
-                            Ticket Options
-                        </TabsTrigger>
-                    </TabsList>
+                    <Tabs
+                        defaultValue={tab}
+                        onValueChange={handleTabChange}
+                        className="mt-6"
+                    >
+                        <TabsList>
+                            <TabsTrigger value="rules">
+                                Signal Rules
+                            </TabsTrigger>
+                            <TabsTrigger value="queues">
+                                Triage Queues
+                            </TabsTrigger>
+                            <TabsTrigger value="sources">
+                                Signal Sources
+                            </TabsTrigger>
+                            <TabsTrigger value="maintenance">
+                                Maintenance
+                            </TabsTrigger>
+                            <TabsTrigger value="signal-outbox">
+                                Signal Outbox
+                            </TabsTrigger>
+                            <TabsTrigger value="ticket-options">
+                                Ticket Options
+                            </TabsTrigger>
+                        </TabsList>
 
-                    {/* --- Tab 1: Signal Rules --- */}
-                    <TabsContent value="rules" className="mt-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">
-                                    Signal Rules
-                                </CardTitle>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setEditingRule(null);
-                                        setRuleDialogOpen(true);
-                                    }}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Create Rule
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {signalRules.length === 0 ? (
-                                    <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No signal rules configured yet. Create
-                                        one to get started.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Name
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Signal Type
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Source
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Priority
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Severity
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Dedup
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Active
-                                                    </th>
-                                                    <th className="pb-2 font-medium">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {signalRules.map((rule) => (
-                                                    <tr
-                                                        key={rule.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2.5 pr-4 font-medium">
-                                                            {rule.name}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {rule.signal_type_name ??
-                                                                'Any'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {rule.signal_source_name ??
-                                                                'Any'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {rule.priority}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {rule.output_severity ? (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className={
-                                                                        severityColors[
-                                                                            rule
-                                                                                .output_severity
-                                                                        ] ?? ''
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        rule.output_severity
-                                                                    }
-                                                                </Badge>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    Inherit
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {rule.dedup_window_minutes
-                                                                ? `${rule.dedup_window_minutes}m`
-                                                                : '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Switch
-                                                                checked={
-                                                                    rule.is_active
-                                                                }
-                                                                onCheckedChange={() =>
-                                                                    handleToggleRuleActive(
-                                                                        rule,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                            <div className="flex gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        setEditingRule(
-                                                                            rule,
-                                                                        );
-                                                                        setRuleDialogOpen(
-                                                                            true,
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    <Pencil className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        setDeleteRuleId(
-                                                                            rule.id,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Trash2 className="h-3.5 w-3.5 text-status-critical" />
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* --- Tab 2: Triage Queues --- */}
-                    <TabsContent value="queues" className="mt-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">
-                                    Triage Queues
-                                </CardTitle>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setEditingQueue(null);
-                                        setQueueDialogOpen(true);
-                                    }}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Create Queue
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {triageQueues.length === 0 ? (
-                                    <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No triage queues configured yet.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Name
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Code
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Tier
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Severities
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Sources
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Auto-Escalate
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Next Queue
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Open
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Active
-                                                    </th>
-                                                    <th className="pb-2 font-medium">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {triageQueues.map((queue) => (
-                                                    <tr
-                                                        key={queue.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2.5 pr-4 font-medium">
-                                                            {queue.name}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 font-mono text-xs text-muted-foreground">
-                                                            {queue.code}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Badge variant="outline">
-                                                                T{queue.tier}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {queue.handle_severities.map(
-                                                                    (s) => (
-                                                                        <Badge
-                                                                            key={
-                                                                                s
-                                                                            }
-                                                                            variant="outline"
-                                                                            className={`text-xs ${severityColors[s] ?? ''}`}
-                                                                        >
-                                                                            {s}
-                                                                        </Badge>
-                                                                    ),
-                                                                )}
-                                                                {queue
-                                                                    .handle_severities
-                                                                    .length ===
-                                                                    0 && (
-                                                                    <span className="text-muted-foreground">
-                                                                        All
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {queue.handle_sources.map(
-                                                                    (s) => (
-                                                                        <Badge
-                                                                            key={
-                                                                                s
-                                                                            }
-                                                                            variant="outline"
-                                                                            className="text-xs"
-                                                                        >
-                                                                            {s}
-                                                                        </Badge>
-                                                                    ),
-                                                                )}
-                                                                {queue
-                                                                    .handle_sources
-                                                                    .length ===
-                                                                    0 && (
-                                                                    <span className="text-muted-foreground">
-                                                                        All
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {queue.auto_escalate_after_minutes
-                                                                ? `${queue.auto_escalate_after_minutes}m`
-                                                                : '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {queue.escalate_to_queue_name ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={
-                                                                    queue.open_alert_count >
-                                                                    0
-                                                                        ? 'bg-status-warning-bg text-status-warning'
-                                                                        : ''
-                                                                }
-                                                            >
-                                                                {
-                                                                    queue.open_alert_count
-                                                                }
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Switch
-                                                                checked={
-                                                                    queue.is_active
-                                                                }
-                                                                onCheckedChange={() =>
-                                                                    handleToggleQueueActive(
-                                                                        queue,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setEditingQueue(
-                                                                        queue,
-                                                                    );
-                                                                    setQueueDialogOpen(
-                                                                        true,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Pencil className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* --- Tab 3: Signal Sources (read-only) --- */}
-                    <TabsContent value="sources" className="mt-4">
-                        {signalSources.length === 0 ? (
+                        {/* --- Tab 1: Signal Rules --- */}
+                        <TabsContent value="rules" className="mt-4">
                             <Card>
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    No signal sources configured.
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {signalSources.map((source) => (
-                                    <Card key={source.id}>
-                                        <CardHeader className="pb-3">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <CardTitle className="text-base">
-                                                        {source.name}
-                                                    </CardTitle>
-                                                    {source.vendor && (
-                                                        <p className="mt-0.5 text-xs text-muted-foreground">
-                                                            {source.vendor}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        statusColors[
-                                                            source.status
-                                                        ] ?? ''
-                                                    }
-                                                >
-                                                    {source.status}
-                                                </Badge>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Last Heartbeat
-                                                    </p>
-                                                    <p
-                                                        className={`font-medium ${heartbeatColor(source.last_heartbeat_at)}`}
-                                                    >
-                                                        {formatRelativeTime(
-                                                            source.last_heartbeat_at,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Last Signal
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {formatRelativeTime(
-                                                            source.last_signal_at,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    24h Signal Count
-                                                </p>
-                                                <p className="text-lg font-semibold">
-                                                    {source.signal_count_24h.toLocaleString()}
-                                                </p>
-                                            </div>
-                                            {source.capabilities.length > 0 && (
-                                                <div>
-                                                    <p className="mb-1 text-xs text-muted-foreground">
-                                                        Capabilities
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {source.capabilities.map(
-                                                            (cap) => (
-                                                                <Badge
-                                                                    key={cap}
-                                                                    variant="secondary"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {cap}
-                                                                </Badge>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
-                    </TabsContent>
-
-                    {/* --- Tab 4: Signal Outbox --- */}
-                    <TabsContent value="signal-outbox" className="mt-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Signal Outbox
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {signalOutbox.length === 0 ? (
-                                    <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No failed signal deliveries.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Signal
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Status
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Attempts
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Last Attempt
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Error
-                                                    </th>
-                                                    <th className="pb-2 font-medium">
-                                                        Action
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {signalOutbox.map((row) => (
-                                                    <tr
-                                                        key={row.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2.5 pr-4">
-                                                            <div className="font-medium">
-                                                                {row.signal
-                                                                    ?.signal_type ??
-                                                                    `Outbox #${row.id}`}
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {row.signal
-                                                                    ? `Signal #${row.signal.id} - Asset #${row.signal.asset_id}`
-                                                                    : 'Missing source signal'}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={
-                                                                    outboxStatusColors[
-                                                                        row
-                                                                            .status
-                                                                    ] ?? ''
-                                                                }
-                                                            >
-                                                                {row.status}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {row.attempts}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {formatDateTime(
-                                                                row.last_attempt_at,
-                                                            )}
-                                                        </td>
-                                                        <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
-                                                            {row.last_error ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled={
-                                                                    !row.can_retry
-                                                                }
-                                                                onClick={() =>
-                                                                    handleRetryOutbox(
-                                                                        row.id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                                                                Retry
-                                                            </Button>
-                                                        </td>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="text-base">
+                                        Signal Rules
+                                    </CardTitle>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingRule(null);
+                                            setRuleDialogOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Create Rule
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    {signalRules.length === 0 ? (
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                            No signal rules configured yet.
+                                            Create one to get started.
+                                        </p>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Name
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Signal Type
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Source
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Priority
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Severity
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Dedup
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Active
+                                                        </th>
+                                                        <th className="pb-2 font-medium">
+                                                            Actions
+                                                        </th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* --- Tab 5: Maintenance Windows --- */}
-                    <TabsContent value="maintenance" className="mt-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">
-                                    Maintenance Windows
-                                </CardTitle>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setEditingMw(null);
-                                        setMwDialogOpen(true);
-                                    }}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Schedule Window
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {maintenanceWindows.length === 0 ? (
-                                    <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No maintenance windows scheduled.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Name
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Source / Site
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Starts At
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Ends At
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Status
-                                                    </th>
-                                                    <th className="pr-4 pb-2 font-medium">
-                                                        Created By
-                                                    </th>
-                                                    <th className="pb-2 font-medium">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {maintenanceWindows.map(
-                                                    (mw) => (
+                                                </thead>
+                                                <tbody>
+                                                    {signalRules.map((rule) => (
                                                         <tr
-                                                            key={mw.id}
+                                                            key={rule.id}
                                                             className="border-b last:border-0"
                                                         >
                                                             <td className="py-2.5 pr-4 font-medium">
-                                                                {mw.name}
+                                                                {rule.name}
                                                             </td>
                                                             <td className="py-2.5 pr-4 text-muted-foreground">
-                                                                {mw.signal_source_name ??
-                                                                    'All sources'}
+                                                                {rule.signal_type_name ??
+                                                                    'Any'}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                {rule.signal_source_name ??
+                                                                    'Any'}
                                                             </td>
                                                             <td className="py-2.5 pr-4">
-                                                                {formatDateTime(
-                                                                    mw.starts_at,
+                                                                {rule.priority}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                {rule.output_severity ? (
+                                                                    <AlertStatusChip
+                                                                        kind="severity"
+                                                                        value={
+                                                                            rule.output_severity
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-muted-foreground">
+                                                                        Inherit
+                                                                    </span>
                                                                 )}
                                                             </td>
                                                             <td className="py-2.5 pr-4">
-                                                                {formatDateTime(
-                                                                    mw.ends_at,
-                                                                )}
+                                                                {rule.dedup_window_minutes
+                                                                    ? `${rule.dedup_window_minutes}m`
+                                                                    : '-'}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                <Switch
+                                                                    checked={
+                                                                        rule.is_active
+                                                                    }
+                                                                    onCheckedChange={() =>
+                                                                        handleToggleRuleActive(
+                                                                            rule,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </td>
+                                                            <td className="py-2.5">
+                                                                <div className="flex gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setEditingRule(
+                                                                                rule,
+                                                                            );
+                                                                            setRuleDialogOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            setDeleteRuleId(
+                                                                                rule.id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5 text-status-critical" />
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* --- Tab 2: Triage Queues --- */}
+                        <TabsContent value="queues" className="mt-4">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="text-base">
+                                        Triage Queues
+                                    </CardTitle>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingQueue(null);
+                                            setQueueDialogOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Create Queue
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    {triageQueues.length === 0 ? (
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                            No triage queues configured yet.
+                                        </p>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Name
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Code
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Tier
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Severities
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Sources
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Auto-Escalate
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Next Queue
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Open
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Active
+                                                        </th>
+                                                        <th className="pb-2 font-medium">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {triageQueues.map(
+                                                        (queue) => (
+                                                            <tr
+                                                                key={queue.id}
+                                                                className="border-b last:border-0"
+                                                            >
+                                                                <td className="py-2.5 pr-4 font-medium">
+                                                                    {queue.name}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4 font-mono text-xs text-muted-foreground">
+                                                                    {queue.code}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <Badge variant="outline">
+                                                                        T
+                                                                        {
+                                                                            queue.tier
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {queue.handle_severities.map(
+                                                                            (
+                                                                                s,
+                                                                            ) => (
+                                                                                <AlertStatusChip
+                                                                                    key={
+                                                                                        s
+                                                                                    }
+                                                                                    kind="severity"
+                                                                                    value={
+                                                                                        s
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                        {queue
+                                                                            .handle_severities
+                                                                            .length ===
+                                                                            0 && (
+                                                                            <span className="text-muted-foreground">
+                                                                                All
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {queue.handle_sources.map(
+                                                                            (
+                                                                                s,
+                                                                            ) => (
+                                                                                <Badge
+                                                                                    key={
+                                                                                        s
+                                                                                    }
+                                                                                    variant="outline"
+                                                                                    className="text-xs"
+                                                                                >
+                                                                                    {
+                                                                                        s
+                                                                                    }
+                                                                                </Badge>
+                                                                            ),
+                                                                        )}
+                                                                        {queue
+                                                                            .handle_sources
+                                                                            .length ===
+                                                                            0 && (
+                                                                            <span className="text-muted-foreground">
+                                                                                All
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    {queue.auto_escalate_after_minutes
+                                                                        ? `${queue.auto_escalate_after_minutes}m`
+                                                                        : '-'}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                    {queue.escalate_to_queue_name ??
+                                                                        '-'}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={
+                                                                            queue.open_alert_count >
+                                                                            0
+                                                                                ? 'bg-status-warning-bg text-status-warning'
+                                                                                : ''
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            queue.open_alert_count
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <Switch
+                                                                        checked={
+                                                                            queue.is_active
+                                                                        }
+                                                                        onCheckedChange={() =>
+                                                                            handleToggleQueueActive(
+                                                                                queue,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </td>
+                                                                <td className="py-2.5">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setEditingQueue(
+                                                                                queue,
+                                                                            );
+                                                                            setQueueDialogOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </td>
+                                                            </tr>
+                                                        ),
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* --- Tab 3: Signal Sources (read-only) --- */}
+                        <TabsContent value="sources" className="mt-4">
+                            {signalSources.length === 0 ? (
+                                <Card>
+                                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                                        No signal sources configured.
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {signalSources.map((source) => (
+                                        <Card key={source.id}>
+                                            <CardHeader className="pb-3">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <CardTitle className="text-base">
+                                                            {source.name}
+                                                        </CardTitle>
+                                                        {source.vendor && (
+                                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                {source.vendor}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            statusColors[
+                                                                source.status
+                                                            ] ?? ''
+                                                        }
+                                                    >
+                                                        {source.status}
+                                                    </Badge>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Last Heartbeat
+                                                        </p>
+                                                        <p
+                                                            className={`font-medium ${heartbeatColor(source.last_heartbeat_at)}`}
+                                                        >
+                                                            {formatRelative(
+                                                                source.last_heartbeat_at,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Last Signal
+                                                        </p>
+                                                        <p className="font-medium">
+                                                            {formatRelative(
+                                                                source.last_signal_at,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        24h Signal Count
+                                                    </p>
+                                                    <p className="text-lg font-semibold">
+                                                        {source.signal_count_24h.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                {source.capabilities.length >
+                                                    0 && (
+                                                    <div>
+                                                        <p className="mb-1 text-xs text-muted-foreground">
+                                                            Capabilities
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {source.capabilities.map(
+                                                                (cap) => (
+                                                                    <Badge
+                                                                        key={
+                                                                            cap
+                                                                        }
+                                                                        variant="secondary"
+                                                                        className="text-xs"
+                                                                    >
+                                                                        {cap}
+                                                                    </Badge>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        {/* --- Tab 4: Signal Outbox --- */}
+                        <TabsContent value="signal-outbox" className="mt-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">
+                                        Signal Outbox
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {signalOutbox.length === 0 ? (
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                            No failed signal deliveries.
+                                        </p>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Signal
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Status
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Attempts
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Last Attempt
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Error
+                                                        </th>
+                                                        <th className="pb-2 font-medium">
+                                                            Action
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {signalOutbox.map((row) => (
+                                                        <tr
+                                                            key={row.id}
+                                                            className="border-b last:border-0"
+                                                        >
+                                                            <td className="py-2.5 pr-4">
+                                                                <div className="font-medium">
+                                                                    {row.signal
+                                                                        ?.signal_type ??
+                                                                        `Outbox #${row.id}`}
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    {row.signal
+                                                                        ? `Signal #${row.signal.id} - Asset #${row.signal.asset_id}`
+                                                                        : 'Missing source signal'}
+                                                                </div>
                                                             </td>
                                                             <td className="py-2.5 pr-4">
                                                                 <Badge
                                                                     variant="outline"
                                                                     className={
-                                                                        windowStatusColors[
-                                                                            mw
+                                                                        outboxStatusColors[
+                                                                            row
                                                                                 .status
                                                                         ] ?? ''
                                                                     }
                                                                 >
-                                                                    {mw.status}
+                                                                    {row.status}
                                                                 </Badge>
                                                             </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                {row.attempts}
+                                                            </td>
                                                             <td className="py-2.5 pr-4 text-muted-foreground">
-                                                                {mw.created_by_name ??
+                                                                {formatDateTime(
+                                                                    row.last_attempt_at,
+                                                                )}
+                                                            </td>
+                                                            <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
+                                                                {row.last_error ??
                                                                     '-'}
                                                             </td>
                                                             <td className="py-2.5">
-                                                                <div className="flex gap-1">
-                                                                    {(mw.status ===
-                                                                        'scheduled' ||
-                                                                        mw.status ===
-                                                                            'active') && (
-                                                                        <>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => {
-                                                                                    setEditingMw(
-                                                                                        mw,
-                                                                                    );
-                                                                                    setMwDialogOpen(
-                                                                                        true,
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <Pencil className="h-3.5 w-3.5" />
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() =>
-                                                                                    handleCancelWindow(
-                                                                                        mw.id,
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <X className="h-3.5 w-3.5 text-status-critical" />
-                                                                            </Button>
-                                                                        </>
-                                                                    )}
-                                                                </div>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    disabled={
+                                                                        !row.can_retry
+                                                                    }
+                                                                    onClick={() =>
+                                                                        handleRetryOutbox(
+                                                                            row.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                                                                    Retry
+                                                                </Button>
                                                             </td>
                                                         </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    {/* --- Tab 5: Ticket Options --- */}
-                    <TabsContent
-                        value="ticket-options"
-                        className="mt-4 space-y-6"
-                    >
-                        {(
-                            [
-                                'category',
-                                'resolution_code',
-                                'task_category',
-                            ] as const
-                        ).map((group) => {
-                            const groupLabels: Record<string, string> = {
-                                category: 'Alert Categories',
-                                resolution_code: 'Resolution Codes',
-                                task_category: 'Task Categories',
-                            };
-                            const items = configOptions?.[group] ?? [];
-                            return (
-                                <Card key={group}>
-                                    <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            {groupLabels[group] ?? group}
-                                        </CardTitle>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => {
-                                                setOptionGroup(group);
-                                                setOptionValue('');
-                                                setOptionLabel('');
-                                                setOptionColor('');
-                                                setOptionDesc('');
-                                                setOptionDialogOpen(true);
-                                            }}
-                                        >
-                                            <Plus className="mr-1 h-4 w-4" />{' '}
-                                            Add
-                                        </Button>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {items.length === 0 ? (
-                                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                                No options configured. Click Add
-                                                to create one.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {items.map((opt) => (
-                                                    <div
-                                                        key={opt.id}
-                                                        className="flex items-center justify-between rounded-lg border px-4 py-2.5"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            {opt.color && (
-                                                                <span
-                                                                    className="inline-block h-3 w-3 rounded-full"
-                                                                    style={{
-                                                                        backgroundColor:
-                                                                            opt.color,
-                                                                    }}
-                                                                />
-                                                            )}
-                                                            <div>
-                                                                <span className="text-sm font-medium">
-                                                                    {opt.label}
-                                                                </span>
-                                                                <span className="ml-2 text-xs text-muted-foreground">
-                                                                    ({opt.value}
-                                                                    )
-                                                                </span>
-                                                                {opt.description && (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        {
-                                                                            opt.description
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* --- Tab 5: Maintenance Windows --- */}
+                        <TabsContent value="maintenance" className="mt-4">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="text-base">
+                                        Maintenance Windows
+                                    </CardTitle>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingMw(null);
+                                            setMwDialogOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Schedule Window
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    {maintenanceWindows.length === 0 ? (
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                            No maintenance windows scheduled.
+                                        </p>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Name
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Source / Site
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Starts At
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Ends At
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Status
+                                                        </th>
+                                                        <th className="pr-4 pb-2 font-medium">
+                                                            Created By
+                                                        </th>
+                                                        <th className="pb-2 font-medium">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {maintenanceWindows.map(
+                                                        (mw) => (
+                                                            <tr
+                                                                key={mw.id}
+                                                                className="border-b last:border-0"
+                                                            >
+                                                                <td className="py-2.5 pr-4 font-medium">
+                                                                    {mw.name}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                    {mw.signal_source_name ??
+                                                                        'All sources'}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    {formatDateTime(
+                                                                        mw.starts_at,
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    {formatDateTime(
+                                                                        mw.ends_at,
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2.5 pr-4">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={
+                                                                            windowStatusColors[
+                                                                                mw
+                                                                                    .status
+                                                                            ] ??
+                                                                            ''
                                                                         }
-                                                                    </p>
+                                                                    >
+                                                                        {
+                                                                            mw.status
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                    {mw.created_by_name ??
+                                                                        '-'}
+                                                                </td>
+                                                                <td className="py-2.5">
+                                                                    <div className="flex gap-1">
+                                                                        {(mw.status ===
+                                                                            'scheduled' ||
+                                                                            mw.status ===
+                                                                                'active') && (
+                                                                            <>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={() => {
+                                                                                        setEditingMw(
+                                                                                            mw,
+                                                                                        );
+                                                                                        setMwDialogOpen(
+                                                                                            true,
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={() =>
+                                                                                        handleCancelWindow(
+                                                                                            mw.id,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <X className="h-3.5 w-3.5 text-status-critical" />
+                                                                                </Button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ),
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        {/* --- Tab 5: Ticket Options --- */}
+                        <TabsContent
+                            value="ticket-options"
+                            className="mt-4 space-y-6"
+                        >
+                            {(
+                                [
+                                    'category',
+                                    'resolution_code',
+                                    'task_category',
+                                ] as const
+                            ).map((group) => {
+                                const groupLabels: Record<string, string> = {
+                                    category: 'Alert Categories',
+                                    resolution_code: 'Resolution Codes',
+                                    task_category: 'Task Categories',
+                                };
+                                const items = configOptions?.[group] ?? [];
+                                return (
+                                    <Card key={group}>
+                                        <CardHeader className="flex flex-row items-center justify-between">
+                                            <CardTitle className="text-base">
+                                                {groupLabels[group] ?? group}
+                                            </CardTitle>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => {
+                                                    setOptionGroup(group);
+                                                    setOptionValue('');
+                                                    setOptionLabel('');
+                                                    setOptionColor('');
+                                                    setOptionDesc('');
+                                                    setOptionDialogOpen(true);
+                                                }}
+                                            >
+                                                <Plus className="mr-1 h-4 w-4" />{' '}
+                                                Add
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {items.length === 0 ? (
+                                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                                    No options configured. Click
+                                                    Add to create one.
+                                                </p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {items.map((opt) => (
+                                                        <div
+                                                            key={opt.id}
+                                                            className="flex items-center justify-between rounded-lg border px-4 py-2.5"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {opt.color && (
+                                                                    <span
+                                                                        className="inline-block h-3 w-3 rounded-full"
+                                                                        style={{
+                                                                            backgroundColor:
+                                                                                opt.color,
+                                                                        }}
+                                                                    />
                                                                 )}
+                                                                <div>
+                                                                    <span className="text-sm font-medium">
+                                                                        {
+                                                                            opt.label
+                                                                        }
+                                                                    </span>
+                                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                                        (
+                                                                        {
+                                                                            opt.value
+                                                                        }
+                                                                        )
+                                                                    </span>
+                                                                    {opt.description && (
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            {
+                                                                                opt.description
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Switch
+                                                                    checked={
+                                                                        opt.is_active
+                                                                    }
+                                                                    onCheckedChange={() =>
+                                                                        router.put(
+                                                                            `/control-room/settings/options/${opt.id}`,
+                                                                            {
+                                                                                is_active:
+                                                                                    !opt.is_active,
+                                                                            },
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <ConfirmChip
+                                                                    label="Delete"
+                                                                    icon={
+                                                                        Trash2
+                                                                    }
+                                                                    destructive
+                                                                    onConfirm={() =>
+                                                                        router.delete(
+                                                                            `/control-room/settings/options/${opt.id}`,
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                checked={
-                                                                    opt.is_active
-                                                                }
-                                                                onCheckedChange={() =>
-                                                                    router.put(
-                                                                        `/control-room/settings/options/${opt.id}`,
-                                                                        {
-                                                                            is_active:
-                                                                                !opt.is_active,
-                                                                        },
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                            <ConfirmChip
-                                                                label="Delete"
-                                                                icon={Trash2}
-                                                                destructive
-                                                                onConfirm={() =>
-                                                                    router.delete(
-                                                                        `/control-room/settings/options/${opt.id}`,
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </TabsContent>
-                </Tabs>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </TabsContent>
+                    </Tabs>
 
-                {/* Add Option Dialog */}
-                {optionDialogOpen && (
-                    <Dialog
-                        open={optionDialogOpen}
-                        onOpenChange={setOptionDialogOpen}
-                    >
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Add Option</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3 py-2">
-                                <div>
-                                    <Label>Value (slug)</Label>
-                                    <Input
-                                        value={optionValue}
-                                        onChange={(e) =>
-                                            setOptionValue(
-                                                e.target.value
-                                                    .toLowerCase()
-                                                    .replace(
-                                                        /[^a-z0-9_]/g,
-                                                        '_',
-                                                    ),
-                                            )
-                                        }
-                                        placeholder="e.g. incident"
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Display Label</Label>
-                                    <Input
-                                        value={optionLabel}
-                                        onChange={(e) =>
-                                            setOptionLabel(e.target.value)
-                                        }
-                                        placeholder="e.g. Incident"
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Color (hex)</Label>
-                                    <div className="flex items-center gap-2">
+                    {/* Add Option Dialog */}
+                    {optionDialogOpen && (
+                        <Dialog
+                            open={optionDialogOpen}
+                            onOpenChange={setOptionDialogOpen}
+                        >
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Add Option</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-3 py-2">
+                                    <div>
+                                        <Label>Value (slug)</Label>
                                         <Input
-                                            value={optionColor}
+                                            value={optionValue}
                                             onChange={(e) =>
-                                                setOptionColor(e.target.value)
+                                                setOptionValue(
+                                                    e.target.value
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9_]/g,
+                                                            '_',
+                                                        ),
+                                                )
                                             }
-                                            placeholder="#ef4444"
-                                            className="flex-1"
+                                            placeholder="e.g. incident"
                                         />
-                                        {optionColor && (
-                                            <span
-                                                className="inline-block h-6 w-6 rounded-full border"
-                                                style={{
-                                                    backgroundColor:
-                                                        optionColor,
-                                                }}
+                                    </div>
+                                    <div>
+                                        <Label>Display Label</Label>
+                                        <Input
+                                            value={optionLabel}
+                                            onChange={(e) =>
+                                                setOptionLabel(e.target.value)
+                                            }
+                                            placeholder="e.g. Incident"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Color (hex)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                value={optionColor}
+                                                onChange={(e) =>
+                                                    setOptionColor(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="#ef4444"
+                                                className="flex-1"
                                             />
-                                        )}
+                                            {optionColor && (
+                                                <span
+                                                    className="inline-block h-6 w-6 rounded-full border"
+                                                    style={{
+                                                        backgroundColor:
+                                                            optionColor,
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Description (optional)</Label>
+                                        <Input
+                                            value={optionDesc}
+                                            onChange={(e) =>
+                                                setOptionDesc(e.target.value)
+                                            }
+                                            placeholder="Brief description..."
+                                        />
                                     </div>
                                 </div>
-                                <div>
-                                    <Label>Description (optional)</Label>
-                                    <Input
-                                        value={optionDesc}
-                                        onChange={(e) =>
-                                            setOptionDesc(e.target.value)
+                                <DialogFooter>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() =>
+                                            setOptionDialogOpen(false)
                                         }
-                                        placeholder="Brief description..."
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => setOptionDialogOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    disabled={
-                                        !optionValue.trim() ||
-                                        !optionLabel.trim()
-                                    }
-                                    onClick={() => {
-                                        router.post(
-                                            '/control-room/settings/options',
-                                            {
-                                                group: optionGroup,
-                                                value: optionValue.trim(),
-                                                label: optionLabel.trim(),
-                                                color:
-                                                    optionColor.trim() || null,
-                                                description:
-                                                    optionDesc.trim() || null,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                onSuccess: () =>
-                                                    setOptionDialogOpen(false),
-                                            },
-                                        );
-                                    }}
-                                >
-                                    Create
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                )}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        disabled={
+                                            !optionValue.trim() ||
+                                            !optionLabel.trim()
+                                        }
+                                        onClick={() => {
+                                            router.post(
+                                                '/control-room/settings/options',
+                                                {
+                                                    group: optionGroup,
+                                                    value: optionValue.trim(),
+                                                    label: optionLabel.trim(),
+                                                    color:
+                                                        optionColor.trim() ||
+                                                        null,
+                                                    description:
+                                                        optionDesc.trim() ||
+                                                        null,
+                                                },
+                                                {
+                                                    preserveScroll: true,
+                                                    onSuccess: () =>
+                                                        setOptionDialogOpen(
+                                                            false,
+                                                        ),
+                                                },
+                                            );
+                                        }}
+                                    >
+                                        Create
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
 
-                {/* Dialogs */}
-                {ruleDialogOpen && (
-                    <SignalRuleDialog
-                        open={ruleDialogOpen}
-                        onClose={() => {
-                            setRuleDialogOpen(false);
-                            setEditingRule(null);
-                        }}
-                        rule={editingRule}
-                        signalTypes={signalTypes}
-                        signalSources={signalSources}
-                        playbooks={playbooks}
+                    {/* Dialogs */}
+                    {ruleDialogOpen && (
+                        <SignalRuleDialog
+                            open={ruleDialogOpen}
+                            onClose={() => {
+                                setRuleDialogOpen(false);
+                                setEditingRule(null);
+                            }}
+                            rule={editingRule}
+                            signalTypes={signalTypes}
+                            signalSources={signalSources}
+                            playbooks={playbooks}
+                        />
+                    )}
+
+                    {queueDialogOpen && (
+                        <TriageQueueDialog
+                            open={queueDialogOpen}
+                            onClose={() => {
+                                setQueueDialogOpen(false);
+                                setEditingQueue(null);
+                            }}
+                            queue={editingQueue}
+                            allQueues={triageQueues}
+                        />
+                    )}
+
+                    {mwDialogOpen && (
+                        <MaintenanceWindowDialog
+                            open={mwDialogOpen}
+                            onClose={() => {
+                                setMwDialogOpen(false);
+                                setEditingMw(null);
+                            }}
+                            window={editingMw}
+                            signalSources={signalSources}
+                            sites={sites}
+                        />
+                    )}
+
+                    <DeleteConfirmDialog
+                        open={deleteRuleId !== null}
+                        onClose={() => setDeleteRuleId(null)}
+                        onConfirm={handleDeleteRule}
+                        title="Delete Signal Rule"
+                        description="Are you sure you want to delete this signal rule? This action cannot be undone."
                     />
-                )}
-
-                {queueDialogOpen && (
-                    <TriageQueueDialog
-                        open={queueDialogOpen}
-                        onClose={() => {
-                            setQueueDialogOpen(false);
-                            setEditingQueue(null);
-                        }}
-                        queue={editingQueue}
-                        allQueues={triageQueues}
-                    />
-                )}
-
-                {mwDialogOpen && (
-                    <MaintenanceWindowDialog
-                        open={mwDialogOpen}
-                        onClose={() => {
-                            setMwDialogOpen(false);
-                            setEditingMw(null);
-                        }}
-                        window={editingMw}
-                        signalSources={signalSources}
-                        sites={sites}
-                    />
-                )}
-
-                <DeleteConfirmDialog
-                    open={deleteRuleId !== null}
-                    onClose={() => setDeleteRuleId(null)}
-                    onConfirm={handleDeleteRule}
-                    title="Delete Signal Rule"
-                    description="Are you sure you want to delete this signal rule? This action cannot be undone."
-                />
+                </CommandCentrePage>
             </PageShell>
         </AppLayout>
     );

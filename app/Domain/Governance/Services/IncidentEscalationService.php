@@ -5,8 +5,8 @@ namespace App\Domain\Governance\Services;
 use App\Domain\Governance\Models\IncidentGovernanceEscalation;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Models\ClientIncident;
-use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -46,27 +46,53 @@ class IncidentEscalationService
         ?int $riskId = null,
         ?string $reasonOverride = null,
     ): ?IncidentGovernanceEscalation {
-        $threshold = self::SEVERITY_THRESHOLDS[$incident->severity ?? 'low'] ?? self::SEVERITY_THRESHOLDS['low'];
+        try {
+            return $this->escalateClientIncidentOrFail($incident, $riskId, $reasonOverride);
+        } catch (\Throwable $e) {
+            Log::error('IncidentEscalationService: failed to escalate', [
+                'client_incident_id' => $incident->id,
+                'severity' => $incident->severity,
+                'reason_override' => $reasonOverride,
+                'error' => $e->getMessage(),
+            ]);
 
-        if (! $threshold['auto_escalate']) {
             return null;
         }
+    }
 
-        $reason = $reasonOverride ?? $this->inferReason($incident);
+    /**
+     * Queue-safe escalation boundary. Persistence failures are deliberately
+     * allowed to escape so the owning job can retry them.
+     */
+    public function escalateClientIncidentOrFail(
+        ClientIncident $incident,
+        ?int $riskId = null,
+        ?string $reasonOverride = null,
+    ): ?IncidentGovernanceEscalation {
+        return DB::transaction(function () use ($incident, $riskId, $reasonOverride): ?IncidentGovernanceEscalation {
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $threshold = self::SEVERITY_THRESHOLDS[$lockedIncident->severity ?? 'low']
+                ?? self::SEVERITY_THRESHOLDS['low'];
 
-        // Idempotency: don't double-escalate the same incident for the same reason.
-        $existing = IncidentGovernanceEscalation::query()
-            ->where('client_incident_id', $incident->id)
-            ->where('escalation_reason', $reason)
-            ->first();
+            if (! $threshold['auto_escalate']) {
+                return null;
+            }
 
-        if ($existing) {
-            return $existing;
-        }
+            $reason = $reasonOverride ?? $this->inferReason($lockedIncident);
+            $existing = IncidentGovernanceEscalation::query()
+                ->where('client_incident_id', $lockedIncident->id)
+                ->where('escalation_reason', $reason)
+                ->first();
 
-        try {
+            if ($existing !== null) {
+                return $existing;
+            }
+
             $escalation = IncidentGovernanceEscalation::create([
-                'client_incident_id' => $incident->id,
+                'client_incident_id' => $lockedIncident->id,
                 'escalation_reason' => $reason,
                 'status' => 'pending',
                 'notified_chair' => $threshold['notify_chair'] ? $this->resolveChairUserId() : null,
@@ -77,7 +103,7 @@ class IncidentEscalationService
             ]);
 
             if ($riskId) {
-                $this->linkToRiskRegister($incident, $escalation, $riskId);
+                $this->linkToRiskRegister($lockedIncident, $escalation, $riskId);
             }
 
             GovernanceAuditService::log(
@@ -85,23 +111,14 @@ class IncidentEscalationService
                 'IncidentGovernanceEscalation',
                 $escalation->id,
                 [
-                    'client_incident_id' => $incident->id,
-                    'severity' => $incident->severity,
+                    'client_incident_id' => $lockedIncident->id,
+                    'severity' => $lockedIncident->severity,
                     'escalation_reason' => $reason,
                 ],
             );
 
             return $escalation;
-        } catch (\Throwable $e) {
-            Log::error('IncidentEscalationService: failed to escalate', [
-                'client_incident_id' => $incident->id,
-                'severity' => $incident->severity,
-                'reason' => $reason,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
+        }, 3);
     }
 
     public function acknowledgeEscalation(IncidentGovernanceEscalation $escalation, int $userId, ?string $actionTaken = null): void

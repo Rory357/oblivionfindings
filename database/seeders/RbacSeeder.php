@@ -459,6 +459,8 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.close', 'description' => 'Close/resolve hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.viewAllSites', 'description' => 'View health and safety records across all sites', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.overrideClosure', 'description' => 'Override blocked H&S event closure with a recorded reason', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
@@ -665,7 +667,7 @@ class RbacSeeder extends Seeder
             'fleet.bookings.approve', 'fleet.incidents.manage', 'fleet.maintenance.manage',
             'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
             'controlRoom.viewAny', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
-            'controlRoom.alerts.escalate', 'controlRoom.reports.view',
+            'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.reports.view',
             'assets.viewAny', 'assets.create', 'assets.update',
             'assets.inspections.record', 'assets.maintenance.record', 'assets.documents.manage',
             'assets.qr.download', 'assets.ownership.manage', 'assets.assignments.manage',
@@ -720,7 +722,7 @@ class RbacSeeder extends Seeder
             'staff.credentials.updateSelf', 'staff.availability.updateSelf',
             'rag.ask.assigned',
             'fleet.viewAny', 'fleet.driverSessions.manage', 'fleet.signals.view',
-            'controlRoom.viewAny',
+            'controlRoom.alerts.view',
             'assets.viewAssigned', 'assets.create', 'assets.update',
             'assets.inspections.record', 'assets.maintenance.record', 'assets.documents.manage',
             'assets.qr.download', 'assets.assignments.manage', 'assets.telemetry.view',
@@ -827,6 +829,8 @@ class RbacSeeder extends Seeder
         $syncPermissions($healthSafetyOfficer, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
+            'healthSafety.viewAllSites',
+            'incidents.create',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',

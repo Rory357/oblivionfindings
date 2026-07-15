@@ -2,17 +2,23 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
+use App\Models\HsEvent;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\SiteHazard;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ControlRoomBridgeWiringTest extends TestCase
@@ -78,12 +84,53 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_high_severity_draft_incident_does_not_create_alert(): void
     {
-        ClientIncident::factory()->create([
+        $incident = ClientIncident::factory()->create([
             'severity' => 'high',
             'status' => 'draft',
+            'submitted_at' => null,
         ]);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertNull($incident->fresh()->control_room_alert_id);
+        $this->assertNull($incident->fresh()->hs_event_id);
+    }
+
+    public function test_draft_submission_builds_one_exact_high_journey_and_repeated_updates_are_stable(): void
+    {
+        $incident = ClientIncident::factory()->create([
+            'severity' => 'high',
+            'status' => 'draft',
+            'submitted_at' => null,
+        ]);
+
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+
+        $incident->update([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+        $incident = $incident->fresh();
+        $alert = ControlRoomAlert::query()->sole();
+        $event = HsEvent::query()->sole();
+
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($event->id, $incident->hs_event_id);
+        $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
+        $this->assertSame($alert->id, $event->control_room_alert_id);
+        $this->assertSame(ClientIncident::class, $event->source_type);
+        $this->assertSame($incident->id, $event->source_id);
+        $this->assertSame('high', $alert->severity);
+        $this->assertSame('high', $event->severity);
+
+        $incident->update(['description' => 'Clarified without duplicating the journey.']);
+
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
+        $this->assertSame($alert->id, $incident->fresh()->control_room_alert_id);
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
     }
 
     public function test_draft_incident_submitted_with_high_severity_creates_alert(): void
@@ -104,7 +151,7 @@ class ControlRoomBridgeWiringTest extends TestCase
         ]);
     }
 
-    public function test_incident_severity_escalated_to_high_creates_alert(): void
+    public function test_incident_severity_escalation_promotes_the_same_exact_journey(): void
     {
         $incident = ClientIncident::factory()->create([
             'severity' => 'low',
@@ -112,14 +159,24 @@ class ControlRoomBridgeWiringTest extends TestCase
         ]);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('hs_events', 1);
+        $eventId = $incident->fresh()->hs_event_id;
 
         $incident->update(['severity' => 'high']);
+        $incident = $incident->fresh();
+        $alert = ControlRoomAlert::query()->sole();
 
         $this->assertDatabaseHas('control_room_alerts', [
-            'source' => 'operations',
-            'alert_type' => 'operations.client_incident_escalation',
+            'source' => 'incident',
+            'alert_type' => "incident.{$incident->type}",
             'severity' => 'high',
         ]);
+        $this->assertSame($eventId, $incident->hs_event_id);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame($alert->id, $incident->hsEvent->control_room_alert_id);
+        $this->assertSame('high', $incident->hsEvent->severity);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('hs_events', 1);
     }
 
     public function test_medium_severity_incident_does_not_create_alert(): void
@@ -363,7 +420,7 @@ class ControlRoomBridgeWiringTest extends TestCase
     {
         $site = Site::factory()->create();
 
-        \App\Models\SiteHazard::create([
+        SiteHazard::create([
             'site_id' => $site->id,
             'hazard_type' => 'environmental',
             'severity' => 4,
@@ -374,7 +431,7 @@ class ControlRoomBridgeWiringTest extends TestCase
         ]);
 
         // If risk_rating was calculated as high/extreme, an alert should exist
-        $hazard = \App\Models\SiteHazard::latest()->first();
+        $hazard = SiteHazard::latest()->first();
 
         if (in_array($hazard->risk_rating, ['high', 'extreme'])) {
             $this->assertDatabaseHas('control_room_alerts', [
@@ -393,43 +450,57 @@ class ControlRoomBridgeWiringTest extends TestCase
     // Deduplication safety
     // ──────────────────────────────────────────────────────
 
-    public function test_bridge_service_deduplication_prevents_duplicate_alerts(): void
+    public function test_distinct_incidents_do_not_fuzzy_deduplicate_each_others_alerts(): void
     {
-        // Create two high-severity incidents for the same client rapidly
         $client = Client::factory()->create();
 
-        ClientIncident::factory()->create([
+        $first = ClientIncident::factory()->create([
             'client_id' => $client->id,
             'type' => 'injury',
             'severity' => 'high',
             'status' => 'submitted',
         ]);
 
-        ClientIncident::factory()->create([
+        $second = ClientIncident::factory()->create([
             'client_id' => $client->id,
             'type' => 'injury',
             'severity' => 'high',
             'status' => 'submitted',
         ]);
 
-        // Bridge dedup: same source + alert_type + client_id within 30 min = suppressed
         $alertCount = ControlRoomAlert::where('source', 'incident')
             ->where('alert_type', 'incident.injury')
             ->where('client_id', $client->id)
             ->count();
 
-        $this->assertEquals(1, $alertCount);
+        $this->assertSame(2, $alertCount);
+        $this->assertNotNull($first->fresh()->control_room_alert_id);
+        $this->assertNotNull($second->fresh()->control_room_alert_id);
+        $this->assertNotSame(
+            $first->fresh()->control_room_alert_id,
+            $second->fresh()->control_room_alert_id,
+        );
+        $this->assertNotNull($first->fresh()->hs_event_id);
+        $this->assertNotNull($second->fresh()->hs_event_id);
+        $this->assertDatabaseCount('hs_events', 2);
     }
 
     // ──────────────────────────────────────────────────────
     // Failure safety — observer must not break record creation
     // ──────────────────────────────────────────────────────
 
-    public function test_incident_creation_succeeds_even_if_bridge_fails(): void
+    public function test_incident_creation_survives_journey_failure_and_logs_structured_repair_context(): void
     {
-        // The observer wraps bridge calls in try/catch — verify the record persists
-        // even if the bridge service were to throw. We test this indirectly:
-        // the incident should always exist regardless of alert outcome.
+        Log::spy();
+        $this->mock(ComprehensiveAlertBridgeService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('bridgeClientIncident')
+                ->once()
+                ->andThrow(new \RuntimeException('Forced journey failure'));
+        });
+        $this->mock(IncidentEscalationService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('escalateClientIncident');
+        });
+
         $incident = ClientIncident::factory()->create([
             'severity' => 'high',
             'status' => 'submitted',
@@ -438,5 +509,16 @@ class ControlRoomBridgeWiringTest extends TestCase
         $this->assertDatabaseHas('client_incidents', [
             'id' => $incident->id,
         ]);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('incident_governance_escalations', 0);
+        Log::shouldHaveReceived('error')->withArgs(
+            fn (string $message, array $context): bool => $message === 'incident_journey_repair_required'
+                && $context['incident_id'] === $incident->id
+                && $context['status'] === 'submitted'
+                && $context['exception'] === \RuntimeException::class
+                && $context['error'] === 'Forced journey failure'
+                && is_array($context['changed_fields']),
+        );
     }
 }

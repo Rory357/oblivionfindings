@@ -2,8 +2,13 @@ import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Field,
+    InfoCard,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -22,12 +27,12 @@ import {
     Pill,
     Plus,
     RadioTower,
-    Truck,
     RotateCcw,
     Search,
     Send,
     ShieldAlert,
     Trash2,
+    Truck,
     User,
     Users,
     X,
@@ -39,7 +44,11 @@ import { useState, type ComponentType, type FormEvent } from 'react';
 /* ------------------------------------------------------------------ */
 
 type JsonCause = { description?: string; category?: string };
-type JsonRec = { description?: string; priority?: string; target_area?: string };
+type JsonRec = {
+    description?: string;
+    priority?: string;
+    target_area?: string;
+};
 
 export type IncidentDetail = {
     id: number;
@@ -69,7 +78,12 @@ export type IncidentDetail = {
     reopened_at: string | null;
     reopened_reason: string | null;
     control_room_alert_id: number | null;
-    client: { id: number; first_name: string; last_name: string; site: string | null } | null;
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        site: string | null;
+    } | null;
     reporter: { name: string; email: string } | null;
     investigator: string | null;
     attachments: Array<{
@@ -92,11 +106,34 @@ export type IncidentDetail = {
         created_by: string | null;
         overdue: boolean;
     }>;
-    control_room_alert: { id: number; status: string; severity: string; alert_type: string; triggered_at: string | null; resolved_at: string | null } | null;
+    control_room_alert: {
+        id: number;
+        status: string;
+        severity: string;
+        alert_type: string;
+        triggered_at: string | null;
+        resolved_at: string | null;
+        url: string | null;
+    } | null;
     hs_event: {
         id: number;
         reference_number: string;
         status: string;
+        url: string | null;
+        corrective_actions_url: string | null;
+        worksafe_notifiable: boolean;
+        worksafe_status: string | null;
+        worksafe_reference: string | null;
+        worksafe_notified_at: string | null;
+        worksafe_acknowledged_at: string | null;
+        handover: {
+            status: string;
+            owner: { id: number; name: string } | null;
+            accepted_by: { id: number; name: string } | null;
+            accepted_at: string | null;
+            notes: string | null;
+            can_accept: boolean;
+        };
         investigation_required: boolean;
         investigation: {
             reference_number: string;
@@ -107,18 +144,70 @@ export type IncidentDetail = {
             recommendations: JsonRec[] | null;
             lessons_learned: string | null;
         } | null;
-        corrective_actions: Array<{ id: number; reference_number: string; title: string; status: string; priority: string; assigned_to: string | null; due_date: string | null }>;
+        corrective_actions: Array<{
+            id: number;
+            reference_number: string;
+            title: string;
+            status: string;
+            priority: string;
+            assigned_to: string | null;
+            due_date: string | null;
+        }>;
     } | null;
-    can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean; raiseCorrectiveAction: boolean };
+    can: {
+        update: boolean;
+        submit: boolean;
+        review: boolean;
+        close: boolean;
+        reopen: boolean;
+        followupsManage: boolean;
+        followupsComplete: boolean;
+        portalManage: boolean;
+        raiseCorrectiveAction: boolean;
+    };
     assignable_staff: Array<{ id: number; name: string }>;
-    safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
+    safeguarding_concerns?: Array<{
+        id: number;
+        reference_number: string | null;
+        status: string | null;
+        severity: string | null;
+        can_view: boolean;
+    }>;
     fleet_incident?: { id: number; reference: string; type: string } | null;
-    medication_error?: { id: number; error_type: string; severity: string; status: string; medication: string | null; reported_at: string | null; url: string } | null;
-    restraint_events?: Array<{ id: number; reference: string; restraint_type: string; severity: string; within_support_plan: boolean; injury_occurred: boolean }>;
-    first_aid_records?: Array<{ id: number; reference: string; person: string; injury: string; treatment_date: string | null; ambulance_called: boolean }>;
+    medication_error?: {
+        id: number;
+        error_type: string;
+        severity: string;
+        status: string;
+        medication: string | null;
+        reported_at: string | null;
+        url: string;
+    } | null;
+    restraint_events?: Array<{
+        id: number;
+        reference: string;
+        restraint_type: string;
+        severity: string;
+        within_support_plan: boolean;
+        injury_occurred: boolean;
+    }>;
+    first_aid_records?: Array<{
+        id: number;
+        reference: string;
+        person: string;
+        injury: string;
+        treatment_date: string | null;
+        ambulance_called: boolean;
+    }>;
 };
 
-type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
+type SectionKey =
+    | 'overview'
+    | 'timeline'
+    | 'photos'
+    | 'followups'
+    | 'investigation'
+    | 'linked';
 
 /* ------------------------------------------------------------------ */
 /*  Tokens                                                             */
@@ -133,12 +222,33 @@ const DOT: Record<string, string> = {
     primary: 'bg-primary',
 };
 
-const SEV_LABEL: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' };
-const SEV_TONE: Record<string, string> = { low: 'success', medium: 'warning', high: 'critical', critical: 'critical' };
-const STATUS_LABEL: Record<string, string> = { draft: 'Draft', submitted: 'Submitted', reviewed: 'Reviewed', closed: 'Closed' };
+const SEV_LABEL: Record<string, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    critical: 'Critical',
+};
+const SEV_TONE: Record<string, string> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
+};
+const STATUS_LABEL: Record<string, string> = {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    reviewed: 'Reviewed',
+    closed: 'Closed',
+};
 
 function titleCase(s: string): string {
     return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function handoverStatusLabel(status: string): string {
+    if (status === 'accepted') return 'Accepted into H&S';
+    if (status === 'awaiting_acceptance' || status === 'awaiting_hs_acceptance')
+        return 'Awaiting H&S acceptance';
+    return titleCase(status).replace(/\bHs\b/g, 'H&S');
 }
 function fmtSize(bytes: number | null): string {
     if (!bytes) return '';
@@ -153,73 +263,141 @@ function fmtSize(bytes: number | null): string {
 
 type LifecycleAction = 'submit' | 'review' | 'close' | 'reopen';
 
-export function IncidentDetailDialog({ detail, open, onClose }: { detail: IncidentDetail; open: boolean; onClose: () => void }) {
+export function IncidentDetailDialog({
+    detail,
+    open,
+    onClose,
+}: {
+    detail: IncidentDetail;
+    open: boolean;
+    onClose: () => void;
+}) {
     const [section, setSection] = useState<SectionKey>('overview');
     const [action, setAction] = useState<LifecycleAction | null>(null);
     const [editing, setEditing] = useState(false);
 
     const d = detail;
     const incidentRef = d.ref ?? `INC-${d.id}`;
-    const clientName = d.client ? `${d.client.first_name} ${d.client.last_name}`.trim() : 'No client linked';
+    const clientName = d.client
+        ? `${d.client.first_name} ${d.client.last_name}`.trim()
+        : 'No client linked';
     const isNearMiss = d.type === 'near_miss';
     const openFollowups = d.followups.filter((f) => !f.completed_at).length;
 
-    const SECTIONS: { key: SectionKey; label: string; blurb: string; icon: ComponentType<{ className?: string }> }[] = [
-        { key: 'overview', label: 'Overview', blurb: 'What happened', icon: FileText },
-        { key: 'timeline', label: 'Timeline', blurb: 'Audit trail', icon: Clock },
-        { key: 'photos', label: 'Photos & documents', blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`, icon: Paperclip },
-        { key: 'followups', label: 'Follow-ups', blurb: openFollowups > 0 ? `${openFollowups} open` : 'all complete', icon: ListTodo },
-        { key: 'investigation', label: 'Investigation', blurb: d.hs_event ? d.hs_event.reference_number : 'no H&S event', icon: Search },
-        { key: 'linked', label: 'Linked records', blurb: 'CR · H&S · client', icon: LinkIcon },
+    const SECTIONS: {
+        key: SectionKey;
+        label: string;
+        blurb: string;
+        icon: ComponentType<{ className?: string }>;
+    }[] = [
+        {
+            key: 'overview',
+            label: 'Overview',
+            blurb: 'What happened',
+            icon: FileText,
+        },
+        {
+            key: 'timeline',
+            label: 'Timeline',
+            blurb: 'Audit trail',
+            icon: Clock,
+        },
+        {
+            key: 'photos',
+            label: 'Photos & documents',
+            blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
+            icon: Paperclip,
+        },
+        {
+            key: 'followups',
+            label: 'Follow-ups',
+            blurb: openFollowups > 0 ? `${openFollowups} open` : 'all complete',
+            icon: ListTodo,
+        },
+        {
+            key: 'investigation',
+            label: 'Investigation',
+            blurb: d.hs_event ? d.hs_event.reference_number : 'no H&S event',
+            icon: Search,
+        },
+        {
+            key: 'linked',
+            label: 'Linked records',
+            blurb: 'CR · H&S · client',
+            icon: LinkIcon,
+        },
     ];
     const stepIndex = SECTIONS.findIndex((s) => s.key === section);
 
     // Endpoints return back() -> Inertia follows the redirect to the current
     // URL (which still carries ?incident=), so the dialog + list refresh together.
-    const completeFollowup = (fid: number) => router.post(`/incidents/${d.id}/followups/${fid}/complete`, {}, { preserveScroll: true });
+    const completeFollowup = (fid: number) =>
+        router.post(
+            `/incidents/${d.id}/followups/${fid}/complete`,
+            {},
+            { preserveScroll: true },
+        );
 
     // While an action / edit pane is open it owns the body + its own buttons,
     // so the Options bar is suppressed.
-    const footerEnd = action || editing ? null : (
-        <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/incidents/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
-                <ExternalLink className="h-4 w-4" /> Open full page
-            </Link>
-            {d.can.update && d.status === 'draft' ? (
-                <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                    <Pencil className="mr-1.5 h-4 w-4" /> Edit
-                </Button>
-            ) : null}
-            {d.can.submit && d.status === 'draft' ? (
-                <Button size="sm" onClick={() => setAction('submit')}>
-                    <Send className="mr-1.5 h-4 w-4" /> Submit for review
-                </Button>
-            ) : null}
-            {d.can.review && d.status === 'submitted' ? (
-                <Button size="sm" onClick={() => setAction('review')}>
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Review
-                </Button>
-            ) : null}
-            {d.can.close && d.status === 'reviewed' ? (
-                <Button size="sm" onClick={() => setAction('close')}>
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close
-                </Button>
-            ) : null}
-            {d.can.reopen && d.status === 'closed' ? (
-                <Button size="sm" variant="outline" onClick={() => setAction('reopen')}>
-                    <RotateCcw className="mr-1.5 h-4 w-4" /> Reopen
-                </Button>
-            ) : null}
-        </div>
-    );
+    const footerEnd =
+        action || editing ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+                <Link
+                    href={`/incidents/${d.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                    <ExternalLink className="h-4 w-4" /> Open full page
+                </Link>
+                {d.can.update && d.status === 'draft' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditing(true)}
+                    >
+                        <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                    </Button>
+                ) : null}
+                {d.can.submit && d.status === 'draft' ? (
+                    <Button size="sm" onClick={() => setAction('submit')}>
+                        <Send className="mr-1.5 h-4 w-4" /> Submit for review
+                    </Button>
+                ) : null}
+                {d.can.review && d.status === 'submitted' ? (
+                    <Button size="sm" onClick={() => setAction('review')}>
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" /> Review
+                    </Button>
+                ) : null}
+                {d.can.close && d.status === 'reviewed' ? (
+                    <Button size="sm" onClick={() => setAction('close')}>
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close
+                    </Button>
+                ) : null}
+                {d.can.reopen && d.status === 'closed' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAction('reopen')}
+                    >
+                        <RotateCcw className="mr-1.5 h-4 w-4" /> Reopen
+                    </Button>
+                ) : null}
+            </div>
+        );
 
     const footerStart = (
         <div className="flex items-center gap-2 text-xs">
-            <span className={`inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${DOT[SEV_TONE[d.severity] ?? 'neutral']}`} />
+            <span
+                className={`inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium`}
+            >
+                <span
+                    className={`h-1.5 w-1.5 rounded-full ${DOT[SEV_TONE[d.severity] ?? 'neutral']}`}
+                />
                 {SEV_LABEL[d.severity] ?? d.severity}
             </span>
-            <span className="text-muted-foreground">{STATUS_LABEL[d.status] ?? d.status}</span>
+            <span className="text-muted-foreground">
+                {STATUS_LABEL[d.status] ?? d.status}
+            </span>
         </div>
     );
 
@@ -235,22 +413,40 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             steps={SECTIONS}
             stepIndex={stepIndex}
             onStepClick={(i) => setSection(SECTIONS[i].key)}
-            headerLabel={editing ? 'Edit incident' : action ? ACTION_META[action].title : (SECTIONS[stepIndex]?.label ?? 'Overview')}
+            headerLabel={
+                editing
+                    ? 'Edit incident'
+                    : action
+                      ? ACTION_META[action].title
+                      : (SECTIONS[stepIndex]?.label ?? 'Overview')
+            }
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
             {editing ? (
                 <EditPane d={d} onDone={() => setEditing(false)} />
             ) : action ? (
-                <ActionPane d={d} action={action} onDone={() => setAction(null)} />
+                <ActionPane
+                    d={d}
+                    action={action}
+                    onDone={() => setAction(null)}
+                />
             ) : (
                 <>
-                    {section === 'overview' ? <OverviewSection d={d} isNearMiss={isNearMiss} /> : null}
+                    {section === 'overview' ? (
+                        <OverviewSection d={d} isNearMiss={isNearMiss} />
+                    ) : null}
                     {section === 'timeline' ? <TimelineSection d={d} /> : null}
                     {section === 'photos' ? <PhotosSection d={d} /> : null}
-                    {section === 'followups' ? <FollowupsSection d={d} onComplete={completeFollowup} /> : null}
-                    {section === 'investigation' ? <InvestigationSection d={d} /> : null}
-                    {section === 'linked' ? <LinkedSection d={d} clientName={clientName} /> : null}
+                    {section === 'followups' ? (
+                        <FollowupsSection d={d} onComplete={completeFollowup} />
+                    ) : null}
+                    {section === 'investigation' ? (
+                        <InvestigationSection d={d} />
+                    ) : null}
+                    {section === 'linked' ? (
+                        <LinkedSection d={d} clientName={clientName} />
+                    ) : null}
                 </>
             )}
         </WizardShell>
@@ -261,21 +457,63 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
 /*  Lifecycle action pane (review / close / reopen)                    */
 /* ------------------------------------------------------------------ */
 
-const ACTION_META: Record<LifecycleAction, { title: string; blurb: string; icon: ComponentType<{ className?: string }>; cta: string }> = {
-    submit: { title: 'Submit for review', blurb: 'Sends the incident to a reviewer and locks the draft for audit — editing and attachments close once submitted.', icon: Send, cta: 'Submit incident' },
-    review: { title: 'Review incident', blurb: 'Mark this incident as reviewed and add any notes.', icon: CheckCircle2, cta: 'Mark reviewed' },
-    close: { title: 'Close incident', blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.', icon: CheckCircle2, cta: 'Close incident' },
-    reopen: { title: 'Reopen incident', blurb: 'Reopen a closed incident — a reason is required for the audit trail.', icon: RotateCcw, cta: 'Reopen incident' },
+const ACTION_META: Record<
+    LifecycleAction,
+    {
+        title: string;
+        blurb: string;
+        icon: ComponentType<{ className?: string }>;
+        cta: string;
+    }
+> = {
+    submit: {
+        title: 'Submit for review',
+        blurb: 'Sends the incident to a reviewer and locks the draft for audit — editing and attachments close once submitted.',
+        icon: Send,
+        cta: 'Submit incident',
+    },
+    review: {
+        title: 'Review incident',
+        blurb: 'Mark this incident as reviewed and add any notes.',
+        icon: CheckCircle2,
+        cta: 'Mark reviewed',
+    },
+    close: {
+        title: 'Close incident',
+        blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.',
+        icon: CheckCircle2,
+        cta: 'Close incident',
+    },
+    reopen: {
+        title: 'Reopen incident',
+        blurb: 'Reopen a closed incident — a reason is required for the audit trail.',
+        icon: RotateCcw,
+        cta: 'Reopen incident',
+    },
 };
 
-function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: LifecycleAction; onDone: () => void }) {
+function ActionPane({
+    d,
+    action,
+    onDone,
+}: {
+    d: IncidentDetail;
+    action: LifecycleAction;
+    onDone: () => void;
+}) {
     const incidentId = d.id;
     const meta = ACTION_META[action];
     // Guardrail rejections come back as a 302 + flash.error (the pane stays
     // open) — show WHY it was blocked, or the user sees nothing happen.
     const [attempted, setAttempted] = useState(false);
-    const flashError = (usePage().props as { flash?: { error?: string } }).flash?.error;
-    const form = useForm<{ review_notes: string; closed_outcome: string; closed_notes: string; reopened_reason: string }>({
+    const flashError = (usePage().props as { flash?: { error?: string } }).flash
+        ?.error;
+    const form = useForm<{
+        review_notes: string;
+        closed_outcome: string;
+        closed_notes: string;
+        reopened_reason: string;
+    }>({
         review_notes: '',
         closed_outcome: '',
         closed_notes: '',
@@ -291,7 +529,10 @@ function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: Lifecycl
             // Guardrail failures come back as flash.error on a 302 (Inertia onSuccess),
             // not a 422 — keep the pane open in that case so the user can adjust.
             onSuccess: (page) => {
-                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+                if (
+                    !(page.props as { flash?: { error?: string } }).flash?.error
+                )
+                    onDone();
             },
         });
     };
@@ -302,45 +543,108 @@ function ActionPane({ d, action, onDone }: { d: IncidentDetail; action: Lifecycl
 
             {attempted && flashError ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
-                    <span className="font-semibold">Couldn't {action === 'submit' ? 'submit' : action} this incident.</span> {flashError}
+                    <span className="font-semibold">
+                        Couldn't {action === 'submit' ? 'submit' : action} this
+                        incident.
+                    </span>{' '}
+                    {flashError}
                 </InfoCard>
             ) : null}
 
             {action === 'submit' ? (
                 <>
-                    <ReviewCard icon={FileText} title="What you're submitting" span>
-                        <ReviewRow label="Incident" value={`${d.ref ?? `INC-${d.id}`} · ${titleCase(d.type)}`} />
-                        <ReviewRow label="Client" value={d.client ? `${d.client.first_name} ${d.client.last_name}` : undefined} />
-                        <ReviewRow label="Severity" value={SEV_LABEL[d.severity] ?? d.severity} />
-                        <ReviewRow label="What happened" value={d.description} />
-                        <ReviewRow label="Attachments" value={`${d.attachments.length}`} />
+                    <ReviewCard
+                        icon={FileText}
+                        title="What you're submitting"
+                        span
+                    >
+                        <ReviewRow
+                            label="Incident"
+                            value={`${d.ref ?? `INC-${d.id}`} · ${titleCase(d.type)}`}
+                        />
+                        <ReviewRow
+                            label="Client"
+                            value={
+                                d.client
+                                    ? `${d.client.first_name} ${d.client.last_name}`
+                                    : undefined
+                            }
+                        />
+                        <ReviewRow
+                            label="Severity"
+                            value={SEV_LABEL[d.severity] ?? d.severity}
+                        />
+                        <ReviewRow
+                            label="What happened"
+                            value={d.description}
+                        />
+                        <ReviewRow
+                            label="Attachments"
+                            value={`${d.attachments.length}`}
+                        />
                     </ReviewCard>
                     <InfoCard icon={Send} tone="info">
-                        Check the details above — after submitting, the record locks and changes need a reviewer. Photos and documents can no longer be added.
+                        Check the details above — after submitting, the record
+                        locks and changes need a reviewer. Photos and documents
+                        can no longer be added.
                     </InfoCard>
                 </>
             ) : null}
 
             {action === 'review' ? (
                 <Field label="Review notes" hint="Optional">
-                    <Textarea rows={4} value={form.data.review_notes} onChange={(e) => form.setData('review_notes', e.target.value)} placeholder="Notes from your review…" />
+                    <Textarea
+                        rows={4}
+                        value={form.data.review_notes}
+                        onChange={(e) =>
+                            form.setData('review_notes', e.target.value)
+                        }
+                        placeholder="Notes from your review…"
+                    />
                 </Field>
             ) : null}
 
             {action === 'close' ? (
                 <>
-                    <Field label="Outcome" required error={form.errors.closed_outcome}>
-                        <Input value={form.data.closed_outcome} onChange={(e) => form.setData('closed_outcome', e.target.value)} placeholder="e.g. Resolved — care plan updated" />
+                    <Field
+                        label="Outcome"
+                        required
+                        error={form.errors.closed_outcome}
+                    >
+                        <Input
+                            value={form.data.closed_outcome}
+                            onChange={(e) =>
+                                form.setData('closed_outcome', e.target.value)
+                            }
+                            placeholder="e.g. Resolved — care plan updated"
+                        />
                     </Field>
                     <Field label="Closing notes" hint="Optional">
-                        <Textarea rows={3} value={form.data.closed_notes} onChange={(e) => form.setData('closed_notes', e.target.value)} />
+                        <Textarea
+                            rows={3}
+                            value={form.data.closed_notes}
+                            onChange={(e) =>
+                                form.setData('closed_notes', e.target.value)
+                            }
+                        />
                     </Field>
                 </>
             ) : null}
 
             {action === 'reopen' ? (
-                <Field label="Reason for reopening" required error={form.errors.reopened_reason}>
-                    <Textarea rows={4} value={form.data.reopened_reason} onChange={(e) => form.setData('reopened_reason', e.target.value)} placeholder="Why is this incident being reopened?" />
+                <Field
+                    label="Reason for reopening"
+                    required
+                    error={form.errors.reopened_reason}
+                >
+                    <Textarea
+                        rows={4}
+                        value={form.data.reopened_reason}
+                        onChange={(e) =>
+                            form.setData('reopened_reason', e.target.value)
+                        }
+                        placeholder="Why is this incident being reopened?"
+                    />
                 </Field>
             ) : null}
 
@@ -377,12 +681,17 @@ const SEVERITY_OPTIONS = [
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
 ];
-const POTENTIAL_OPTIONS = [...SEVERITY_OPTIONS, { value: 'critical', label: 'Critical' }];
+const POTENTIAL_OPTIONS = [
+    ...SEVERITY_OPTIONS,
+    { value: 'critical', label: 'Critical' },
+];
 
 function toLocalInput(iso: string): string {
     const dt = new Date(iso);
     if (Number.isNaN(dt.getTime())) return '';
-    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
 }
 
 function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
@@ -404,46 +713,116 @@ function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
         form.put(`/incidents/${d.id}`, {
             preserveScroll: true,
             onSuccess: (page) => {
-                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+                if (
+                    !(page.props as { flash?: { error?: string } }).flash?.error
+                )
+                    onDone();
             },
         });
     };
 
     return (
         <form onSubmit={submit} className="flex flex-col gap-4">
-            <StepHead icon={Pencil} title="Edit incident" blurb="Update the incident details. Drafts only — once submitted, the record is locked for audit." />
+            <StepHead
+                icon={Pencil}
+                title="Edit incident"
+                blurb="Update the incident details. Drafts only — once submitted, the record is locked for audit."
+            />
             <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Type" required error={form.errors.type}>
-                    <SelectInput value={form.data.type} onChange={(v) => form.setData('type', v)} placeholder="Select type" options={INCIDENT_TYPES} />
+                    <SelectInput
+                        value={form.data.type}
+                        onChange={(v) => form.setData('type', v)}
+                        placeholder="Select type"
+                        options={INCIDENT_TYPES}
+                    />
                 </Field>
                 <Field label="Severity" required error={form.errors.severity}>
-                    <SelectInput value={form.data.severity} onChange={(v) => form.setData('severity', v)} placeholder="Select severity" options={SEVERITY_OPTIONS} />
+                    <SelectInput
+                        value={form.data.severity}
+                        onChange={(v) => form.setData('severity', v)}
+                        placeholder="Select severity"
+                        options={SEVERITY_OPTIONS}
+                    />
                 </Field>
             </div>
             <Field label="When it occurred" error={form.errors.occurred_at}>
-                <Input type="datetime-local" value={form.data.occurred_at} onChange={(e) => form.setData('occurred_at', e.target.value)} />
+                <Input
+                    type="datetime-local"
+                    value={form.data.occurred_at}
+                    onChange={(e) =>
+                        form.setData('occurred_at', e.target.value)
+                    }
+                />
             </Field>
             <Field label="What happened" error={form.errors.description}>
-                <Textarea rows={4} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+                <Textarea
+                    rows={4}
+                    value={form.data.description}
+                    onChange={(e) =>
+                        form.setData('description', e.target.value)
+                    }
+                />
             </Field>
-            <Field label="Immediate action taken" error={form.errors.immediate_action_taken}>
-                <Textarea rows={3} value={form.data.immediate_action_taken} onChange={(e) => form.setData('immediate_action_taken', e.target.value)} />
+            <Field
+                label="Immediate action taken"
+                error={form.errors.immediate_action_taken}
+            >
+                <Textarea
+                    rows={3}
+                    value={form.data.immediate_action_taken}
+                    onChange={(e) =>
+                        form.setData('immediate_action_taken', e.target.value)
+                    }
+                />
             </Field>
             <Field label="Witnesses" error={form.errors.witnesses}>
-                <Input value={form.data.witnesses} onChange={(e) => form.setData('witnesses', e.target.value)} placeholder="Names of any witnesses" />
+                <Input
+                    value={form.data.witnesses}
+                    onChange={(e) => form.setData('witnesses', e.target.value)}
+                    placeholder="Names of any witnesses"
+                />
             </Field>
             {isNearMiss ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Potential severity" error={form.errors.potential_severity}>
-                        <SelectInput value={form.data.potential_severity} onChange={(v) => form.setData('potential_severity', v)} placeholder="What could have happened" options={POTENTIAL_OPTIONS} />
+                    <Field
+                        label="Potential severity"
+                        error={form.errors.potential_severity}
+                    >
+                        <SelectInput
+                            value={form.data.potential_severity}
+                            onChange={(v) =>
+                                form.setData('potential_severity', v)
+                            }
+                            placeholder="What could have happened"
+                            options={POTENTIAL_OPTIONS}
+                        />
                     </Field>
-                    <Field label="Could have caused" error={form.errors.potential_consequence}>
-                        <Input value={form.data.potential_consequence} onChange={(e) => form.setData('potential_consequence', e.target.value)} />
+                    <Field
+                        label="Could have caused"
+                        error={form.errors.potential_consequence}
+                    >
+                        <Input
+                            value={form.data.potential_consequence}
+                            onChange={(e) =>
+                                form.setData(
+                                    'potential_consequence',
+                                    e.target.value,
+                                )
+                            }
+                        />
                     </Field>
                 </div>
             ) : null}
             <label className="flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" checked={form.data.is_notifiable} onChange={(e) => form.setData('is_notifiable', e.target.checked)} className="h-4 w-4 rounded border-border" />
+                <input
+                    type="checkbox"
+                    checked={form.data.is_notifiable}
+                    onChange={(e) =>
+                        form.setData('is_notifiable', e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-border"
+                />
                 WorkSafe NZ notifiable event
             </label>
             <div className="flex justify-end gap-2">
@@ -462,20 +841,54 @@ function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
 /*  Sections                                                           */
 /* ------------------------------------------------------------------ */
 
-function OverviewSection({ d, isNearMiss }: { d: IncidentDetail; isNearMiss: boolean }) {
+function OverviewSection({
+    d,
+    isNearMiss,
+}: {
+    d: IncidentDetail;
+    isNearMiss: boolean;
+}) {
     const concerns = d.safeguarding_concerns ?? [];
-    const escalation = concerns.length ? (concerns.find((c) => c.can_view) ?? concerns[0]) : null;
+    const escalation = concerns.length
+        ? (concerns.find((c) => c.can_view) ?? concerns[0])
+        : null;
+    const worksafe = d.hs_event
+        ? {
+              notifiable: d.hs_event.worksafe_notifiable,
+              status: d.hs_event.worksafe_status,
+              reference: d.hs_event.worksafe_reference,
+              notifiedAt: d.hs_event.worksafe_notified_at,
+              acknowledgedAt: d.hs_event.worksafe_acknowledged_at,
+          }
+        : {
+              notifiable: d.is_notifiable,
+              status: d.worksafe_notification_status,
+              reference: d.worksafe_reference,
+              notifiedAt: d.worksafe_notified_at,
+              acknowledgedAt: null,
+          };
+    const handover = d.hs_event?.handover ?? null;
+    const worksafeNotified =
+        worksafe.status === 'notified' || worksafe.status === 'acknowledged';
     return (
         <div className="grid gap-4 sm:grid-cols-2">
             {escalation ? (
                 <div className="sm:col-span-2">
                     <InfoCard icon={ShieldAlert} tone="warn">
-                        <span className="font-semibold">Escalated to safeguarding.</span>{' '}
+                        <span className="font-semibold">
+                            Escalated to safeguarding.
+                        </span>{' '}
                         {escalation.can_view ? (
                             <>
                                 Concern {escalation.reference_number}
-                                {escalation.status ? ` · ${titleCase(escalation.status)}` : ''}.{' '}
-                                <Link href={`/safeguarding/${escalation.id}`} className="font-medium text-primary hover:underline">
+                                {escalation.status
+                                    ? ` · ${titleCase(escalation.status)}`
+                                    : ''}
+                                .{' '}
+                                <Link
+                                    href={`/safeguarding/${escalation.id}`}
+                                    className="font-medium text-primary hover:underline"
+                                >
                                     Open concern
                                 </Link>
                             </>
@@ -486,53 +899,160 @@ function OverviewSection({ d, isNearMiss }: { d: IncidentDetail; isNearMiss: boo
                 </div>
             ) : null}
 
-            {d.is_notifiable ? (
+            {worksafe.notifiable ? (
                 <div className="sm:col-span-2">
                     <InfoCard icon={ShieldAlert} tone="crit">
-                        <span className="font-semibold">WorkSafe NZ notifiable event.</span>{' '}
-                        {d.worksafe_notification_status === 'notified'
-                            ? `Notified${d.worksafe_notified_at ? ` ${formatDateTime(d.worksafe_notified_at)}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''}.`
-                            : 'Notification to WorkSafe NZ is still pending — notify from the full page.'}
+                        <span className="font-semibold">
+                            WorkSafe NZ notifiable event.
+                        </span>{' '}
+                        {worksafe.status === 'acknowledged'
+                            ? `Acknowledged by WorkSafe${worksafe.acknowledgedAt ? ` ${formatDateTime(worksafe.acknowledgedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
+                            : worksafeNotified
+                              ? `Notified${worksafe.notifiedAt ? ` ${formatDateTime(worksafe.notifiedAt)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
+                              : 'Notification to WorkSafe NZ is still pending with Health & Safety.'}
                     </InfoCard>
                 </div>
             ) : null}
 
+            {handover ? (
+                <ReviewCard icon={RadioTower} title="H&S handover" span>
+                    <ReviewRow
+                        label="Status"
+                        value={handoverStatusLabel(handover.status)}
+                    />
+                    <ReviewRow
+                        label="H&S owner"
+                        value={handover.owner?.name ?? 'No H&S owner assigned'}
+                    />
+                    <ReviewRow
+                        label="Accepted by"
+                        value={handover.accepted_by?.name}
+                    />
+                    <ReviewRow
+                        label="Accepted at"
+                        value={
+                            handover.accepted_at
+                                ? formatDateTime(handover.accepted_at)
+                                : undefined
+                        }
+                    />
+                    <ReviewRow
+                        label="Acceptance notes"
+                        value={handover.notes}
+                    />
+                </ReviewCard>
+            ) : null}
+
             <ReviewCard icon={FileText} title="What happened" span>
-                <p className="text-sm whitespace-pre-wrap text-foreground">{d.description || '—'}</p>
+                <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {d.description || '—'}
+                </p>
             </ReviewCard>
 
             <ReviewCard icon={Users} title="People">
-                <ReviewRow label="Client" value={d.client ? `${d.client.first_name} ${d.client.last_name}` : undefined} />
+                <ReviewRow
+                    label="Client"
+                    value={
+                        d.client
+                            ? `${d.client.first_name} ${d.client.last_name}`
+                            : undefined
+                    }
+                />
                 <ReviewRow label="Reported by" value={d.reporter?.name} />
                 <ReviewRow label="Witnesses" value={d.witnesses} />
             </ReviewCard>
 
             <ReviewCard icon={Search} title="Classification">
                 <ReviewRow label="Source" value={titleCase(d.source)} />
-                <ReviewRow label={isNearMiss ? 'Potential severity' : 'Severity'} value={isNearMiss ? (d.potential_severity ? SEV_LABEL[d.potential_severity] : undefined) : SEV_LABEL[d.severity]} />
-                {isNearMiss ? <ReviewRow label="Could have caused" value={d.potential_consequence} /> : null}
-                <ReviewRow label="H&S event" value={d.hs_event?.reference_number} />
+                <ReviewRow
+                    label={isNearMiss ? 'Potential severity' : 'Severity'}
+                    value={
+                        isNearMiss
+                            ? d.potential_severity
+                                ? SEV_LABEL[d.potential_severity]
+                                : undefined
+                            : SEV_LABEL[d.severity]
+                    }
+                />
+                {isNearMiss ? (
+                    <ReviewRow
+                        label="Could have caused"
+                        value={d.potential_consequence}
+                    />
+                ) : null}
+                <ReviewRow
+                    label="H&S event"
+                    value={d.hs_event?.reference_number}
+                />
             </ReviewCard>
 
             <ReviewCard icon={CheckCircle2} title="Immediate actions" span>
-                <p className="text-sm whitespace-pre-wrap text-foreground">{d.immediate_action_taken || '—'}</p>
+                <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {d.immediate_action_taken || '—'}
+                </p>
             </ReviewCard>
         </div>
     );
 }
 
 function TimelineSection({ d }: { d: IncidentDetail }) {
-    type TLEvent = { at: string; label: string; tone: string; icon: ComponentType<{ className?: string }> };
+    type TLEvent = {
+        at: string;
+        label: string;
+        tone: string;
+        icon: ComponentType<{ className?: string }>;
+    };
     const events: TLEvent[] = [];
-    if (d.occurred_at) events.push({ at: d.occurred_at, label: 'Incident occurred', tone: 'neutral', icon: AlertTriangle });
-    if (d.control_room_alert?.triggered_at) events.push({ at: d.control_room_alert.triggered_at, label: 'Control Room alert raised', tone: 'critical', icon: RadioTower });
-    if (d.submitted_at) events.push({ at: d.submitted_at, label: 'Submitted for review', tone: 'info', icon: Send });
-    if (d.reviewed_at) events.push({ at: d.reviewed_at, label: 'Reviewed', tone: 'primary', icon: CheckCircle2 });
-    if (d.reopened_at) events.push({ at: d.reopened_at, label: `Reopened${d.reopened_reason ? ` · ${d.reopened_reason}` : ''}`, tone: 'warning', icon: RotateCcw });
-    if (d.closed_at) events.push({ at: d.closed_at, label: `Closed${d.closed_outcome ? ` · ${d.closed_outcome}` : ''}`, tone: 'success', icon: CheckCircle2 });
+    if (d.occurred_at)
+        events.push({
+            at: d.occurred_at,
+            label: 'Incident occurred',
+            tone: 'neutral',
+            icon: AlertTriangle,
+        });
+    if (d.control_room_alert?.triggered_at)
+        events.push({
+            at: d.control_room_alert.triggered_at,
+            label: 'Control Room alert raised',
+            tone: 'critical',
+            icon: RadioTower,
+        });
+    if (d.submitted_at)
+        events.push({
+            at: d.submitted_at,
+            label: 'Submitted for review',
+            tone: 'info',
+            icon: Send,
+        });
+    if (d.reviewed_at)
+        events.push({
+            at: d.reviewed_at,
+            label: 'Reviewed',
+            tone: 'primary',
+            icon: CheckCircle2,
+        });
+    if (d.reopened_at)
+        events.push({
+            at: d.reopened_at,
+            label: `Reopened${d.reopened_reason ? ` · ${d.reopened_reason}` : ''}`,
+            tone: 'warning',
+            icon: RotateCcw,
+        });
+    if (d.closed_at)
+        events.push({
+            at: d.closed_at,
+            label: `Closed${d.closed_outcome ? ` · ${d.closed_outcome}` : ''}`,
+            tone: 'success',
+            icon: CheckCircle2,
+        });
     events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-    if (!events.length) return <p className="text-sm text-muted-foreground">No timeline events yet.</p>;
+    if (!events.length)
+        return (
+            <p className="text-sm text-muted-foreground">
+                No timeline events yet.
+            </p>
+        );
 
     return (
         <ol className="relative ml-2 border-l border-border">
@@ -540,12 +1060,18 @@ function TimelineSection({ d }: { d: IncidentDetail }) {
                 const Icon = e.icon;
                 return (
                     <li key={i} className="mb-5 ml-5">
-                        <span className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full ${DOT[e.tone] ?? DOT.neutral}`} />
+                        <span
+                            className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full ${DOT[e.tone] ?? DOT.neutral}`}
+                        />
                         <div className="flex items-center gap-2">
                             <Icon className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">{e.label}</span>
+                            <span className="text-sm font-medium text-foreground">
+                                {e.label}
+                            </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(e.at)}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {formatDateTime(e.at)}
+                        </p>
                     </li>
                 );
             })}
@@ -558,63 +1084,132 @@ function PhotosSection({ d }: { d: IncidentDetail }) {
     const canEdit = d.status === 'draft' && d.can.update;
     return (
         <div className="flex flex-col gap-3">
-            {canEdit ? <AttachmentUploader endpoint={`/incidents/${d.id}/attachments`} hint="PDF, Word, images — up to 10 MB each" /> : null}
+            {canEdit ? (
+                <AttachmentUploader
+                    endpoint={`/incidents/${d.id}/attachments`}
+                    hint="PDF, Word, images — up to 10 MB each"
+                />
+            ) : null}
 
             {d.attachments.length ? (
                 <div className="flex flex-col gap-2">
                     {d.attachments.map((a) => (
-                        <AttachmentRow key={a.id} a={a} incidentId={d.id} canEdit={canEdit} canPortal={d.can.portalManage} />
+                        <AttachmentRow
+                            key={a.id}
+                            a={a}
+                            incidentId={d.id}
+                            canEdit={canEdit}
+                            canPortal={d.can.portalManage}
+                        />
                     ))}
                 </div>
             ) : (
                 <div className="rounded-xl border border-dashed border-border py-10 text-center">
                     <Paperclip className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">No photos or documents attached.</p>
-                    {!canEdit ? <p className="mt-1 text-xs text-muted-foreground/70">Attachments can only be added while the incident is a draft.</p> : null}
+                    <p className="text-sm text-muted-foreground">
+                        No photos or documents attached.
+                    </p>
+                    {!canEdit ? (
+                        <p className="mt-1 text-xs text-muted-foreground/70">
+                            Attachments can only be added while the incident is
+                            a draft.
+                        </p>
+                    ) : null}
                 </div>
             )}
         </div>
     );
 }
 
-function AttachmentRow({ a, incidentId, canEdit, canPortal }: { a: IncidentDetail['attachments'][number]; incidentId: number; canEdit: boolean; canPortal: boolean }) {
+function AttachmentRow({
+    a,
+    incidentId,
+    canEdit,
+    canPortal,
+}: {
+    a: IncidentDetail['attachments'][number];
+    incidentId: number;
+    canEdit: boolean;
+    canPortal: boolean;
+}) {
     // Two-phase remove — evidence deletion should never be a single mis-click.
     const [removeArming, setRemoveArming] = useState(false);
-    const remove = () => router.delete(`/incidents/${incidentId}/attachments/${a.id}`, { preserveScroll: true });
-    const togglePortal = () => router.patch(`/incidents/${incidentId}/attachments/${a.id}`, { portal_visible: !a.portal_visible }, { preserveScroll: true });
+    const remove = () =>
+        router.delete(`/incidents/${incidentId}/attachments/${a.id}`, {
+            preserveScroll: true,
+        });
+    const togglePortal = () =>
+        router.patch(
+            `/incidents/${incidentId}/attachments/${a.id}`,
+            { portal_visible: !a.portal_visible },
+            { preserveScroll: true },
+        );
     return (
         <div className="flex items-center gap-3 rounded-lg border border-border p-3">
             <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{a.name}</p>
+                <p className="truncate text-sm font-medium text-foreground">
+                    {a.name}
+                </p>
                 <p className="text-xs text-muted-foreground">
                     {fmtSize(a.size)}
                     {a.uploaded_by ? ` · ${a.uploaded_by}` : ''}
                     {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
                     {a.portal_visible ? ' · shared to portal' : ''}
                 </p>
-                {a.notes ? <p className="mt-0.5 text-xs text-muted-foreground">{a.notes}</p> : null}
+                {a.notes ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {a.notes}
+                    </p>
+                ) : null}
             </div>
             {canPortal ? (
-                <Button variant="ghost" size="sm" onClick={togglePortal} title={a.portal_visible ? 'Stop sharing to the family portal' : 'Share to the family portal'}>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={togglePortal}
+                    title={
+                        a.portal_visible
+                            ? 'Stop sharing to the family portal'
+                            : 'Share to the family portal'
+                    }
+                >
                     {a.portal_visible ? 'Unshare' : 'Share'}
                 </Button>
             ) : null}
-            <a href={a.download_url} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted">
+            <a
+                href={a.download_url}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
+            >
                 <Download className="h-3.5 w-3.5" /> Download
             </a>
             {canEdit ? (
                 removeArming ? (
                     <span className="inline-flex items-center gap-1">
-                        <Button variant="destructive" size="sm" onClick={remove}>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={remove}
+                        >
                             Remove?
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setRemoveArming(false)} aria-label="Keep attachment">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRemoveArming(false)}
+                            aria-label="Keep attachment"
+                        >
                             <X className="h-3.5 w-3.5" />
                         </Button>
                     </span>
                 ) : (
-                    <Button variant="ghost" size="sm" onClick={() => setRemoveArming(true)} title="Remove attachment" className="text-status-critical hover:text-status-critical">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRemoveArming(true)}
+                        title="Remove attachment"
+                        className="text-status-critical hover:text-status-critical"
+                    >
                         <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                 )
@@ -623,7 +1218,13 @@ function AttachmentRow({ a, incidentId, canEdit, canPortal }: { a: IncidentDetai
     );
 }
 
-function FollowupsSection({ d, onComplete }: { d: IncidentDetail; onComplete: (id: number) => void }) {
+function FollowupsSection({
+    d,
+    onComplete,
+}: {
+    d: IncidentDetail;
+    onComplete: (id: number) => void;
+}) {
     return (
         <div className="flex flex-col gap-3">
             {d.can.followupsManage ? <AddFollowupForm d={d} /> : null}
@@ -631,23 +1232,44 @@ function FollowupsSection({ d, onComplete }: { d: IncidentDetail; onComplete: (i
             {d.followups.length ? (
                 <div className="flex flex-col gap-2">
                     {d.followups.map((f) => (
-                        <div key={f.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                            <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`} />
+                        <div
+                            key={f.id}
+                            className="flex items-start gap-3 rounded-lg border border-border p-3"
+                        >
+                            <ListTodo
+                                className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`}
+                            />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-foreground">{f.notes || 'Follow-up task'}</p>
+                                <p className="text-sm text-foreground">
+                                    {f.notes || 'Follow-up task'}
+                                </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {f.assigned_to ? `${f.assigned_to}` : 'Unassigned'}
-                                    {f.due_at ? ` · due ${formatDateTime(f.due_at)}` : ''}
-                                    {f.completed_at ? ` · completed ${formatDateTime(f.completed_at)}` : f.overdue ? ' · overdue' : ''}
+                                    {f.assigned_to
+                                        ? `${f.assigned_to}`
+                                        : 'Unassigned'}
+                                    {f.due_at
+                                        ? ` · due ${formatDateTime(f.due_at)}`
+                                        : ''}
+                                    {f.completed_at
+                                        ? ` · completed ${formatDateTime(f.completed_at)}`
+                                        : f.overdue
+                                          ? ' · overdue'
+                                          : ''}
                                 </p>
                             </div>
                             {!f.completed_at && d.can.followupsComplete ? (
-                                <Button variant="outline" size="sm" onClick={() => onComplete(f.id)}>
-                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onComplete(f.id)}
+                                >
+                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />{' '}
+                                    Complete
                                 </Button>
                             ) : f.completed_at ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                                    <CheckCircle2 className="h-3.5 w-3.5" />{' '}
+                                    Done
                                 </span>
                             ) : null}
                         </div>
@@ -656,7 +1278,9 @@ function FollowupsSection({ d, onComplete }: { d: IncidentDetail; onComplete: (i
             ) : (
                 <div className="rounded-xl border border-dashed border-border py-10 text-center">
                     <ListTodo className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">No follow-ups on this incident.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No follow-ups on this incident.
+                    </p>
                 </div>
             )}
         </div>
@@ -665,11 +1289,20 @@ function FollowupsSection({ d, onComplete }: { d: IncidentDetail; onComplete: (i
 
 function AddFollowupForm({ d }: { d: IncidentDetail }) {
     const [open, setOpen] = useState(false);
-    const form = useForm<{ notes: string; assigned_to_user_id: string; due_at: string }>({ notes: '', assigned_to_user_id: '', due_at: '' });
+    const form = useForm<{
+        notes: string;
+        assigned_to_user_id: string;
+        due_at: string;
+    }>({ notes: '', assigned_to_user_id: '', due_at: '' });
 
     if (!open) {
         return (
-            <Button variant="outline" size="sm" className="self-start" onClick={() => setOpen(true)}>
+            <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => setOpen(true)}
+            >
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Add follow-up
             </Button>
         );
@@ -691,9 +1324,17 @@ function AddFollowupForm({ d }: { d: IncidentDetail }) {
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+        <form
+            onSubmit={submit}
+            className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3"
+        >
             <Field label="Task" required error={form.errors.notes}>
-                <Textarea rows={2} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="e.g. Update the care plan and notify the GP" />
+                <Textarea
+                    rows={2}
+                    value={form.data.notes}
+                    onChange={(e) => form.setData('notes', e.target.value)}
+                    placeholder="e.g. Update the care plan and notify the GP"
+                />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Assign to">
@@ -701,15 +1342,31 @@ function AddFollowupForm({ d }: { d: IncidentDetail }) {
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
                         placeholder="Unassigned"
-                        options={d.assignable_staff.map((s) => ({ value: String(s.id), label: s.name }))}
+                        options={d.assignable_staff.map((s) => ({
+                            value: String(s.id),
+                            label: s.name,
+                        }))}
                     />
                 </Field>
                 <Field label="Due">
-                    <Input type="date" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
+                    <Input
+                        type="date"
+                        value={form.data.due_at}
+                        onChange={(e) => form.setData('due_at', e.target.value)}
+                    />
                 </Field>
             </div>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { form.reset(); form.clearErrors(); setOpen(false); }}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                        form.reset();
+                        form.clearErrors();
+                        setOpen(false);
+                    }}
+                >
                     Cancel
                 </Button>
                 <Button type="submit" size="sm" disabled={form.processing}>
@@ -729,12 +1386,14 @@ const METHODOLOGY_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
-function InvestigationSection({ d }: { d: IncidentDetail }) {
+export function InvestigationSection({ d }: { d: IncidentDetail }) {
     if (!d.hs_event) {
         return (
             <div className="rounded-xl border border-dashed border-border py-12 text-center">
                 <Search className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No Health &amp; Safety event recorded for this incident.</p>
+                <p className="text-sm text-muted-foreground">
+                    No Health &amp; Safety event recorded for this incident.
+                </p>
             </div>
         );
     }
@@ -744,49 +1403,126 @@ function InvestigationSection({ d }: { d: IncidentDetail }) {
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
                 <div>
-                    <p className="text-sm font-semibold text-foreground">{ev.reference_number}</p>
-                    <p className="text-xs text-muted-foreground">H&amp;S event · {titleCase(ev.status)}{ev.investigation_required ? ' · investigation required' : ''}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                        {ev.reference_number}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        H&amp;S event · {titleCase(ev.status)}
+                        {ev.investigation_required
+                            ? ' · investigation required'
+                            : ''}
+                    </p>
                 </div>
-                <Link href={`/health-safety/events/${ev.id}`} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted">
-                    <ExternalLink className="h-3.5 w-3.5" /> Open in Health &amp; Safety
-                </Link>
+                {ev.url ? (
+                    <Link
+                        href={ev.url}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" /> Open in Health
+                        &amp; Safety
+                    </Link>
+                ) : (
+                    <span className="text-xs text-muted-foreground">
+                        H&amp;S access required to open
+                    </span>
+                )}
             </div>
 
             {inv ? (
-                <ReviewCard icon={Search} title={`Investigation ${inv.reference_number}`} span>
+                <ReviewCard
+                    icon={Search}
+                    title={`Investigation ${inv.reference_number}`}
+                    span
+                >
                     <ReviewRow label="Status" value={titleCase(inv.status)} />
-                    <ReviewRow label="Methodology" value={inv.methodology ? (METHODOLOGY_LABELS[inv.methodology] ?? inv.methodology.replace(/_/g, ' ')) : undefined} />
-                    {inv.root_causes?.length ? <ReviewRow label="Root causes" value={inv.root_causes.map((c) => c.description).filter(Boolean).join('; ')} /> : null}
-                    {inv.recommendations?.length ? <ReviewRow label="Recommendations" value={inv.recommendations.map((r) => r.description).filter(Boolean).join('; ')} /> : null}
-                    {inv.lessons_learned ? <ReviewRow label="Lessons learned" value={inv.lessons_learned} /> : null}
+                    <ReviewRow
+                        label="Methodology"
+                        value={
+                            inv.methodology
+                                ? (METHODOLOGY_LABELS[inv.methodology] ??
+                                  inv.methodology.replace(/_/g, ' '))
+                                : undefined
+                        }
+                    />
+                    {inv.root_causes?.length ? (
+                        <ReviewRow
+                            label="Root causes"
+                            value={inv.root_causes
+                                .map((c) => c.description)
+                                .filter(Boolean)
+                                .join('; ')}
+                        />
+                    ) : null}
+                    {inv.recommendations?.length ? (
+                        <ReviewRow
+                            label="Recommendations"
+                            value={inv.recommendations
+                                .map((r) => r.description)
+                                .filter(Boolean)
+                                .join('; ')}
+                        />
+                    ) : null}
+                    {inv.lessons_learned ? (
+                        <ReviewRow
+                            label="Lessons learned"
+                            value={inv.lessons_learned}
+                        />
+                    ) : null}
                 </ReviewCard>
             ) : (
-                <p className="text-sm text-muted-foreground">No investigation has been opened yet.</p>
+                <p className="text-sm text-muted-foreground">
+                    No investigation has been opened yet.
+                </p>
             )}
 
             <div>
                 <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">Corrective actions</p>
-                    <Link href={`/health-safety/corrective-actions?event=${ev.id}`} className="text-xs font-medium text-primary hover:underline">
-                        Open register
-                    </Link>
+                    <p className="text-sm font-semibold text-foreground">
+                        Corrective actions
+                    </p>
+                    {ev.corrective_actions_url ? (
+                        <Link
+                            href={ev.corrective_actions_url}
+                            className="text-xs font-medium text-primary hover:underline"
+                        >
+                            Open register
+                        </Link>
+                    ) : null}
                 </div>
                 {ev.corrective_actions.length ? (
                     <div className="flex flex-col gap-2">
                         {ev.corrective_actions.map((ca) => (
-                            <div key={ca.id} className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm">
+                            <div
+                                key={ca.id}
+                                className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm"
+                            >
                                 <div className="min-w-0">
-                                    <p className="truncate font-medium text-foreground">{ca.reference_number} · {ca.title}</p>
-                                    <p className="text-xs text-muted-foreground">{titleCase(ca.status)}{ca.assigned_to ? ` · ${ca.assigned_to}` : ''}{ca.due_date ? ` · due ${formatDateTime(ca.due_date)}` : ''}</p>
+                                    <p className="truncate font-medium text-foreground">
+                                        {ca.reference_number} · {ca.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {titleCase(ca.status)}
+                                        {ca.assigned_to
+                                            ? ` · ${ca.assigned_to}`
+                                            : ''}
+                                        {ca.due_date
+                                            ? ` · due ${formatDateTime(ca.due_date)}`
+                                            : ''}
+                                    </p>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-xs text-muted-foreground">No corrective actions raised. Formal remediation is raised and governed in the Health &amp; Safety register.</p>
+                    <p className="text-xs text-muted-foreground">
+                        No corrective actions raised. Formal remediation is
+                        raised and governed in the Health &amp; Safety register.
+                    </p>
                 )}
 
-                {d.can.raiseCorrectiveAction ? <RaiseCorrectiveActionForm d={d} /> : null}
+                {d.can.raiseCorrectiveAction ? (
+                    <RaiseCorrectiveActionForm d={d} />
+                ) : null}
             </div>
         </div>
     );
@@ -794,7 +1530,13 @@ function InvestigationSection({ d }: { d: IncidentDetail }) {
 
 function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
     const [open, setOpen] = useState(false);
-    const form = useForm<{ title: string; description: string; priority: string; due_date: string; assigned_to_user_id: string }>({
+    const form = useForm<{
+        title: string;
+        description: string;
+        priority: string;
+        due_date: string;
+        assigned_to_user_id: string;
+    }>({
         title: '',
         description: '',
         priority: 'medium',
@@ -808,7 +1550,12 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
 
     if (!open) {
         return (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => setOpen(true)}>
+            <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setOpen(true)}
+            >
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Raise corrective action
             </Button>
         );
@@ -823,7 +1570,9 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
         form.post(`/incidents/${d.id}/corrective-actions`, {
             preserveScroll: true,
             onSuccess: (page) => {
-                if (!(page.props as { flash?: { error?: string } }).flash?.error) {
+                if (
+                    !(page.props as { flash?: { error?: string } }).flash?.error
+                ) {
                     form.reset();
                     setOpen(false);
                     // Stay in the incident — the refreshed detail shows the new
@@ -834,13 +1583,29 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
     };
 
     return (
-        <form onSubmit={submit} className="mt-2 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground">Creates a row in the H&amp;S Corrective Actions register, linked to {d.hs_event.reference_number}.</p>
+        <form
+            onSubmit={submit}
+            className="mt-2 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3"
+        >
+            <p className="text-xs text-muted-foreground">
+                Creates a row in the H&amp;S Corrective Actions register, linked
+                to {d.hs_event.reference_number}.
+            </p>
             <Field label="Action" required error={form.errors.title}>
-                <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="e.g. Install a grab rail in the bathroom" />
+                <Input
+                    value={form.data.title}
+                    onChange={(e) => form.setData('title', e.target.value)}
+                    placeholder="e.g. Install a grab rail in the bathroom"
+                />
             </Field>
             <Field label="Detail" hint="Optional">
-                <Textarea rows={2} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+                <Textarea
+                    rows={2}
+                    value={form.data.description}
+                    onChange={(e) =>
+                        form.setData('description', e.target.value)
+                    }
+                />
             </Field>
             <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Priority">
@@ -857,14 +1622,37 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                     />
                 </Field>
                 <Field label="Owner">
-                    <SelectInput value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} placeholder="Unassigned" options={d.assignable_staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                    <SelectInput
+                        value={form.data.assigned_to_user_id}
+                        onChange={(v) => form.setData('assigned_to_user_id', v)}
+                        placeholder="Unassigned"
+                        options={d.assignable_staff.map((s) => ({
+                            value: String(s.id),
+                            label: s.name,
+                        }))}
+                    />
                 </Field>
                 <Field label="Due">
-                    <Input type="date" value={form.data.due_date} onChange={(e) => form.setData('due_date', e.target.value)} />
+                    <Input
+                        type="date"
+                        value={form.data.due_date}
+                        onChange={(e) =>
+                            form.setData('due_date', e.target.value)
+                        }
+                    />
                 </Field>
             </div>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { form.reset(); form.clearErrors(); setOpen(false); }}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                        form.reset();
+                        form.clearErrors();
+                        setOpen(false);
+                    }}
+                >
                     Cancel
                 </Button>
                 <Button type="submit" size="sm" disabled={form.processing}>
@@ -875,7 +1663,13 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
     );
 }
 
-function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: string }) {
+export function LinkedSection({
+    d,
+    clientName,
+}: {
+    d: IncidentDetail;
+    clientName: string;
+}) {
     return (
         <div className="flex flex-col gap-2">
             {d.control_room_alert ? (
@@ -883,24 +1677,46 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
                     icon={RadioTower}
                     title="Control Room alert"
                     sub={`${titleCase(d.control_room_alert.alert_type)} · ${titleCase(d.control_room_alert.status)}${d.control_room_alert.triggered_at ? ` · ${formatDateTime(d.control_room_alert.triggered_at)}` : ''}`}
-                    href={`/control-room/alerts/${d.control_room_alert.id}`}
+                    href={d.control_room_alert.url}
                 />
             ) : null}
             {d.hs_event ? (
-                <LinkedRow icon={ShieldAlert} title="Health & Safety event" sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`} href={`/health-safety/events/${d.hs_event.id}`} />
+                <LinkedRow
+                    icon={ShieldAlert}
+                    title="Health & Safety event"
+                    sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
+                    href={d.hs_event.url}
+                />
             ) : null}
             {(d.safeguarding_concerns ?? []).map((c) =>
                 c.can_view ? (
-                    <LinkedRow key={c.id} icon={ShieldAlert} title="Safeguarding concern" sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`} href={`/safeguarding/${c.id}`} />
+                    <LinkedRow
+                        key={c.id}
+                        icon={ShieldAlert}
+                        title="Safeguarding concern"
+                        sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
+                        href={`/safeguarding/${c.id}`}
+                    />
                 ) : (
-                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground">
+                    <div
+                        key={c.id}
+                        className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
+                    >
                         <ShieldAlert className="h-4 w-4 shrink-0" />
-                        <span className="text-sm">Safeguarding concern raised · restricted (need-to-know)</span>
+                        <span className="text-sm">
+                            Safeguarding concern raised · restricted
+                            (need-to-know)
+                        </span>
                     </div>
                 ),
             )}
             {d.fleet_incident ? (
-                <LinkedRow icon={Truck} title="Fleet incident" sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`} href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`} />
+                <LinkedRow
+                    icon={Truck}
+                    title="Fleet incident"
+                    sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
+                    href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
+                />
             ) : null}
             {d.medication_error ? (
                 <LinkedRow
@@ -928,17 +1744,43 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
                     href={`/health-safety/first-aid?record=${r.id}`}
                 />
             ))}
-            {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !d.medication_error && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length && !(d.first_aid_records ?? []).length ? (
-                <p className="text-sm text-muted-foreground">No linked records.</p>
+            {d.client ? (
+                <LinkedRow
+                    icon={User}
+                    title="Client record"
+                    sub={clientName}
+                    href={`/operations/clients/${d.client.id}/care`}
+                />
+            ) : null}
+            {!d.control_room_alert &&
+            !d.hs_event &&
+            !d.client &&
+            !d.fleet_incident &&
+            !d.medication_error &&
+            !(d.safeguarding_concerns ?? []).length &&
+            !(d.restraint_events ?? []).length &&
+            !(d.first_aid_records ?? []).length ? (
+                <p className="text-sm text-muted-foreground">
+                    No linked records.
+                </p>
             ) : null}
         </div>
     );
 }
 
-function LinkedRow({ icon: Icon, title, sub, href }: { icon: ComponentType<{ className?: string }>; title: string; sub: string; href: string }) {
-    return (
-        <Link href={href} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+function LinkedRow({
+    icon: Icon,
+    title,
+    sub,
+    href,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    title: string;
+    sub: string;
+    href: string | null;
+}) {
+    const content = (
+        <>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </span>
@@ -946,7 +1788,22 @@ function LinkedRow({ icon: Icon, title, sub, href }: { icon: ComponentType<{ cla
                 <p className="text-sm font-medium text-foreground">{title}</p>
                 <p className="truncate text-xs text-muted-foreground">{sub}</p>
             </div>
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            {href ? (
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            ) : null}
+        </>
+    );
+
+    return href ? (
+        <Link
+            href={href}
+            className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+        >
+            {content}
         </Link>
+    ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+            {content}
+        </div>
     );
 }

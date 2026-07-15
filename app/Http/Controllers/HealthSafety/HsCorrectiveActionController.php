@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Exposes the (already gated) HsCorrectiveActionService over HTTP (E-Gap 3).
@@ -19,11 +22,16 @@ use Illuminate\Validation\Rule;
  */
 class HsCorrectiveActionController extends Controller
 {
-    public function __construct(private readonly HsCorrectiveActionService $service) {}
+    public function __construct(
+        private readonly HsCorrectiveActionService $service,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     /** Add a standalone corrective action to the event. */
     public function store(Request $request, HsEvent $event)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -38,9 +46,16 @@ class HsCorrectiveActionController extends Controller
                 HsCorrectiveAction::TYPE_PREVENTIVE,
                 HsCorrectiveAction::TYPE_IMPROVEMENT,
             ])],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to_user_id' => ['nullable', 'integer'],
             'due_date' => ['nullable', 'date'],
         ]);
+        if (isset($data['assigned_to_user_id'])) {
+            $this->assertStaffIsAssignable(
+                $request,
+                $event,
+                (int) $data['assigned_to_user_id'],
+            );
+        }
 
         try {
             $this->service->createStandalone($event, $data);
@@ -54,6 +69,7 @@ class HsCorrectiveActionController extends Controller
     /** Seed a corrective action from an investigation recommendation (E-Gap 6). */
     public function seedFromRecommendation(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         abort_unless($investigation->hs_event_id === $event->id, 404);
 
         $data = $request->validate(['recommendation_index' => ['required', 'integer', 'min:0']]);
@@ -70,9 +86,17 @@ class HsCorrectiveActionController extends Controller
     /** Start (open → in_progress), optionally (re)assigning the owner. */
     public function start(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
-        $data = $request->validate(['assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id']]);
+        $data = $request->validate(['assigned_to_user_id' => ['nullable', 'integer']]);
+        if (isset($data['assigned_to_user_id'])) {
+            $this->assertStaffIsAssignable(
+                $request,
+                $event,
+                (int) $data['assigned_to_user_id'],
+            );
+        }
 
         try {
             $this->service->start($action, $data['assigned_to_user_id'] ?? null);
@@ -86,6 +110,7 @@ class HsCorrectiveActionController extends Controller
     /** Complete (in_progress → completed) with evidence. */
     public function complete(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate(['completion_notes' => ['required', 'string', 'max:2000']]);
@@ -105,6 +130,7 @@ class HsCorrectiveActionController extends Controller
     /** Verify (completed → verified) — enforces verifier ≠ completer + effectiveness. */
     public function verify(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate([
@@ -126,8 +152,9 @@ class HsCorrectiveActionController extends Controller
     }
 
     /** Close (verified → closed); auto-advances the event to monitoring when all resolved. */
-    public function close(HsEvent $event, HsCorrectiveAction $action)
+    public function close(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
         try {
@@ -142,6 +169,7 @@ class HsCorrectiveActionController extends Controller
     /** Return for rework (completed → in_progress) with a reason. */
     public function returnForRework(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
+        $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
@@ -158,5 +186,31 @@ class HsCorrectiveActionController extends Controller
     private function ensureBelongs(HsEvent $event, HsCorrectiveAction $action): void
     {
         abort_unless($action->hs_event_id === $event->id, 404);
+    }
+
+    private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
+    {
+        $query = HsEvent::query();
+        $this->siteAccess->applyHsEventScope($query, $request->user(), ['healthSafety.viewAllSites']);
+
+        return $query->findOrFail($event->id);
+    }
+
+    private function assertStaffIsAssignable(Request $request, HsEvent $event, int $staffId): void
+    {
+        $query = User::query()->whereKey($staffId);
+        $this->siteAccess->applyHsEventStaffScope(
+            $query,
+            $event,
+            $request->user(),
+            ['healthSafety.viewAllSites'],
+        );
+        $staff = $query->first();
+
+        if (! $staff || ! $staff->canDo('hazards.manage')) {
+            throw ValidationException::withMessages([
+                'assigned_to_user_id' => 'Choose approved H&S staff available for this event site.',
+            ]);
+        }
     }
 }

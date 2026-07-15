@@ -89,6 +89,7 @@ use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\Clients\ClientStaffPreparationProjection;
 use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\NotificationService;
@@ -111,6 +112,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class ClientController extends Controller
 {
@@ -3563,10 +3565,15 @@ class ClientController extends Controller
         return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
     }
 
-    public function acknowledgePanic(Request $request, Client $client)
-    {
+    public function acknowledgePanic(
+        Request $request,
+        Client $client,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ) {
+        $user = $request->user();
+        abort_unless($user, 403);
         $this->authorize('view', $client);
-        abort_unless($this->canManageClientTrackers($request->user()), 403);
+        abort_unless($this->canManageClientTrackers($user), 403);
         abort_unless(
             app(PortalClientSectionAccess::class)
                 ->activeLocationTrackingConsent($client),
@@ -3583,20 +3590,25 @@ class ClientController extends Controller
             $meta = $device->meta ?? [];
             $meta['panic_active'] = false;
             $meta['panic_acknowledged_at'] = now()->toISOString();
-            $meta['panic_acknowledged_by'] = $request->user()?->id;
+            $meta['panic_acknowledged_by'] = $user->id;
             $device->forceFill(['meta' => $meta])->save();
         }
 
         if (Schema::hasTable('control_room_alerts')) {
-            ControlRoomAlert::query()
+            $alerts = ControlRoomAlert::query()
                 ->where('client_id', $client->id)
                 ->whereIn('source', ['tracker', 'resident_tracker'])
-                ->whereIn('status', ['open', 'triaging'])
-                ->update([
-                    'status' => 'ack',
-                    'acknowledged_at' => now(),
-                    'acknowledged_by_user_id' => $request->user()?->id,
-                ]);
+                ->where('status', ControlRoomAlert::STATUS_OPEN)
+                ->get();
+
+            foreach ($alerts as $alert) {
+                try {
+                    $lifecycle->acknowledge($alert, $user);
+                } catch (InvalidArgumentException) {
+                    // A concurrent operator may have already moved this alert.
+                    // Leave its newer lifecycle state intact.
+                }
+            }
         }
 
         return back()->with('success', 'Panic acknowledged.');

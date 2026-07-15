@@ -1,14 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,21 +12,34 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    WizardShell,
-    WizardStepPane,
-} from '@/components/wizard/shell';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
+import {
+    countFleetAlertActions,
+    fleetAlertNextAction,
+    isFleetAlertActionEligible,
+    type FleetAlertAction,
+} from '@/lib/fleet-alert-workflow';
 import { formatDateTime } from '@/lib/fleet-utils';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
     CheckCircle,
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     ExternalLink,
+    Eye,
     X,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -96,6 +100,18 @@ const SEVERITY_BORDER: Record<string, string> = {
     high: 'border-l-4 border-l-orange-500',
     medium: 'border-l-4 border-l-yellow-500',
     low: 'border-l-4 border-l-blue-400',
+};
+
+const ACTIVE_ALERT_STATUSES = new Set(['open', 'ack', 'triaging', 'confirmed']);
+
+const STATUS_LABELS: Record<string, string> = {
+    open: 'Open',
+    ack: 'Acknowledged',
+    triaging: 'In triage',
+    confirmed: 'Confirmed',
+    resolved: 'Resolved',
+    closed: 'Closed',
+    dismissed: 'Dismissed',
 };
 
 function severityVariant(
@@ -207,12 +223,15 @@ export function ResolveAlertWizard({
                         <Textarea
                             id="resolution-notes"
                             value={notes}
-                            onChange={(event) => onNotesChange(event.target.value)}
+                            onChange={(event) =>
+                                onNotesChange(event.target.value)
+                            }
                             rows={8}
                             required
                         />
                         <p className="text-sm text-muted-foreground">
-                            Explain what happened, what was checked, and why the alert can be closed.
+                            Explain what happened, what was checked, and why the
+                            alert can be closed.
                         </p>
                     </div>
                 </WizardStepPane>
@@ -220,7 +239,7 @@ export function ResolveAlertWizard({
                 <WizardStepPane>
                     <div className="space-y-3 rounded-xl border border-border bg-card/70 p-4">
                         <h3 className="font-semibold">Resolution notes</h3>
-                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                        <p className="text-sm whitespace-pre-wrap text-muted-foreground">
                             {notes.trim()}
                         </p>
                     </div>
@@ -249,6 +268,26 @@ function statusVariant(
     }
 }
 
+function AlertStatusBadge({ status }: { status: string }) {
+    const StatusIcon =
+        status === 'open'
+            ? AlertTriangle
+            : status === 'ack'
+              ? Bell
+              : status === 'triaging'
+                ? Eye
+                : status === 'dismissed'
+                  ? X
+                  : CheckCircle;
+
+    return (
+        <Badge variant={statusVariant(status)} className="gap-1.5">
+            <StatusIcon className="h-3 w-3" aria-hidden="true" />
+            {STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}
+        </Badge>
+    );
+}
+
 export default function AlertsIndex({
     hero: rawHero,
     control_room_alerts: rawCrAlerts,
@@ -274,7 +313,7 @@ export default function AlertsIndex({
     const canManage = can.manage;
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [bulkAction, setBulkAction] = useState<string | null>(null);
+    const [bulkAction, setBulkAction] = useState<FleetAlertAction | null>(null);
     const [resolveAlertId, setResolveAlertId] = useState<number | null>(null);
     const [resolveBulkOpen, setResolveBulkOpen] = useState(false);
     const [resolutionNotes, setResolutionNotes] = useState('');
@@ -321,8 +360,15 @@ export default function AlertsIndex({
     };
 
     const operationalAlerts = crAlerts;
-    const unresolvedOperationalAlerts = operationalAlerts.filter(
-        (a) => !['resolved', 'closed'].includes(a.status),
+    const actionableOperationalAlerts = operationalAlerts.filter(
+        (alert) => fleetAlertNextAction(alert.status) !== null,
+    );
+    const selectedAlerts = operationalAlerts.filter((alert) =>
+        selectedIds.includes(`cr-${alert.id}`),
+    );
+    const selectedActionCounts = countFleetAlertActions(selectedAlerts);
+    const unresolvedOperationalAlerts = operationalAlerts.filter((a) =>
+        ACTIVE_ALERT_STATUSES.has(a.status),
     );
     const criticalCount = unresolvedOperationalAlerts.filter(
         (a) => a.severity === 'critical',
@@ -369,20 +415,26 @@ export default function AlertsIndex({
     }, []);
 
     const toggleSelectAll = useCallback(() => {
-        const crIds = operationalAlerts.map((a) => `cr-${a.id}`);
-        if (selectedIds.length === crIds.length) {
+        const crIds = actionableOperationalAlerts.map((a) => `cr-${a.id}`);
+        if (crIds.every((id) => selectedIds.includes(id))) {
             setSelectedIds([]);
         } else {
             setSelectedIds(crIds);
         }
-    }, [operationalAlerts, selectedIds.length]);
+    }, [actionableOperationalAlerts, selectedIds]);
 
     const handleBulkAction = useCallback(
-        (action: string) => {
+        (action: FleetAlertAction) => {
             if (selectedIds.length === 0) return;
-            const numericIds = selectedIds
-                .map((id) => Number(id.replace('cr-', '')))
-                .filter((id) => !isNaN(id));
+            const numericIds = operationalAlerts
+                .filter(
+                    (alert) =>
+                        selectedIds.includes(`cr-${alert.id}`) &&
+                        isFleetAlertActionEligible(alert.status, action),
+                )
+                .map((alert) => alert.id);
+            if (numericIds.length === 0) return;
+
             router.post(
                 '/fleet-assets/alerts/bulk-action',
                 { action, ids: numericIds } as any,
@@ -392,7 +444,7 @@ export default function AlertsIndex({
                 },
             );
         },
-        [selectedIds],
+        [operationalAlerts, selectedIds],
     );
 
     const openSingleResolve = useCallback((alertId: number) => {
@@ -430,9 +482,13 @@ export default function AlertsIndex({
             return;
         }
 
-        const numericIds = selectedIds
-            .map((id) => Number(id.replace('cr-', '')))
-            .filter((id) => !isNaN(id));
+        const numericIds = operationalAlerts
+            .filter(
+                (alert) =>
+                    selectedIds.includes(`cr-${alert.id}`) &&
+                    isFleetAlertActionEligible(alert.status, 'resolve'),
+            )
+            .map((alert) => alert.id);
 
         router.post(
             '/fleet-assets/alerts/bulk-action',
@@ -445,7 +501,13 @@ export default function AlertsIndex({
                 },
             },
         );
-    }, [closeResolveDialog, resolutionNotes, resolveAlertId, selectedIds]);
+    }, [
+        closeResolveDialog,
+        operationalAlerts,
+        resolutionNotes,
+        resolveAlertId,
+        selectedIds,
+    ]);
 
     const resolveDialogOpen = resolveAlertId !== null || resolveBulkOpen;
 
@@ -462,12 +524,16 @@ export default function AlertsIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Bell} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Fleet alerts · Control Room feed</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Alerts</h1>
+                            <HeroStatusPill>
+                                Fleet alerts · Control Room feed
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Alerts
+                            </h1>
                             <p className="mt-0.5 max-w-xl text-[13px] text-primary-foreground/75">
-                                Active fleet and asset operations alerts from
-                                Control Room, with archived legacy asset alert
-                                history kept separately below.
+                                These are the same live records used by Control
+                                Room. Work each alert in order, then record the
+                                outcome once the situation is safe.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -476,14 +542,18 @@ export default function AlertsIndex({
                                 label="Unresolved"
                                 value={fmt(hero.unresolved)}
                                 caption="need action"
-                                tone={hero.unresolved > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.unresolved > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/alerts?severity=critical"
                                 label="Critical"
                                 value={fmt(hero.critical)}
                                 caption="immediate attention"
-                                tone={hero.critical > 0 ? 'critical' : 'success'}
+                                tone={
+                                    hero.critical > 0 ? 'critical' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/alerts?status=ack"
@@ -497,12 +567,17 @@ export default function AlertsIndex({
                                 label="Resolved 7d"
                                 value={fmt(hero.resolved_7d)}
                                 caption="closed this week"
-                                tone={hero.resolved_7d > 0 ? 'success' : 'neutral'}
+                                tone={
+                                    hero.resolved_7d > 0 ? 'success' : 'neutral'
+                                }
                             />
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href="/control-room" icon={ExternalLink}>
+                        <FleetHeroAction
+                            href="/control-room"
+                            icon={ExternalLink}
+                        >
                             Control Room
                         </FleetHeroAction>
                     </div>
@@ -554,6 +629,44 @@ export default function AlertsIndex({
                     )}
                 </div>
 
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="flex items-center justify-between gap-6 p-4">
+                        <div>
+                            <p className="text-sm font-semibold">
+                                One Control Room workflow
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Fleet and Control Room update the same alert, so
+                                the next person can see exactly where the
+                                response is up to.
+                            </p>
+                        </div>
+                        <ol className="flex shrink-0 items-center gap-2 text-xs font-medium">
+                            <li className="rounded-full border bg-background px-3 py-1.5">
+                                1 · Acknowledge
+                            </li>
+                            <li
+                                aria-hidden="true"
+                                className="text-muted-foreground"
+                            >
+                                →
+                            </li>
+                            <li className="rounded-full border bg-background px-3 py-1.5">
+                                2 · Start triage
+                            </li>
+                            <li
+                                aria-hidden="true"
+                                className="text-muted-foreground"
+                            >
+                                →
+                            </li>
+                            <li className="rounded-full border bg-background px-3 py-1.5">
+                                3 · Resolve with notes
+                            </li>
+                        </ol>
+                    </CardContent>
+                </Card>
+
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <Select
@@ -596,174 +709,218 @@ export default function AlertsIndex({
                 {/* Table with severity left borders */}
                 <div className="overflow-hidden rounded-lg border">
                     <FleetResponsiveTable>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                {canManage && (
-                                    <th className="w-8 px-4 py-3 text-left font-medium">
-                                        <input
-                                            type="checkbox"
-                                            checked={
-                                                operationalAlerts.length > 0 &&
-                                                selectedIds.length ===
-                                                    operationalAlerts.length
-                                            }
-                                            onChange={toggleSelectAll}
-                                            className="h-3.5 w-3.5 rounded border-border"
-                                        />
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    {canManage && (
+                                        <th className="w-8 px-4 py-3 text-left font-medium">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    actionableOperationalAlerts.length >
+                                                        0 &&
+                                                    actionableOperationalAlerts.every(
+                                                        (alert) =>
+                                                            selectedIds.includes(
+                                                                `cr-${alert.id}`,
+                                                            ),
+                                                    )
+                                                }
+                                                onChange={toggleSelectAll}
+                                                className="h-3.5 w-3.5 rounded border-border"
+                                            />
+                                        </th>
+                                    )}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Type
                                     </th>
-                                )}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Type
-                                </th>
-                                {renderSortHeader('severity', 'Severity')}
-                                {renderSortHeader('status', 'Status')}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Asset
-                                </th>
-                                {renderSortHeader('triggered_at', 'Triggered')}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {operationalAlerts.length > 0 ? (
-                                operationalAlerts.map((alert) => (
-                                    <tr
-                                        key={alert.id}
-                                        className={`border-b transition-colors hover:bg-muted/30 ${SEVERITY_BORDER[alert.severity] ?? ''}`}
-                                    >
-                                        {canManage && (
-                                            <td className="px-4 py-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.includes(
-                                                        `cr-${alert.id}`,
-                                                    )}
-                                                    onChange={() =>
-                                                        toggleSelect(
-                                                            `cr-${alert.id}`,
-                                                        )
-                                                    }
-                                                    className="h-3.5 w-3.5 rounded border-border"
-                                                />
-                                            </td>
-                                        )}
-                                        <td data-fleet-row-identity className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <AlertTriangle
-                                                    className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-status-critical' : 'text-status-warning'}`}
-                                                />
-                                                <span className="font-medium">
-                                                    {(
-                                                        alert.alert_type ?? ''
-                                                    ).replace(/_/g, ' ')}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge
-                                                variant={severityVariant(
-                                                    alert.severity,
-                                                )}
-                                                className="text-xs font-bold uppercase"
+                                    {renderSortHeader('severity', 'Severity')}
+                                    {renderSortHeader('status', 'Status')}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Asset
+                                    </th>
+                                    {renderSortHeader(
+                                        'triggered_at',
+                                        'Triggered',
+                                    )}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {operationalAlerts.length > 0 ? (
+                                    operationalAlerts.map((alert) => {
+                                        const nextAction = fleetAlertNextAction(
+                                            alert.status,
+                                        );
+
+                                        return (
+                                            <tr
+                                                key={alert.id}
+                                                className={`border-b transition-colors hover:bg-muted/30 ${SEVERITY_BORDER[alert.severity] ?? ''}`}
                                             >
-                                                {alert.severity}
-                                            </Badge>
-                                        </td>
-                                        <td data-fleet-row-status className="px-4 py-3">
-                                            <Badge
-                                                variant={statusVariant(
-                                                    alert.status,
+                                                {canManage && (
+                                                    <td className="px-4 py-3">
+                                                        {nextAction ? (
+                                                            <input
+                                                                type="checkbox"
+                                                                aria-label={`Select alert ${alert.id}`}
+                                                                checked={selectedIds.includes(
+                                                                    `cr-${alert.id}`,
+                                                                )}
+                                                                onChange={() =>
+                                                                    toggleSelect(
+                                                                        `cr-${alert.id}`,
+                                                                    )
+                                                                }
+                                                                className="h-3.5 w-3.5 rounded border-border"
+                                                            />
+                                                        ) : null}
+                                                    </td>
                                                 )}
-                                            >
-                                                {alert.status}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {alert.asset ? (
-                                                <Link
-                                                    href={`/fleet-assets/assets/${alert.asset.id}`}
-                                                    className="text-primary hover:underline"
+                                                <td
+                                                    data-fleet-row-identity
+                                                    className="px-4 py-3"
                                                 >
-                                                    {alert.asset.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td data-fleet-row-time className="px-4 py-3 text-muted-foreground">
-                                            {alert.triggered_at
-                                                ? formatDateTime(
-                                                      alert.triggered_at,
-                                                  )
-                                                : '---'}
-                                        </td>
-                                        <td data-fleet-row-action className="px-4 py-3">
-                                            {canManage ? (
-                                                <div className="flex gap-1">
-                                                    {alert.status ===
-                                                        'open' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                router.post(
-                                                                    `/fleet-assets/alerts/${alert.id}/acknowledge`,
-                                                                )
-                                                            }
+                                                    <div className="flex items-center gap-2">
+                                                        <AlertTriangle
+                                                            className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-status-critical' : 'text-status-warning'}`}
+                                                        />
+                                                        <span className="font-medium">
+                                                            {(
+                                                                alert.alert_type ??
+                                                                ''
+                                                            ).replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Badge
+                                                        variant={severityVariant(
+                                                            alert.severity,
+                                                        )}
+                                                        className="text-xs font-bold uppercase"
+                                                    >
+                                                        {alert.severity}
+                                                    </Badge>
+                                                </td>
+                                                <td
+                                                    data-fleet-row-status
+                                                    className="px-4 py-3"
+                                                >
+                                                    <AlertStatusBadge
+                                                        status={alert.status}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {alert.asset ? (
+                                                        <Link
+                                                            href={`/fleet-assets/assets/${alert.asset.id}`}
+                                                            className="text-primary hover:underline"
                                                         >
-                                                            Acknowledge
-                                                        </Button>
+                                                            {alert.asset.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            ---
+                                                        </span>
                                                     )}
-                                                    {[
-                                                        'open',
-                                                        'ack',
-                                                        'triaging',
-                                                    ].includes(
-                                                        alert.status,
-                                                    ) && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                openSingleResolve(
-                                                                    alert.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle className="mr-1 h-3 w-3" />
-                                                            Resolve
-                                                        </Button>
+                                                </td>
+                                                <td
+                                                    data-fleet-row-time
+                                                    className="px-4 py-3 text-muted-foreground"
+                                                >
+                                                    {alert.triggered_at
+                                                        ? formatDateTime(
+                                                              alert.triggered_at,
+                                                          )
+                                                        : '---'}
+                                                </td>
+                                                <td
+                                                    data-fleet-row-action
+                                                    className="px-4 py-3"
+                                                >
+                                                    {canManage ? (
+                                                        <div className="flex gap-1">
+                                                            {nextAction ===
+                                                                'acknowledge' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            `/fleet-assets/alerts/${alert.id}/acknowledge`,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Bell className="mr-1 h-3.5 w-3.5" />
+                                                                    Acknowledge
+                                                                </Button>
+                                                            )}
+                                                            {nextAction ===
+                                                                'triage' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            `/fleet-assets/alerts/${alert.id}/triage`,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Eye className="mr-1 h-3.5 w-3.5" />
+                                                                    Start triage
+                                                                </Button>
+                                                            )}
+                                                            {nextAction ===
+                                                                'resolve' && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        openSingleResolve(
+                                                                            alert.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                                                    Resolve
+                                                                </Button>
+                                                            )}
+                                                            {!nextAction && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    No action
+                                                                    needed
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            View only
+                                                        </span>
                                                     )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">
-                                                    View only
-                                                </span>
-                                            )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td
+                                            colSpan={canManage ? 7 : 6}
+                                            className="px-4 py-12"
+                                        >
+                                            <FleetEmptyState
+                                                icon={Bell}
+                                                title="No operational alerts"
+                                                description="Control Room fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules."
+                                            />
                                         </td>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td
-                                        colSpan={canManage ? 7 : 6}
-                                        className="px-4 py-12"
-                                    >
-                                        <FleetEmptyState
-                                            icon={Bell}
-                                            title="No operational alerts"
-                                            description="Control Room fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules."
-                                        />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                )}
+                            </tbody>
+                        </table>
                     </FleetResponsiveTable>
                 </div>
 
@@ -865,20 +1022,35 @@ export default function AlertsIndex({
                             {selectedIds.length !== 1 ? 's' : ''} selected
                         </span>
                         <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setBulkAction('acknowledge')}
-                            >
-                                Acknowledge Selected
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={openBulkResolve}
-                            >
-                                Resolve Selected
-                            </Button>
+                            {selectedActionCounts.acknowledge > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setBulkAction('acknowledge')}
+                                >
+                                    Acknowledge open (
+                                    {selectedActionCounts.acknowledge})
+                                </Button>
+                            )}
+                            {selectedActionCounts.triage > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setBulkAction('triage')}
+                                >
+                                    Start triage ({selectedActionCounts.triage})
+                                </Button>
+                            )}
+                            {selectedActionCounts.resolve > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={openBulkResolve}
+                                >
+                                    Resolve ready (
+                                    {selectedActionCounts.resolve})
+                                </Button>
+                            )}
                         </div>
                         <Button
                             size="sm"
@@ -920,12 +1092,18 @@ export default function AlertsIndex({
                     }}
                     title={
                         bulkAction === 'acknowledge'
-                            ? 'Acknowledge Alerts'
-                            : 'Resolve Alerts'
+                            ? 'Acknowledge alerts'
+                            : 'Start triage'
                     }
-                    description={`Are you sure you want to ${bulkAction ?? ''} ${selectedIds.length} selected alert${selectedIds.length !== 1 ? 's' : ''}?`}
+                    description={
+                        bulkAction === 'acknowledge'
+                            ? `Confirm that the team has seen ${selectedActionCounts.acknowledge} open alert${selectedActionCounts.acknowledge !== 1 ? 's' : ''}.`
+                            : `Mark ${selectedActionCounts.triage} acknowledged alert${selectedActionCounts.triage !== 1 ? 's' : ''} as actively being worked.`
+                    }
                     confirmText={
-                        bulkAction === 'acknowledge' ? 'Acknowledge' : 'Resolve'
+                        bulkAction === 'acknowledge'
+                            ? 'Acknowledge alerts'
+                            : 'Start triage'
                     }
                     variant="default"
                 />

@@ -7,7 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
-function reportsUser(string $role): User
+function itReportsUser(string $role): User
 {
     $user = User::factory()->create(['role' => $role, 'approved_at' => now()]);
     $user->roles()->syncWithoutDetaching([
@@ -36,8 +36,8 @@ function reportsProfile(): HrEmployeeProfile
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->agent = reportsUser('hr');            // it.view + it.manage
-    $this->worker = reportsUser('support_worker'); // it.request only
+    $this->agent = itReportsUser('hr');            // it.view + it.manage
+    $this->worker = itReportsUser('support_worker'); // it.request only
 });
 
 test('reports are agent-only and a young tenant gets a zeroed, well-formed report', function () {
@@ -134,7 +134,7 @@ test('per-card CSV export is agent-only, correct and injection-guarded', functio
     $this->actingAs($this->worker)->get('/it/reports/export?card=trend')->assertForbidden();
 
     // A requester whose name is a spreadsheet-formula payload.
-    $evil = reportsUser('support_worker');
+    $evil = itReportsUser('support_worker');
     $evil->forceFill(['name' => '=cmd|calc'])->save();
     ItTicket::factory()->create([
         'tenant_id' => 1,

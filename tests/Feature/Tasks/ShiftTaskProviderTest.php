@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\ShiftTask;
@@ -56,6 +57,34 @@ test('shift tasks expose the rostered staff assignee through the canonical shift
     expect($tasks)->toHaveCount(1)
         ->and(collect($tasks)->pluck('title'))->not->toContain('Foreign tenant task')
         ->and($tasks[0]->assignee)->toBe([
+            'id' => $worker->id,
+            'name' => $worker->name,
+        ]);
+});
+
+it('renders the rostered worker without loading an undefined shift relationship', function () {
+    $this->seed(RbacSeeder::class);
+    $worker = User::factory()->create(['approved_at' => now()]);
+    $permission = Permission::query()->where('key', 'shifts.viewAny')->firstOrFail();
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
+    $shift = Shift::factory()->create([
+        'user_id' => $worker->id,
+        'starts_at' => now()->addHour(),
+        'status' => 'scheduled',
+    ]);
+    $task = ShiftTask::query()->create([
+        'shift_id' => $shift->id,
+        'label' => 'Complete the shift safety check',
+        'is_completed' => false,
+    ]);
+
+    $items = (new ShiftTaskProvider)->tasks($worker);
+
+    expect($items)->toHaveCount(1)
+        ->and($items[0]->id)->toBe('shift_task-'.$task->id)
+        ->and($items[0]->assignee)->toBe([
             'id' => $worker->id,
             'name' => $worker->name,
         ]);

@@ -98,6 +98,7 @@ use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
 use App\Services\Notifications\WebPushProvider;
+use App\Services\UserSiteAccessService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -173,6 +174,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(WebPushProvider::class);
 
         $this->app->singleton(DeliveryProviderManager::class);
+        $this->app->scoped(UserSiteAccessService::class);
     }
 
     /**

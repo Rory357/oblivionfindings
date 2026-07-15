@@ -8,6 +8,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -26,7 +27,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->admin = User::factory()->create([
@@ -67,7 +68,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
             'client_request_uuid' => '39b88216-6350-46d3-ad65-7d8ce327c92c',
             'captured_offline_at' => now()->toIso8601String(),
             'origin_device_id' => 'api-device',
-            'queued_offline' => false,
+            'queued_offline' => true,
         ];
 
         $url = "/api/medications/clients/{$this->client->id}/medications/{$this->medication->id}/administrations";
@@ -75,7 +76,9 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
         $this->actingAs($this->admin, 'sanctum')
             ->postJson($url, $payload)
             ->assertOk()
-            ->assertJsonPath('sync.status', 'processed');
+            ->assertJsonPath('sync.status', 'synced');
+
+        Cache::forget('emar:idempotency:administration:'.$payload['client_request_uuid']);
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson($url, $payload)
@@ -84,6 +87,10 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
             ->assertJsonPath('sync.duplicate', true);
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_request_uuid' => $payload['client_request_uuid'],
+        ]);
     }
 
     public function test_successful_api_administration_cache_expires_after_seven_days(): void

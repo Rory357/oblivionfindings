@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
@@ -11,6 +12,7 @@ use App\Models\FleetOutingResident;
 use App\Models\FleetVehicleBooking;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -18,11 +20,13 @@ use Inertia\Inertia;
 
 class OutingController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $formOptions = $this->formOptions($request);
 
-        if (!Schema::hasTable('fleet_outings')) {
+        if (! Schema::hasTable('fleet_outings')) {
             return Inertia::render('fleet-assets/outings/index', [
                 'outings' => [
                     'data' => [],
@@ -62,7 +66,7 @@ class OutingController extends Controller
         }
 
         if ($request->filled('date_to')) {
-            $query->where('planned_departure', '<=', $request->input('date_to') . ' 23:59:59');
+            $query->where('planned_departure', '<=', $request->input('date_to').' 23:59:59');
         }
 
         if ($request->filled('search')) {
@@ -173,10 +177,7 @@ class OutingController extends Controller
                         ->where('ends_at', '<', now())
                         ->count()
                     : 0,
-                'critical_alerts' => ControlRoomAlert::query()
-                    ->whereNotIn('status', ['closed', 'resolved'])
-                    ->where('severity', 'critical')
-                    ->count(),
+                'critical_alerts' => $this->criticalAlertCount($request),
             ],
             'chart_data' => $chartFormatted,
             'can' => [
@@ -185,6 +186,16 @@ class OutingController extends Controller
             ],
             ...$formOptions,
         ]);
+    }
+
+    private function criticalAlertCount(Request $request): int
+    {
+        $query = ControlRoomAlert::query()
+            ->actionable()
+            ->where('severity', 'critical');
+        $this->siteAccess->applyAlertScope($query, $request->user(), ['fleet.manage']);
+
+        return $query->count();
     }
 
     private function formOptions(Request $request): array
@@ -203,7 +214,7 @@ class OutingController extends Controller
             ->get($selectCols)
             ->map(fn ($client) => [
                 'id' => $client->id,
-                'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
                 'transport_needs' => $hasTransportNeeds ? $client->transport_needs : null,
                 'transport_notes' => $hasTransportNeeds ? $client->transport_notes : null,
                 'site' => $client->site?->name,
@@ -277,14 +288,14 @@ class OutingController extends Controller
         ]);
 
         // Verify assigned driver has valid eligibility
-        if (!empty($data['driver_user_id'])) {
-            $driverEligible = \App\Domain\Hr\Models\HrDriverEligibility::query()
+        if (! empty($data['driver_user_id'])) {
+            $driverEligible = HrDriverEligibility::query()
                 ->where('user_id', $data['driver_user_id'])
                 ->where('status', 'eligible')
                 ->where('licence_expires_at', '>', now())
                 ->exists();
 
-            if (!$driverEligible) {
+            if (! $driverEligible) {
                 return back()->withErrors([
                     'driver_user_id' => 'The selected driver does not have valid eligibility or their licence has expired.',
                 ]);
@@ -404,7 +415,7 @@ class OutingController extends Controller
                 'residents' => $outing->residents->map(fn ($r) => [
                     'id' => $r->id,
                     'client_id' => $r->client_id,
-                    'client_name' => trim(($r->client?->first_name ?? '') . ' ' . ($r->client?->last_name ?? '')),
+                    'client_name' => trim(($r->client?->first_name ?? '').' '.($r->client?->last_name ?? '')),
                     'transport_needs' => $r->client?->transport_needs,
                     'pre_check_completed' => (bool) $r->pre_check_completed,
                     'medication_packed' => (bool) $r->medication_packed,
@@ -430,7 +441,7 @@ class OutingController extends Controller
         // Safety check: all residents must have pre-check and medication packing completed
         $residents = $outing->residents()->get();
         if ($residents->isNotEmpty()) {
-            $unprepared = $residents->filter(fn ($r) => !$r->pre_check_completed);
+            $unprepared = $residents->filter(fn ($r) => ! $r->pre_check_completed);
             if ($unprepared->isNotEmpty()) {
                 return back()->with('error', 'All residents must have their pre-departure check completed before starting the outing.');
             }

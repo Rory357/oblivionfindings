@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -37,7 +38,7 @@ class ShiftSiteIsolationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-04-06 10:00:00'));
 
         $this->siteA = Site::factory()->create(['name' => 'Harbour House']);
@@ -204,8 +205,15 @@ class ShiftSiteIsolationTest extends TestCase
             );
 
         $this->actingAs($manager)
-            ->get(route('operations.timesheets.edit', $hiddenTimesheet))
-            ->assertForbidden();
+            ->get(route('operations.timesheets.index', [
+                'mode' => 'approvals',
+                'edit' => $hiddenTimesheet->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('timesheets.data', fn ($rows) => collect($rows)
+                    ->doesntContain(fn ($row) => (int) $row['id'] === (int) $hiddenTimesheet->id))
+            );
     }
 
     public function test_handover_acknowledgement_is_blocked_for_foreign_site(): void

@@ -13,20 +13,23 @@ class HsEventFactory extends Factory
 
     public function definition(): array
     {
-        $source = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
+        $sourceType = HsEvent::class;
+        $sourceId = fake()->unique()->numberBetween(1_000_000, 2_000_000_000);
+        $eventCategory = HsEvent::CATEGORY_INCIDENT;
 
         return [
+            'organization_id' => 1,
             'reference_number' => HsEvent::generateReferenceNumber(),
-            'source_type' => get_class($source),
-            'source_id' => $source->getKey(),
-            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'event_category' => $eventCategory,
             'severity' => fake()->randomElement(['low', 'medium', 'high', 'critical']),
             'status' => HsEvent::STATUS_OPEN,
             'occurred_at' => fake()->dateTimeBetween('-1 month', 'now'),
             'reported_at' => now(),
             'worksafe_notifiable' => false,
             'investigation_required' => false,
-            'idempotency_key' => hash('sha256', fake()->uuid()),
+            'idempotency_key' => HsEvent::buildIdempotencyKey($sourceType, $sourceId, $eventCategory),
             'created_by' => User::factory(),
         ];
     }
@@ -63,6 +66,47 @@ class HsEventFactory extends Factory
             'worksafe_notifiable' => true,
             'worksafe_status' => HsEvent::WORKSAFE_PENDING,
             'investigation_required' => true,
+        ]);
+    }
+
+    public function forClientIncident(ClientIncident $incident): static
+    {
+        $category = $incident->type === 'near_miss'
+            ? HsEvent::CATEGORY_NEAR_MISS
+            : HsEvent::CATEGORY_INCIDENT;
+
+        return $this->state(fn () => [
+            'source_type' => ClientIncident::class,
+            'source_id' => $incident->id,
+            'event_category' => $category,
+            'site_id' => $incident->site_id,
+            'client_id' => $incident->client_id,
+            'occurred_at' => $incident->occurred_at,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                $incident->id,
+                $category
+            ),
+        ]);
+    }
+
+    public function awaitingHandoverAcceptance(User $owner): static
+    {
+        return $this->state(fn () => [
+            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            'owner_user_id' => $owner->id,
+            'accepted_by_user_id' => null,
+            'accepted_at' => null,
+        ]);
+    }
+
+    public function handoverAccepted(User $owner, User $acceptedBy): static
+    {
+        return $this->state(fn () => [
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'owner_user_id' => $owner->id,
+            'accepted_by_user_id' => $acceptedBy->id,
+            'accepted_at' => now(),
         ]);
     }
 }

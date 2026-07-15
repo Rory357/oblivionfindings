@@ -1,0 +1,44 @@
+{
+  "incident": {
+    "id": 169,
+    "reference": "INC-2026-0097",
+    "source": "sensor",
+    "status": "submitted",
+    "site_id": 9401,
+    "alert_id": 70,
+    "hs_event_id": 43,
+    "is_notifiable": false,
+    "worksafe_status": null,
+    "worksafe_reference": null
+  },
+  "alert": {
+    "id": 70,
+    "reference": "CR-2026-0068",
+    "status": "resolved",
+    "notes": "Automatic fall signal retained as operational evidence.",
+    "incident_claim": 169,
+    "tasks": 0,
+    "evidence_packs": 1,
+    "evidence_items": 1
+  },
+  "health_safety": {
+    "id": 43,
+    "reference": "HS-2026-0042",
+    "status": "open",
+    "handover_status": "accepted",
+    "owner_user_id": 107,
+    "accepted_by_user_id": 107,
+    "accepted_at": "2026-07-15T08:58:59+00:00",
+    "worksafe_notifiable": false,
+    "worksafe_status": null,
+    "worksafe_reference": null,
+    "investigations": 0,
+    "corrective_actions": 0,
+    "dispositions": 0
+  },
+  "counts": {
+    "source_events": 1,
+    "candidate_alerts": 1,
+    "medication_errors": 0
+  }
+}

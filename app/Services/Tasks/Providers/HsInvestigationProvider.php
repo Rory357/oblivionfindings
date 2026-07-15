@@ -6,10 +6,14 @@ use App\Models\HsInvestigation;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
+use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 
-class HsInvestigationProvider implements TaskProvider, HasModelClass
+class HsInvestigationProvider implements HasModelClass, TaskProvider
 {
+    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+
     public function sourceKey(): string
     {
         return 'hs_investigation';
@@ -33,7 +37,20 @@ class HsInvestigationProvider implements TaskProvider, HasModelClass
     public function tasks(User $user, array $filters = []): array
     {
         $query = HsInvestigation::query()
-            ->with(['leadInvestigator:id,name'])
+            ->with([
+                'leadInvestigator:id,name',
+                'hsEvent.client:id,first_name,last_name',
+                'hsEvent.site:id,name',
+                'hsEvent.controlRoomAlert:id,reference_number',
+                'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
+                'hsEvent.clientIncident.client:id,first_name,last_name',
+                'hsEvent.clientIncident.site:id,name',
+            ])
+            ->whereHas('hsEvent', fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
+                $q,
+                $user,
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             ->orderByDesc('created_at')
             ->limit(300);
 
@@ -42,6 +59,17 @@ class HsInvestigationProvider implements TaskProvider, HasModelClass
         }
 
         return $query->get()->map(function (HsInvestigation $investigation) {
+            $event = $investigation->hsEvent;
+            $journey = IncidentJourneyTaskContext::make($event?->clientIncident, $event?->controlRoomAlert, $event);
+            $client = $journey['person'] ?? ($event?->client ? [
+                'id' => $event->client->id,
+                'name' => trim($event->client->first_name.' '.$event->client->last_name),
+            ] : null);
+            $site = $journey['site'] ?? ($event?->site ? [
+                'id' => $event->site->id,
+                'name' => $event->site->name,
+            ] : null);
+
             return new TaskItem(
                 id: 'hs_investigation-'.$investigation->id,
                 source: $this->sourceKey(),
@@ -58,6 +86,8 @@ class HsInvestigationProvider implements TaskProvider, HasModelClass
                 assignee: $investigation->leadInvestigator
                     ? ['id' => $investigation->leadInvestigator->id, 'name' => $investigation->leadInvestigator->name]
                     : null,
+                client: $client,
+                site: $site,
                 dueAt: optional($investigation->target_completion_date)->toIso8601String(),
                 createdAt: optional($investigation->created_at)->toIso8601String(),
                 link: "/health-safety/events/{$investigation->hs_event_id}",
@@ -65,6 +95,9 @@ class HsInvestigationProvider implements TaskProvider, HasModelClass
                 description: $investigation->findings_summary
                     ? str($investigation->findings_summary)->limit(140)->toString()
                     : null,
+                journey: $journey,
+                sourceContext: str_replace('_', ' ', (string) $investigation->investigation_type),
+                actionLabel: 'Continue H&S investigation',
             );
         })->all();
     }

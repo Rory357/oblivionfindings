@@ -3,7 +3,15 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
-import { IncidentTrendCard, LaggingCharts, LeadingCharts, type OpenHazardRow, SiteLeagueCard } from './components/charts';
+import { SubstanceWizardDialog } from '@/components/health-safety/substance-wizard-dialog';
+import { Card as GuardrailCard } from '@/components/ui/card';
+import {
+    IncidentTrendCard,
+    LaggingCharts,
+    LeadingCharts,
+    type OpenHazardRow,
+    SiteLeagueCard,
+} from './components/charts';
 import {
     CommandCentreHero,
     type HeroFilters,
@@ -19,14 +27,12 @@ import {
 } from './components/dashboard-tabs';
 import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
-import { SubstanceWizardDialog } from '@/components/health-safety/substance-wizard-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Props = {
-    kpis: Record<string, number>;
+    kpis: Record<string, number | null>;
     incident_trends: Array<{
         month: string;
         count: number;
@@ -38,6 +44,7 @@ type Props = {
             open_events_high_critical: number;
             events_period: number;
             worksafe_notifiable_open: number;
+            worksafe_pending: number;
             events_by_severity: Record<string, number>;
         };
         investigations: {
@@ -65,7 +72,12 @@ type Props = {
     lens: string;
     sites: Array<{ id: number; name: string }>;
     org_name: string | null;
-    clients: Array<{ id: number; name: string }>;
+    clients: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        site_id?: number | null;
+    }>;
     staff: Array<{ id: number; name: string }>;
     leading_lagging: HeroLeadingLagging;
     frequency_trends: Array<{
@@ -76,10 +88,19 @@ type Props = {
     frequency_operands: { near_misses: number; recordable: number };
     hazard_burndown: Array<{ week: string; open: number }>;
     incidents_by_category: Array<{ label: string; count: number }>;
-    site_league: Array<{ id: number; name: string; incidents: number; hazards: number }>;
+    site_league: Array<{
+        id: number;
+        name: string;
+        incidents: number;
+        hazards: number;
+    }>;
     open_hazards_list: OpenHazardRow[];
     worker_participation: { pct: number | null; committees: number };
-    procedures: { approved: number; review_due: number; coverage_gap_categories: number };
+    procedures: {
+        approved: number;
+        review_due: number;
+        coverage_gap_categories: number;
+    };
     first_aid?: { treatments: number; ambulance: number; hospital: number };
     restraints?: RestraintDashboardData;
     worklists: WorklistsPayload;
@@ -167,7 +188,7 @@ export default function HealthSafetyDashboard({
                     filters={filters}
                     sites={sites}
                     expiring={worklists.expiring}
-                    notifiableEvents={worklists.notifiable_events}
+                    worksafePending={backbone?.events.worksafe_pending ?? 0}
                     activeAlerts={kpis.active_alerts ?? 0}
                     openSafeguarding={kpis.open_safeguarding ?? 0}
                     fleetUnresolved={kpis.fleet_unresolved ?? 0}
@@ -189,13 +210,23 @@ export default function HealthSafetyDashboard({
                     <div className="flex flex-col gap-4">
                         {/* Row 1 — overdue corrective actions (1.5fr) + site safety league (1fr) */}
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                            <HsWorklists worklists={worklists} show={['corrective_actions']} />
+                            <HsWorklists
+                                worklists={worklists}
+                                show={['corrective_actions']}
+                            />
                             <SiteLeagueCard data={site_league} />
                         </div>
                         {/* Row 2 — WorkSafe-notifiable events + expiring soon (1fr 1fr) */}
-                        <HsWorklists worklists={worklists} show={['notifiable', 'expiring']} />
+                        <HsWorklists
+                            worklists={worklists}
+                            show={['notifiable', 'expiring']}
+                        />
                         {/* Row 3 — full-width incident & near-miss trend */}
-                        <IncidentTrendCard bars={incident_trends} frequency={frequency_trends} variant="full" />
+                        <IncidentTrendCard
+                            bars={incident_trends}
+                            frequency={frequency_trends}
+                            variant="full"
+                        />
                     </div>
                 )}
 
@@ -212,7 +243,9 @@ export default function HealthSafetyDashboard({
                             operands={frequency_operands}
                             burndown={hazard_burndown}
                             drillPct={kpis.drill_compliance_pct ?? 0}
-                            trainingPct={leading_lagging.leading.training_pct ?? 0}
+                            trainingPct={
+                                leading_lagging.leading.training_pct ?? 0
+                            }
                             openHazards={open_hazards_list}
                         />
                     </div>
@@ -228,7 +261,10 @@ export default function HealthSafetyDashboard({
                             category={incidents_by_category}
                         />
                         <RestraintStrip data={restraints} />
-                        <HsWorklists worklists={worklists} show={['investigations']} />
+                        <HsWorklists
+                            worklists={worklists}
+                            show={['investigations']}
+                        />
                     </div>
                 )}
 
@@ -236,9 +272,14 @@ export default function HealthSafetyDashboard({
                     <div className="flex flex-col gap-4">
                         <CompliancePanel
                             expiring={worklists.expiring}
-                            notifiableEvents={worklists.notifiable_events}
+                            worksafePending={
+                                backbone?.events.worksafe_pending ?? 0
+                            }
                         />
-                        <HsWorklists worklists={worklists} show={['expiring']} />
+                        <HsWorklists
+                            worklists={worklists}
+                            show={['expiring']}
+                        />
                         <GovernanceExports />
                     </div>
                 )}
@@ -259,7 +300,12 @@ export default function HealthSafetyDashboard({
                     }}
                 />
                 {activeWizard === 'incident' ? (
-                    <ReportIncidentDialog open onClose={() => setActiveWizard(null)} clients={clients} sites={sites} />
+                    <ReportIncidentDialog
+                        open
+                        onClose={() => setActiveWizard(null)}
+                        clients={clients}
+                        sites={sites}
+                    />
                 ) : null}
                 {/* The Chemical register's add-substance wizard is the single source — the
                     launcher tile mounts the same modal as the register's "Add substance". */}
@@ -269,15 +315,26 @@ export default function HealthSafetyDashboard({
                         onClose={() => setActiveWizard(null)}
                         onOpenSubstance={(id, opts) => {
                             setActiveWizard(null);
-                            router.visit(`/health-safety/substances?substance=${id}${opts?.action ? `&action=${opts.action}` : ''}`);
+                            router.visit(
+                                `/health-safety/substances?substance=${id}${opts?.action ? `&action=${opts.action}` : ''}`,
+                            );
                         }}
                     />
                 ) : null}
-                {activeWizard && activeWizard !== 'substance' && WIZARD_CONFIGS[activeWizard] ? (
+                {activeWizard &&
+                activeWizard !== 'substance' &&
+                WIZARD_CONFIGS[activeWizard] ? (
                     <HsFormWizard
                         key={activeWizard}
                         config={WIZARD_CONFIGS[activeWizard]}
-                        refData={{ sites, clients, staff }}
+                        refData={{
+                            sites,
+                            clients: clients.map((client) => ({
+                                id: client.id,
+                                name: `${client.first_name} ${client.last_name}`.trim(),
+                            })),
+                            staff,
+                        }}
                         open
                         onClose={() => setActiveWizard(null)}
                     />
@@ -292,15 +349,49 @@ export default function HealthSafetyDashboard({
  * Register. A leading care-activity signal: first-aid-only treatment is NOT recordable and
  * is deliberately excluded from TRIFR, so it lives here rather than among the lagging rates.
  */
-function FirstAidStrip({ data }: { data: { treatments: number; ambulance: number; hospital: number } }) {
-    const cards: { label: string; value: number; href: string; tone: 'neutral' | 'warning' | 'critical' }[] = [
-        { label: 'First-aid treatments', value: data.treatments, href: '/health-safety/first-aid', tone: 'neutral' },
-        { label: 'Ambulance called', value: data.ambulance, href: '/health-safety/first-aid?tab=ambulance', tone: 'warning' },
-        { label: 'Hospital referrals', value: data.hospital, href: '/health-safety/first-aid?treatment_outcome=sent_to_hospital', tone: 'critical' },
+function FirstAidStrip({
+    data,
+}: {
+    data: { treatments: number; ambulance: number; hospital: number };
+}) {
+    const cards: {
+        label: string;
+        value: number;
+        href: string;
+        tone: 'neutral' | 'warning' | 'critical';
+    }[] = [
+        {
+            label: 'First-aid treatments',
+            value: data.treatments,
+            href: '/health-safety/first-aid',
+            tone: 'neutral',
+        },
+        {
+            label: 'Ambulance called',
+            value: data.ambulance,
+            href: '/health-safety/first-aid?tab=ambulance',
+            tone: 'warning',
+        },
+        {
+            label: 'Hospital referrals',
+            value: data.hospital,
+            href: '/health-safety/first-aid?treatment_outcome=sent_to_hospital',
+            tone: 'critical',
+        },
     ];
 
-    const valueClass = (tone: 'neutral' | 'warning' | 'critical', value: number) => {
-        const colour = value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground';
+    const valueClass = (
+        tone: 'neutral' | 'warning' | 'critical',
+        value: number,
+    ) => {
+        const colour =
+            value <= 0
+                ? 'text-foreground'
+                : tone === 'critical'
+                  ? 'text-status-critical'
+                  : tone === 'warning'
+                    ? 'text-status-warning'
+                    : 'text-foreground';
         return `mt-1 text-3xl font-bold tabular-nums ${colour}`;
     };
 
@@ -310,11 +401,17 @@ function FirstAidStrip({ data }: { data: { treatments: number; ambulance: number
                 <Link
                     key={c.label}
                     href={c.href}
-                    className="group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
-                    <span className="text-xs font-medium text-muted-foreground">{c.label}</span>
-                    <span className={valueClass(c.tone, c.value)}>{c.value}</span>
-                    <span className="mt-1 text-[11px] text-muted-foreground">last 30 days</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                        {c.label}
+                    </span>
+                    <span className={valueClass(c.tone, c.value)}>
+                        {c.value}
+                    </span>
+                    <span className="mt-1 text-[11px] text-muted-foreground">
+                        last 30 days
+                    </span>
                 </Link>
             ))}
         </div>
@@ -330,37 +427,104 @@ function FirstAidStrip({ data }: { data: { treatments: number; ambulance: number
  */
 function RestraintStrip({ data }: { data: RestraintDashboardData }) {
     const s = data.summary;
-    const tiles: { label: string; value: number; caption: string; href: string; tone: 'neutral' | 'warning' | 'critical' }[] = [
-        { label: 'Restraint events', value: s.events_in_period, caption: 'this period', href: '/health-safety/restraints?lens=events&tab=30d', tone: 'neutral' },
-        { label: 'Out of plan', value: s.out_of_plan, caption: 'deviations', href: '/health-safety/restraints?lens=events&tab=out_of_plan', tone: 'critical' },
-        { label: 'With injury', value: s.with_injury, caption: 'harm occurred', href: '/health-safety/restraints?lens=events&tab=injury', tone: 'critical' },
-        { label: 'Unreviewed', value: s.unreviewed, caption: 'need review', href: '/health-safety/restraints?lens=events&tab=unreviewed', tone: 'warning' },
-        { label: 'Active BSPs', value: s.active_plans, caption: 'in place', href: '/health-safety/restraints?lens=plans&tab=active', tone: 'neutral' },
-        { label: 'Plans review due', value: s.plans_review_due, caption: 'within 30 days', href: '/health-safety/restraints?lens=plans&tab=review_due', tone: 'warning' },
+    const tiles: {
+        label: string;
+        value: number;
+        caption: string;
+        href: string;
+        tone: 'neutral' | 'warning' | 'critical';
+    }[] = [
+        {
+            label: 'Restraint events',
+            value: s.events_in_period,
+            caption: 'this period',
+            href: '/health-safety/restraints?lens=events&tab=30d',
+            tone: 'neutral',
+        },
+        {
+            label: 'Out of plan',
+            value: s.out_of_plan,
+            caption: 'deviations',
+            href: '/health-safety/restraints?lens=events&tab=out_of_plan',
+            tone: 'critical',
+        },
+        {
+            label: 'With injury',
+            value: s.with_injury,
+            caption: 'harm occurred',
+            href: '/health-safety/restraints?lens=events&tab=injury',
+            tone: 'critical',
+        },
+        {
+            label: 'Unreviewed',
+            value: s.unreviewed,
+            caption: 'need review',
+            href: '/health-safety/restraints?lens=events&tab=unreviewed',
+            tone: 'warning',
+        },
+        {
+            label: 'Active BSPs',
+            value: s.active_plans,
+            caption: 'in place',
+            href: '/health-safety/restraints?lens=plans&tab=active',
+            tone: 'neutral',
+        },
+        {
+            label: 'Plans review due',
+            value: s.plans_review_due,
+            caption: 'within 30 days',
+            href: '/health-safety/restraints?lens=plans&tab=review_due',
+            tone: 'warning',
+        },
     ];
 
-    const valueClass = (tone: 'neutral' | 'warning' | 'critical', value: number) => {
-        const colour = value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground';
+    const valueClass = (
+        tone: 'neutral' | 'warning' | 'critical',
+        value: number,
+    ) => {
+        const colour =
+            value <= 0
+                ? 'text-foreground'
+                : tone === 'critical'
+                  ? 'text-status-critical'
+                  : tone === 'warning'
+                    ? 'text-status-warning'
+                    : 'text-foreground';
         return `mt-1 text-2xl font-bold tabular-nums ${colour}`;
     };
 
     const sevTone = (sev: string | null): 'neutral' | 'warning' | 'critical' =>
-        sev === 'critical' || sev === 'high' ? 'critical' : sev === 'medium' ? 'warning' : 'neutral';
+        sev === 'critical' || sev === 'high'
+            ? 'critical'
+            : sev === 'medium'
+              ? 'warning'
+              : 'neutral';
     const sevClass = (sev: string | null) => {
         const t = sevTone(sev);
-        return t === 'critical' ? 'bg-status-critical-bg text-status-critical' : t === 'warning' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground';
+        return t === 'critical'
+            ? 'bg-status-critical-bg text-status-critical'
+            : t === 'warning'
+              ? 'bg-status-warning-bg text-status-warning'
+              : 'bg-muted text-muted-foreground';
     };
 
     return (
-        <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <GuardrailCard
+            unstyled
+            className="rounded-xl border border-border bg-card p-4 shadow-sm"
+        >
             <div className="flex items-center justify-between gap-3">
                 <div>
-                    <h3 className="text-sm font-semibold text-foreground">Restraint &amp; behaviour support</h3>
-                    <p className="text-[11px] text-muted-foreground">Least-restrictive practice — Ngā Paerewa NZS 8134:2021</p>
+                    <h3 className="text-sm font-semibold text-foreground">
+                        Restraint &amp; behaviour support
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">
+                        Least-restrictive practice — Ngā Paerewa NZS 8134:2021
+                    </p>
                 </div>
                 <Link
                     href="/health-safety/restraints"
-                    className="shrink-0 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="shrink-0 text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                     Open register →
                 </Link>
@@ -371,11 +535,17 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                     <Link
                         key={t.label}
                         href={t.href}
-                        className="group flex flex-col rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="group flex flex-col rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                     >
-                        <span className="text-[11px] font-medium text-muted-foreground">{t.label}</span>
-                        <span className={valueClass(t.tone, t.value)}>{t.value}</span>
-                        <span className="mt-0.5 text-[10px] text-muted-foreground">{t.caption}</span>
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                            {t.label}
+                        </span>
+                        <span className={valueClass(t.tone, t.value)}>
+                            {t.value}
+                        </span>
+                        <span className="mt-0.5 text-[10px] text-muted-foreground">
+                            {t.caption}
+                        </span>
                     </Link>
                 ))}
             </div>
@@ -383,8 +553,13 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
             {data.unreviewed.length > 0 ? (
                 <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">Needs review</span>
-                        <Link href="/health-safety/restraints?lens=events&tab=unreviewed" className="text-[11px] font-medium text-primary hover:underline">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            Needs review
+                        </span>
+                        <Link
+                            href="/health-safety/restraints?lens=events&tab=unreviewed"
+                            className="text-[11px] font-medium text-primary hover:underline"
+                        >
                             View all
                         </Link>
                     </div>
@@ -393,21 +568,35 @@ function RestraintStrip({ data }: { data: RestraintDashboardData }) {
                             <li key={e.id}>
                                 <Link
                                     href={`/health-safety/restraints?lens=events&tab=unreviewed&event=${e.id}`}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                                    className="flex items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none focus-visible:ring-inset"
                                 >
-                                    <span className="font-mono text-[11px] text-muted-foreground">{e.reference}</span>
-                                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{e.client ?? 'Unknown client'}</span>
+                                    <span className="font-mono text-[11px] text-muted-foreground">
+                                        {e.reference}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                                        {e.client ?? 'Unknown client'}
+                                    </span>
                                     {e.restraint_type ? (
-                                        <span className="hidden truncate text-xs text-muted-foreground sm:inline">{e.restraint_type}</span>
+                                        <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+                                            {e.restraint_type}
+                                        </span>
                                     ) : null}
                                     {!e.within_support_plan ? (
-                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">Out of plan</span>
+                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
+                                            Out of plan
+                                        </span>
                                     ) : null}
                                     {e.injury_occurred ? (
-                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">Injury</span>
+                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
+                                            Injury
+                                        </span>
                                     ) : null}
                                     {e.severity ? (
-                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${sevClass(e.severity)}`}>{e.severity}</span>
+                                        <span
+                                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${sevClass(e.severity)}`}
+                                        >
+                                            {e.severity}
+                                        </span>
                                     ) : null}
                                 </Link>
                             </li>

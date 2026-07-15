@@ -14,6 +14,8 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftTimelineService;
+use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -40,7 +42,7 @@ class ShiftHandoverWorkflowTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->manager = $this->makeUser('admin');
         $this->outgoingStaff = $this->makeUser('support_worker', ['shifts.update', 'shifts.viewAssigned']);
@@ -178,7 +180,7 @@ class ShiftHandoverWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_reassigned_incoming_shift_blocks_previous_staff_and_allows_current_assignee_to_acknowledge(): void
+    public function test_reassigned_incoming_shift_invalidates_stored_handover_until_target_is_reconciled(): void
     {
         $outgoingShift = $this->makeInProgressShift($this->outgoingStaff);
         $incomingShift = $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
@@ -202,14 +204,13 @@ class ShiftHandoverWorkflowTest extends TestCase
 
         $this->actingAs($this->otherStaff)
             ->patch("/operations/handovers/{$handover->id}/acknowledge")
-            ->assertRedirect()
-            ->assertSessionHas('success', 'Handover acknowledged.');
+            ->assertForbidden();
 
         $this->assertDatabaseHas('shift_handovers', [
             'id' => $handover->id,
-            'status' => ShiftHandoverService::STATUS_ACKNOWLEDGED,
-            'incoming_staff_id' => $this->otherStaff->id,
-            'acknowledged_by' => $this->otherStaff->id,
+            'status' => ShiftHandoverService::STATUS_SUBMITTED,
+            'incoming_staff_id' => $this->incomingStaff->id,
+            'acknowledged_by' => null,
         ]);
     }
 
@@ -381,12 +382,14 @@ class ShiftHandoverWorkflowTest extends TestCase
     public function test_outgoing_staff_can_update_draft_handover(): void
     {
         $outgoingShift = $this->makeInProgressShift($this->outgoingStaff);
-        $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
+        $incomingShift = $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
 
         $handover = ShiftHandover::factory()->draft()->create([
             'outgoing_shift_id' => $outgoingShift->id,
+            'incoming_shift_id' => $incomingShift->id,
             'client_id' => $this->client->id,
             'outgoing_staff_id' => $this->outgoingStaff->id,
+            'incoming_staff_id' => $this->incomingStaff->id,
             'handover_notes' => 'Original note',
         ]);
 
@@ -514,7 +517,7 @@ class ShiftHandoverWorkflowTest extends TestCase
     public function test_index_filters_by_outgoing_shift_week_not_created_at(): void
     {
         // Shift happened two weeks ago, but the handover row is created "now".
-        $shiftDay = now()->copy()->subWeeks(2)->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(2);
+        $shiftDay = now()->copy()->subWeeks(2)->startOfWeek(Carbon::MONDAY)->addDays(2);
         $outgoingShift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -529,8 +532,10 @@ class ShiftHandoverWorkflowTest extends TestCase
         ]);
         $handover = ShiftHandover::factory()->create([
             'outgoing_shift_id' => $outgoingShift->id,
+            'incoming_shift_id' => null,
             'client_id' => $this->client->id,
             'outgoing_staff_id' => $this->outgoingStaff->id,
+            'incoming_staff_id' => null,
             'status' => ShiftHandoverService::STATUS_SUBMITTED,
             'submitted_at' => now(),
             'submitted_by' => $this->outgoingStaff->id,
@@ -542,7 +547,7 @@ class ShiftHandoverWorkflowTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('handovers', 0));
 
         // …but the shift's own week includes it.
-        $weekParam = $shiftDay->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->toDateString();
+        $weekParam = $shiftDay->copy()->startOfWeek(Carbon::MONDAY)->toDateString();
         $this->actingAs($this->manager)
             ->get('/operations/handovers?week='.$weekParam)
             ->assertInertia(fn (Assert $page) => $page

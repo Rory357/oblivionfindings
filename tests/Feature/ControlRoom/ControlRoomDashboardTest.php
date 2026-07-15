@@ -4,12 +4,17 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
+use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Tasks\Providers\ControlRoomAlertProvider;
+use Database\Factories\ControlRoomAlertFactory;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ControlRoomDashboardTest extends TestCase
@@ -22,19 +27,36 @@ class ControlRoomDashboardTest extends TestCase
 
     protected User $supportWorker;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
 
-        $this->coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->coordinator = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'role' => 'coordinator',
+            'approved_at' => now(),
+        ]);
         $this->coordinator->roles()->attach(Role::where('name', 'coordinator')->first());
 
-        $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->supportWorker = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
     }
 
@@ -61,16 +83,19 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dashboard_accessible_by_support_worker_with_view_permission(): void
+    public function test_dashboard_blocked_for_support_worker_without_full_operator_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_dashboard_blocked_for_user_without_permission(): void
     {
-        $noPermUser = User::factory()->create(['approved_at' => now()]);
+        $noPermUser = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
+            'approved_at' => now(),
+        ]);
         // No roles attached
 
         $this->actingAs($noPermUser)
@@ -89,23 +114,27 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/index')
+                ->has('hero')
+                ->has('worklist')
+                ->has('handover')
+                ->has('activity')
+                ->has('freshness')
                 ->has('alerts')
                 ->has('stats')
-                ->has('daily_trend')
-                ->has('by_severity')
                 ->has('staff')
                 ->has('filters')
                 ->has('can')
+                ->missing('analytics')
             );
     }
 
     public function test_dashboard_shows_correct_stats(): void
     {
-        ControlRoomAlert::factory()->open()->count(3)->create();
-        ControlRoomAlert::factory()->acknowledged()->count(2)->create();
-        ControlRoomAlert::factory()->triaging()->count(1)->create();
-        ControlRoomAlert::factory()->resolved()->count(4)->create();
-        ControlRoomAlert::factory()->closed()->count(2)->create();
+        $this->alertFactory()->open()->count(3)->create();
+        $this->alertFactory()->acknowledged()->count(2)->create();
+        $this->alertFactory()->triaging()->count(1)->create();
+        $this->alertFactory()->resolved()->count(4)->create();
+        $this->alertFactory()->closed()->count(2)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room')
@@ -134,7 +163,7 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_dashboard_returns_paginated_alerts(): void
     {
-        ControlRoomAlert::factory()->count(30)->create();
+        $this->alertFactory()->count(30)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room')
@@ -146,20 +175,78 @@ class ControlRoomDashboardTest extends TestCase
             );
     }
 
-    public function test_dashboard_daily_trend_has_14_entries(): void
+    public function test_task7_final_gap_dashboard_default_and_all_lists_exclude_terminal_and_unknown_history(): void
+    {
+        $active = $this->alertFactory()->open()->create();
+        $resolved = $this->alertFactory()->resolved()->create();
+        $this->alertFactory()->closed()->create();
+        $this->alertFactory()->create(['status' => ControlRoomAlert::STATUS_DISMISSED]);
+        $legacy = $this->alertFactory()->open()->create();
+        DB::table('control_room_alerts')
+            ->where('id', $legacy->id)
+            ->update(['status' => 'legacy_unknown']);
+
+        $onlyActive = fn ($rows): bool => collect($rows)->pluck('id')->all() === [$active->id];
+
+        $this->actingAs($this->admin)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('alerts.data', $onlyActive));
+
+        $this->actingAs($this->admin)
+            ->get('/control-room?status=all')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('alerts.data', $onlyActive));
+
+        $this->actingAs($this->admin)
+            ->get('/control-room?status=resolved')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('alerts.data', 1)
+                ->where('alerts.data.0.id', $resolved->id));
+    }
+
+    public function test_dashboard_defers_historical_trends_from_the_initial_live_desk(): void
     {
         $this->actingAs($this->admin)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('daily_trend', 14)
+                ->missing('analytics')
+            );
+    }
+
+    public function test_residual_terminal_sla_is_omitted_from_dashboard_status_and_daily_compliance(): void
+    {
+        $alert = $this->alertFactory()->open()->create();
+        AlertSla::query()->create([
+            'alert_id' => $alert->id,
+            'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
+            'cycle_history' => [['ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH]],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('alerts.data.0.id', $alert->id)
+                ->where('alerts.data.0.sla_status', null)
+                ->missing('analytics')
             );
     }
 
     public function test_dashboard_scopes_alerts_stats_staff_and_sites_for_site_bound_user(): void
     {
-        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
-        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+        $visibleSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Visible Site',
+            'type' => 'house',
+        ]);
+        $hiddenSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Hidden Site',
+            'type' => 'house',
+        ]);
         $visibleOperator = $this->makeRoleUser('coordinator');
         $hiddenOperator = $this->makeRoleUser('coordinator');
 
@@ -167,11 +254,11 @@ class ControlRoomDashboardTest extends TestCase
         $this->scopeUserToSite($visibleOperator, $visibleSite);
         $this->scopeUserToSite($hiddenOperator, $hiddenSite);
 
-        $visibleAlert = ControlRoomAlert::factory()->open()->create([
+        $visibleAlert = $this->alertFactory()->open()->create([
             'site_id' => $visibleSite->id,
         ]);
 
-        ControlRoomAlert::factory()->open()->create([
+        $this->alertFactory()->open()->create([
             'site_id' => $hiddenSite->id,
         ]);
 
@@ -190,20 +277,29 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_dashboard_recent_activity_is_scoped_to_visible_alerts(): void
     {
-        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
-        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+        $visibleSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Visible Site',
+            'type' => 'house',
+        ]);
+        $hiddenSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Hidden Site',
+            'type' => 'house',
+        ]);
 
         $this->scopeUserToSite($this->coordinator, $visibleSite);
 
-        $visibleAlert = ControlRoomAlert::factory()->open()->create([
+        $visibleAlert = $this->alertFactory()->open()->create([
             'site_id' => $visibleSite->id,
         ]);
 
-        $hiddenAlert = ControlRoomAlert::factory()->open()->create([
+        $hiddenAlert = $this->alertFactory()->open()->create([
             'site_id' => $hiddenSite->id,
         ]);
 
         AuditLog::create([
+            'organization_id' => $this->admin->organization_id,
             'user_id' => $this->admin->id,
             'action' => 'controlRoom.alert.acknowledge',
             'auditable_type' => $visibleAlert->getMorphClass(),
@@ -214,6 +310,7 @@ class ControlRoomDashboardTest extends TestCase
         ]);
 
         AuditLog::create([
+            'organization_id' => $this->admin->organization_id,
             'user_id' => $this->admin->id,
             'action' => 'controlRoom.alert.escalate',
             'auditable_type' => $hiddenAlert->getMorphClass(),
@@ -234,8 +331,16 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_manage_any_permissions_do_not_bypass_dashboard_site_scope(): void
     {
-        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
-        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+        $visibleSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Visible Site',
+            'type' => 'house',
+        ]);
+        $hiddenSite = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+            'name' => 'Hidden Site',
+            'type' => 'house',
+        ]);
 
         $this->scopeUserToSite($this->coordinator, $visibleSite);
 
@@ -248,11 +353,11 @@ class ControlRoomDashboardTest extends TestCase
             $permissionMap['timesheets.manageAny'] => ['allowed' => true],
         ]);
 
-        ControlRoomAlert::factory()->open()->create([
+        $this->alertFactory()->open()->create([
             'site_id' => $visibleSite->id,
         ]);
 
-        ControlRoomAlert::factory()->open()->create([
+        $this->alertFactory()->open()->create([
             'site_id' => $hiddenSite->id,
         ]);
 
@@ -273,8 +378,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_status(): void
     {
-        ControlRoomAlert::factory()->open()->count(3)->create();
-        ControlRoomAlert::factory()->resolved()->count(2)->create();
+        $this->alertFactory()->open()->count(3)->create();
+        $this->alertFactory()->resolved()->count(2)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?status=open')
@@ -286,8 +391,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_severity(): void
     {
-        ControlRoomAlert::factory()->critical()->count(2)->create();
-        ControlRoomAlert::factory()->low()->count(5)->create();
+        $this->alertFactory()->critical()->count(2)->create();
+        $this->alertFactory()->low()->count(5)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?severity=critical')
@@ -299,8 +404,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_source(): void
     {
-        ControlRoomAlert::factory()->fromFleet()->count(3)->create();
-        ControlRoomAlert::factory()->fromCompliance()->count(4)->create();
+        $this->alertFactory()->fromFleet()->count(3)->create();
+        $this->alertFactory()->fromCompliance()->count(4)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?source=fleet')
@@ -312,8 +417,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_assigned_to_me(): void
     {
-        ControlRoomAlert::factory()->assignedTo($this->admin)->count(2)->create();
-        ControlRoomAlert::factory()->count(3)->create();
+        $this->alertFactory()->assignedTo($this->admin)->count(2)->create();
+        $this->alertFactory()->count(3)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?assigned_to=me')
@@ -325,8 +430,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_unassigned(): void
     {
-        ControlRoomAlert::factory()->assignedTo($this->admin)->count(2)->create();
-        ControlRoomAlert::factory()->count(3)->create(); // These will have null assigned_to
+        $this->alertFactory()->assignedTo($this->admin)->count(2)->create();
+        $this->alertFactory()->count(3)->create(); // These will have null assigned_to
 
         $this->actingAs($this->admin)
             ->get('/control-room?assigned_to=unassigned')
@@ -338,8 +443,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_escalation_level(): void
     {
-        ControlRoomAlert::factory()->escalated(2)->count(2)->create();
-        ControlRoomAlert::factory()->count(5)->create(); // Level 0
+        $this->alertFactory()->escalated(2)->count(2)->create();
+        $this->alertFactory()->count(5)->create(); // Level 0
 
         $this->actingAs($this->admin)
             ->get('/control-room?escalation_level=1')
@@ -351,9 +456,9 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_search(): void
     {
-        ControlRoomAlert::factory()->create(['alert_type' => 'Fire Alarm']);
-        ControlRoomAlert::factory()->create(['alert_type' => 'Speeding']);
-        ControlRoomAlert::factory()->create(['notes' => 'Fire detected in kitchen']);
+        $this->alertFactory()->create(['alert_type' => 'Fire Alarm']);
+        $this->alertFactory()->create(['alert_type' => 'Speeding']);
+        $this->alertFactory()->create(['notes' => 'Fire detected in kitchen']);
 
         $this->actingAs($this->admin)
             ->get('/control-room?search=Fire')
@@ -365,9 +470,9 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_filter_by_date_range(): void
     {
-        ControlRoomAlert::factory()->create(['triggered_at' => now()->subDays(2)]);
-        ControlRoomAlert::factory()->create(['triggered_at' => now()->subDays(10)]);
-        ControlRoomAlert::factory()->create(['triggered_at' => now()->subDays(20)]);
+        $this->alertFactory()->create(['triggered_at' => now()->subDays(2)]);
+        $this->alertFactory()->create(['triggered_at' => now()->subDays(10)]);
+        $this->alertFactory()->create(['triggered_at' => now()->subDays(20)]);
 
         $from = now()->subDays(5)->format('Y-m-d');
         $to = now()->format('Y-m-d');
@@ -382,9 +487,9 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_combined_filters(): void
     {
-        ControlRoomAlert::factory()->critical()->fromFleet()->open()->count(2)->create();
-        ControlRoomAlert::factory()->critical()->fromCompliance()->open()->create();
-        ControlRoomAlert::factory()->low()->fromFleet()->open()->create();
+        $this->alertFactory()->critical()->fromFleet()->open()->count(2)->create();
+        $this->alertFactory()->critical()->fromCompliance()->open()->create();
+        $this->alertFactory()->low()->fromFleet()->open()->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?severity=critical&source=fleet&status=open')
@@ -400,8 +505,8 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_sort_by_severity(): void
     {
-        ControlRoomAlert::factory()->critical()->create();
-        ControlRoomAlert::factory()->low()->create();
+        $this->alertFactory()->critical()->create();
+        $this->alertFactory()->low()->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?sort=severity&dir=asc')
@@ -440,17 +545,15 @@ class ControlRoomDashboardTest extends TestCase
             );
     }
 
-    public function test_support_worker_gets_limited_permissions(): void
+    public function test_task5_failed_gate_support_worker_keeps_narrow_alert_task_visibility_without_operator_dashboard(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('can.manage', false)
-                ->where('can.assign', false)
-                ->where('can.escalate', false)
-                ->where('can.create', false)
-            );
+            ->assertForbidden();
+
+        $this->assertFalse($this->supportWorker->canDo('controlRoom.viewAny'));
+        $this->assertTrue($this->supportWorker->canDo('controlRoom.alerts.view'));
+        $this->assertTrue(app(ControlRoomAlertProvider::class)->canView($this->supportWorker));
     }
 
     // ──────────────────────────────────────
@@ -459,7 +562,7 @@ class ControlRoomDashboardTest extends TestCase
 
     public function test_pagination_page_2(): void
     {
-        ControlRoomAlert::factory()->count(30)->create();
+        $this->alertFactory()->count(30)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room?page=2')
@@ -470,9 +573,17 @@ class ControlRoomDashboardTest extends TestCase
             );
     }
 
+    private function alertFactory(): ControlRoomAlertFactory
+    {
+        return ControlRoomAlert::factory()->state([
+            'site_id' => $this->site->id,
+        ]);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([
+            'organization_id' => $this->admin->organization_id,
             'role' => $roleName,
             'approved_at' => now(),
         ]);
@@ -490,7 +601,7 @@ class ControlRoomDashboardTest extends TestCase
         HrEmployeeProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'tenant_id' => 1,
+                'tenant_id' => $user->organization_id,
                 'employee_number' => 'EMP-DASH-'.$user->id,
                 'work_email' => $user->email,
                 'position_title' => 'Control Room',

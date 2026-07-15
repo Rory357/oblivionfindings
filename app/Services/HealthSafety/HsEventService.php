@@ -2,10 +2,17 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Domain\Governance\Models\NotifiableIncident;
+use App\Models\ClientIncident;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -22,10 +29,11 @@ class HsEventService
 {
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
+        private readonly HsInvestigationService $investigations,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Public API                                                         */
+    /*  Public API */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -48,6 +56,9 @@ class HsEventService
      *     worksafe_notifiable?: bool,
      *     organization_id?: int|null,
      *     created_by?: int|null,
+     *     control_room_alert_id?: int|null,
+     *     handover_status?: string,
+     *     owner_user_id?: int|null,
      * } $data
      */
     public function recordEvent(array $data): ?HsEvent
@@ -88,6 +99,9 @@ class HsEventService
                 'worksafe_notifiable' => $data['worksafe_notifiable'] ?? false,
                 'worksafe_status' => ($data['worksafe_notifiable'] ?? false) ? HsEvent::WORKSAFE_PENDING : null,
                 'investigation_required' => $this->requiresInvestigation($severity, $data['worksafe_notifiable'] ?? false),
+                'control_room_alert_id' => $data['control_room_alert_id'] ?? null,
+                'handover_status' => $data['handover_status'] ?? HsEvent::HANDOVER_NOT_REQUIRED,
+                'owner_user_id' => $data['owner_user_id'] ?? null,
                 'idempotency_key' => $idempotencyKey,
                 'created_by' => $data['created_by'] ?? auth()->id(),
             ]);
@@ -95,7 +109,7 @@ class HsEventService
             Log::info('HsEventService: event created', [
                 'hs_event_id' => $hsEvent->id,
                 'reference' => $hsEvent->reference_number,
-                'source' => class_basename($source) . ':' . $source->getKey(),
+                'source' => class_basename($source).':'.$source->getKey(),
                 'category' => $category,
                 'severity' => $severity,
             ]);
@@ -108,7 +122,7 @@ class HsEventService
             }
 
             Log::error('HsEventService: failed to create event', [
-                'source' => class_basename($source) . ':' . $source->getKey(),
+                'source' => class_basename($source).':'.$source->getKey(),
                 'category' => $category,
                 'error' => $e->getMessage(),
             ]);
@@ -118,12 +132,11 @@ class HsEventService
     }
 
     /**
-     * Update HsEvent severity when the source model's severity escalates.
+     * Project a source-model severity onto an existing H&S event.
      *
-     * This also implements carry-forward #1: escalation bypass for dedup.
-     * When severity materially escalates (e.g. high → critical), a new
-     * Control Room bridge call is dispatched with an escalation flag so
-     * the dedup window does not silently suppress it.
+     * Callers own any monotonic floor or linked Control Room journey update.
+     * This method normalises the requested value and marks an investigation
+     * required when the change is a material escalation.
      */
     public function syncSeverity(HsEvent $hsEvent, string $newSeverity): void
     {
@@ -163,8 +176,60 @@ class HsEventService
         $hsEvent->updateQuietly(['control_room_alert_id' => $alertId]);
     }
 
+    /**
+     * Accept an incident-backed H&S handover without changing its governance stage.
+     *
+     * Acceptance is monotonic: retries return the first accepted record and never
+     * replace its owner, actor, timestamp, or notes.
+     */
+    public function acceptHandover(
+        HsEvent $event,
+        User $actor,
+        ?User $owner = null,
+        ?string $notes = null,
+    ): HsEvent {
+        return DB::transaction(function () use ($event, $actor, $owner, $notes): HsEvent {
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+
+            if ($locked->handover_status === HsEvent::HANDOVER_ACCEPTED) {
+                return $locked->loadMissing(['owner:id,name', 'acceptedBy:id,name']);
+            }
+
+            if ($locked->handover_status !== HsEvent::HANDOVER_AWAITING_ACCEPTANCE) {
+                throw new \DomainException('This H&S event is not awaiting handover acceptance.');
+            }
+
+            if ($locked->source_type !== ClientIncident::class) {
+                throw new \DomainException('Only submitted incident handovers can be accepted.');
+            }
+
+            $incident = ClientIncident::query()->find($locked->source_id);
+            if (! $incident || $incident->status === 'draft' || $incident->submitted_at === null) {
+                throw new \DomainException('Submit the incident before accepting its H&S handover.');
+            }
+
+            $owner ??= $actor;
+            $locked->update([
+                'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+                'owner_user_id' => $owner->id,
+                'accepted_by_user_id' => $actor->id,
+                'accepted_at' => now(),
+                'acceptance_notes' => filled($notes) ? trim((string) $notes) : null,
+            ]);
+
+            Log::info('HsEventService: incident handover accepted', [
+                'hs_event_id' => $locked->id,
+                'incident_id' => $incident->id,
+                'accepted_by' => $actor->id,
+                'owner_user_id' => $owner->id,
+            ]);
+
+            return $locked->fresh(['owner:id,name', 'acceptedBy:id,name']);
+        }, 3);
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Governance — gated closure (E-Gap 1)                                */
+    /*  Governance — gated closure (E-Gap 1) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -178,67 +243,176 @@ class HsEventService
      */
     public function closeBlockers(HsEvent $event): array
     {
-        $blockers = [];
+        return $this->closureGate($event)['blockers'];
+    }
 
-        if ($event->investigation_required && ! $event->hasCompletedInvestigation()) {
-            $blockers[] = 'A completed investigation is required before this event can be closed.';
+    /**
+     * @return array{
+     *     acceptance_ok: bool,
+     *     worksafe_ok: bool,
+     *     investigation_ok: bool,
+     *     recommendations_ok: bool,
+     *     actions_ok: bool,
+     *     blockers: list<string>
+     * }
+     */
+    public function closureGate(HsEvent $event): array
+    {
+        $blockers = [];
+        $sourceType = ltrim((string) $event->source_type, '\\');
+        $handoverRequiresAcceptance = $sourceType === ClientIncident::class
+            || in_array($event->handover_status, [
+                HsEvent::HANDOVER_NOT_READY,
+                HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ], true);
+        $acceptanceOk = ! $handoverRequiresAcceptance
+            || $event->handover_status === HsEvent::HANDOVER_ACCEPTED;
+
+        if (! $acceptanceOk) {
+            $blockers[] = 'Accept the H&S handover before closing this event.';
         }
 
-        if ($event->hasOpenCorrectiveActions()) {
+        $worksafeOk = ! $event->worksafe_notifiable
+            || in_array($event->worksafe_status, [
+                HsEvent::WORKSAFE_NOTIFIED,
+                HsEvent::WORKSAFE_ACKNOWLEDGED,
+            ], true);
+
+        if (! $worksafeOk) {
+            $blockers[] = 'Record the WorkSafe notification before closing this event.';
+        }
+
+        $hasActiveInvestigation = $event->investigations()
+            ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
+            ->exists();
+        $investigationOk = ! $hasActiveInvestigation
+            && (! $event->investigation_required || $event->hasCompletedInvestigation());
+
+        if (! $investigationOk) {
+            $blockers[] = $hasActiveInvestigation
+                ? 'Complete the active H&S investigation before closing this event.'
+                : 'Complete the required H&S investigation before closing this event.';
+        }
+
+        $recommendationsOk = true;
+        $completedInvestigations = $event->investigations()
+            ->where('status', HsInvestigation::STATUS_COMPLETED)
+            ->get();
+
+        foreach ($completedInvestigations as $investigation) {
+            $missing = $this->investigations->undispositionedRecommendationIndexes($investigation);
+            if ($missing === []) {
+                continue;
+            }
+
+            $recommendationsOk = false;
+            $numbers = collect($missing)
+                ->map(static fn (int $index): string => (string) ($index + 1))
+                ->implode(', ');
+            $blockers[] = "Decide the outcome of recommendation {$numbers} on investigation {$investigation->reference_number}.";
+        }
+
+        $unresolvedActionDisposition = HsRecommendationDisposition::query()
+            ->whereHas('investigation', fn ($query) => $query->where('hs_event_id', $event->id))
+            ->where('disposition', HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION)
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('hs_corrective_action_id')
+                    ->orWhereHas('correctiveAction', fn ($actionQuery) => $actionQuery
+                        ->whereNotIn('status', [
+                            HsCorrectiveAction::STATUS_VERIFIED,
+                            HsCorrectiveAction::STATUS_CLOSED,
+                        ]));
+            })
+            ->exists();
+        $actionsOk = ! $event->hasOpenCorrectiveActions() && ! $unresolvedActionDisposition;
+
+        if (! $actionsOk) {
             $blockers[] = 'All corrective actions must be verified or closed before this event can be closed.';
         }
 
-        return $blockers;
+        return [
+            'acceptance_ok' => $acceptanceOk,
+            'worksafe_ok' => $worksafeOk,
+            'investigation_ok' => $investigationOk,
+            'recommendations_ok' => $recommendationsOk,
+            'actions_ok' => $actionsOk,
+            'blockers' => $blockers,
+        ];
     }
 
     /**
      * Close an event through the governance gate.
      *
-     * Blocks unless every gate in {@see closeBlockers()} is met, except when an
-     * `$overrideReason` is supplied (logged for the audit trail). A closure
-     * summary is always required.
+     * Blocks unless every gate in {@see closeBlockers()} is met. Bypass requires
+     * both the dedicated override permission and a reason; the actor, reason and
+     * exact blockers are then written to the strict audit trail. A closure summary
+     * is always required.
      *
      * @throws \DomainException when the gate blocks and no override reason is given
      */
     public function closeEvent(HsEvent $event, string $summary, User $actor, ?string $overrideReason = null): HsEvent
     {
-        if ($event->status === HsEvent::STATUS_CLOSED) {
-            throw new \DomainException('This event is already closed.');
-        }
-
         $summary = trim($summary);
         if ($summary === '') {
             throw new \DomainException('A closure summary is required.');
         }
 
-        $blockers = $this->closeBlockers($event);
-        $override = $overrideReason !== null && trim($overrideReason) !== '';
+        return DB::transaction(function () use ($event, $summary, $actor, $overrideReason): HsEvent {
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            if ($locked->status === HsEvent::STATUS_CLOSED) {
+                throw new \DomainException('This event is already closed.');
+            }
 
-        if ($blockers !== [] && ! $override) {
-            throw new \DomainException(implode(' ', $blockers));
-        }
+            $blockers = $this->closeBlockers($locked);
+            $normalisedOverrideReason = filled($overrideReason) ? trim((string) $overrideReason) : null;
 
-        $event->update([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => $summary,
-        ]);
+            if ($blockers !== [] && $normalisedOverrideReason === null) {
+                throw new \DomainException(implode(' ', $blockers));
+            }
 
-        Log::info('HsEventService: event closed', [
-            'hs_event_id' => $event->id,
-            'reference' => $event->reference_number,
-            'actor' => $actor->id,
-            'overridden' => $override,
-            'override_reason' => $override ? trim((string) $overrideReason) : null,
-            'blockers_at_close' => $blockers,
-        ]);
+            if ($blockers !== [] && ! $actor->canDo('healthSafety.overrideClosure')) {
+                throw new \DomainException(
+                    'You do not have permission to override H&S closure blockers. Complete the listed work or ask an authorised manager.'
+                );
+            }
 
-        return $event;
+            $overridden = $blockers !== [];
+            $locked->update([
+                'status' => HsEvent::STATUS_CLOSED,
+                'closed_at' => now(),
+                'closed_by' => $actor->id,
+                'closure_summary' => $summary,
+            ]);
+
+            AuditLogger::logOrFail(
+                $overridden
+                    ? 'healthSafety.event.closureOverridden'
+                    : 'healthSafety.event.closed',
+                $locked,
+                [
+                    'actor_id' => $actor->id,
+                    'closure_summary' => $summary,
+                    'override_reason' => $overridden ? $normalisedOverrideReason : null,
+                    'blockers' => $blockers,
+                ],
+            );
+
+            Log::info('HsEventService: event closed', [
+                'hs_event_id' => $locked->id,
+                'reference' => $locked->reference_number,
+                'actor' => $actor->id,
+                'overridden' => $overridden,
+                'override_reason' => $overridden ? $normalisedOverrideReason : null,
+                'blockers_at_close' => $blockers,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Governance — WorkSafe NZ notification (E-Gap 2)                     */
+    /*  Governance — WorkSafe NZ notification (E-Gap 2) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -256,30 +430,36 @@ class HsEventService
         ?string $reference = null,
         bool $sitePreserved = false,
     ): HsEvent {
-        if (! $event->worksafe_notifiable) {
-            throw new \DomainException('This event is not WorkSafe-notifiable.');
-        }
+        return DB::transaction(function () use ($event, $notifiedAt, $method, $reference, $sitePreserved): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
 
-        if ($event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
-            throw new \DomainException('WorkSafe has already acknowledged this notification.');
-        }
+            if (! $locked->worksafe_notifiable) {
+                throw new \DomainException('This event is not WorkSafe-notifiable.');
+            }
 
-        $event->update([
-            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
-            'worksafe_notified_at' => $notifiedAt,
-            'worksafe_method' => $method,
-            'worksafe_reference' => $reference ?: $event->worksafe_reference,
-            'worksafe_site_preserved' => $sitePreserved,
-        ]);
+            if ($locked->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
+                throw new \DomainException('WorkSafe has already acknowledged this notification.');
+            }
 
-        Log::info('HsEventService: WorkSafe notification recorded', [
-            'hs_event_id' => $event->id,
-            'reference' => $event->worksafe_reference,
-            'method' => $method,
-            'site_preserved' => $sitePreserved,
-        ]);
+            $locked->update([
+                'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+                'worksafe_notified_at' => $notifiedAt,
+                'worksafe_method' => $method,
+                'worksafe_reference' => $reference ?: $locked->worksafe_reference,
+                'worksafe_site_preserved' => $sitePreserved,
+            ]);
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
 
-        return $event;
+            Log::info('HsEventService: WorkSafe notification recorded', [
+                'hs_event_id' => $locked->id,
+                'reference' => $locked->fresh()->worksafe_reference,
+                'method' => $method,
+                'site_preserved' => $sitePreserved,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
     }
 
     /**
@@ -289,24 +469,87 @@ class HsEventService
      */
     public function acknowledgeWorksafe(HsEvent $event, \DateTimeInterface|string $acknowledgedAt): HsEvent
     {
-        if ($event->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
-            throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
+        return DB::transaction(function () use ($event, $acknowledgedAt): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+
+            if ($locked->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
+                throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
+            }
+
+            $locked->update([
+                'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+                'worksafe_acknowledged_at' => $acknowledgedAt,
+            ]);
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
+
+            Log::info('HsEventService: WorkSafe acknowledgement recorded', [
+                'hs_event_id' => $locked->id,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    /**
+     * Keep legacy incident/governance rows as one-way projections of HsEvent.
+     */
+    private function projectWorksafeCompatibility(HsEvent $event, ?ClientIncident $incident): void
+    {
+        if (! $incident) {
+            return;
         }
 
-        $event->update([
-            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
-            'worksafe_acknowledged_at' => $acknowledgedAt,
+        $incident->updateQuietly([
+            'is_notifiable' => (bool) $event->worksafe_notifiable,
+            'worksafe_notification_status' => $event->worksafe_status,
+            'worksafe_notified_at' => $event->worksafe_notified_at,
+            'worksafe_reference' => $event->worksafe_reference,
+            'site_preserved' => (bool) $event->worksafe_site_preserved,
         ]);
 
-        Log::info('HsEventService: WorkSafe acknowledgement recorded', [
-            'hs_event_id' => $event->id,
-        ]);
+        NotifiableIncident::query()
+            ->where('related_incident_id', $incident->id)
+            ->where('notification_authority', 'worksafe')
+            ->get()
+            ->each(function (NotifiableIncident $legacy) use ($event): void {
+                $tracking = $legacy->authority_response_tracking ?? [];
+                if ($event->worksafe_acknowledged_at) {
+                    $tracking['worksafe_acknowledged_at'] = $event->worksafe_acknowledged_at->toIso8601String();
+                }
 
-        return $event;
+                $legacy->updateQuietly([
+                    'status' => $event->worksafe_status,
+                    'notified_at' => $event->worksafe_notified_at,
+                    'notification_reference' => $event->worksafe_reference,
+                    'notified_by' => auth()->id() ?: $legacy->notified_by,
+                    'site_preserved' => (bool) $event->worksafe_site_preserved,
+                    'authority_response_tracking' => $tracking ?: null,
+                ]);
+            });
+    }
+
+    /**
+     * Match IncidentJourneyService's incident -> HsEvent lock order before
+     * projecting canonical WorkSafe state back to the compatibility columns.
+     */
+    private function lockIncidentForWorksafeProjection(HsEvent $event): ?ClientIncident
+    {
+        $incidentId = ClientIncident::query()
+            ->where('hs_event_id', $event->id)
+            ->value('id');
+
+        if (! $incidentId && $event->source_type === ClientIncident::class) {
+            $incidentId = $event->source_id;
+        }
+
+        return $incidentId
+            ? ClientIncident::query()->whereKey($incidentId)->lockForUpdate()->first()
+            : null;
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Severity normalisation                                             */
+    /*  Severity normalisation */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -332,7 +575,7 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     private function requiresInvestigation(string $normalisedSeverity, bool $worksafeNotifiable): bool
@@ -345,8 +588,7 @@ class HsEventService
     }
 
     /**
-     * Determine if a severity change represents a material escalation
-     * that should bypass the bridge dedup window.
+     * Determine if a severity change requires an H&S investigation.
      *
      * Material escalation = crossing from below-high to high-or-above,
      * or from high to critical.

@@ -6,7 +6,10 @@ use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,8 +26,9 @@ class ControlRoomReportService
 {
     protected string $dbDriver;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {
         $this->dbDriver = DB::connection()->getDriverName();
     }
 
@@ -33,58 +37,76 @@ class ControlRoomReportService
      */
     public function slaCompliance(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
-        $alertQuery = $this->baseAlertQuery($from, $to, $siteId);
-
-        $totalWithSla = (clone $alertQuery)->whereHas('sla')->count();
-        $breached = (clone $alertQuery)->whereHas('sla', fn ($q) => $q->breached())->count();
-        $met = $totalWithSla - $breached;
-
-        // Breakdown by breach type
-        $ackBreached = (clone $alertQuery)
-            ->whereHas('sla', fn ($q) => $q->where('acknowledge_breached', true))
-            ->count();
-        $responseBreached = (clone $alertQuery)
-            ->whereHas('sla', fn ($q) => $q->where('response_breached', true))
-            ->count();
-        $resolutionBreached = (clone $alertQuery)
-            ->whereHas('sla', fn ($q) => $q->where('resolution_breached', true))
-            ->count();
-
-        // Average times
-        $avgAckMinutes = $this->avgTimeDiff($from, $to, $siteId, 'triggered_at', 'acknowledged_at', 'minute');
-        $avgResponseMinutes = $this->avgTimeDiff($from, $to, $siteId, 'acknowledged_at', 'resolved_at', 'minute');
-        $avgResolutionHours = $this->avgTimeDiff($from, $to, $siteId, 'triggered_at', 'resolved_at', 'hour');
+        $cycles = $this->slaCyclesInPeriod($from, $to, $siteId);
+        $totalWithSla = $cycles->count();
+        $assessed = $cycles->where('assessed', true)->count();
+        $breached = $cycles->where('breached', true)->count();
+        $met = $cycles->where('met', true)->count();
+        $inProgress = $cycles->where('assessed', false)->count();
 
         // By severity
         $bySeverity = [];
         foreach (['critical', 'high', 'medium', 'low'] as $severity) {
-            $sevQuery = (clone $alertQuery)->where('severity', $severity);
-            $sevTotal = (clone $sevQuery)->whereHas('sla')->count();
-            $sevBreached = (clone $sevQuery)->whereHas('sla', fn ($q) => $q->breached())->count();
+            $severityCycles = $cycles->where('severity', $severity);
+            $sevTotal = $severityCycles->count();
+            $sevAssessed = $severityCycles->where('assessed', true)->count();
+            $sevBreached = $severityCycles->where('breached', true)->count();
+            $sevMet = $severityCycles->where('met', true)->count();
 
             $bySeverity[$severity] = [
                 'total' => $sevTotal,
-                'met' => $sevTotal - $sevBreached,
+                'assessed_total' => $sevAssessed,
+                'met' => $sevMet,
                 'breached' => $sevBreached,
-                'compliance_pct' => $sevTotal > 0 ? round((($sevTotal - $sevBreached) / $sevTotal) * 100, 1) : 100,
+                'in_progress' => max(0, $sevTotal - $sevAssessed),
+                'compliance_pct' => $sevAssessed > 0 ? round(($sevMet / $sevAssessed) * 100, 1) : null,
             ];
         }
 
         return [
             'total_with_sla' => $totalWithSla,
+            'total_sla_cycles' => $totalWithSla,
+            'unique_alerts_with_sla' => $cycles->pluck('alert_id')->unique()->count(),
+            'assessed_total' => $assessed,
             'sla_met' => $met,
             'sla_breached' => $breached,
-            'compliance_pct' => $totalWithSla > 0 ? round(($met / $totalWithSla) * 100, 1) : 100,
+            'sla_in_progress' => $inProgress,
+            'compliance_pct' => $assessed > 0 ? round(($met / $assessed) * 100, 1) : null,
             'breach_breakdown' => [
-                'acknowledge' => $ackBreached,
-                'response' => $responseBreached,
-                'resolution' => $resolutionBreached,
+                'acknowledge' => $cycles->where('acknowledge_breached', true)->count(),
+                'response' => $cycles->where('response_breached', true)->count(),
+                'resolution' => $cycles->where('resolution_breached', true)->count(),
             ],
-            'avg_acknowledge_minutes' => round((float) $avgAckMinutes, 1),
-            'avg_response_minutes' => round((float) $avgResponseMinutes, 1),
-            'avg_resolution_hours' => round((float) $avgResolutionHours, 1),
+            'avg_acknowledge_minutes' => $this->averageCycleDuration($cycles, 'acknowledged_at', 60),
+            'avg_response_minutes' => $this->averageCycleDuration($cycles, 'responded_at', 60),
+            'avg_resolution_hours' => $this->averageCycleDuration($cycles, 'resolved_at', 3600),
             'by_severity' => $bySeverity,
         ];
+    }
+
+    /**
+     * Daily SLA compliance grouped by the start date of every reportable cycle.
+     *
+     * @return array<int, array{date: string, compliance_pct: int|null}>
+     */
+    public function slaDailyTrend(Carbon $from, Carbon $to, int|array|null $siteId = null): array
+    {
+        return $this->slaCyclesInPeriod($from, $to, $siteId)
+            ->groupBy(fn (array $cycle): string => $cycle['started_at']->toDateString())
+            ->sortKeys()
+            ->map(function (Collection $cycles, string $date): array {
+                $assessed = $cycles->where('assessed', true)->count();
+                $met = $cycles->where('met', true)->count();
+
+                return [
+                    'date' => $date,
+                    'compliance_pct' => $assessed > 0
+                        ? (int) round(($met / $assessed) * 100)
+                        : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -96,7 +118,7 @@ class ControlRoomReportService
 
         $total = (clone $query)->count();
         $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
-        $open = (clone $query)->whereNotIn('status', ['resolved', 'closed'])->count();
+        $open = (clone $query)->actionable()->count();
 
         return [
             'total' => $total,
@@ -159,7 +181,7 @@ class ControlRoomReportService
         // Currently stuck at high escalation (level 3+, still open)
         $stuckAtHighEscalation = (clone $query)
             ->where('escalation_level', '>=', 3)
-            ->whereNotIn('status', ['resolved', 'closed'])
+            ->actionable()
             ->count();
 
         return [
@@ -178,9 +200,9 @@ class ControlRoomReportService
     {
         // Active alerts per user (currently unresolved)
         $activePerUser = ControlRoomAlert::query()
-            ->whereNotIn('status', ['resolved', 'closed'])
+            ->actionable()
             ->whereNotNull('assigned_to_user_id')
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
             ->select('assigned_to_user_id', DB::raw('COUNT(*) as active_count'))
             ->groupBy('assigned_to_user_id')
             ->with('assignedTo:id,name')
@@ -214,8 +236,8 @@ class ControlRoomReportService
 
         // Alerts per queue (currently active)
         $perQueue = TriageQueue::active()
-            ->withCount(['alerts as active_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])
-                ->when($siteId, fn ($qq) => $qq->where('site_id', $siteId)),
+            ->withCount(['alerts as active_count' => fn ($q) => $q->actionable()
+                ->tap(fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)),
             ])
             ->orderBy('tier')
             ->get()
@@ -228,9 +250,9 @@ class ControlRoomReportService
 
         // Unassigned alerts
         $unassigned = ControlRoomAlert::query()
-            ->whereNotIn('status', ['resolved', 'closed'])
+            ->actionable()
             ->whereNull('assigned_to_user_id')
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
             ->count();
 
         return [
@@ -244,10 +266,17 @@ class ControlRoomReportService
     /**
      * Playbook performance metrics.
      */
-    public function playbookPerformance(Carbon $from, Carbon $to): array
-    {
+    public function playbookPerformance(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+    ): array {
         $runs = PlaybookRun::where('created_at', '>=', $from)
             ->where('created_at', '<=', $to)
+            ->when($siteId !== null, fn ($query) => $query->whereHas(
+                'alert',
+                fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId),
+            ))
             ->with('playbook:id,name');
 
         $total = (clone $runs)->count();
@@ -300,12 +329,18 @@ class ControlRoomReportService
      */
     public function siteComparison(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
-        return ControlRoomAlert::query()
+        $query = ControlRoomAlert::query()
             ->where('triggered_at', '>=', $from)
-            ->where('triggered_at', '<=', $to)
-            ->whereNotNull('site_id')
-            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
-            ->join('sites', 'control_room_alerts.site_id', '=', 'sites.id')
+            ->where('triggered_at', '<=', $to);
+        $this->applySiteConstraint($query, $siteId);
+        $effectiveSiteExpression = $this->siteAccess->alertEffectiveSiteExpression($query);
+
+        return $query
+            ->join('sites', fn ($join) => $join->on(
+                'sites.id',
+                '=',
+                DB::raw($effectiveSiteExpression),
+            ))
             ->select(
                 'sites.id as site_id',
                 'sites.name as site_name',
@@ -340,7 +375,7 @@ class ControlRoomReportService
     public function attentionFlags(int|array|null $siteId = null): array
     {
         $baseQuery = ControlRoomAlert::query()
-            ->whereNotIn('status', ['resolved', 'closed'])
+            ->actionable()
             ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId));
 
         $unassigned = (clone $baseQuery)->whereNull('assigned_to_user_id')->count();
@@ -350,19 +385,11 @@ class ControlRoomReportService
             ->where('triggered_at', '<', now()->subHours(4))
             ->count();
 
-        // SLA compliance check (last 7 days)
-        $recentSlaTotal = AlertSla::query()
-            ->where('created_at', '>=', now()->subDays(7))
-            ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))
-            ->count();
-        $recentSlaBreached = AlertSla::query()
-            ->where('created_at', '>=', now()->subDays(7))
-            ->breached()
-            ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))
-            ->count();
-        $slaCompliancePct = $recentSlaTotal > 0
-            ? round((($recentSlaTotal - $recentSlaBreached) / $recentSlaTotal) * 100, 1)
-            : 100;
+        // SLA compliance check (last 7 days). Reopened work retains one SLA
+        // row, so the reporting window must use each cycle's start time rather
+        // than the age of the original row.
+        $recentSla = $this->slaCompliance(now()->subDays(7), now(), $siteId);
+        $slaCompliancePct = $recentSla['compliance_pct'];
 
         $flags = [];
 
@@ -402,7 +429,7 @@ class ControlRoomReportService
             ];
         }
 
-        if ($slaCompliancePct < 90) {
+        if ($slaCompliancePct !== null && $slaCompliancePct < 90) {
             $flags[] = [
                 'level' => $slaCompliancePct < 75 ? 'critical' : 'warning',
                 'message' => "SLA compliance at {$slaCompliancePct}% (7-day average) — below 90% threshold",
@@ -454,24 +481,176 @@ class ControlRoomReportService
             ->value('avg_val');
     }
 
-    protected function applySiteConstraint($query, int|array|null $siteId): void
+    protected function applySiteConstraint(Builder $query, int|array|null $siteId): void
     {
         if ($siteId === null) {
             return;
         }
 
-        if (is_array($siteId)) {
-            if ($siteId === []) {
-                $query->whereRaw('1 = 0');
+        $this->siteAccess->applyAlertSiteScopeForSiteIds(
+            $query,
+            is_array($siteId) ? $siteId : [$siteId],
+        );
+    }
 
-                return;
-            }
+    /**
+     * Flatten the persisted current clock and immutable history snapshots into
+     * one report row per SLA cycle. Report periods follow cycle start time, not
+     * the original alert timestamp, so reopened work is neither hidden nor
+     * collapsed into the latest clock.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function slaCyclesInPeriod(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId,
+    ): Collection {
+        return AlertSla::query()
+            ->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId))
+            ->with('alert:id,client_id,site_id,severity,status,triggered_at')
+            ->get()
+            ->flatMap(fn (AlertSla $sla) => $this->reportableSlaCycles($sla))
+            ->filter(fn (array $cycle) => $cycle['started_at'] instanceof Carbon
+                && $cycle['started_at']->betweenIncluded($from, $to))
+            ->values();
+    }
 
-            $query->whereIn('site_id', $siteId);
+    /** @return array<int, array<string, mixed>> */
+    private function reportableSlaCycles(AlertSla $sla): array
+    {
+        $cycles = collect($sla->cycle_history ?? [])
+            ->map(fn (array $snapshot) => $this->normaliseSlaCycle($sla, $snapshot))
+            ->filter()
+            ->values();
 
-            return;
+        if ($sla->ended_as === null
+            && $sla->sla_definition_id !== null
+            && $sla->alert?->status !== ControlRoomAlert::STATUS_DISMISSED) {
+            $cycles->push($this->normaliseSlaCycle($sla, [
+                'cycle_number' => $sla->cycle_number,
+                'cycle_started_at' => $sla->cycle_started_at?->toIso8601String(),
+                'ended_at' => null,
+                'ended_as' => null,
+                'definition' => ['id' => $sla->sla_definition_id],
+                'deadlines' => [
+                    'acknowledge_at' => $sla->acknowledge_deadline?->toIso8601String(),
+                    'response_at' => $sla->response_deadline?->toIso8601String(),
+                    'resolution_at' => $sla->resolution_deadline?->toIso8601String(),
+                ],
+                'results' => [
+                    'acknowledged_at' => $sla->acknowledged_at?->toIso8601String(),
+                    'responded_at' => $sla->responded_at?->toIso8601String(),
+                    'resolved_at' => $sla->resolved_at?->toIso8601String(),
+                    'acknowledge_breached' => (bool) $sla->acknowledge_breached,
+                    'response_breached' => (bool) $sla->response_breached,
+                    'resolution_breached' => (bool) $sla->resolution_breached,
+                ],
+            ]));
         }
 
-        $query->where('site_id', $siteId);
+        return $cycles->filter()->values()->all();
+    }
+
+    /** @return array<string, mixed>|null */
+    private function normaliseSlaCycle(AlertSla $sla, array $cycle): ?array
+    {
+        $endedAs = data_get($cycle, 'ended_as');
+        $definitionId = data_get($cycle, 'definition.id');
+        if ($definitionId === null || in_array($endedAs, [
+            AlertSla::ENDED_DISMISSED,
+            AlertSla::ENDED_RECONCILED_NO_MATCH,
+        ], true)) {
+            return null;
+        }
+
+        $cycleNumber = (int) (data_get($cycle, 'cycle_number') ?: 1);
+        $endedAt = $this->cycleTimestamp(data_get($cycle, 'ended_at'));
+        $startedAt = $this->cycleTimestamp(data_get($cycle, 'cycle_started_at'))
+            ?? ($cycleNumber === 1 ? $sla->alert?->triggered_at : null)
+            ?? $endedAt
+            ?? $sla->created_at;
+        $evaluationTime = $endedAt ?? now();
+
+        $milestones = collect(['acknowledge', 'response', 'resolution'])
+            ->mapWithKeys(function (string $milestone) use ($cycle, $evaluationTime) {
+                $deadline = $this->cycleTimestamp(data_get($cycle, "deadlines.{$milestone}_at"));
+                $completedKey = match ($milestone) {
+                    'acknowledge' => 'acknowledged_at',
+                    'response' => 'responded_at',
+                    'resolution' => 'resolved_at',
+                };
+                $completed = $this->cycleTimestamp(data_get($cycle, "results.{$completedKey}"));
+                $storedBreach = (bool) data_get($cycle, "results.{$milestone}_breached", false);
+                $breached = $storedBreach || ($deadline !== null && (
+                    $completed !== null
+                        ? $completed->gt($deadline)
+                        : $evaluationTime->gt($deadline)
+                ));
+
+                return [$milestone => [
+                    'deadline' => $deadline,
+                    'completed' => $completed,
+                    'breached' => $breached,
+                ]];
+            });
+        $configured = $milestones->filter(fn (array $milestone) => $milestone['deadline'] !== null);
+        $breached = $configured->contains(fn (array $milestone) => $milestone['breached']);
+        $allCompleted = $configured->isNotEmpty()
+            && $configured->every(fn (array $milestone) => $milestone['completed'] !== null);
+        $assessed = $breached || $allCompleted;
+        $met = $assessed
+            && ! $breached
+            && $configured->isNotEmpty()
+            && $configured->every(fn (array $milestone) => $milestone['completed']->lte($milestone['deadline']));
+
+        return [
+            'alert_id' => (int) $sla->alert_id,
+            'severity' => $sla->alert?->severity,
+            'cycle_number' => $cycleNumber,
+            'started_at' => $startedAt,
+            'acknowledged_at' => $milestones['acknowledge']['completed'],
+            'responded_at' => $milestones['response']['completed'],
+            'resolved_at' => $milestones['resolution']['completed'],
+            'acknowledge_breached' => $milestones['acknowledge']['breached'],
+            'response_breached' => $milestones['response']['breached'],
+            'resolution_breached' => $milestones['resolution']['breached'],
+            'assessed' => $assessed,
+            'breached' => $breached,
+            'met' => $met,
+        ];
+    }
+
+    private function cycleTimestamp(mixed $value): ?Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+
+        if (! filled($value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function averageCycleDuration(
+        Collection $cycles,
+        string $completedKey,
+        int $secondsPerUnit,
+    ): float {
+        $durations = $cycles
+            ->filter(fn (array $cycle) => $cycle['started_at'] instanceof Carbon
+                && $cycle[$completedKey] instanceof Carbon
+                && $cycle[$completedKey]->gte($cycle['started_at']))
+            ->map(fn (array $cycle) => (
+                $cycle[$completedKey]->getTimestamp() - $cycle['started_at']->getTimestamp()
+            ) / $secondsPerUnit);
+
+        return round((float) ($durations->avg() ?? 0), 1);
     }
 }

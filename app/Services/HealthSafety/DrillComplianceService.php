@@ -4,6 +4,7 @@ namespace App\Services\HealthSafety;
 
 use App\Models\EmergencyDrill;
 use App\Models\Site;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,13 +28,16 @@ class DrillComplianceService
      *
      * @return array<int,'compliant'|'due_soon'|'overdue'>
      */
-    public function statusBySite(): array
+    public function statusBySite(int|array|null $siteId = null): array
     {
         $sixMonthsAgo = Carbon::now()->subMonths(6);
         $graceFloor = $sixMonthsAgo->copy()->subMonth();
 
-        return EmergencyDrill::query()
-            ->whereNotNull('completed_at')
+        $query = EmergencyDrill::query()
+            ->whereNotNull('completed_at');
+        $this->applySiteScope($query, $siteId);
+
+        return $query
             ->groupBy('site_id')
             ->selectRaw('site_id, MAX(completed_at) as last')
             ->pluck('last', 'site_id')
@@ -62,10 +66,12 @@ class DrillComplianceService
      *
      * @return array{total_sites:int, compliant:int, due_soon:int, overdue:int, pct:int}
      */
-    public function summary(): array
+    public function summary(int|array|null $siteId = null): array
     {
-        $byId = $this->statusBySite();
-        $activeSiteIds = Site::query()->where('is_active', true)->pluck('id');
+        $byId = $this->statusBySite($siteId);
+        $siteQuery = Site::query()->where('is_active', true);
+        $this->applySiteScope($siteQuery, $siteId, 'id');
+        $activeSiteIds = $siteQuery->pluck('id');
 
         $compliant = 0;
         $dueSoon = 0;
@@ -98,17 +104,17 @@ class DrillComplianceService
     /**
      * Reconciled compliance percentage (active sites with a current drill).
      */
-    public function compliancePct(): int
+    public function compliancePct(int|array|null $siteId = null): int
     {
-        return $this->summary()['pct'];
+        return $this->summary($siteId)['pct'];
     }
 
     /**
      * Count of active sites currently graded 'overdue' (never drilled or >7mo).
      */
-    public function sitesOverdue(): int
+    public function sitesOverdue(int|array|null $siteId = null): int
     {
-        return $this->summary()['overdue'];
+        return $this->summary($siteId)['overdue'];
     }
 
     /**
@@ -147,5 +153,26 @@ class DrillComplianceService
             'scheduled_count' => $scheduledCount,
             'open_findings' => (int) $openFindings,
         ];
+    }
+
+    private function applySiteScope(
+        Builder $query,
+        int|array|null $siteId,
+        string $column = 'site_id',
+    ): Builder {
+        if ($siteId === null) {
+            return $query;
+        }
+
+        $siteIds = collect(is_array($siteId) ? $siteId : [$siteId])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn($column), $siteIds);
     }
 }

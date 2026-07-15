@@ -80,7 +80,7 @@ class InjuriesControllerTest extends TestCase
             ->get('/health-safety/injuries?injury='.$inj->id)
             ->assertInertia(fn (Assert $p) => $p
                 ->where('detail.id', $inj->id)
-                ->where('detail.reference', 'WI-'.str_pad((string) $inj->id, 4, '0', STR_PAD_LEFT))
+                ->where('detail.reference', $inj->reference_number)
                 ->has('detail.rtw_plans')
                 ->has('detail.attachments')
                 ->where('detail.can.manage', true));
@@ -386,7 +386,7 @@ class InjuriesControllerTest extends TestCase
         $res = $this->actingAs($this->admin)->get('/health-safety/injuries/export');
         $res->assertOk();
         $this->assertStringContainsString('text/csv', (string) $res->headers->get('Content-Type'));
-        $this->assertStringContainsString('WI-'.str_pad((string) $inj->id, 4, '0', STR_PAD_LEFT), $res->streamedContent());
+        $this->assertStringContainsString($inj->reference_number, $res->streamedContent());
     }
 
     public function test_show_redirects_to_register_modal(): void

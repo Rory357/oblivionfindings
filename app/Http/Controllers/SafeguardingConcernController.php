@@ -10,6 +10,7 @@ use App\Models\SafeguardingExternalReport;
 use App\Models\Client;
 use App\Models\User;
 use App\Models\Site;
+use App\Services\AuditLogger;
 use App\Services\Safeguarding\SafeguardingLifecycle;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -750,9 +751,9 @@ class SafeguardingConcernController extends Controller
 
     /**
      * X3 state-sync: when a concern reaches a terminal state (closed /
-     * no_action_required) keep linked records coherent — close the linked HsEvent
-     * and resolve the Control Room alert. Best-effort; never blocks the action.
-     * (NotifiableIncident has its own regulator lifecycle and is left as-is.)
+     * no_action_required), close its H&S projection while preserving the linked
+     * Control Room alert as an independent operational lifecycle. Best-effort;
+     * never blocks the safeguarding action.
      */
     private function syncTerminalState(SafeguardingConcern $concern): void
     {
@@ -771,8 +772,33 @@ class SafeguardingConcernController extends Controller
             $alertId = $hsEvent->control_room_alert_id;
             if ($alertId) {
                 $alert = ControlRoomAlert::find($alertId);
-                if ($alert && ! in_array($alert->status, [ControlRoomAlert::STATUS_RESOLVED, ControlRoomAlert::STATUS_CLOSED], true)) {
-                    $alert->update(['status' => ControlRoomAlert::STATUS_RESOLVED, 'resolved_at' => now()]);
+                if ($alert && $alert->isActionable()) {
+                    $at = now();
+                    $actor = auth()->user();
+                    $context = $alert->context ?? [];
+                    $context['journey_attention'] = [
+                        'type' => 'safeguarding_terminal',
+                        'safeguarding_concern_id' => $concern->id,
+                        'hs_event_id' => $hsEvent->id,
+                        'reason' => $concern->closure_summary
+                            ?: $concern->triage_notes
+                            ?: 'The linked safeguarding record reached a terminal state.',
+                        'actor_id' => $actor?->id,
+                        'actor_name' => $actor?->name,
+                        'requested_at' => $at->toIso8601String(),
+                        'alert_status_at_request' => $alert->status,
+                        'requires_operational_decision' => true,
+                    ];
+                    $alert->update(['context' => $context]);
+
+                    AuditLogger::log('controlRoom.alert.safeguardingTerminalAttention', $alert, [
+                        'actor_id' => $actor?->id,
+                        'alert_id' => $alert->id,
+                        'safeguarding_concern_id' => $concern->id,
+                        'hs_event_id' => $hsEvent->id,
+                        'alert_status' => $alert->status,
+                        'requires_operational_decision' => true,
+                    ]);
                 }
             }
         } catch (\Throwable $e) {

@@ -5,7 +5,9 @@ namespace Tests\Feature\ControlRoom;
 use App\Models\ControlRoom\AlertDiscussion;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,7 +25,7 @@ class ControlRoomDiscussionControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -31,7 +33,12 @@ class ControlRoomDiscussionControllerTest extends TestCase
         $this->other = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->other->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->alert = ControlRoomAlert::factory()->open()->create();
+        $site = Site::factory()->create([
+            'tenant_id' => $this->admin->organization_id,
+        ]);
+        $this->alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $site->id,
+        ]);
     }
 
     public function test_index_requires_view_permission(): void

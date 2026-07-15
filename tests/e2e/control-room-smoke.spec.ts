@@ -1,7 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { collectConsoleErrors, expectNoConsoleErrors, loginAsStaff } from './helpers';
+import { collectConsoleErrors, expectNoConsoleErrors } from './helpers';
+import {
+    loginAsFixture,
+    seedIncidentHandoverFixtures,
+} from './incident-handover-helpers';
 
 /**
  * Page-load smoke for the Control Room module.
@@ -25,17 +31,30 @@ async function expectNoBlockingAxeViolations(page: Page) {
     expect(
         blocking,
         `axe found blocking violations:\n${blocking
-            .map((v) => `  - [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length} nodes)`)
+            .map(
+                (v) =>
+                    `  - [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length} nodes)`,
+            )
             .join('\n')}`,
     ).toEqual([]);
 }
 
 test.describe('control room — smoke', () => {
-    test.beforeEach(async ({ page }) => {
-        await loginAsStaff(page);
+    let operator: ReturnType<
+        typeof seedIncidentHandoverFixtures
+    >['users']['operator'];
+
+    test.beforeAll(() => {
+        operator = seedIncidentHandoverFixtures().users.operator;
     });
 
-    test('dashboard loads with KPI cards and no a11y blockers', async ({ page }, testInfo) => {
+    test.beforeEach(async ({ page }) => {
+        await loginAsFixture(page, operator);
+    });
+
+    test('dashboard loads with KPI cards and no a11y blockers', async ({
+        page,
+    }, testInfo) => {
         test.skip(
             !testInfo.project.name.includes('desktop'),
             'Dashboard a11y baseline runs on desktop project.',
@@ -44,17 +63,44 @@ test.describe('control room — smoke', () => {
         const errors = collectConsoleErrors(page);
 
         await page.goto('/control-room');
-        await expect(page.getByRole('heading', { name: 'Control Room', level: 1 })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { name: 'Control Room Desk', level: 1 }),
+        ).toBeVisible();
 
-        // KPI labels emitted by KpiCard — visible regardless of whether any
-        // alerts exist in the seeded fixture set.
-        await expect(page.getByText('Open Alerts', { exact: true })).toBeVisible();
-        await expect(page.getByText('Critical', { exact: true })).toBeVisible();
-        await expect(page.getByText('Avg Response')).toBeVisible();
-        await expect(page.getByRole('link', { name: /SLA Compliance/ })).toBeVisible();
+        // Current desk summary and continuity language remains visible even when
+        // there are no active alerts in the seeded fixture set.
+        await expect(page.getByText('Active', { exact: true })).toBeVisible();
+        await expect(
+            page.getByText('Critical', { exact: true }).first(),
+        ).toBeVisible();
+        await expect(
+            page.getByText('SLA breached', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText('Last 24 hours', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', { name: 'Priority worklist' }),
+        ).toBeVisible();
+        await expect(page.getByText('Live desk connection')).toBeVisible();
 
         // Filter UI is present so operators can scope the alert list.
-        await expect(page.getByPlaceholder('Search alerts...')).toBeVisible();
+        await expect(
+            page.getByPlaceholder('Reference, incident, H&S or summary'),
+        ).toBeVisible();
+
+        const evidenceDirectory = resolve(
+            process.cwd(),
+            'output',
+            'playwright',
+        );
+        mkdirSync(evidenceDirectory, { recursive: true });
+        await page.screenshot({
+            path: resolve(
+                evidenceDirectory,
+                'control-room-dashboard-first-viewport.png',
+            ),
+        });
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(errors);
@@ -70,7 +116,9 @@ test.describe('control room — smoke', () => {
         expectNoConsoleErrors(errors);
     });
 
-    test('integration alerts list pre-scopes to integration sources', async ({ page }) => {
+    test('integration alerts list pre-scopes to integration sources', async ({
+        page,
+    }) => {
         await page.goto('/control-room/integration-alerts');
         await expect(page.locator('body')).toContainText(/Integration Alerts/i);
     });
@@ -85,7 +133,9 @@ test.describe('control room — smoke', () => {
         await expect(page.locator('body')).toContainText(/SLA/i);
     });
 
-    test('SLA breaches renders and the legacy alias redirects', async ({ page }) => {
+    test('SLA breaches renders and the legacy alias redirects', async ({
+        page,
+    }) => {
         await page.goto('/control-room/sla-breaches');
         await expect(page).toHaveURL(/\/control-room\/sla\/breaches$/);
         await expect(page.locator('body')).toContainText(/Breach/i);
@@ -138,7 +188,9 @@ test.describe('control room — smoke', () => {
 
     test('map view renders', async ({ page }) => {
         await page.goto('/control-room/map');
-        await expect(page.locator('body')).toContainText(/Map|Location|Devices/i);
+        await expect(page.locator('body')).toContainText(
+            /Map|Location|Devices/i,
+        );
     });
 
     test('shifts page renders', async ({ page }) => {

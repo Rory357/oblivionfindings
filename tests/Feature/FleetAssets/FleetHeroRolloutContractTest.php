@@ -9,6 +9,7 @@ use App\Models\FleetFuelLog;
 use App\Models\FleetTrip;
 use App\Models\FleetWorkOrder;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,10 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_daily_check_and_vehicle_index_expose_live_compliance_badge_counts(): void
     {
-        $user = $this->makeFleetUser();
+        // This contract verifies organisation-wide badge arithmetic. Cross-site
+        // totals are intentionally reserved for the explicit fleet manager bypass.
+        $user = $this->makeFleetUser(['fleet.manage']);
+        $site = Site::factory()->create();
 
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->addDays(10),
@@ -68,10 +72,10 @@ class FleetHeroRolloutContractTest extends TestCase
             'cof_expires_at' => now()->subDay(),
         ]);
 
-        ControlRoomAlert::factory()->fromFleet()->open()->critical()->create();
-        ControlRoomAlert::factory()->fromFleet()->open()->high()->create();
-        ControlRoomAlert::factory()->fromCompliance()->open()->low()->create();
-        ControlRoomAlert::factory()->fromFleet()->resolved()->critical()->create();
+        ControlRoomAlert::factory()->fromFleet()->open()->critical()->create(['site_id' => $site->id]);
+        ControlRoomAlert::factory()->fromFleet()->open()->high()->create(['site_id' => $site->id]);
+        ControlRoomAlert::factory()->fromCompliance()->open()->low()->create(['site_id' => $site->id]);
+        ControlRoomAlert::factory()->fromFleet()->resolved()->critical()->create(['site_id' => $site->id]);
 
         $this->actingAs($user)
             ->get('/fleet-assets/daily-check')

@@ -83,6 +83,7 @@ class HandleInertiaRequests extends Middleware
                 "tasks.nav.{$user->id}",
                 now()->addMinutes(5),
                 function () use ($user) {
+                    $this->preparePermissionLookup($user);
                     $taskAggregator = app(TaskAggregator::class);
                     $view = $taskAggregator->sourcesFor($user) !== [];
 
@@ -292,6 +293,10 @@ class HandleInertiaRequests extends Middleware
                 // The incident report wizard reads this so its success pane can
                 // open the newly-created incident over the register.
                 'created_incident_id' => session('created_incident_id'),
+                // Canonical incident reporting returns official references and
+                // the truthful H&S handover state; it never derives a reference
+                // from a raw database id.
+                'incident_report_result' => session('incident_report_result'),
                 // The New-alert wizard reads this so its success pane can open
                 // the freshly-raised alert's workspace.
                 'created_alert_id' => session('created_alert_id'),
@@ -349,8 +354,16 @@ class HandleInertiaRequests extends Middleware
         return once(fn () => Cache::remember(
             sprintf('user:%d:capabilities:%s', $user->id, self::PERMISSIONS_CACHE_VERSION),
             300,
-            fn () => $this->buildUserPermissions($user),
+            fn () => $this->buildUserPermissions($this->preparePermissionLookup($user)),
         ));
+    }
+
+    protected function preparePermissionLookup(User $user): User
+    {
+        return $user->loadMissing([
+            'permissionOverrides:id,key',
+            'roles.permissions:id,key',
+        ]);
     }
 
     protected function buildUserPermissions($user): array

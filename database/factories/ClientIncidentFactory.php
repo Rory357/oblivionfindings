@@ -4,6 +4,8 @@ namespace Database\Factories;
 
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\HsEvent;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -49,6 +51,20 @@ class ClientIncidentFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'severity' => 'high',
+        ]);
+    }
+
+    public function atSite(Site $site): static
+    {
+        return $this->state(fn () => [
+            'site_id' => $site->id,
+        ]);
+    }
+
+    public function linkedToHsEvent(HsEvent $event): static
+    {
+        return $this->state(fn () => [
+            'hs_event_id' => $event->id,
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,19 +17,25 @@ class HsInvestigation extends Model
     protected $table = 'hs_investigations';
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     // Investigation types
     public const TYPE_STANDARD = 'standard';
+
     public const TYPE_FULL = 'full';
+
     public const TYPE_WORKSAFE_DIRECTED = 'worksafe_directed';
 
     // Lifecycle statuses (ordered)
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_FINDINGS_RECORDED = 'findings_recorded';
+
     public const STATUS_UNDER_REVIEW = 'under_review';
+
     public const STATUS_COMPLETED = 'completed';
 
     /**
@@ -57,10 +64,15 @@ class HsInvestigation extends Model
 
     // Methodology options
     public const METHODOLOGY_5_WHYS = '5_whys';
+
     public const METHODOLOGY_FISHBONE = 'fishbone';
+
     public const METHODOLOGY_BOW_TIE = 'bow_tie';
+
     public const METHODOLOGY_ICAM = 'icam';
+
     public const METHODOLOGY_TAPROOT = 'taproot';
+
     public const METHODOLOGY_OTHER = 'other';
 
     public const VALID_METHODOLOGIES = [
@@ -74,19 +86,26 @@ class HsInvestigation extends Model
 
     // Contributing factor types
     public const FACTOR_HUMAN = 'human';
+
     public const FACTOR_ENVIRONMENTAL = 'environmental';
+
     public const FACTOR_PROCEDURAL = 'procedural';
+
     public const FACTOR_ORGANIZATIONAL = 'organizational';
+
     public const FACTOR_EQUIPMENT = 'equipment';
 
     // Recommendation priority levels
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_MEDIUM = 'medium';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_CRITICAL = 'critical';
 
     /* ------------------------------------------------------------------ */
-    /*  Fillable / Casts                                                   */
+    /*  Fillable / Casts */
     /* ------------------------------------------------------------------ */
 
     protected $fillable = [
@@ -130,7 +149,7 @@ class HsInvestigation extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function hsEvent(): BelongsTo
@@ -171,8 +190,16 @@ class HsInvestigation extends Model
         return $this->hasMany(HsCorrectiveAction::class, 'hs_investigation_id');
     }
 
+    /**
+     * The explicit governance decision recorded for each recommendation.
+     */
+    public function recommendationDispositions(): HasMany
+    {
+        return $this->hasMany(HsRecommendationDisposition::class, 'hs_investigation_id');
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -198,7 +225,7 @@ class HsInvestigation extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Lifecycle helpers                                                   */
+    /*  Lifecycle helpers */
     /* ------------------------------------------------------------------ */
 
     public function canTransitionTo(string $newStatus): bool
@@ -238,11 +265,11 @@ class HsInvestigation extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reference number generation                                        */
+    /*  Reference number generation */
     /* ------------------------------------------------------------------ */
 
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('INV');
+        return app(ReferenceNumberGenerator::class)->next('INV');
     }
 }

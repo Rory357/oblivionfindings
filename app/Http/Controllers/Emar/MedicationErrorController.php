@@ -3,17 +3,23 @@
 namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Governance\RegisterIncidentGovernanceEscalationJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
 use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Throwable;
 
 class MedicationErrorController extends Controller
 {
@@ -173,35 +179,55 @@ class MedicationErrorController extends Controller
         $validated['reported_at'] = now();
         $validated['status'] = 'reported';
 
-        // Optionally create a linked incident
-        $incidentId = null;
-        if ($request->boolean('create_incident')) {
-            $incident = ClientIncident::create([
-                'client_id' => $validated['client_id'],
-                'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
-                'description' => $validated['description'],
-                'occurred_at' => now(),
-                'reported_by' => $request->user()->id,
-                'severity' => match ($validated['severity']) {
-                    'critical' => 'critical',
-                    'major' => 'high',
-                    'moderate' => 'medium',
-                    default => 'low',
-                },
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'type' => 'medication_error',
-            ]);
-            $incidentId = $incident->id;
-        }
+        DB::transaction(function () use ($request, $validated): void {
+            $incident = null;
+            if ($request->boolean('create_incident')) {
+                $incident = ClientIncident::withoutEvents(
+                    fn () => ClientIncident::create([
+                        'client_id' => $validated['client_id'],
+                        'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
+                        'description' => $validated['description'],
+                        'occurred_at' => now(),
+                        'reported_by' => $request->user()->id,
+                        'severity' => match ($validated['severity']) {
+                            'critical' => 'critical',
+                            'major' => 'high',
+                            'moderate' => 'medium',
+                            default => 'low',
+                        },
+                        'status' => 'submitted',
+                        'submitted_at' => now(),
+                        'type' => 'medication_error',
+                    ]),
+                );
+                app(IncidentJourneyService::class)
+                    ->ensureForSubmittedIncident($incident, $request->user());
+            }
 
-        unset($validated['create_incident']);
-        $validated['client_incident_id'] = $incidentId;
+            $errorAttributes = $validated;
+            unset($errorAttributes['create_incident']);
+            $errorAttributes['client_incident_id'] = $incident?->id;
+            $error = MedicationError::create($errorAttributes);
 
-        $error = MedicationError::create($validated);
+            app(MedicationSignalService::class)->emitError($error);
 
-        // Emit canonical signal for major/critical medication errors → Control Room
-        app(MedicationSignalService::class)->emitError($error);
+            if ($incident !== null) {
+                app(TimelineEmitter::class)->project($incident->fresh());
+
+                $incidentId = (int) $incident->id;
+                DB::afterCommit(function () use ($incidentId): void {
+                    try {
+                        RegisterIncidentGovernanceEscalationJob::dispatch($incidentId);
+                    } catch (Throwable $exception) {
+                        Log::error('Medication incident governance dispatch failed', [
+                            'client_incident_id' => $incidentId,
+                            'exception' => $exception::class,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                });
+            }
+        }, 3);
 
         return redirect()->back()->with('success', 'Medication error reported successfully.');
     }
@@ -300,29 +326,60 @@ class MedicationErrorController extends Controller
      */
     public function linkIncident(Request $request, MedicationError $error)
     {
-        if ($error->client_incident_id) {
-            return redirect()->route('incidents.show', $error->client_incident_id);
-        }
+        $incidentId = DB::transaction(function () use ($request, $error): int {
+            $lockedError = MedicationError::query()
+                ->whereKey($error->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $incident = ClientIncident::create([
-            'client_id' => $error->client_id,
-            'title' => 'Medication Error: '.str_replace('_', ' ', (string) $error->error_type),
-            'description' => $error->description ?: 'Linked from medication error '.$error->id.'.',
-            'occurred_at' => $error->reported_at ?? now(),
-            'reported_by' => $request->user()->id,
-            'severity' => match ($error->severity) {
-                'critical' => 'critical',
-                'major' => 'high',
-                'moderate' => 'medium',
-                default => 'low',
-            },
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'type' => 'medication_error',
-        ]);
+            if ($lockedError->client_incident_id !== null) {
+                return (int) $lockedError->client_incident_id;
+            }
 
-        $error->update(['client_incident_id' => $incident->id]);
+            $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
+                'client_id' => $lockedError->client_id,
+                'title' => 'Medication Error: '.str_replace('_', ' ', (string) $lockedError->error_type),
+                'description' => $lockedError->description ?: 'Linked from medication error '.$lockedError->id.'.',
+                'occurred_at' => $lockedError->reported_at ?? now(),
+                'reported_by' => $request->user()->id,
+                'severity' => match ($lockedError->severity) {
+                    'critical' => 'critical',
+                    'major' => 'high',
+                    'moderate' => 'medium',
+                    default => 'low',
+                },
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'type' => 'medication_error',
+            ]));
 
-        return redirect()->route('incidents.show', $incident);
+            $lockedError->forceFill(['client_incident_id' => $incident->id])->save();
+            $linkedError = $lockedError->fresh();
+            $signals = app(MedicationSignalService::class);
+            $signals->emitError($linkedError);
+            $existingAlert = $signals->attachExistingErrorSignalToIncident($linkedError);
+            $journeys = app(IncidentJourneyService::class);
+            $journey = $existingAlert === null
+                ? $journeys->ensureForSubmittedIncident($incident, $request->user())
+                : $journeys->attachAlertToIncident($incident, $existingAlert, $request->user());
+            app(TimelineEmitter::class)->project($journey->incident);
+
+            $createdIncidentId = (int) $journey->incident->id;
+            DB::afterCommit(function () use ($createdIncidentId): void {
+                try {
+                    RegisterIncidentGovernanceEscalationJob::dispatch($createdIncidentId);
+                } catch (Throwable $exception) {
+                    Log::error('Linked medication incident governance dispatch failed', [
+                        'client_incident_id' => $createdIncidentId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            });
+
+            return $createdIncidentId;
+        }, 3);
+
+        return redirect()->route('incidents.show', $incidentId);
     }
 }

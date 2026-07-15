@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientDocumentFolder;
+use App\Models\RespiteBooking;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -24,20 +26,28 @@ class ClientControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $providerManager;
+
     protected User $coordinator;
+
     protected User $supportWorker;
+
     protected User $financeUser;
+
     protected User $hrUser;
+
     protected User $auditor;
+
     protected Site $site;
+
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -74,6 +84,7 @@ class ClientControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+
         return $user;
     }
 
@@ -164,7 +175,7 @@ class ClientControllerTest extends TestCase
         );
     }
 
-    public function test_support_worker_can_access_client_index_with_viewAssigned_permission(): void
+    public function test_support_worker_can_access_client_index_with_view_assigned_permission(): void
     {
         $client = Client::factory()->create();
         $client->supportWorkers()->attach($this->supportWorker->id);
@@ -358,7 +369,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
 
         // Create a respite booking for this client
-        \App\Models\RespiteBooking::create([
+        RespiteBooking::create([
             'client_id' => $client->id,
             'status' => 'confirmed',
             'start_at' => now()->addDay(),
@@ -405,7 +416,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -418,7 +429,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->providerManager)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->providerManager)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -431,7 +442,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->coordinator)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->coordinator)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -445,7 +456,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
         $client->supportWorkers()->attach($this->supportWorker->id);
 
-        $response = $this->actingAs($this->supportWorker)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->supportWorker)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -458,7 +469,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->supportWorker)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->supportWorker)->get("/operations/clients/{$client->id}");
 
         $response->assertForbidden();
     }
@@ -467,7 +478,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->auditor)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->auditor)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -480,7 +491,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->financeUser)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->financeUser)->get("/operations/clients/{$client->id}");
 
         $response->assertForbidden();
     }
@@ -489,7 +500,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->hrUser)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->hrUser)->get("/operations/clients/{$client->id}");
 
         $response->assertForbidden();
     }
@@ -500,7 +511,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
         $client->portalUsers()->attach($clientUser->id, ['relation' => 'client']);
 
-        $response = $this->actingAs($clientUser)->get("/clients/{$client->id}");
+        $response = $this->actingAs($clientUser)->get("/portal/clients/{$client->id}");
 
         $response->assertOk();
     }
@@ -510,7 +521,7 @@ class ClientControllerTest extends TestCase
         $clientUser = $this->createUserWithRole('client');
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($clientUser)->get("/clients/{$client->id}");
+        $response = $this->actingAs($clientUser)->get("/portal/clients/{$client->id}");
 
         $response->assertForbidden();
     }
@@ -521,7 +532,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
         $client->portalUsers()->attach($nokUser->id, ['relation' => 'parent']);
 
-        $response = $this->actingAs($nokUser)->get("/clients/{$client->id}");
+        $response = $this->actingAs($nokUser)->get("/portal/clients/{$client->id}");
 
         $response->assertOk();
     }
@@ -552,7 +563,7 @@ class ClientControllerTest extends TestCase
             'service_context_id' => $this->serviceContext->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -572,8 +583,8 @@ class ClientControllerTest extends TestCase
                 ->where('suburb', 'Parnell')
                 ->where('city', 'Auckland')
                 ->where('postcode', '1001')
-                ->where('funding_type', 'whaikaha')
-                ->where('funding_notes', 'Funded until Dec')
+                ->missing('funding_type')
+                ->missing('funding_notes')
                 ->has('profile_photo_url')
                 ->has('avatar')
                 ->has('site')
@@ -588,7 +599,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -615,7 +626,7 @@ class ClientControllerTest extends TestCase
             'size_bytes' => 1024,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -671,7 +682,7 @@ class ClientControllerTest extends TestCase
             'actor_user_id' => $this->admin->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -721,7 +732,7 @@ class ClientControllerTest extends TestCase
             'actor_user_id' => $this->admin->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -761,7 +772,7 @@ class ClientControllerTest extends TestCase
             'ends_at' => now()->subDay()->addHours(4),
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -777,7 +788,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -798,7 +809,7 @@ class ClientControllerTest extends TestCase
             'status' => 'cancelled',
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -816,7 +827,7 @@ class ClientControllerTest extends TestCase
             'address_line_1' => '1 Test St',
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -840,7 +851,7 @@ class ClientControllerTest extends TestCase
             'address_line_1' => '1 Test St',
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -859,13 +870,14 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->has('respite', fn ($r) => $r
                 ->has('bookings')
                 ->has('requests')
+                ->has('allocation')
             )
         );
     }
@@ -876,7 +888,7 @@ class ClientControllerTest extends TestCase
         $portalUser = $this->createUserWithRole('next_of_kin');
         $client->portalUsers()->attach($portalUser->id, ['relation' => 'parent']);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -894,7 +906,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -911,7 +923,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -932,7 +944,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
         $client->supportWorkers()->attach($this->supportWorker->id);
 
-        $response = $this->actingAs($this->supportWorker)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->supportWorker)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -952,13 +964,13 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->coordinator)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->coordinator)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->has('can', fn ($can) => $can
                 ->where('edit', false)
-                ->where('assign_workers', true)
+                ->where('assign_workers', false)
                 ->where('create_note', true)
                 ->where('pin_handover', true)
                 ->where('manage_onboarding', true)
@@ -982,7 +994,7 @@ class ClientControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get("/clients/{$client->id}?modal=1");
+            ->get("/operations/clients/{$client->id}?modal=1");
 
         $response->assertOk();
         $response->assertJsonStructure([
@@ -1011,7 +1023,7 @@ class ClientControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->getJson("/clients/{$client->id}");
+            ->getJson("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertJsonStructure([
@@ -1034,7 +1046,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $response = $this->actingAs($this->admin)
-            ->getJson("/clients/{$client->id}");
+            ->getJson("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertJsonPath('client.site.id', $this->site->id);
@@ -1047,7 +1059,7 @@ class ClientControllerTest extends TestCase
         $client->supportWorkers()->attach($this->supportWorker->id);
 
         $response = $this->actingAs($this->admin)
-            ->getJson("/clients/{$client->id}");
+            ->getJson("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertJsonCount(1, 'client.support_workers');
@@ -1327,7 +1339,7 @@ class ClientControllerTest extends TestCase
 
     public function test_store_validates_email_max_length(): void
     {
-        $data = $this->validClientData(['email' => str_repeat('a', 250) . '@test.com']);
+        $data = $this->validClientData(['email' => str_repeat('a', 250).'@test.com']);
 
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
@@ -2511,7 +2523,7 @@ class ClientControllerTest extends TestCase
             'service_context_id' => $this->serviceContext->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2530,7 +2542,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create();
         $client->supportWorkers()->attach($this->supportWorker->id);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2545,7 +2557,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create(['site_id' => null]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2557,7 +2569,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create(['service_context_id' => null]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2580,7 +2592,7 @@ class ClientControllerTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2604,7 +2616,7 @@ class ClientControllerTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2657,7 +2669,7 @@ class ClientControllerTest extends TestCase
         $client = Client::factory()->create(['site_id' => null]);
 
         $response = $this->actingAs($this->admin)
-            ->getJson("/clients/{$client->id}");
+            ->getJson("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertJsonPath('client.site', null);
@@ -2678,7 +2690,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2690,7 +2702,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2702,7 +2714,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2714,7 +2726,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2726,7 +2738,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2799,7 +2811,7 @@ class ClientControllerTest extends TestCase
         ]);
 
         // The profile item counts as complete because we have name, dob, phone, address
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -2822,7 +2834,7 @@ class ClientControllerTest extends TestCase
             'postcode' => null,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
+        $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page

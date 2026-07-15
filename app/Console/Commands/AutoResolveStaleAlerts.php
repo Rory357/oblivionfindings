@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\ControlRoomAlert;
-use App\Services\AuditLogger;
+use App\Models\ControlRoom\AlertTask;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AutoResolveStaleAlerts extends Command
@@ -42,7 +44,7 @@ class AutoResolveStaleAlerts extends Command
      */
     protected const ELIGIBLE_STATUSES = ['open'];
 
-    public function handle(): int
+    public function handle(ControlRoomAlertLifecycleService $lifecycle): int
     {
         $dryRun = (bool) $this->option('dry-run');
         $now = now();
@@ -58,7 +60,10 @@ class AutoResolveStaleAlerts extends Command
                     ->where('alert_type', $alertType)
                     ->whereIn('status', self::ELIGIBLE_STATUSES)
                     ->where('triggered_at', '<', $cutoff)
-                    ->whereNull('escalated_at');
+                    ->whereNull('acknowledged_at')
+                    ->whereNull('escalated_at')
+                    ->whereDoesntHave('tasks', fn ($tasks) => $tasks
+                        ->whereNotIn('status', AlertTask::TERMINAL_STATUSES));
 
                 $count = $query->count();
 
@@ -72,10 +77,11 @@ class AutoResolveStaleAlerts extends Command
                     continue;
                 }
 
-                $query->chunkById(50, function ($alerts) use ($alertType, $ttlHours, &$resolved) {
+                $query->chunkById(50, function ($alerts) use ($lifecycle, $ttlHours, &$resolved) {
                     foreach ($alerts as $alert) {
-                        $this->resolveAsStale($alert, $ttlHours);
-                        $resolved++;
+                        if ($this->resolveAsStale($alert, $ttlHours, $lifecycle)) {
+                            $resolved++;
+                        }
                     }
                 });
             }
@@ -100,41 +106,51 @@ class AutoResolveStaleAlerts extends Command
         return self::SUCCESS;
     }
 
-    protected function resolveAsStale(ControlRoomAlert $alert, int $ttlHours): void
+    protected function resolveAsStale(
+        ControlRoomAlert $alert,
+        int $ttlHours,
+        ControlRoomAlertLifecycleService $lifecycle,
+    ): bool
     {
-        $resolvedAt = now();
-        $reason = "Auto-resolved: alert exceeded {$ttlHours}-hour staleness threshold without resolution or escalation.";
+        $selectedAlertType = (string) $alert->alert_type;
 
-        $context = $alert->context ?? [];
-        $resolution = [
-            'resolved_at' => $resolvedAt->toISOString(),
-            'reason' => $reason,
-            'source' => self::RESOLUTION_SOURCE,
-            'actor' => 'system',
-            'ttl_hours' => $ttlHours,
-        ];
+        return DB::transaction(function () use ($alert, $lifecycle, $selectedAlertType, $ttlHours): bool {
+            $locked = ControlRoomAlert::query()
+                ->whereKey($alert->id)
+                ->lockForUpdate()
+                ->first();
+            $cutoff = now()->subHours($ttlHours);
 
-        $history = $context['resolution_history'] ?? [];
-        $history[] = $resolution;
+            if (! $locked
+                || $locked->alert_type !== $selectedAlertType
+                || ! in_array($locked->status, self::ELIGIBLE_STATUSES, true)
+                || $locked->triggered_at === null
+                || ! $locked->triggered_at->lt($cutoff)
+                || $locked->acknowledged_at !== null
+                || $locked->escalated_at !== null
+                || $locked->tasks()
+                    ->whereNotIn('status', AlertTask::TERMINAL_STATUSES)
+                    ->limit(1)
+                    ->lockForUpdate()
+                    ->get(['id'])
+                    ->isNotEmpty()) {
+                return false;
+            }
 
-        $alert->update([
-            'status' => 'resolved',
-            'resolved_at' => $resolvedAt,
-            'resolved_by_user_id' => null,
-            'notes' => $reason,
-            'context' => array_merge($context, [
-                'resolution' => $resolution,
-                'resolution_history' => $history,
-            ]),
-        ]);
+            $reason = "Auto-resolved: alert exceeded {$ttlHours}-hour staleness threshold without resolution or escalation.";
+            $lifecycle->resolveAutomatically(
+                $locked,
+                $reason,
+                self::RESOLUTION_SOURCE,
+                self::RESOLUTION_SOURCE,
+                [
+                    'ttl_hours' => $ttlHours,
+                    'alert_type' => $locked->alert_type,
+                    'triggered_at' => $locked->triggered_at->toISOString(),
+                ],
+            );
 
-        $alert->sla?->recordResolution();
-
-        AuditLogger::log('controlRoom.alert.stale_auto_resolved', $alert, [
-            'resolution_source' => self::RESOLUTION_SOURCE,
-            'ttl_hours' => $ttlHours,
-            'alert_type' => $alert->alert_type,
-            'triggered_at' => $alert->triggered_at?->toISOString(),
-        ]);
+            return true;
+        }, 3);
     }
 }

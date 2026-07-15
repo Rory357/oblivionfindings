@@ -39,7 +39,12 @@ export function buildHsTabItems(
     complianceCount: number,
 ): RosterTabItem[] {
     return [
-        { id: 'overview', label: 'Overview', icon: LayoutGrid, tone: 'primary' },
+        {
+            id: 'overview',
+            label: 'Overview',
+            icon: LayoutGrid,
+            tone: 'primary',
+        },
         { id: 'leading', label: 'Leading', icon: TrendingUp, tone: 'success' },
         {
             id: 'lagging',
@@ -83,7 +88,8 @@ export function RoleLensBanner({ lens }: { lens: string }) {
         <div className="flex items-start gap-2 rounded-xl border border-dashed border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
             <Search className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-                <span className="font-semibold text-foreground">{t.title}</span> — {t.body}
+                <span className="font-semibold text-foreground">{t.title}</span>{' '}
+                — {t.body}
             </span>
         </div>
     );
@@ -124,9 +130,15 @@ function KpiCard({
                 )}
             >
                 <CardContent className="p-4">
-                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
-                    <div className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">{caption}</div>
+                    <div className="text-xs font-medium text-muted-foreground">
+                        {label}
+                    </div>
+                    <div className="mt-1 text-2xl font-bold text-foreground tabular-nums">
+                        {value}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {caption}
+                    </div>
                 </CardContent>
             </Card>
         </Link>
@@ -162,12 +174,21 @@ function StatusCard({
         <Card className={cn('border-t-4', STATUS_TOP[tone])}>
             <CardContent className="flex flex-col gap-2 p-4">
                 <div className="flex items-center gap-2">
-                    <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', STATUS_CHIP[tone])}>
+                    <span
+                        className={cn(
+                            'flex h-8 w-8 items-center justify-center rounded-lg',
+                            STATUS_CHIP[tone],
+                        )}
+                    >
                         <Icon className="h-4 w-4" />
                     </span>
-                    <span className="text-sm font-semibold text-foreground">{title}</span>
+                    <span className="text-sm font-semibold text-foreground">
+                        {title}
+                    </span>
                 </div>
-                <div className="text-sm font-medium text-foreground">{status}</div>
+                <div className="text-sm font-medium text-foreground">
+                    {status}
+                </div>
                 <div className="text-[11px] text-muted-foreground">{sub}</div>
             </CardContent>
         </Card>
@@ -194,14 +215,20 @@ export function LeadingPanel({
                 label="Near-miss : incident"
                 value={fmt(data.near_miss_ratio, '×')}
                 caption="target ≥ 3 — strong reporting culture"
-                accent={(data.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'}
+                accent={
+                    (data.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'
+                }
             />
             <KpiCard
                 href="/health-safety/corrective-actions"
                 label="Actions closed on time"
                 value={fmt(data.actions_on_time_pct, '%')}
                 caption="30-day · target ≥ 90%"
-                accent={(data.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'}
+                accent={
+                    (data.actions_on_time_pct ?? 0) >= 90
+                        ? 'success'
+                        : 'warning'
+                }
             />
             <KpiCard
                 href="/health-safety/worker-participation"
@@ -215,13 +242,19 @@ export function LeadingPanel({
                 label="Worker participation"
                 value={fmt(workerParticipation.pct, '%')}
                 caption={`HSR engagement · ${workerParticipation.committees} committee${workerParticipation.committees === 1 ? '' : 's'}`}
-                accent={(workerParticipation.pct ?? 0) >= 70 ? 'success' : 'warning'}
+                accent={
+                    (workerParticipation.pct ?? 0) >= 70 ? 'success' : 'warning'
+                }
             />
         </div>
     );
 }
 
-export function LaggingPanel({ data }: { data: HeroLeadingLagging['lagging'] }) {
+export function LaggingPanel({
+    data,
+}: {
+    data: HeroLeadingLagging['lagging'];
+}) {
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
@@ -250,7 +283,9 @@ export function LaggingPanel({ data }: { data: HeroLeadingLagging['lagging'] }) 
                 label="Days LTI-free"
                 value={fmt(data.days_since_lti)}
                 caption="since last lost-time injury"
-                accent={(data.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'}
+                accent={
+                    (data.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'
+                }
             />
         </div>
     );
@@ -258,23 +293,22 @@ export function LaggingPanel({ data }: { data: HeroLeadingLagging['lagging'] }) 
 
 export function CompliancePanel({
     expiring,
-    notifiableEvents,
+    worksafePending,
 }: {
     expiring: Array<{ type: string }>;
-    notifiableEvents: Array<{ status: string }>;
+    worksafePending: number;
 }) {
-    const notifiableAwaiting = notifiableEvents.filter((n) => n.status === 'pending').length;
     const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
     const drillsDue = expiring.filter((e) => e.type === 'drill').length;
 
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatusCard
-                icon={notifiableAwaiting > 0 ? ShieldAlert : CheckCircle2}
+                icon={worksafePending > 0 ? ShieldAlert : CheckCircle2}
                 title="WorkSafe notifiable"
-                status={`${notifiableAwaiting} awaiting notification`}
+                status={`${worksafePending} awaiting notification`}
                 sub="HSWA 2015 · records kept ≥ 5 years"
-                tone={notifiableAwaiting > 0 ? 'warning' : 'success'}
+                tone={worksafePending > 0 ? 'warning' : 'success'}
             />
             <StatusCard
                 icon={ShieldCheck}
@@ -286,14 +320,22 @@ export function CompliancePanel({
             <StatusCard
                 icon={FlaskConical}
                 title="Hazardous substances"
-                status={sdsExpiring > 0 ? `${sdsExpiring} SDS expiring` : 'SDS current'}
+                status={
+                    sdsExpiring > 0
+                        ? `${sdsExpiring} SDS expiring`
+                        : 'SDS current'
+                }
                 sub="Hazardous Substances Regs 2017"
                 tone={sdsExpiring > 0 ? 'warning' : 'success'}
             />
             <StatusCard
                 icon={Flame}
                 title="Fire safety"
-                status={drillsDue > 0 ? `${drillsDue} drill${drillsDue === 1 ? '' : 's'} due` : 'Drills current'}
+                status={
+                    drillsDue > 0
+                        ? `${drillsDue} drill${drillsDue === 1 ? '' : 's'} due`
+                        : 'Drills current'
+                }
                 sub="Emergency evacuation drills"
                 tone={drillsDue > 0 ? 'warning' : 'success'}
             />
@@ -312,18 +354,49 @@ export function CompliancePanel({
 /*  Governance & board exports (WS8)                                   */
 /* ------------------------------------------------------------------ */
 
-const GOVERNANCE_REPORTS: Array<{ label: string; desc: string; icon: LucideIcon; href: string }> = [
-    { label: 'Board summary', desc: 'H&S posture for the board', icon: FileText, href: '/health-safety/reports/board-summary' },
-    { label: 'WorkSafe register', desc: 'Notifiable-events register', icon: ShieldAlert, href: '/health-safety/reports/worksafe-register' },
-    { label: 'Investigation outcomes', desc: 'Findings & lessons', icon: Search, href: '/health-safety/reports/investigation-outcomes' },
-    { label: 'Corrective-action traceability', desc: 'Action → event trail', icon: ClipboardCheck, href: '/health-safety/reports/corrective-action-traceability' },
-    { label: 'Risk-assessment register', desc: 'Active risk assessments', icon: Target, href: '/health-safety/reports/risk-assessment-register' },
+const GOVERNANCE_REPORTS: Array<{
+    label: string;
+    desc: string;
+    icon: LucideIcon;
+    href: string;
+}> = [
+    {
+        label: 'Board summary',
+        desc: 'H&S posture for the board',
+        icon: FileText,
+        href: '/health-safety/reports/board-summary',
+    },
+    {
+        label: 'WorkSafe register',
+        desc: 'Notifiable-events register',
+        icon: ShieldAlert,
+        href: '/health-safety/reports/worksafe-register',
+    },
+    {
+        label: 'Investigation outcomes',
+        desc: 'Findings & lessons',
+        icon: Search,
+        href: '/health-safety/reports/investigation-outcomes',
+    },
+    {
+        label: 'Corrective-action traceability',
+        desc: 'Action → event trail',
+        icon: ClipboardCheck,
+        href: '/health-safety/reports/corrective-action-traceability',
+    },
+    {
+        label: 'Risk-assessment register',
+        desc: 'Active risk assessments',
+        icon: Target,
+        href: '/health-safety/reports/risk-assessment-register',
+    },
 ];
 
 export function GovernanceExports() {
     // Every export here links to a governance.view-gated report route; hide the
     // whole strip for register-only roles so they don't hit a 403 on click.
-    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+    const canViewBoardReports =
+        usePage<SharedData>().props.auth.can?.governance?.view ?? false;
     if (!canViewBoardReports) {
         return null;
     }
@@ -332,8 +405,12 @@ export function GovernanceExports() {
         <Card>
             <CardContent className="p-4">
                 <div className="mb-3">
-                    <div className="text-base font-semibold text-foreground">Governance &amp; board exports</div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">One-click reports for the board &amp; WorkSafe NZ</p>
+                    <div className="text-base font-semibold text-foreground">
+                        Governance &amp; board exports
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        One-click reports for the board &amp; WorkSafe NZ
+                    </p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {GOVERNANCE_REPORTS.map((r) => (
@@ -346,8 +423,12 @@ export function GovernanceExports() {
                                 <r.icon className="h-4 w-4" />
                             </span>
                             <span className="min-w-0">
-                                <span className="block text-[13px] font-semibold text-foreground">{r.label}</span>
-                                <span className="block text-[11px] text-muted-foreground">{r.desc}</span>
+                                <span className="block text-[13px] font-semibold text-foreground">
+                                    {r.label}
+                                </span>
+                                <span className="block text-[11px] text-muted-foreground">
+                                    {r.desc}
+                                </span>
                             </span>
                         </Link>
                     ))}

@@ -4,13 +4,17 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\TimeEntry;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ControlRoomTimeEntryController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
     use RespondsToInertiaOrJson;
 
     /**
@@ -20,6 +24,7 @@ class ControlRoomTimeEntryController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $entries = TimeEntry::where('alert_id', $alert->id)
             ->with('user:id,name,email')
@@ -61,6 +66,7 @@ class ControlRoomTimeEntryController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         // Check no running entry for this user on this alert
         $running = TimeEntry::where('alert_id', $alert->id)
@@ -101,6 +107,7 @@ class ControlRoomTimeEntryController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $entry->alert);
 
         if (! $entry->isRunning()) {
             if ($request->header('X-Inertia')) {
@@ -153,16 +160,22 @@ class ControlRoomTimeEntryController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'duration_minutes' => ['required', 'integer', 'min:1'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'task_id' => ['nullable', 'integer'],
+            'task_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('control_room_alert_tasks', 'id')
+                    ->where(fn ($query) => $query->where('alert_id', $alert->id)),
+            ],
             'started_at' => ['nullable', 'date'],
         ]);
 
         $startedAt = isset($data['started_at'])
-            ? \Carbon\Carbon::parse($data['started_at'])
+            ? Carbon::parse($data['started_at'])
             : now()->subMinutes($data['duration_minutes']);
 
         $endedAt = $startedAt->copy()->addMinutes($data['duration_minutes']);
@@ -200,6 +213,7 @@ class ControlRoomTimeEntryController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $entry->alert);
 
         $alertId = $entry->alert_id;
         $alert = $entry->alert;

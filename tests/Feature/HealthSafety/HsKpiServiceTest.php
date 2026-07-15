@@ -45,6 +45,7 @@ class HsKpiServiceTest extends TestCase
     {
         BillingEntry::create([
             'client_id' => $this->client->id,
+            'site_id' => $site?->id,
             'staff_id' => $this->staff->id,
             'service_date' => $date ?? now()->subMonths(2),
             'hours' => $hours,
@@ -66,15 +67,19 @@ class HsKpiServiceTest extends TestCase
         $this->assertEquals(1000.0, $this->svc->totalHoursWorked());
     }
 
-    public function test_total_hours_worked_scopes_by_site_via_snapshot(): void
+    public function test_total_hours_worked_scopes_by_immutable_site_id_when_names_collide_or_change(): void
     {
-        $maple = Site::factory()->create(['name' => 'Maple House']);
-        $rata = Site::factory()->create(['name' => 'Rata House']);
+        $maple = Site::factory()->create(['name' => 'Shared House Name']);
+        $rata = Site::factory()->create(['name' => 'Shared House Name']);
         $this->bookHours(1000, $maple);
         $this->bookHours(250, $rata);
 
         $this->assertEquals(1000.0, $this->svc->totalHoursWorked(null, null, $maple->id));
         $this->assertEquals(250.0, $this->svc->totalHoursWorked(null, null, $rata->id));
+
+        $maple->update(['name' => 'Renamed Maple House']);
+
+        $this->assertEquals(1000.0, $this->svc->totalHoursWorked(null, null, $maple->id));
     }
 
     // ──────────────────────────────────────────────────────

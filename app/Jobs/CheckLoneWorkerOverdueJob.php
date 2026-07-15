@@ -9,7 +9,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Scheduled job to detect lone worker overdue check-ins and session overruns.
@@ -31,43 +33,66 @@ class CheckLoneWorkerOverdueJob implements ShouldQueue
         // Emergency sessions are excluded — they already have a higher-severity
         // canonical alert and should not generate overdue noise on top.
         // Completed sessions are excluded — they have ended normally.
-        $activeSessions = LoneWorkerSession::whereIn('status', ['active', 'overdue'])
-            ->with(['user:id,name', 'site:id,name', 'client:id,first_name,last_name'])
-            ->get();
-
         $overdueCount = 0;
         $overrunCount = 0;
+        $sessionsChecked = 0;
 
-        foreach ($activeSessions as $session) {
-            // Check for overdue check-in
-            if ($session->isCheckInOverdue()) {
-                $lastCheckIn = $session->last_check_in_at ?? $session->started_at;
-                $minutesOverdue = (int) $lastCheckIn
-                    ->addMinutes($session->check_in_interval_minutes)
-                    ->diffInMinutes(now());
+        LoneWorkerSession::query()
+            ->whereIn('status', ['active', 'overdue'])
+            ->select('id')
+            ->chunkById(100, function ($sessions) use (
+                $signalService,
+                &$overdueCount,
+                &$overrunCount,
+                &$sessionsChecked,
+            ): void {
+                foreach ($sessions as $candidate) {
+                    $sessionsChecked++;
 
-                // Update session status to overdue if still active
-                if ($session->status === 'active') {
-                    $session->update(['status' => 'overdue']);
+                    try {
+                        $outcome = DB::transaction(function () use ($candidate, $signalService): array {
+                            $session = LoneWorkerSession::query()
+                                ->whereKey($candidate->id)
+                                ->lockForUpdate()
+                                ->first();
+                            if (! $session || ! in_array($session->status, ['active', 'overdue'], true)) {
+                                return ['overdue' => 0, 'overrun' => 0];
+                            }
+
+                            $overdue = 0;
+                            $overrun = 0;
+                            $lastCheckIn = ($session->last_check_in_at ?? $session->started_at)->copy();
+                            $checkInDeadline = $lastCheckIn->addMinutes($session->check_in_interval_minutes);
+                            if ($session->status === 'active' && $checkInDeadline->isPast()) {
+                                $minutesOverdue = (int) $checkInDeadline->diffInMinutes(now());
+                                $session->update(['status' => 'overdue']);
+                                $signalService->emitOverdueCheckIn($session, $minutesOverdue);
+                                $overdue = 1;
+                            }
+
+                            if ($session->expected_end_at && $session->expected_end_at->isPast()) {
+                                $minutesOverrun = (int) $session->expected_end_at->diffInMinutes(now());
+                                $signalService->emitSessionOverrun($session, $minutesOverrun);
+                                $overrun = 1;
+                            }
+
+                            return ['overdue' => $overdue, 'overrun' => $overrun];
+                        }, 3);
+
+                        $overdueCount += $outcome['overdue'];
+                        $overrunCount += $outcome['overrun'];
+                    } catch (Throwable $exception) {
+                        Log::error('CheckLoneWorkerOverdueJob: session failed', [
+                            'session_id' => $candidate->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
                 }
-
-                // Emit signal → Control Room
-                $signalService->emitOverdueCheckIn($session, $minutesOverdue);
-                $overdueCount++;
-            }
-
-            // Check for session overrun (past expected end time, still active)
-            if ($session->expected_end_at && $session->expected_end_at->isPast()) {
-                $minutesOverrun = (int) $session->expected_end_at->diffInMinutes(now());
-
-                $signalService->emitSessionOverrun($session, $minutesOverrun);
-                $overrunCount++;
-            }
-        }
+            });
 
         if ($overdueCount > 0 || $overrunCount > 0) {
             Log::info('CheckLoneWorkerOverdueJob: completed', [
-                'sessions_checked' => $activeSessions->count(),
+                'sessions_checked' => $sessionsChecked,
                 'overdue_check_ins' => $overdueCount,
                 'session_overruns' => $overrunCount,
             ]);

@@ -3,9 +3,11 @@
 namespace Tests\Feature\FleetAssets;
 
 use App\Models\AuditLog;
+use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,19 +19,33 @@ class AlertControllerTest extends TestCase
 
     private User $admin;
 
+    private Site $site;
+
+    private Asset $asset;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->asset = Asset::factory()->vehicle()->create([
+            'site_id' => $this->site->id,
+            'created_by_user_id' => $this->admin->id,
+            'updated_by_user_id' => $this->admin->id,
+        ]);
     }
 
     public function test_index_exposes_control_room_manage_flag_only_for_canonical_permission(): void
     {
-        ControlRoomAlert::factory()->fromFleet()->create();
+        ControlRoomAlert::factory()->fromFleet()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->get('/fleet-assets/alerts')
@@ -44,7 +60,7 @@ class AlertControllerTest extends TestCase
 
     public function test_acknowledge_uses_canonical_status_actor_and_audit(): void
     {
-        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/alerts/{$alert->id}/acknowledge")
@@ -65,9 +81,51 @@ class AlertControllerTest extends TestCase
         ]);
     }
 
+    public function test_start_triage_uses_canonical_status_note_and_audit(): void
+    {
+        $alert = ControlRoomAlert::factory()->fromFleet()->acknowledged()->create($this->alertProvenance());
+
+        $this->actingAs($this->admin)
+            ->post("/fleet-assets/alerts/{$alert->id}/triage", [
+                'notes' => 'Fleet lead has taken over and is checking the vehicle.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->fresh()->status);
+
+        $audit = AuditLog::query()
+            ->where('action', 'controlRoom.alert.triage')
+            ->where('auditable_id', $alert->id)
+            ->firstOrFail();
+
+        $this->assertSame($this->admin->id, $audit->user_id);
+        $this->assertSame(
+            'Fleet lead has taken over and is checking the vehicle.',
+            $audit->meta['operator_note'] ?? null,
+        );
+    }
+
+    public function test_open_and_acknowledged_alerts_cannot_skip_straight_to_resolution(): void
+    {
+        foreach ([
+            ControlRoomAlert::factory()->fromFleet()->open()->create($this->alertProvenance()),
+            ControlRoomAlert::factory()->fromFleet()->acknowledged()->create($this->alertProvenance()),
+        ] as $alert) {
+            $this->actingAs($this->admin)
+                ->post("/fleet-assets/alerts/{$alert->id}/resolve", [
+                    'resolution_notes' => 'This must not skip the Control Room handoff.',
+                ])
+                ->assertRedirect()
+                ->assertSessionHasErrors('alert');
+
+            $this->assertNotSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
+        }
+    }
+
     public function test_resolve_requires_resolution_notes(): void
     {
-        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/alerts/{$alert->id}/resolve")
@@ -78,7 +136,7 @@ class AlertControllerTest extends TestCase
 
     public function test_resolve_uses_canonical_status_actor_notes_and_audit(): void
     {
-        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromFleet()->triaging()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/alerts/{$alert->id}/resolve", [
@@ -103,7 +161,7 @@ class AlertControllerTest extends TestCase
 
     public function test_bulk_acknowledge_uses_canonical_status_and_actor(): void
     {
-        $alerts = ControlRoomAlert::factory()->fromFleet()->open()->count(2)->create();
+        $alerts = ControlRoomAlert::factory()->fromFleet()->open()->count(2)->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post('/fleet-assets/alerts/bulk-action', [
@@ -126,9 +184,38 @@ class AlertControllerTest extends TestCase
         );
     }
 
+    public function test_bulk_start_triage_advances_only_acknowledged_alerts(): void
+    {
+        $acknowledged = ControlRoomAlert::factory()
+            ->fromFleet()
+            ->acknowledged()
+            ->count(2)
+            ->create($this->alertProvenance());
+
+        $this->actingAs($this->admin)
+            ->post('/fleet-assets/alerts/bulk-action', [
+                'action' => 'triage',
+                'ids' => $acknowledged->pluck('id')->all(),
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        foreach ($acknowledged as $alert) {
+            $this->assertDatabaseHas('control_room_alerts', [
+                'id' => $alert->id,
+                'status' => ControlRoomAlert::STATUS_TRIAGING,
+            ]);
+        }
+
+        $this->assertSame(
+            2,
+            AuditLog::where('action', 'controlRoom.alert.triage')->count(),
+        );
+    }
+
     public function test_bulk_resolve_requires_resolution_notes(): void
     {
-        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post('/fleet-assets/alerts/bulk-action', [
@@ -142,7 +229,7 @@ class AlertControllerTest extends TestCase
 
     public function test_bulk_resolve_uses_canonical_status_actor_and_notes(): void
     {
-        $alerts = ControlRoomAlert::factory()->fromFleet()->open()->count(2)->create();
+        $alerts = ControlRoomAlert::factory()->fromFleet()->triaging()->count(2)->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post('/fleet-assets/alerts/bulk-action', [
@@ -164,7 +251,7 @@ class AlertControllerTest extends TestCase
 
     public function test_fleet_manage_alone_cannot_mutate_alerts(): void
     {
-        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromFleet()->open()->create($this->alertProvenance());
         $user = User::factory()->create(['approved_at' => now()]);
         $this->grantPermission($user, 'fleet.manage');
 
@@ -177,7 +264,7 @@ class AlertControllerTest extends TestCase
 
     public function test_fleet_bridge_does_not_mutate_non_fleet_alerts(): void
     {
-        $alert = ControlRoomAlert::factory()->fromCompliance()->open()->create();
+        $alert = ControlRoomAlert::factory()->fromCompliance()->open()->create($this->alertProvenance());
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/alerts/{$alert->id}/acknowledge")
@@ -196,5 +283,14 @@ class AlertControllerTest extends TestCase
         $user->permissionOverrides()->syncWithoutDetaching([
             $permission->id => ['allowed' => true],
         ]);
+    }
+
+    /** @return array{site_id: int, asset_id: int} */
+    private function alertProvenance(): array
+    {
+        return [
+            'site_id' => $this->site->id,
+            'asset_id' => $this->asset->id,
+        ];
     }
 }

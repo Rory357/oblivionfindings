@@ -37,6 +37,9 @@ class TaskItem
         public ?string $type = null,       // human row label, e.g. "Corrective action"
         public ?string $description = null,
         public bool $restricted = false,   // need-to-know row: drawer attaches no extra context
+        public ?array $journey = null,     // shared incident journey key, source and official references
+        public ?string $sourceContext = null,
+        public string $actionLabel = 'Open record',
     ) {}
 
     private ?bool $overdue = null;
@@ -83,6 +86,9 @@ class TaskItem
             'type' => $this->type,
             'description' => $this->description,
             'restricted' => $this->restricted,
+            'journey' => $this->journey,
+            'sourceContext' => $this->sourceContext,
+            'actionLabel' => $this->actionLabel,
             'overdue' => $this->isOverdue(),
         ];
     }

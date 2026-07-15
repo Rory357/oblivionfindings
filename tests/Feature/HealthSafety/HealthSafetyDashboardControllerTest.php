@@ -17,16 +17,20 @@ class HealthSafetyDashboardControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
     }
 
     protected function hsOfficer(): User
     {
         $user = User::factory()->create([
             'role' => 'health_safety_officer',
+            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
@@ -57,7 +61,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
 
     public function test_dashboard_echoes_lens_and_site_params(): void
     {
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->hsOfficer())
             ->get('/health-safety?lens=governance&site='.$site->id)
@@ -81,6 +85,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'role' => 'support_worker',
+            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         if ($role = Role::where('name', 'support_worker')->first()) {

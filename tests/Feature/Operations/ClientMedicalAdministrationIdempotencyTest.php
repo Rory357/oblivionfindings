@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\User;
 use App\Services\NotificationService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
@@ -28,7 +29,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->admin = User::factory()->create([
@@ -66,6 +67,10 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 
     public function test_duplicate_client_request_uuid_returns_cached_response_without_second_write(): void
     {
+        $notification = Mockery::mock(NotificationService::class);
+        $notification->shouldReceive('notifyCrud')->once()->andReturnNull();
+        $this->app->instance(NotificationService::class, $notification);
+
         $scheduledFor = now()->setTime(8, 0);
         $payload = [
             'status' => 'given',
@@ -75,7 +80,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'client_request_uuid' => '5f996066-45d0-44a0-9c61-f88bc13d31f4',
             'captured_offline_at' => now()->toIso8601String(),
             'origin_device_id' => 'test-device',
-            'queued_offline' => false,
+            'queued_offline' => true,
         ];
 
         $url = "/operations/clients/{$this->client->id}/medical/medications/{$this->medication->id}/administrations";
@@ -84,7 +89,9 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             ->postJson($url, $payload)
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('sync.status', 'processed');
+            ->assertJsonPath('sync.status', 'synced');
+
+        Cache::forget('emar:idempotency:administration:'.$payload['client_request_uuid']);
 
         $this->actingAs($this->admin)
             ->postJson($url, $payload)
@@ -94,6 +101,10 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             ->assertJsonPath('sync.duplicate', true);
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_request_uuid' => $payload['client_request_uuid'],
+        ]);
     }
 
     public function test_offline_replay_conflicts_with_existing_scheduled_record(): void

@@ -10,6 +10,7 @@ use App\Models\FleetVehicleBooking;
 use App\Notifications\Fleet\FleetBookingApprovedNotification;
 use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,6 +18,8 @@ use Inertia\Inertia;
 
 class VehicleBookingController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $query = FleetVehicleBooking::query()
@@ -104,10 +107,11 @@ class VehicleBookingController extends Controller
                 ->where('planned_return', '<', $now)
                 ->count()
             : 0;
-        $criticalAlerts = ControlRoomAlert::query()
-            ->whereNotIn('status', ['closed', 'resolved'])
-            ->where('severity', 'critical')
-            ->count();
+        $criticalAlertQuery = ControlRoomAlert::query()
+            ->actionable()
+            ->where('severity', 'critical');
+        $this->siteAccess->applyAlertScope($criticalAlertQuery, $request->user(), ['fleet.manage']);
+        $criticalAlerts = $criticalAlertQuery->count();
 
         $data = [
             'bookings' => [
