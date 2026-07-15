@@ -1,4 +1,4 @@
-import { PageHero } from '@/components/page';
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatRelative } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
@@ -93,21 +94,6 @@ const CHART_COLORS = [
     '#22d3ee',
 ];
 
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return 'Never';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) return `${diffSec}s ago`;
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
-    const diffDay = Math.floor(diffHr / 24);
-    return `${diffDay}d ago`;
-}
-
 const breadcrumbs = [
     { title: 'Control Room', href: '/control-room' },
     { title: 'Live Statistics', href: '#' },
@@ -181,25 +167,14 @@ export default function ControlRoomStats({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Live Statistics - Control Room" />
             <PageShell>
-                <PageHero
+                <CommandCentrePage
+                    variant="compact"
+                    current="/control-room/stats"
                     icon={TrendingUp}
-                    title="Live Statistics"
-                    description="Real-time KPIs and analytics for the control room."
-                    stats={[
-                        {
-                            label: 'SLA compliance',
-                            value:
-                                kpis.sla_compliance_pct === null
-                                    ? 'Not assessed'
-                                    : `${kpis.sla_compliance_pct}%`,
-                        },
-                        {
-                            label: 'Avg acknowledge',
-                            value: `${kpis.avg_acknowledge_minutes}m`,
-                        },
-                        { label: 'Open alerts', value: kpis.open_alerts },
-                        { label: 'Alerts today', value: kpis.alerts_today },
-                    ]}
+                    title="Operational analytics"
+                    description="Review Control Room workload, SLA performance, trends, and service health away from the live desk."
+                    status="Analytics workspace"
+                    freshness={periodLabel}
                     actions={
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
@@ -230,567 +205,584 @@ export default function ControlRoomStats({
                             </Select>
                         </div>
                     }
-                />
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info-bg p-2">
-                                    <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        Avg Acknowledge
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {kpis.avg_acknowledge_minutes}m
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
-                                    <CheckCircle className="h-5 w-5 text-primary dark:text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        Avg Resolution
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {kpis.avg_resolution_hours}h
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success-bg p-2">
-                                    <ShieldCheck className="h-5 w-5 text-status-success dark:text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        SLA Compliance
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {kpis.sla_compliance_pct === null
-                                            ? 'Not assessed'
-                                            : `${kpis.sla_compliance_pct}%`}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning-bg p-2">
-                                    <AlertTriangle className="h-5 w-5 text-status-warning dark:text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        Open Alerts
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {kpis.open_alerts}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
-                                    <Zap className="h-5 w-5 text-primary dark:text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        Alerts Today
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {kpis.alerts_today}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Charts Grid */}
-                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    {/* Alert Volume Trend */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Alert Volume Trend
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={volume_trend}>
-                                        <defs>
-                                            <linearGradient
-                                                id="volumeGradient"
-                                                x1="0"
-                                                y1="0"
-                                                x2="0"
-                                                y2="1"
-                                            >
-                                                <stop
-                                                    offset="5%"
-                                                    stopColor="#6366f1"
-                                                    stopOpacity={0.3}
-                                                />
-                                                <stop
-                                                    offset="95%"
-                                                    stopColor="#6366f1"
-                                                    stopOpacity={0}
-                                                />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid
-                                            strokeDasharray="3 3"
-                                            className="stroke-muted"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={{ fontSize: 11 }}
-                                            interval="preserveStartEnd"
-                                            className="text-muted-foreground"
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 11 }}
-                                            allowDecimals={false}
-                                            className="text-muted-foreground"
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor:
-                                                    'hsl(var(--card))',
-                                                border: '1px solid hsl(var(--border))',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="#6366f1"
-                                            strokeWidth={2}
-                                            fill="url(#volumeGradient)"
-                                            name="Alerts"
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Severity Distribution */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Severity Distribution (Unresolved)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px]">
-                                {severityPieData.length === 0 ? (
-                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                        No unresolved alerts
+                >
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-status-info-bg p-2">
+                                        <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
                                     </div>
-                                ) : (
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Avg Acknowledge
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {kpis.avg_acknowledge_minutes}m
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
+                                        <CheckCircle className="h-5 w-5 text-primary dark:text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Avg Resolution
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {kpis.avg_resolution_hours}h
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-status-success-bg p-2">
+                                        <ShieldCheck className="h-5 w-5 text-status-success dark:text-status-success" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            SLA Compliance
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {kpis.sla_compliance_pct === null
+                                                ? 'Not assessed'
+                                                : `${kpis.sla_compliance_pct}%`}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-status-warning-bg p-2">
+                                        <AlertTriangle className="h-5 w-5 text-status-warning dark:text-status-warning" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Open Alerts
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {kpis.open_alerts}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
+                                        <Zap className="h-5 w-5 text-primary dark:text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Alerts Today
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {kpis.alerts_today}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Charts Grid */}
+                    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        {/* Alert Volume Trend */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Alert Volume Trend
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[280px]">
                                     <ResponsiveContainer
                                         width="100%"
                                         height="100%"
                                     >
-                                        <PieChart>
-                                            <Pie
-                                                data={severityPieData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={100}
-                                                paddingAngle={3}
-                                                dataKey="value"
-                                                nameKey="name"
-                                                label={({ name, value }) =>
-                                                    `${name}: ${value}`
-                                                }
+                                        <AreaChart data={volume_trend}>
+                                            <defs>
+                                                <linearGradient
+                                                    id="volumeGradient"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="5%"
+                                                        stopColor="#6366f1"
+                                                        stopOpacity={0.3}
+                                                    />
+                                                    <stop
+                                                        offset="95%"
+                                                        stopColor="#6366f1"
+                                                        stopOpacity={0}
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{ fontSize: 11 }}
+                                                interval="preserveStartEnd"
+                                                className="text-muted-foreground"
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                allowDecimals={false}
+                                                className="text-muted-foreground"
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor:
+                                                        'hsl(var(--card))',
+                                                    border: '1px solid hsl(var(--border))',
+                                                    borderRadius: '8px',
+                                                    fontSize: '12px',
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="count"
+                                                stroke="#6366f1"
+                                                strokeWidth={2}
+                                                fill="url(#volumeGradient)"
+                                                name="Alerts"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Severity Distribution */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Severity Distribution (Unresolved)
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[280px]">
+                                    {severityPieData.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                            No unresolved alerts
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <PieChart>
+                                                <Pie
+                                                    data={severityPieData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={100}
+                                                    paddingAngle={3}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    label={({ name, value }) =>
+                                                        `${name}: ${value}`
+                                                    }
+                                                >
+                                                    {severityPieData.map(
+                                                        (entry, index) => (
+                                                            <Cell
+                                                                key={index}
+                                                                fill={
+                                                                    entry.color
+                                                                }
+                                                            />
+                                                        ),
+                                                    )}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor:
+                                                            'hsl(var(--card))',
+                                                        border: '1px solid hsl(var(--border))',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                    }}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Top Sources */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Top Sources ({periodLabel})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[280px]">
+                                    {top_sources.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                            No data for this period
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <BarChart
+                                                data={top_sources}
+                                                layout="vertical"
+                                                margin={{ left: 80 }}
                                             >
-                                                {severityPieData.map(
-                                                    (entry, index) => (
-                                                        <Cell
-                                                            key={index}
-                                                            fill={entry.color}
-                                                        />
+                                                <CartesianGrid
+                                                    strokeDasharray="3 3"
+                                                    className="stroke-muted"
+                                                />
+                                                <XAxis
+                                                    type="number"
+                                                    tick={{ fontSize: 11 }}
+                                                    allowDecimals={false}
+                                                />
+                                                <YAxis
+                                                    type="category"
+                                                    dataKey="name"
+                                                    tick={{ fontSize: 11 }}
+                                                    width={75}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor:
+                                                            'hsl(var(--card))',
+                                                        border: '1px solid hsl(var(--border))',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                    }}
+                                                />
+                                                <Bar
+                                                    dataKey="count"
+                                                    fill="#8b5cf6"
+                                                    radius={[0, 4, 4, 0]}
+                                                    name="Alerts"
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Top Alert Types */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Top Alert Types ({periodLabel})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[280px]">
+                                    {top_alert_types.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                            No data for this period
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <BarChart
+                                                data={top_alert_types}
+                                                layout="vertical"
+                                                margin={{ left: 80 }}
+                                            >
+                                                <CartesianGrid
+                                                    strokeDasharray="3 3"
+                                                    className="stroke-muted"
+                                                />
+                                                <XAxis
+                                                    type="number"
+                                                    tick={{ fontSize: 11 }}
+                                                    allowDecimals={false}
+                                                />
+                                                <YAxis
+                                                    type="category"
+                                                    dataKey="name"
+                                                    tick={{ fontSize: 11 }}
+                                                    width={75}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor:
+                                                            'hsl(var(--card))',
+                                                        border: '1px solid hsl(var(--border))',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                    }}
+                                                />
+                                                <Bar
+                                                    dataKey="count"
+                                                    fill="#f97316"
+                                                    radius={[0, 4, 4, 0]}
+                                                    name="Alerts"
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Operator Performance */}
+                    <div className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Users className="h-4 w-4" />
+                                    Operator Performance ({periodLabel})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {operator_performance.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No operator data for this period.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b text-left text-muted-foreground">
+                                                    <th className="pr-4 pb-3 font-medium">
+                                                        Operator
+                                                    </th>
+                                                    <th className="pr-4 pb-3 text-right font-medium">
+                                                        Alerts Handled
+                                                    </th>
+                                                    <th className="pr-4 pb-3 text-right font-medium">
+                                                        Avg Response
+                                                    </th>
+                                                    <th className="hidden pb-3 font-medium sm:table-cell">
+                                                        Volume
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {operator_performance.map(
+                                                    (op, i) => (
+                                                        <tr
+                                                            key={i}
+                                                            className="border-b last:border-0"
+                                                        >
+                                                            <td className="py-3 pr-4 font-medium">
+                                                                {op.name}
+                                                            </td>
+                                                            <td className="py-3 pr-4 text-right">
+                                                                {
+                                                                    op.alerts_handled
+                                                                }
+                                                            </td>
+                                                            <td className="py-3 pr-4 text-right">
+                                                                {op.avg_response_minutes >
+                                                                0
+                                                                    ? `${op.avg_response_minutes}m`
+                                                                    : '-'}
+                                                            </td>
+                                                            <td className="hidden py-3 sm:table-cell">
+                                                                <div className="h-2 w-full max-w-[200px] rounded-full bg-muted">
+                                                                    <div
+                                                                        className="h-2 rounded-full bg-primary"
+                                                                        style={{
+                                                                            width: `${(op.alerts_handled / maxOperatorAlerts) * 100}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                        </tr>
                                                     ),
                                                 )}
-                                            </Pie>
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor:
-                                                        'hsl(var(--card))',
-                                                    border: '1px solid hsl(var(--border))',
-                                                    borderRadius: '8px',
-                                                    fontSize: '12px',
-                                                }}
-                                            />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Top Sources */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Top Sources ({periodLabel})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px]">
-                                {top_sources.length === 0 ? (
-                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                        No data for this period
+                                            </tbody>
+                                        </table>
                                     </div>
-                                ) : (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={top_sources}
-                                            layout="vertical"
-                                            margin={{ left: 80 }}
-                                        >
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                className="stroke-muted"
-                                            />
-                                            <XAxis
-                                                type="number"
-                                                tick={{ fontSize: 11 }}
-                                                allowDecimals={false}
-                                            />
-                                            <YAxis
-                                                type="category"
-                                                dataKey="name"
-                                                tick={{ fontSize: 11 }}
-                                                width={75}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor:
-                                                        'hsl(var(--card))',
-                                                    border: '1px solid hsl(var(--border))',
-                                                    borderRadius: '8px',
-                                                    fontSize: '12px',
-                                                }}
-                                            />
-                                            <Bar
-                                                dataKey="count"
-                                                fill="#8b5cf6"
-                                                radius={[0, 4, 4, 0]}
-                                                name="Alerts"
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
                                 )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                    {/* Top Alert Types */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Top Alert Types ({periodLabel})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px]">
-                                {top_alert_types.length === 0 ? (
-                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                        No data for this period
-                                    </div>
+                    {/* Shift Comparison */}
+                    <div className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Activity className="h-4 w-4" />
+                                    Shift Comparison (Last 5 Completed)
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {shift_comparison.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No completed shifts found.
+                                    </p>
                                 ) : (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={top_alert_types}
-                                            layout="vertical"
-                                            margin={{ left: 80 }}
-                                        >
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                className="stroke-muted"
-                                            />
-                                            <XAxis
-                                                type="number"
-                                                tick={{ fontSize: 11 }}
-                                                allowDecimals={false}
-                                            />
-                                            <YAxis
-                                                type="category"
-                                                dataKey="name"
-                                                tick={{ fontSize: 11 }}
-                                                width={75}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor:
-                                                        'hsl(var(--card))',
-                                                    border: '1px solid hsl(var(--border))',
-                                                    borderRadius: '8px',
-                                                    fontSize: '12px',
-                                                }}
-                                            />
-                                            <Bar
-                                                dataKey="count"
-                                                fill="#f97316"
-                                                radius={[0, 4, 4, 0]}
-                                                name="Alerts"
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Operator Performance */}
-                <div className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Users className="h-4 w-4" />
-                                Operator Performance ({periodLabel})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {operator_performance.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No operator data for this period.
-                                </p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-muted-foreground">
-                                                <th className="pr-4 pb-3 font-medium">
-                                                    Operator
-                                                </th>
-                                                <th className="pr-4 pb-3 text-right font-medium">
-                                                    Alerts Handled
-                                                </th>
-                                                <th className="pr-4 pb-3 text-right font-medium">
-                                                    Avg Response
-                                                </th>
-                                                <th className="hidden pb-3 font-medium sm:table-cell">
-                                                    Volume
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {operator_performance.map(
-                                                (op, i) => (
-                                                    <tr
-                                                        key={i}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-3 pr-4 font-medium">
-                                                            {op.name}
-                                                        </td>
-                                                        <td className="py-3 pr-4 text-right">
-                                                            {op.alerts_handled}
-                                                        </td>
-                                                        <td className="py-3 pr-4 text-right">
-                                                            {op.avg_response_minutes >
-                                                            0
-                                                                ? `${op.avg_response_minutes}m`
-                                                                : '-'}
-                                                        </td>
-                                                        <td className="hidden py-3 sm:table-cell">
-                                                            <div className="h-2 w-full max-w-[200px] rounded-full bg-muted">
-                                                                <div
-                                                                    className="h-2 rounded-full bg-primary"
-                                                                    style={{
-                                                                        width: `${(op.alerts_handled / maxOperatorAlerts) * 100}%`,
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ),
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Shift Comparison */}
-                <div className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Activity className="h-4 w-4" />
-                                Shift Comparison (Last 5 Completed)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {shift_comparison.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No completed shifts found.
-                                </p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-muted-foreground">
-                                                <th className="pr-4 pb-3 font-medium">
-                                                    Shift
-                                                </th>
-                                                <th className="pr-4 pb-3 text-right font-medium">
-                                                    Duration
-                                                </th>
-                                                <th className="pr-4 pb-3 text-right font-medium">
-                                                    Created
-                                                </th>
-                                                <th className="pr-4 pb-3 text-right font-medium">
-                                                    Resolved
-                                                </th>
-                                                <th className="pb-3 text-right font-medium">
-                                                    Escalated
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {shift_comparison.map((s, i) => (
-                                                <tr
-                                                    key={i}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="py-3 pr-4 font-medium">
-                                                        {s.name}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right">
-                                                        {s.duration_hours}h
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right">
-                                                        {s.alerts_created}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right text-status-success dark:text-status-success">
-                                                        {s.alerts_resolved}
-                                                    </td>
-                                                    <td className="py-3 text-right">
-                                                        {s.alerts_escalated >
-                                                        0 ? (
-                                                            <span className="text-status-warning dark:text-status-warning">
-                                                                {
-                                                                    s.alerts_escalated
-                                                                }
-                                                            </span>
-                                                        ) : (
-                                                            <span>
-                                                                {
-                                                                    s.alerts_escalated
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    </td>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b text-left text-muted-foreground">
+                                                    <th className="pr-4 pb-3 font-medium">
+                                                        Shift
+                                                    </th>
+                                                    <th className="pr-4 pb-3 text-right font-medium">
+                                                        Duration
+                                                    </th>
+                                                    <th className="pr-4 pb-3 text-right font-medium">
+                                                        Created
+                                                    </th>
+                                                    <th className="pr-4 pb-3 text-right font-medium">
+                                                        Resolved
+                                                    </th>
+                                                    <th className="pb-3 text-right font-medium">
+                                                        Escalated
+                                                    </th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                                            </thead>
+                                            <tbody>
+                                                {shift_comparison.map(
+                                                    (s, i) => (
+                                                        <tr
+                                                            key={i}
+                                                            className="border-b last:border-0"
+                                                        >
+                                                            <td className="py-3 pr-4 font-medium">
+                                                                {s.name}
+                                                            </td>
+                                                            <td className="py-3 pr-4 text-right">
+                                                                {
+                                                                    s.duration_hours
+                                                                }
+                                                                h
+                                                            </td>
+                                                            <td className="py-3 pr-4 text-right">
+                                                                {
+                                                                    s.alerts_created
+                                                                }
+                                                            </td>
+                                                            <td className="py-3 pr-4 text-right text-status-success dark:text-status-success">
+                                                                {
+                                                                    s.alerts_resolved
+                                                                }
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                {s.alerts_escalated >
+                                                                0 ? (
+                                                                    <span className="text-status-warning dark:text-status-warning">
+                                                                        {
+                                                                            s.alerts_escalated
+                                                                        }
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>
+                                                                        {
+                                                                            s.alerts_escalated
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                {/* Signal Source Health */}
-                <div className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Wifi className="h-4 w-4" />
-                                Signal Source Health
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {signal_sources.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No signal sources configured.
-                                </p>
-                            ) : (
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {signal_sources.map((ss, i) => (
-                                        <div
-                                            key={i}
-                                            className={`rounded-lg border p-4 ${
-                                                !ss.is_healthy
-                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                                    : 'border-border'
-                                            }`}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span
-                                                        className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                                            ss.is_healthy
-                                                                ? 'bg-status-success'
-                                                                : 'bg-status-critical'
-                                                        }`}
-                                                    />
-                                                    <span className="text-sm font-medium">
-                                                        {ss.name}
+                    {/* Signal Source Health */}
+                    <div className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Wifi className="h-4 w-4" />
+                                    Signal Source Health
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {signal_sources.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No signal sources configured.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                        {signal_sources.map((ss, i) => (
+                                            <div
+                                                key={i}
+                                                className={`rounded-lg border p-4 ${
+                                                    !ss.is_healthy
+                                                        ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
+                                                        : 'border-border'
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span
+                                                            className={`inline-block h-2.5 w-2.5 rounded-full ${
+                                                                ss.is_healthy
+                                                                    ? 'bg-status-success'
+                                                                    : 'bg-status-critical'
+                                                            }`}
+                                                        />
+                                                        <span className="text-sm font-medium">
+                                                            {ss.name}
+                                                        </span>
+                                                    </div>
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-xs"
+                                                    >
+                                                        {ss.signal_count_24h} /
+                                                        24h
+                                                    </Badge>
+                                                </div>
+                                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                                    {ss.is_healthy ? (
+                                                        <Wifi className="h-3 w-3" />
+                                                    ) : (
+                                                        <WifiOff className="h-3 w-3 text-status-critical" />
+                                                    )}
+                                                    <span>
+                                                        {ss.last_heartbeat_at
+                                                            ? formatRelative(
+                                                                  ss.last_heartbeat_at,
+                                                              )
+                                                            : 'No heartbeat'}
                                                     </span>
                                                 </div>
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="text-xs"
-                                                >
-                                                    {ss.signal_count_24h} / 24h
-                                                </Badge>
                                             </div>
-                                            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                                                {ss.is_healthy ? (
-                                                    <Wifi className="h-3 w-3" />
-                                                ) : (
-                                                    <WifiOff className="h-3 w-3 text-status-critical" />
-                                                )}
-                                                <span>
-                                                    {ss.last_heartbeat_at
-                                                        ? formatRelativeTime(
-                                                              ss.last_heartbeat_at,
-                                                          )
-                                                        : 'No heartbeat'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CommandCentrePage>
             </PageShell>
         </AppLayout>
     );

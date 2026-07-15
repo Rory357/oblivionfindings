@@ -1,13 +1,22 @@
-import { AlertWorkspaceDialog, PaneNav, type AlertWorkspaceDetail } from '@/components/control-room/alert-workspace-dialog';
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import { AlertStatus } from '@/components/control-room/alert-worklist/alert-status';
+import {
+    AlertWorkspaceDialog,
+    PaneNav,
+    type AlertWorkspaceDetail,
+} from '@/components/control-room/alert-workspace-dialog';
 import { BulkAlertActionDialog } from '@/components/control-room/bulk-alert-action-dialog';
-import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -46,6 +55,7 @@ interface AlertSla {
 
 interface QueueAlert {
     id: number;
+    reference_number: string | null;
     severity: string;
     alert_type: string;
     alert_type_raw?: string;
@@ -93,34 +103,11 @@ interface Props {
 
 // --- Severity config ---
 
-const severityConfig: Record<
-    string,
-    { label: string; className: string; borderColor: string; order: number }
-> = {
-    critical: {
-        label: 'Critical',
-        className: 'bg-status-critical text-white',
-        borderColor: 'border-l-red-600',
-        order: 0,
-    },
-    high: {
-        label: 'High',
-        className: 'bg-status-warning text-white',
-        borderColor: 'border-l-orange-500',
-        order: 1,
-    },
-    medium: {
-        label: 'Medium',
-        className: 'bg-status-warning text-white',
-        borderColor: 'border-l-yellow-500',
-        order: 2,
-    },
-    low: {
-        label: 'Low',
-        className: 'bg-status-info text-white',
-        borderColor: 'border-l-blue-500',
-        order: 3,
-    },
+const severityBorder: Record<string, string> = {
+    critical: 'border-l-red-600',
+    high: 'border-l-orange-500',
+    medium: 'border-l-yellow-500',
+    low: 'border-l-blue-500',
 };
 
 const tierBgColors: Record<number, string> = {
@@ -327,14 +314,14 @@ function AlertCard({
 }) {
     const [moveOpen, setMoveOpen] = useState(false);
     const breached = isAlertBreached(alert.sla);
-    const sev = severityConfig[alert.severity] ?? severityConfig.low;
+    const borderColor = severityBorder[alert.severity] ?? severityBorder.low;
     const isSelected = selectedAlertIds.has(alert.id);
 
     const otherQueues = allQueues.filter((q) => q.id !== currentQueueId);
 
     return (
         <div
-            className={`rounded-lg border border-l-4 bg-card transition-all ${sev.borderColor} ${
+            className={`rounded-lg border border-l-4 bg-card transition-all ${borderColor} ${
                 breached
                     ? 'animate-pulse-subtle border-t-red-300 border-r-red-300 border-b-red-300 shadow-sm shadow-red-100'
                     : 'border-t-border border-r-border border-b-border'
@@ -357,16 +344,16 @@ function AlertCard({
                                 {alert.alert_type}
                             </p>
                             <span className="text-[10px] font-medium text-muted-foreground">
-                                #{alert.id}
+                                {alert.reference_number ?? `Alert ${alert.id}`}
                             </span>
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                        <Badge
-                            className={`px-1.5 py-0 text-[10px] ${sev.className}`}
-                        >
-                            {sev.label}
-                        </Badge>
+                        <AlertStatus
+                            status={alert.status}
+                            severity={alert.severity}
+                            slaStatus={alert.sla?.status}
+                        />
                         {breached && (
                             <ShieldAlert className="h-3.5 w-3.5 text-status-critical" />
                         )}
@@ -392,14 +379,6 @@ function AlertCard({
                             {formatTimeInQueue(alert.entered_queue_at, nowMs)}{' '}
                             in queue
                         </span>
-                        {alert.status !== 'open' && (
-                            <Badge
-                                variant="outline"
-                                className="ml-1 px-1 py-0 text-[9px] capitalize"
-                            >
-                                {alert.status}
-                            </Badge>
-                        )}
                     </div>
                 </div>
 
@@ -482,7 +461,11 @@ function AlertCard({
             </div>
 
             {moveOpen ? (
-                <MoveQueueDialog alert={alert} queues={otherQueues} onClose={() => setMoveOpen(false)} />
+                <MoveQueueDialog
+                    alert={alert}
+                    queues={otherQueues}
+                    onClose={() => setMoveOpen(false)}
+                />
             ) : null}
         </div>
     );
@@ -505,7 +488,10 @@ function MoveQueueDialog({
 
     // Queue names are often already tier-labelled ("Tier 1"), so only prepend the
     // tier prefix when the name doesn't already carry it — avoids "Tier 1: Tier 1".
-    const queueLabel = (q: QueueOption) => (q.name.trim().toLowerCase().startsWith('tier') ? q.name : `Tier ${q.tier}: ${q.name}`);
+    const queueLabel = (q: QueueOption) =>
+        q.name.trim().toLowerCase().startsWith('tier')
+            ? q.name
+            : `Tier ${q.tier}: ${q.name}`;
 
     const submit = () => {
         if (!target || busy) return;
@@ -524,12 +510,16 @@ function MoveQueueDialog({
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="sm:max-w-md">
-                <DialogTitle className="sr-only">Move alert to another queue</DialogTitle>
-                <DialogDescription className="sr-only">Choose the queue this alert should move to.</DialogDescription>
+                <DialogTitle className="sr-only">
+                    Move alert to another queue
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                    Choose the queue this alert should move to.
+                </DialogDescription>
                 <div className="flex flex-col gap-4">
                     <StepHead
                         icon={MoveRight}
-                        title={`Move CR-${alert.id} to another queue`}
+                        title={`Move ${alert.reference_number ?? `Alert ${alert.id}`} to another queue`}
                         blurb="The alert leaves its current queue and joins the target queue's worklist. The move is recorded on the queue history."
                     />
                     {step === 0 ? (
@@ -539,18 +529,42 @@ function MoveQueueDialog({
                                     value={targetId}
                                     onChange={setTargetId}
                                     placeholder="Select a queue"
-                                    options={queues.map((q) => ({ value: String(q.id), label: queueLabel(q) }))}
+                                    options={queues.map((q) => ({
+                                        value: String(q.id),
+                                        label: queueLabel(q),
+                                    }))}
                                 />
                             </Field>
-                            <PaneNav onCancel={onClose} onNext={() => setStep(1)} nextDisabled={!target} step={0} stepCount={2} />
+                            <PaneNav
+                                onCancel={onClose}
+                                onNext={() => setStep(1)}
+                                nextDisabled={!target}
+                                step={0}
+                                stepCount={2}
+                            />
                         </>
                     ) : (
                         <>
                             <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-sm">
-                                <span className="font-medium text-foreground">CR-{alert.id} · {alert.alert_type}</span>
-                                <span className="text-muted-foreground"> → {target ? queueLabel(target) : ''}</span>
+                                <span className="font-medium text-foreground">
+                                    {alert.reference_number ??
+                                        `Alert ${alert.id}`}{' '}
+                                    · {alert.alert_type}
+                                </span>
+                                <span className="text-muted-foreground">
+                                    {' '}
+                                    → {target ? queueLabel(target) : ''}
+                                </span>
                             </div>
-                            <PaneNav onCancel={onClose} onBack={() => setStep(0)} onSubmit={submit} submitLabel="Move alert" processing={busy} step={1} stepCount={2} />
+                            <PaneNav
+                                onCancel={onClose}
+                                onBack={() => setStep(0)}
+                                onSubmit={submit}
+                                submitLabel="Move alert"
+                                processing={busy}
+                                step={1}
+                                stepCount={2}
+                            />
                         </>
                     )}
                 </div>
@@ -660,7 +674,8 @@ function QueueColumn({
             >
                 {queue.alert_count > queue.alerts.length ? (
                     <p className="rounded-md bg-muted/60 px-2 py-1 text-center text-[11px] text-muted-foreground">
-                        Showing the top {queue.alerts.length} of {queue.alert_count} — work from the top down.
+                        Showing the top {queue.alerts.length} of{' '}
+                        {queue.alert_count} — work from the top down.
                     </p>
                 ) : null}
                 {queue.alerts.length === 0 ? (
@@ -710,12 +725,20 @@ export default function EscalationQueue({
     const openWorkspace = (id: number) => {
         const params = new URLSearchParams(window.location.search);
         params.set('alert', String(id));
-        router.get(`/control-room/escalations?${params.toString()}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            `/control-room/escalations?${params.toString()}`,
+            {},
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
     const closeWorkspace = () => {
         const params = new URLSearchParams(window.location.search);
         params.delete('alert');
-        router.get(`/control-room/escalations${params.size ? `?${params.toString()}` : ''}`, {}, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            `/control-room/escalations${params.size ? `?${params.toString()}` : ''}`,
+            {},
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -783,112 +806,109 @@ export default function EscalationQueue({
         >
             <Head title="Escalation Queue - Control Room" />
             <PageShell>
-                <PageHero
-                    icon={AlertTriangle}
-                    title="Command Centre"
-                    description="Escalation queues — SLA-tracked tiers with guided moves and escalations."
-                    stats={[
-                        { label: 'Active queues', value: queues.length },
-                        { label: 'Total alerts', value: totalAlerts },
-                        { label: 'SLA breached', value: totalBreached },
-                    ]}
-                />
-
-                {/* Command centre tabs — the four alert surfaces are one workspace */}
-                <CommandCentreTabs
+                <CommandCentrePage
                     current="/control-room/escalations"
+                    icon={AlertTriangle}
+                    title="Escalations"
+                    description="Escalation queues — SLA-tracked tiers with guided moves and escalations."
+                    status="Live escalation workspace"
+                    freshness="Auto-refreshing every 30 seconds"
                     badges={{ '/control-room/escalations': totalAlerts }}
-                    className="mb-6"
-                />
-
-                {/* Summary stats */}
-                <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Active Queues
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {queues.length}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Total Alerts
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">{totalAlerts}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                SLA Breached
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p
-                                className={`text-2xl font-bold ${totalBreached > 0 ? 'text-status-critical' : ''}`}
-                            >
-                                {totalBreached}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">
-                                Selected
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {selectedAlertIds.size}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Kanban columns */}
-                {queues.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <CheckCircle2 className="mb-4 h-12 w-12 text-status-success" />
-                            <p className="text-lg font-medium text-muted-foreground">
-                                No active triage queues configured
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Set up triage queues to enable the escalation
-                                workflow.
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="flex items-start gap-0 overflow-x-auto pb-4">
-                        {queues.map((queue, index) => (
-                            <div key={queue.id} className="flex items-start">
-                                {index > 0 && (
-                                    <div className="flex items-center self-stretch px-1 pt-20">
-                                        <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
-                                    </div>
-                                )}
-                                <QueueColumn
-                                    queue={queue}
-                                    allQueues={allQueues}
-                                    canManage={can.manage}
-                                    nowMs={nowMs}
-                                    selectedAlertIds={selectedAlertIds}
-                                    onToggleSelect={handleToggleSelect}
-                                    onOpen={openWorkspace}
-                                />
-                            </div>
-                        ))}
+                >
+                    {/* Summary stats */}
+                    <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Active Queues
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold">
+                                    {queues.length}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Total Alerts
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold">
+                                    {totalAlerts}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    SLA Breached
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p
+                                    className={`text-2xl font-bold ${totalBreached > 0 ? 'text-status-critical' : ''}`}
+                                >
+                                    {totalBreached}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-medium text-muted-foreground">
+                                    Selected
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-2xl font-bold">
+                                    {selectedAlertIds.size}
+                                </p>
+                            </CardContent>
+                        </Card>
                     </div>
-                )}
+
+                    {/* Kanban columns */}
+                    {queues.length === 0 ? (
+                        <Card>
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <CheckCircle2 className="mb-4 h-12 w-12 text-status-success" />
+                                <p className="text-lg font-medium text-muted-foreground">
+                                    No active triage queues configured
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Set up triage queues to enable the
+                                    escalation workflow.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="flex items-start gap-0 overflow-x-auto pb-4">
+                            {queues.map((queue, index) => (
+                                <div
+                                    key={queue.id}
+                                    className="flex items-start"
+                                >
+                                    {index > 0 && (
+                                        <div className="flex items-center self-stretch px-1 pt-20">
+                                            <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
+                                        </div>
+                                    )}
+                                    <QueueColumn
+                                        queue={queue}
+                                        allQueues={allQueues}
+                                        canManage={can.manage}
+                                        nowMs={nowMs}
+                                        selectedAlertIds={selectedAlertIds}
+                                        onToggleSelect={handleToggleSelect}
+                                        onOpen={openWorkspace}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CommandCentrePage>
             </PageShell>
 
             {/* Floating bulk action bar */}
@@ -937,7 +957,11 @@ export default function EscalationQueue({
 
             {/* Workspace-over-list */}
             {detail ? (
-                <AlertWorkspaceDialog detail={detail} open onClose={closeWorkspace} />
+                <AlertWorkspaceDialog
+                    detail={detail}
+                    open
+                    onClose={closeWorkspace}
+                />
             ) : null}
 
             {/* Pulse animation style */}

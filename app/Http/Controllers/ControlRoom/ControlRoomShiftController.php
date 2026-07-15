@@ -65,7 +65,7 @@ class ControlRoomShiftController extends Controller
             ];
 
             $notes = OperatorNote::where('shift_id', $activeShift->id)
-                ->with('user:id,name')
+                ->with(['user:id,name', 'alert:id,reference_number'])
                 ->orderByDesc('is_pinned')
                 ->orderByDesc('created_at')
                 ->get()
@@ -77,6 +77,7 @@ class ControlRoomShiftController extends Controller
                     'requires_followup' => $note->requires_followup,
                     'followup_at' => $note->followup_at?->toISOString(),
                     'alert_id' => $note->alert_id,
+                    'alert_reference' => $note->alert?->reference_number,
                     'user' => $note->user ? [
                         'id' => $note->user->id,
                         'name' => $note->user->name,

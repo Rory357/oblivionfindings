@@ -28,6 +28,7 @@ class ControlRoomMyTasksController extends Controller
             ->get()
             ->map(fn (ControlRoomAlert $a) => [
                 'id' => $a->id,
+                'reference_number' => $a->reference_number,
                 'source' => $a->source,
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
@@ -59,7 +60,7 @@ class ControlRoomMyTasksController extends Controller
         // My Follow-ups: operator notes I created that need followup
         $myFollowups = OperatorNote::where('user_id', $user->id)
             ->where('requires_followup', true)
-            ->with(['alert:id,alert_type,severity,status'])
+            ->with(['alert:id,reference_number,alert_type,severity,status'])
             ->orderBy('followup_at')
             ->orderByDesc('created_at')
             ->limit(30)
@@ -72,6 +73,7 @@ class ControlRoomMyTasksController extends Controller
                 'created_at' => optional($n->created_at)->toISOString(),
                 'alert' => $n->alert ? [
                     'id' => $n->alert->id,
+                    'reference_number' => $n->alert->reference_number,
                     'alert_type' => $n->alert->alert_type,
                     'severity' => $n->alert->severity,
                     'status' => $n->alert->status,

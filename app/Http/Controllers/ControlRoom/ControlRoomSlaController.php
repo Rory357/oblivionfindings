@@ -186,7 +186,7 @@ class ControlRoomSlaController extends Controller
         $user = request()->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
-        $sla->update(['is_active' => !$sla->is_active]);
+        $sla->update(['is_active' => ! $sla->is_active]);
 
         AuditLogger::log('controlRoom.sla.toggleActive', $sla, [
             'sla_id' => $sla->id,
@@ -239,17 +239,17 @@ class ControlRoomSlaController extends Controller
                 $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
             })
             ->with([
-                'alert:id,alert_type,severity,source,status,triggered_at',
+                'alert:id,reference_number,alert_type,severity,source,status,triggered_at',
                 'slaDefinition:id,name,code',
             ]);
 
-        if (!empty($filters['severity'])) {
+        if (! empty($filters['severity'])) {
             $query->whereHas('alert', function ($q) use ($filters) {
                 $q->where('severity', $filters['severity']);
             });
         }
 
-        if (!empty($filters['breach_type'])) {
+        if (! empty($filters['breach_type'])) {
             $breachType = $filters['breach_type'];
             $query->milestoneBreached($breachType);
         }
@@ -263,6 +263,7 @@ class ControlRoomSlaController extends Controller
                 return [
                     'id' => $alertSla->id,
                     'alert_id' => $alertSla->alert_id,
+                    'alert_reference' => $alertSla->alert?->reference_number,
                     'alert_type' => $alertSla->alert?->alert_type,
                     'severity' => $alertSla->alert?->severity,
                     'source' => $alertSla->alert?->source,

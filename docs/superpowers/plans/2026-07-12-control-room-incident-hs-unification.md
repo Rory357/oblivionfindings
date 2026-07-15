@@ -921,38 +921,47 @@ git commit -m "feat(control-room): require incoming handover acceptance"
 - Test: `resources/js/components/command-centre/command-centre-page.test.tsx`
 - Test: `tests/Feature/ControlRoom/ControlRoomShellConsistencyTest.php`
 
-- [ ] **Step 1: Inventory every routed Control Room page in a failing consistency test**
+- [x] **Step 1: Inventory every routed Control Room page in a failing consistency test**
 
 Build the expected route/component matrix from `routes/control-room.php`. Assert each primary operator page uses the shared workspace strip and either the full or compact command-centre shell, and assert each specialist page has a unique title rather than the repeated generic `Command Centre` label.
 
-- [ ] **Step 2: Write failing component semantics tests**
+- [x] **Step 2: Write failing component semantics tests**
 
 `WorkspaceStrip` renders route navigation in a `<nav>`, sets `aria-current="page"` on the active destination, supports keyboard focus, and does not use `role="tab"` without a tab panel. `CommandCentrePage` exposes title, description, status/freshness, actions, optional workflow, and optional footer filters.
 
-- [ ] **Step 3: Implement full and compact shell variants**
+- [x] **Step 3: Implement full and compact shell variants**
 
 Use the extracted hero primitives. The full variant supports Desk, Active alerts, Escalations, Safety handovers, My queue, and Shifts. The compact variant gives Devices, Playbooks, SLA, Reports, Stats, Broadcasts, Messaging, and Settings the same eyebrow, medallion, hierarchy, spacing, and action treatment without duplicating dashboard KPIs.
 
-- [ ] **Step 4: Replace page-local status/date/reference maps while touching each page**
+- [x] **Step 4: Replace page-local status/date/reference maps while touching each page**
 
 Use `control-room-vocab.ts`, the shared alert status component, and `resources/js/lib/datetime.ts`. Preserve domain-specific content and actions. Remove raw enum labels, colour-only SLA dots, fabricated references, and repeated local relative-time helpers from the listed pages.
 
-- [ ] **Step 5: Apply page-specific information architecture**
+- [x] **Step 5: Apply page-specific information architecture**
 
 Use exact titles: `Escalations`, `My queue`, `Live map`, `Control Room shifts`, `Operational analytics`, `Reports`, `Messaging`, `Settings`, `Devices`, `Playbooks`, `SLA performance`, and `Broadcasts`. Keep route navigation stable and ensure the first action matches the page purpose.
 
-- [ ] **Step 6: Run component, route, type, and formatting checks**
+- [x] **Step 6: Run component, route, type, and formatting checks**
 
 Run: `npm test -- resources/js/components/command-centre/workspace-strip.test.tsx resources/js/components/command-centre/command-centre-page.test.tsx && php artisan test tests/Feature/ControlRoom/ControlRoomShellConsistencyTest.php && npm run types && npx prettier --check resources/js/components/command-centre resources/js/pages/control-room`
 
 Expected: all routed desktop Control Room pages use the shared shell contract and compile without new type or formatting errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add resources/js/components/command-centre resources/js/pages/control-room tests/Feature/ControlRoom/ControlRoomShellConsistencyTest.php
 git commit -m "feat(control-room): unify the command-centre module shell"
 ```
+
+**Task 13 evidence (2026-07-15):**
+
+- Added the semantic desktop workspace strip and full/compact `CommandCentrePage` shell, then applied unique page purpose, hierarchy and actions across every routed Control Room operator and specialist surface in the route matrix.
+- Replaced remaining compatibility-table, My queue, escalation, device-history and SLA-breach alert badges with the shared alert vocabulary; added truthful official references and removed fabricated `CR-123`/`#123` labels and repeated page-local relative-time formatters.
+- `npx vitest run resources/js/components/command-centre/command-centre-page.test.tsx resources/js/components/command-centre/workspace-strip.test.tsx resources/js/components/control-room/alert-worklist/alert-worklist.test.tsx` passed: 3 files, 4 tests.
+- `npm run types`, targeted ESLint, targeted Prettier, Pint, PHP syntax checks and `git diff --check` passed.
+- Focused Control Room shell/My queue/escalation/shift suite passed: 29 tests, 212 assertions. Operational surface site-isolation passed: 17 tests. The SLA breach fixture was corrected to use its tenant site and then passed with 18 assertions, including the official-reference contract.
+- Desktop browser proof remains intentionally deferred to Tasks 15–16. No mobile/responsive/WebView testing, merge, push or deployment was performed.
 
 ---
 

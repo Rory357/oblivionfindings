@@ -70,11 +70,12 @@ class ControlRoomEscalationController extends Controller
                     // Build client name from relation
                     $clientName = null;
                     if ($alert->client) {
-                        $clientName = trim($alert->client->first_name . ' ' . $alert->client->last_name);
+                        $clientName = trim($alert->client->first_name.' '.$alert->client->last_name);
                     }
 
                     return [
                         'id' => $alert->id,
+                        'reference_number' => $alert->reference_number,
                         'severity' => $alert->severity,
                         'alert_type' => $formattedAlertType,
                         'alert_type_raw' => $alert->alert_type,
@@ -154,8 +155,7 @@ class ControlRoomEscalationController extends Controller
         Request $request,
         ControlRoomAlert $alert,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->siteAccess()->assertCanAccessAlert(

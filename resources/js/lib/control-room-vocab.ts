@@ -48,8 +48,11 @@ export const ALERT_SEVERITY_VOCAB: Record<string, StatusVocabulary> = {
 
 export const ALERT_SLA_VOCAB: Record<string, StatusVocabulary> = {
     on_track: { label: 'SLA on track', tone: 'success', icon: CheckCircle2 },
+    green: { label: 'SLA on track', tone: 'success', icon: CheckCircle2 },
     at_risk: { label: 'SLA at risk', tone: 'warning', icon: Clock3 },
+    yellow: { label: 'SLA at risk', tone: 'warning', icon: Clock3 },
     breached: { label: 'SLA breached', tone: 'critical', icon: Siren },
+    red: { label: 'SLA breached', tone: 'critical', icon: Siren },
     resolved: { label: 'SLA complete', tone: 'success', icon: CheckCircle2 },
     not_applicable: { label: 'No SLA', tone: 'neutral', icon: CircleDot },
 };

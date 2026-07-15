@@ -1,3 +1,4 @@
+import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
 import { AlertWorklist } from '@/components/control-room/alert-worklist/alert-worklist';
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
 import {
@@ -24,19 +25,17 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatRelative } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Bell,
     BellOff,
     CheckCircle2,
     ChevronDown,
     ChevronUp,
-    Circle,
     Clock,
     Eye,
     Filter,
-    ShieldAlert,
     User,
     UserPlus,
     X,
@@ -115,69 +114,6 @@ interface Props {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const severityColors: Record<string, string> = {
-    critical: 'bg-status-critical text-white',
-    high: 'bg-status-warning text-white',
-    medium: 'bg-status-warning text-black',
-    low: 'bg-status-success text-white',
-};
-
-const severityBorders: Record<string, string> = {
-    critical: 'border-l-red-600',
-    high: 'border-l-orange-500',
-    medium: 'border-l-yellow-500',
-    low: 'border-l-green-600',
-};
-
-const statusColors: Record<string, string> = {
-    open: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    ack: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    triaging: 'bg-status-info-bg text-status-info border-status-info/30',
-    resolved:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    closed: 'bg-muted text-foreground border-border',
-};
-
-const statusLabels: Record<string, string> = {
-    open: 'Open',
-    ack: 'Acknowledged',
-    triaging: 'Triaging',
-    resolved: 'Resolved',
-    closed: 'Closed',
-};
-
-const slaColors: Record<string, string> = {
-    green: 'text-status-success',
-    yellow: 'text-status-warning',
-    red: 'text-status-critical',
-};
-
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-}
-
-function severityIcon(severity: string) {
-    switch (severity) {
-        case 'critical':
-            return <ShieldAlert className="h-3 w-3" />;
-        case 'high':
-            return <AlertTriangle className="h-3 w-3" />;
-        default:
-            return null;
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -711,11 +647,7 @@ export default function AlertsIndex({
                                                 onClick={() =>
                                                     openWorkspace(alert.id)
                                                 }
-                                                className={`cursor-pointer border-b border-l-4 transition-colors hover:bg-muted/40 ${
-                                                    severityBorders[
-                                                        alert.severity
-                                                    ] ?? 'border-l-transparent'
-                                                } ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
+                                                className={`cursor-pointer border-b border-l-4 border-l-primary/50 transition-colors hover:bg-muted/40 ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
                                                     selected.has(alert.id)
                                                         ? 'bg-primary/5'
                                                         : ''
@@ -770,33 +702,16 @@ export default function AlertsIndex({
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-2.5">
-                                                    <Badge
-                                                        className={`inline-flex items-center gap-1 ${
-                                                            severityColors[
-                                                                alert.severity
-                                                            ] ??
-                                                            'bg-muted-foreground/80 text-white'
-                                                        }`}
-                                                    >
-                                                        {severityIcon(
-                                                            alert.severity,
-                                                        )}
-                                                        {alert.severity}
-                                                    </Badge>
+                                                    <AlertStatusChip
+                                                        kind="severity"
+                                                        value={alert.severity}
+                                                    />
                                                 </td>
                                                 <td className="px-3 py-2.5">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            statusColors[
-                                                                alert.status
-                                                            ] ?? ''
-                                                        }
-                                                    >
-                                                        {statusLabels[
-                                                            alert.status
-                                                        ] ?? alert.status}
-                                                    </Badge>
+                                                    <AlertStatusChip
+                                                        kind="status"
+                                                        value={alert.status}
+                                                    />
                                                     {alert.snoozed_until &&
                                                     new Date(
                                                         alert.snoozed_until,
@@ -812,14 +727,11 @@ export default function AlertsIndex({
                                                 </td>
                                                 <td className="px-3 py-2.5">
                                                     {alert.sla_status ? (
-                                                        <Circle
-                                                            className={`h-3 w-3 fill-current ${
-                                                                slaColors[
-                                                                    alert
-                                                                        .sla_status
-                                                                ] ??
-                                                                'text-muted-foreground'
-                                                            }`}
+                                                        <AlertStatusChip
+                                                            kind="sla"
+                                                            value={
+                                                                alert.sla_status
+                                                            }
                                                         />
                                                     ) : (
                                                         <span className="text-xs text-muted-foreground">
@@ -839,7 +751,7 @@ export default function AlertsIndex({
                                                         }
                                                     >
                                                         <Clock className="h-3 w-3" />
-                                                        {formatRelativeTime(
+                                                        {formatRelative(
                                                             alert.triggered_at,
                                                         )}
                                                     </span>

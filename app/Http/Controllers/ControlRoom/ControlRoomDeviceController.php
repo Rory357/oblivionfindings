@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
@@ -94,12 +96,12 @@ class ControlRoomDeviceController extends Controller
 
         $client = null;
         if ($device->client_id) {
-            $client = \App\Models\Client::find($device->client_id, ['id', 'first_name', 'last_name']);
+            $client = Client::find($device->client_id, ['id', 'first_name', 'last_name']);
         }
 
         $asset = null;
         if ($device->asset_id) {
-            $asset = \App\Models\Asset::find($device->asset_id, ['id', 'name', 'asset_tag']);
+            $asset = Asset::find($device->asset_id, ['id', 'name', 'asset_tag']);
         }
 
         // Recent signals (last 50).
@@ -123,6 +125,7 @@ class ControlRoomDeviceController extends Controller
             ->get()
             ->map(fn ($a) => [
                 'id' => $a->id,
+                'reference_number' => $a->reference_number,
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
                 'status' => $a->status,
@@ -159,7 +162,7 @@ class ControlRoomDeviceController extends Controller
                 'site' => $site ? ['id' => $site->id, 'name' => $site->name] : null,
                 'client' => $client ? [
                     'id' => $client->id,
-                    'name' => trim($client->first_name . ' ' . $client->last_name),
+                    'name' => trim($client->first_name.' '.$client->last_name),
                 ] : null,
                 'asset' => $asset ? [
                     'id' => $asset->id,

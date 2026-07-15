@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -133,16 +134,6 @@ interface Props {
 }
 
 const STEPS = ['Urgent work', 'Context', 'Incoming team', 'Final review'];
-
-function formatDateTime(value: string | null | undefined): string {
-    if (!value) return 'Not recorded';
-
-    return new Intl.DateTimeFormat('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Pacific/Auckland',
-    }).format(new Date(value));
-}
 
 function formatDuration(minutes: number | null): string {
     if (minutes === null) return 'Not available';

@@ -1,11 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
+import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AppLayout from '@/layouts/app-layout';
+import { formatRelative } from '@/lib/datetime';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -66,21 +74,6 @@ interface Props {
     device_types: Record<string, string>;
 }
 
-function formatRelativeTime(isoString: string | null): string {
-    if (!isoString) return 'Never';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-}
-
 const statusDotColor: Record<string, string> = {
     online: 'bg-status-success',
     offline: 'bg-status-critical',
@@ -104,10 +97,14 @@ const typeBadgeColors: Record<string, string> = {
     camera: 'bg-status-info-bg text-status-info border-status-info/30',
     door: 'bg-primary/10 text-primary border-primary',
     sensor: 'bg-status-info-bg text-status-info border-status-info/30',
-    alarm_panel: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    bed_sensor: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    personal_tracker: 'bg-status-success-bg text-status-success border-status-success/30',
-    vehicle_tracker: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    alarm_panel:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    bed_sensor:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    personal_tracker:
+        'bg-status-success-bg text-status-success border-status-success/30',
+    vehicle_tracker:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     environmental: 'bg-status-info-bg text-status-info border-status-info/30',
     network: 'bg-muted text-foreground border-border',
 };
@@ -138,8 +135,11 @@ function BatteryIndicator({ level }: { level: number | null }) {
     return (
         <div className="flex items-center gap-1.5">
             <Icon className={`h-3.5 w-3.5 ${textColor}`} />
-            <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
-                <div className={`h-full rounded-full ${color}`} style={{ width: `${level}%` }} />
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                <div
+                    className={`h-full rounded-full ${color}`}
+                    style={{ width: `${level}%` }}
+                />
             </div>
             <span className={`text-xs font-medium ${textColor}`}>{level}%</span>
         </div>
@@ -156,18 +156,22 @@ function DeviceCard({ device }: { device: DeviceItem }) {
 
     return (
         <Link href={`/control-room/devices/${device.id}`} className="block">
-            <Card className={`hover:shadow-md transition-all cursor-pointer ${cardBg}`}>
+            <Card
+                className={`cursor-pointer transition-all hover:shadow-md ${cardBg}`}
+            >
                 <CardContent className="pt-4 pb-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${statusDotColor[device.status] ?? 'bg-muted'}`} />
-                            <h3 className="font-medium text-sm truncate">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <span
+                                className={`inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full ${statusDotColor[device.status] ?? 'bg-muted'}`}
+                            />
+                            <h3 className="truncate text-sm font-medium">
                                 {device.name || device.device_uid}
                             </h3>
                         </div>
                         <Badge
                             variant="outline"
-                            className={`text-[10px] flex-shrink-0 flex items-center gap-1 ${typeBadgeColors[device.type] ?? ''}`}
+                            className={`flex flex-shrink-0 items-center gap-1 text-[10px] ${typeBadgeColors[device.type] ?? ''}`}
                         >
                             {typeIcons[device.type]}
                             {device.type_label}
@@ -175,12 +179,16 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                     </div>
 
                     {device.name && (
-                        <p className="text-xs text-muted-foreground mb-2 font-mono truncate">{device.device_uid}</p>
+                        <p className="mb-2 truncate font-mono text-xs text-muted-foreground">
+                            {device.device_uid}
+                        </p>
                     )}
 
                     {(device.vendor || device.model) && (
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
-                            {[device.vendor, device.model].filter(Boolean).join(' ')}
+                        <p className="mb-2 truncate text-xs text-muted-foreground">
+                            {[device.vendor, device.model]
+                                .filter(Boolean)
+                                .join(' ')}
                         </p>
                     )}
 
@@ -195,7 +203,7 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                             ) : (
                                 <WifiOff className="h-3 w-3 text-status-critical" />
                             )}
-                            {formatRelativeTime(device.last_seen_at)}
+                            {formatRelative(device.last_seen_at)}
                         </span>
                         {device.signal_source_name && (
                             <span className="flex items-center gap-1">
@@ -206,7 +214,7 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                     </div>
 
                     {device.site_name && (
-                        <p className="text-xs text-muted-foreground mt-1.5 truncate">
+                        <p className="mt-1.5 truncate text-xs text-muted-foreground">
                             {device.site_name}
                         </p>
                     )}
@@ -228,205 +236,254 @@ const typeTabMap: Array<{ value: string; label: string }> = [
     { value: 'network', label: 'Network' },
 ];
 
-export default function DevicesIndex({ devices, stats, filters, sites }: Props) {
+export default function DevicesIndex({
+    devices,
+    stats,
+    filters,
+    sites,
+}: Props) {
     const applyFilter = (key: string, value: string | boolean) => {
         const newFilters: Record<string, string | boolean | undefined> = {
             ...filters,
             [key]: value || undefined,
         };
         // Reset to page 1 on filter change
-        router.get('/control-room/devices', newFilters as Record<string, string>, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        router.get(
+            '/control-room/devices',
+            newFilters as Record<string, string>,
+            {
+                preserveState: true,
+                preserveScroll: true,
+            },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Control Room', href: '/control-room' },
-            { title: 'Devices', href: '#' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Control Room', href: '/control-room' },
+                { title: 'Devices', href: '#' },
+            ]}
+        >
             <Head title="Device Monitoring" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={Cctv}
-                        title="Device Monitoring"
-                        description="Monitor IoT device health and connectivity status"
-                        stats={[
-                            { label: 'Total', value: stats.total },
-                            { label: 'Online', value: stats.online },
-                            { label: 'Offline', value: stats.offline },
-                            { label: 'Low battery', value: stats.low_battery },
-                        ]}
-                        actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/control-room">Dashboard</Link>
-                            </Button>
-                        }
-                    />
-                }
-            >
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-4 pb-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Total Devices
-                                    </p>
-                                    <p className="text-2xl font-bold">{stats.total}</p>
-                                </div>
-                                <Cpu className="h-8 w-8 text-muted-foreground/30" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-success/50">
-                        <CardContent className="pt-4 pb-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-status-success uppercase tracking-wider">
-                                        Online
-                                    </p>
-                                    <p className="text-2xl font-bold text-status-success">{stats.online}</p>
-                                </div>
-                                <Wifi className="h-8 w-8 text-status-success" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-critical/50">
-                        <CardContent className="pt-4 pb-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-status-critical uppercase tracking-wider">
-                                        Offline
-                                    </p>
-                                    <p className="text-2xl font-bold text-status-critical">{stats.offline}</p>
-                                </div>
-                                <WifiOff className="h-8 w-8 text-status-critical" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-warning/50">
-                        <CardContent className="pt-4 pb-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-status-warning uppercase tracking-wider">
-                                        Low Battery
-                                    </p>
-                                    <p className="text-2xl font-bold text-status-warning">{stats.low_battery}</p>
-                                </div>
-                                <BatteryLow className="h-8 w-8 text-status-warning" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Type Tabs */}
-                <Tabs
-                    defaultValue={filters.type || 'all'}
-                    onValueChange={(v) => applyFilter('type', v === 'all' ? '' : v)}
-                    className="w-full"
+            <PageLayout>
+                <CommandCentrePage
+                    variant="compact"
+                    current="/control-room/devices"
+                    icon={Cctv}
+                    title="Devices"
+                    description="Monitor IoT device health, connectivity, battery state, and location context."
+                    status="Device monitoring workspace"
+                    freshness={`${stats.online} online · ${stats.offline} offline`}
+                    actions={
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                        >
+                            <Link href="/control-room/map">Open live map</Link>
+                        </Button>
+                    }
                 >
-                    <TabsList className="flex flex-wrap h-auto gap-1">
-                        {typeTabMap.map((tab) => (
-                            <TabsTrigger key={tab.value} value={tab.value} className="text-xs">
-                                {tab.label}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                </Tabs>
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Card>
+                            <CardContent className="pt-4 pb-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                            Total Devices
+                                        </p>
+                                        <p className="text-2xl font-bold">
+                                            {stats.total}
+                                        </p>
+                                    </div>
+                                    <Cpu className="h-8 w-8 text-muted-foreground/30" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-status-success/50">
+                            <CardContent className="pt-4 pb-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium tracking-wider text-status-success uppercase">
+                                            Online
+                                        </p>
+                                        <p className="text-2xl font-bold text-status-success">
+                                            {stats.online}
+                                        </p>
+                                    </div>
+                                    <Wifi className="h-8 w-8 text-status-success" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-status-critical/50">
+                            <CardContent className="pt-4 pb-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium tracking-wider text-status-critical uppercase">
+                                            Offline
+                                        </p>
+                                        <p className="text-2xl font-bold text-status-critical">
+                                            {stats.offline}
+                                        </p>
+                                    </div>
+                                    <WifiOff className="h-8 w-8 text-status-critical" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-status-warning/50">
+                            <CardContent className="pt-4 pb-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium tracking-wider text-status-warning uppercase">
+                                            Low Battery
+                                        </p>
+                                        <p className="text-2xl font-bold text-status-warning">
+                                            {stats.low_battery}
+                                        </p>
+                                    </div>
+                                    <BatteryLow className="h-8 w-8 text-status-warning" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                {/* Filters Row */}
-                <div className="flex flex-wrap items-center gap-3">
-                    <Select
-                        value={filters.status || 'all'}
-                        onValueChange={(v) => applyFilter('status', v === 'all' ? '' : v)}
+                    {/* Type Tabs */}
+                    <Tabs
+                        defaultValue={filters.type || 'all'}
+                        onValueChange={(v) =>
+                            applyFilter('type', v === 'all' ? '' : v)
+                        }
+                        className="w-full"
                     >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="online">Online</SelectItem>
-                            <SelectItem value="offline">Offline</SelectItem>
-                            <SelectItem value="maintenance">Maintenance</SelectItem>
-                            <SelectItem value="retired">Retired</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <Select
-                        value={filters.site_id || 'all'}
-                        onValueChange={(v) => applyFilter('site_id', v === 'all' ? '' : v)}
-                    >
-                        <SelectTrigger className="w-48">
-                            <SelectValue placeholder="Site" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Sites</SelectItem>
-                            {sites.map((site) => (
-                                <SelectItem key={site.id} value={String(site.id)}>
-                                    {site.name}
-                                </SelectItem>
+                        <TabsList className="flex h-auto flex-wrap gap-1">
+                            {typeTabMap.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                    className="text-xs"
+                                >
+                                    {tab.label}
+                                </TabsTrigger>
                             ))}
-                        </SelectContent>
-                    </Select>
+                        </TabsList>
+                    </Tabs>
 
-                    <Button
-                        variant={filters.low_battery ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => applyFilter('low_battery', !filters.low_battery)}
-                        className="flex items-center gap-1.5"
-                    >
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Low Battery
-                    </Button>
-                </div>
+                    {/* Filters Row */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Select
+                            value={filters.status || 'all'}
+                            onValueChange={(v) =>
+                                applyFilter('status', v === 'all' ? '' : v)
+                            }
+                        >
+                            <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="online">Online</SelectItem>
+                                <SelectItem value="offline">Offline</SelectItem>
+                                <SelectItem value="maintenance">
+                                    Maintenance
+                                </SelectItem>
+                                <SelectItem value="retired">Retired</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                {/* Device Grid */}
-                {devices.data.length === 0 ? (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="py-12 text-center text-sm text-muted-foreground">
-                                <Cpu className="mx-auto mb-3 h-12 w-12 opacity-40" />
-                                <p>No devices found matching your filters.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {devices.data.map((device) => (
-                            <DeviceCard key={device.id} device={device} />
-                        ))}
+                        <Select
+                            value={filters.site_id || 'all'}
+                            onValueChange={(v) =>
+                                applyFilter('site_id', v === 'all' ? '' : v)
+                            }
+                        >
+                            <SelectTrigger className="w-48">
+                                <SelectValue placeholder="Site" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Sites</SelectItem>
+                                {sites.map((site) => (
+                                    <SelectItem
+                                        key={site.id}
+                                        value={String(site.id)}
+                                    >
+                                        {site.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Button
+                            variant={
+                                filters.low_battery ? 'default' : 'outline'
+                            }
+                            size="sm"
+                            onClick={() =>
+                                applyFilter('low_battery', !filters.low_battery)
+                            }
+                            className="flex items-center gap-1.5"
+                        >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Low Battery
+                        </Button>
                     </div>
-                )}
 
-                {/* Pagination */}
-                {devices.links?.length > 3 && (
-                    <div className="flex justify-center gap-1 flex-wrap">
-                        {devices.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(link.url, {}, { preserveState: true, preserveScroll: true })
-                                }
-                            >
-                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                            </Button>
-                        ))}
-                    </div>
-                )}
+                    {/* Device Grid */}
+                    {devices.data.length === 0 ? (
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="py-12 text-center text-sm text-muted-foreground">
+                                    <Cpu className="mx-auto mb-3 h-12 w-12 opacity-40" />
+                                    <p>
+                                        No devices found matching your filters.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {devices.data.map((device) => (
+                                <DeviceCard key={device.id} device={device} />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Pagination */}
+                    {devices.links?.length > 3 && (
+                        <div className="flex flex-wrap justify-center gap-1">
+                            {devices.links.map((link, i) => (
+                                <Button
+                                    key={i}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    size="sm"
+                                    disabled={!link.url}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                >
+                                    <span
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
+                                </Button>
+                            ))}
+                        </div>
+                    )}
+                </CommandCentrePage>
             </PageLayout>
         </AppLayout>
     );

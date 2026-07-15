@@ -33,6 +33,22 @@ function StatusChip({ item }: { item: ReturnType<typeof vocabularyFor> }) {
     );
 }
 
+const ALERT_VOCABULARY = {
+    status: ALERT_STATUS_VOCAB,
+    severity: ALERT_SEVERITY_VOCAB,
+    sla: ALERT_SLA_VOCAB,
+} as const;
+
+export function AlertStatusChip({
+    kind,
+    value,
+}: {
+    kind: keyof typeof ALERT_VOCABULARY;
+    value: string | null | undefined;
+}) {
+    return <StatusChip item={vocabularyFor(ALERT_VOCABULARY[kind], value)} />;
+}
+
 export function AlertStatus({
     status,
     severity,
@@ -44,10 +60,10 @@ export function AlertStatus({
 }) {
     return (
         <div role="status" className="flex flex-wrap items-center gap-1.5">
-            <StatusChip item={vocabularyFor(ALERT_STATUS_VOCAB, status)} />
-            <StatusChip item={vocabularyFor(ALERT_SEVERITY_VOCAB, severity)} />
+            <AlertStatusChip kind="status" value={status} />
+            <AlertStatusChip kind="severity" value={severity} />
             {slaStatus ? (
-                <StatusChip item={vocabularyFor(ALERT_SLA_VOCAB, slaStatus)} />
+                <AlertStatusChip kind="sla" value={slaStatus} />
             ) : null}
         </div>
     );
