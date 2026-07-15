@@ -8,6 +8,7 @@ use App\Services\AuditLogger;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
+use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
@@ -149,7 +150,15 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
     public function tasks(User $user, array $filters = []): array
     {
         $query = ControlRoomAlert::query()
-            ->with(['client:id,first_name,last_name', 'site:id,name', 'assignedTo:id,name'])
+            ->with([
+                'client:id,first_name,last_name',
+                'site:id,name',
+                'assignedTo:id,name',
+                'clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
+                'clientIncident.client:id,first_name,last_name',
+                'clientIncident.site:id,name',
+                'clientIncident.hsEvent:id,reference_number',
+            ])
             // Same site scoping as the Control Room index (applyAlertScope) —
             // the queue must never show alerts the module itself would hide.
             ->tap(fn ($q) => app(UserSiteAccessService::class)->applyAlertScope($q, $user, self::ALERT_BYPASS_PERMISSIONS))
@@ -161,8 +170,15 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
         }
 
         return $query->get()->map(function (ControlRoomAlert $alert) {
-            $client = $alert->client;
-            $site = $alert->site;
+            $journey = IncidentJourneyTaskContext::make($alert->clientIncident, $alert);
+            $client = $journey['person'] ?? ($alert->client ? [
+                'id' => $alert->client->id,
+                'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
+            ] : null);
+            $site = $journey['site'] ?? ($alert->site ? [
+                'id' => $alert->site->id,
+                'name' => (string) $alert->site->name,
+            ] : null);
 
             $title = ucfirst(str_replace('_', ' ', (string) $alert->alert_type));
 
@@ -186,17 +202,16 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                 assignee: $alert->assignedTo
                     ? ['id' => $alert->assignedTo->id, 'name' => (string) $alert->assignedTo->name]
                     : null,
-                client: $client
-                    ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
-                    : null,
-                site: $site
-                    ? ['id' => $site->id, 'name' => (string) $site->name]
-                    : null,
+                client: $client,
+                site: $site,
                 dueAt: optional($alert->due_at)->toIso8601String(),
                 createdAt: optional($alert->created_at)->toIso8601String(),
                 link: "/control-room/alerts/{$alert->id}",
                 type: 'Alert',
                 description: $alert->notes ? str($alert->notes)->limit(140)->toString() : null,
+                journey: $journey,
+                sourceContext: str_replace('_', ' ', (string) ($alert->source ?: $alert->alert_type)),
+                actionLabel: 'Continue Control Room response',
             );
         })->all();
     }

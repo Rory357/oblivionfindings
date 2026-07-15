@@ -7,11 +7,15 @@ use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
+use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
-class IncidentFollowupProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class IncidentFollowupProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
+    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites', 'reports.viewAny'];
+
     public function sourceKey(): string
     {
         return 'followup';
@@ -38,6 +42,11 @@ class IncidentFollowupProvider implements TaskProvider, HasModelClass, Assignabl
     {
         // Re-fetch with the same viewAssigned client scoping tasks() applies.
         $followup = IncidentFollowup::query()
+            ->whereHas('incident', fn ($query) => app(UserSiteAccessService::class)->applyClientIncidentScope(
+                $query,
+                $actor,
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             ->when(
                 ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
                 fn ($q) => $q->whereHas('incident.client.supportWorkers', fn ($qq) => $qq->whereKey($actor->id)),
@@ -70,10 +79,18 @@ class IncidentFollowupProvider implements TaskProvider, HasModelClass, Assignabl
     {
         $query = IncidentFollowup::query()
             ->with([
-                'incident:id,reference_number,title,client_id',
+                'incident:id,reference_number,title,client_id,site_id,hs_event_id,control_room_alert_id,source,occurred_at',
+                'incident.site:id,name',
+                'incident.controlRoomAlert:id,reference_number',
+                'incident.hsEvent:id,reference_number',
                 'incident.client:id,first_name,last_name',
                 'assignedTo:id,name',
             ])
+            ->whereHas('incident', fn ($q) => app(UserSiteAccessService::class)->applyClientIncidentScope(
+                $q,
+                $user,
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             // Same viewAssigned client scoping as the incidents register.
             ->when(
                 ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
@@ -88,7 +105,7 @@ class IncidentFollowupProvider implements TaskProvider, HasModelClass, Assignabl
 
         return $query->get()->map(function (IncidentFollowup $followup) {
             $incident = $followup->incident;
-            $client = $incident?->client;
+            $journey = IncidentJourneyTaskContext::make($incident);
 
             return new TaskItem(
                 id: 'followup-'.$followup->id,
@@ -104,14 +121,16 @@ class IncidentFollowupProvider implements TaskProvider, HasModelClass, Assignabl
                 assignee: $followup->assignedTo
                     ? ['id' => $followup->assignedTo->id, 'name' => $followup->assignedTo->name]
                     : null,
-                client: $client
-                    ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
-                    : null,
+                client: $journey['person'] ?? null,
+                site: $journey['site'] ?? null,
                 dueAt: optional($followup->due_at)->toIso8601String(),
                 createdAt: optional($followup->created_at)->toIso8601String(),
-                link: "/incidents/{$followup->client_incident_id}",
+                link: "/incidents?incident={$followup->client_incident_id}",
                 type: 'Follow-up',
                 description: $followup->notes ? str($followup->notes)->limit(140)->toString() : null,
+                journey: $journey,
+                sourceContext: 'Incident follow-up',
+                actionLabel: 'Complete incident follow-up',
             );
         })->all();
     }

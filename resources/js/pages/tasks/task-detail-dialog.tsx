@@ -5,6 +5,7 @@
  * every other modal in the app. Assignment / watch / split mirror the queue's
  * write actions. */
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -17,8 +18,8 @@ import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Eye,
     ExternalLink,
+    Eye,
     GitBranchPlus,
     History,
     Loader2,
@@ -27,7 +28,14 @@ import {
     Users,
     UserX,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
+import { JourneyReferenceStrip } from './journey-reference-strip';
 import {
     childLabelFor,
     dueInfo,
@@ -38,12 +46,13 @@ import {
     type TaskDetail,
     type TaskItem,
 } from './types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex items-baseline justify-between gap-4 py-1.5">
-            <dt className="shrink-0 text-xs font-semibold text-muted-foreground">{label}</dt>
+            <dt className="shrink-0 text-xs font-semibold text-muted-foreground">
+                {label}
+            </dt>
             <dd className="min-w-0 text-right text-sm">{children}</dd>
         </div>
     );
@@ -158,7 +167,10 @@ function SplitTaskForm({
 
             <div className="space-y-3">
                 <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="split-title">
+                    <label
+                        className="mb-1 block text-xs font-medium text-muted-foreground"
+                        htmlFor="split-title"
+                    >
                         Title
                     </label>
                     <input
@@ -172,8 +184,12 @@ function SplitTaskForm({
                 </div>
 
                 <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="split-desc">
-                        Description <span className="font-normal">(optional)</span>
+                    <label
+                        className="mb-1 block text-xs font-medium text-muted-foreground"
+                        htmlFor="split-desc"
+                    >
+                        Description{' '}
+                        <span className="font-normal">(optional)</span>
                     </label>
                     <textarea
                         id="split-desc"
@@ -187,8 +203,12 @@ function SplitTaskForm({
 
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="split-due">
-                            Due date <span className="font-normal">(optional)</span>
+                        <label
+                            className="mb-1 block text-xs font-medium text-muted-foreground"
+                            htmlFor="split-due"
+                        >
+                            Due date{' '}
+                            <span className="font-normal">(optional)</span>
                         </label>
                         <input
                             id="split-due"
@@ -200,13 +220,23 @@ function SplitTaskForm({
                     </div>
 
                     <div className="relative">
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="split-assignee">
-                            Assignee <span className="font-normal">(optional)</span>
+                        <label
+                            className="mb-1 block text-xs font-medium text-muted-foreground"
+                            htmlFor="split-assignee"
+                        >
+                            Assignee{' '}
+                            <span className="font-normal">(optional)</span>
                         </label>
                         {assignee ? (
-                            <GuardrailCard unstyled className="flex h-9 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm">
-                                <span className="truncate">{assignee.name}</span>
-                                <Button unstyled
+                            <GuardrailCard
+                                unstyled
+                                className="flex h-9 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm"
+                            >
+                                <span className="truncate">
+                                    {assignee.name}
+                                </span>
+                                <Button
+                                    unstyled
                                     type="button"
                                     aria-label="Clear assignee"
                                     onClick={() => {
@@ -224,7 +254,9 @@ function SplitTaskForm({
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onFocus={() => setShowResults(true)}
-                                onBlur={() => setTimeout(() => setShowResults(false), 150)}
+                                onBlur={() =>
+                                    setTimeout(() => setShowResults(false), 150)
+                                }
                                 placeholder="Unassigned"
                                 autoComplete="off"
                                 className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -254,11 +286,20 @@ function SplitTaskForm({
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-1">
-                    <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={onCancel}
+                    >
                         Cancel
                     </Button>
                     <Button size="sm" disabled={!canSubmit} onClick={submit}>
-                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        {busy ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4" />
+                        )}
                         Create
                     </Button>
                 </div>
@@ -292,7 +333,10 @@ export function TaskDetailDialog({
         setLoading(true);
         setError(null);
         try {
-            const params = new URLSearchParams({ source: target.source, id: taskNumericId(target) });
+            const params = new URLSearchParams({
+                source: target.source,
+                id: taskNumericId(target),
+            });
             const res = await fetch(`/tasks/detail?${params.toString()}`, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
@@ -301,7 +345,10 @@ export function TaskDetailDialog({
             const data = (await res.json()) as TaskDetail;
             if (seq.current === mySeq) setDetail(data);
         } catch {
-            if (seq.current === mySeq) setError('Could not load this task. It may have been removed, or you may not have access.');
+            if (seq.current === mySeq)
+                setError(
+                    'Could not load this task. It may have been removed, or you may not have access.',
+                );
         } finally {
             if (seq.current === mySeq) setLoading(false);
         }
@@ -357,14 +404,18 @@ export function TaskDetailDialog({
     const submitSplit = (data: SplitPayload) => {
         if (!item) return;
         setSplitBusy(true);
-        router.post(`/tasks/${item.source}/${taskNumericId(item)}/split`, data, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setSplitOpen(false);
-                void fetchDetail(item);
+        router.post(
+            `/tasks/${item.source}/${taskNumericId(item)}/split`,
+            data,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSplitOpen(false);
+                    void fetchDetail(item);
+                },
+                onFinish: () => setSplitBusy(false),
             },
-            onFinish: () => setSplitBusy(false),
-        });
+        );
     };
 
     const due = display ? dueInfo(display) : null;
@@ -372,7 +423,10 @@ export function TaskDetailDialog({
     const childLabel = item ? childLabelFor(item.source) : 'follow-up';
 
     return (
-        <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
+        <Dialog
+            open={item !== null}
+            onOpenChange={(open) => !open && onClose()}
+        >
             <DialogContent
                 data-test="tasks-detail-dialog"
                 className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
@@ -386,23 +440,34 @@ export function TaskDetailDialog({
                                         {display.ref}
                                     </span>
                                 ) : null}
-                                <StatusBadge variant={SEVERITY_VARIANT[display.severity]} size="sm">
+                                <StatusBadge
+                                    variant={SEVERITY_VARIANT[display.severity]}
+                                    size="sm"
+                                >
                                     {humanise(display.severity)}
                                 </StatusBadge>
                                 <StatusBadge variant="neutral" size="sm">
                                     {humanise(display.status)}
                                 </StatusBadge>
                             </div>
-                            <DialogTitle className="text-base leading-snug">{display.title}</DialogTitle>
+                            <DialogTitle className="text-base leading-snug">
+                                {display.title}
+                            </DialogTitle>
                             <DialogDescription>
                                 {display.type ? `${display.type} · ` : ''}
                                 {display.sourceLabel}
+                                {display.sourceContext
+                                    ? ` · ${humanise(display.sourceContext)}`
+                                    : ''}
                             </DialogDescription>
+                            <JourneyReferenceStrip journey={display.journey} />
                         </DialogHeader>
 
                         <div className="flex-1 overflow-y-auto px-5 py-4">
                             {display.description ? (
-                                <p className="mb-4 text-sm whitespace-pre-line text-muted-foreground">{display.description}</p>
+                                <p className="mb-4 text-sm whitespace-pre-line text-muted-foreground">
+                                    {display.description}
+                                </p>
                             ) : null}
 
                             <dl className="divide-y divide-border rounded-lg border border-border px-3 py-1">
@@ -410,21 +475,31 @@ export function TaskDetailDialog({
                                     {display.assignee ? (
                                         display.assignee.name
                                     ) : (
-                                        <span className="text-muted-foreground">Unassigned</span>
+                                        <span className="text-muted-foreground">
+                                            Unassigned
+                                        </span>
                                     )}
                                 </MetaRow>
                                 <MetaRow label="Client">
-                                    <span className="text-muted-foreground">{display.client?.name ?? '—'}</span>
+                                    <span className="text-muted-foreground">
+                                        {display.client?.name ?? '—'}
+                                    </span>
                                 </MetaRow>
                                 <MetaRow label="Site">
-                                    <span className="text-muted-foreground">{display.site?.name ?? '—'}</span>
+                                    <span className="text-muted-foreground">
+                                        {display.site?.name ?? '—'}
+                                    </span>
                                 </MetaRow>
                                 <MetaRow label="Due">
-                                    <span className={due?.className}>{due?.label ?? '—'}</span>
+                                    <span className={due?.className}>
+                                        {due?.label ?? '—'}
+                                    </span>
                                 </MetaRow>
                                 <MetaRow label="Created">
                                     <span className="text-muted-foreground">
-                                        {display.createdAt ? formatDateTime(display.createdAt) : '—'}
+                                        {display.createdAt
+                                            ? formatDateTime(display.createdAt)
+                                            : '—'}
                                     </span>
                                 </MetaRow>
                             </dl>
@@ -493,31 +568,53 @@ export function TaskDetailDialog({
                                             <AlertTriangle className="h-4 w-4 text-status-warning" />
                                             {error}
                                         </span>
-                                        <Button variant="outline" size="sm" onClick={() => item && void fetchDetail(item)}>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                item && void fetchDetail(item)
+                                            }
+                                        >
                                             Retry
                                         </Button>
                                     </div>
                                 ) : detail && detail.timeline.length > 0 ? (
                                     <ul className="space-y-0">
                                         {detail.timeline.map((entry, i) => (
-                                            <li key={entry.id} className="relative flex gap-3 pb-3 last:pb-0">
+                                            <li
+                                                key={entry.id}
+                                                className="relative flex gap-3 pb-3 last:pb-0"
+                                            >
                                                 {/* Rail connecting the dots (skipped after the last entry). */}
-                                                {i < detail.timeline.length - 1 ? (
-                                                    <span className="absolute top-3 left-[3.5px] h-full w-px bg-border" aria-hidden />
+                                                {i <
+                                                detail.timeline.length - 1 ? (
+                                                    <span
+                                                        className="absolute top-3 left-[3.5px] h-full w-px bg-border"
+                                                        aria-hidden
+                                                    />
                                                 ) : null}
-                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary/60" aria-hidden />
+                                                <span
+                                                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary/60"
+                                                    aria-hidden
+                                                />
                                                 <div className="min-w-0 text-sm">
-                                                    <div className="font-medium">{humanise(entry.action)}</div>
+                                                    <div className="font-medium">
+                                                        {humanise(entry.action)}
+                                                    </div>
                                                     <div className="text-xs text-muted-foreground">
                                                         {entry.user ?? 'System'}
-                                                        {entry.at ? ` · ${formatDateTime(entry.at)}` : ''}
+                                                        {entry.at
+                                                            ? ` · ${formatDateTime(entry.at)}`
+                                                            : ''}
                                                     </div>
                                                 </div>
                                             </li>
                                         ))}
                                     </ul>
                                 ) : (
-                                    <p className="py-1 text-sm text-muted-foreground">No recorded activity yet.</p>
+                                    <p className="py-1 text-sm text-muted-foreground">
+                                        No recorded activity yet.
+                                    </p>
                                 )}
                             </div>
                         </div>
@@ -527,18 +624,28 @@ export function TaskDetailDialog({
                             <Button
                                 className="flex-1"
                                 disabled={!display.link}
-                                onClick={() => display.link && router.visit(display.link)}
+                                onClick={() =>
+                                    display.link && router.visit(display.link)
+                                }
                             >
                                 <ExternalLink className="h-4 w-4" />
-                                Open record
+                                {display.actionLabel ?? 'Open record'}
                             </Button>
                             {detail ? (
                                 <Button
-                                    variant={detail.isWatching ? 'default' : 'outline'}
+                                    variant={
+                                        detail.isWatching
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     disabled={watchBusy}
                                     onClick={toggleWatch}
                                     aria-pressed={detail.isWatching}
-                                    title={detail.isWatching ? 'Stop following this task' : 'Follow this task'}
+                                    title={
+                                        detail.isWatching
+                                            ? 'Stop following this task'
+                                            : 'Follow this task'
+                                    }
                                 >
                                     {watchBusy ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -550,18 +657,32 @@ export function TaskDetailDialog({
                             ) : null}
                             {detail?.canAssign ? (
                                 assignedToMe ? (
-                                    <Button variant="outline" disabled={assigning} onClick={() => assign(null)}>
+                                    <Button
+                                        variant="outline"
+                                        disabled={assigning}
+                                        onClick={() => assign(null)}
+                                    >
                                         <UserX className="h-4 w-4" />
                                         Unassign
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button variant="outline" disabled={assigning} onClick={() => assign(currentUserId)}>
+                                        <Button
+                                            variant="outline"
+                                            disabled={assigning}
+                                            onClick={() =>
+                                                assign(currentUserId)
+                                            }
+                                        >
                                             <UserCheck className="h-4 w-4" />
                                             Assign to me
                                         </Button>
                                         {display.assignee ? (
-                                            <Button variant="outline" disabled={assigning} onClick={() => assign(null)}>
+                                            <Button
+                                                variant="outline"
+                                                disabled={assigning}
+                                                onClick={() => assign(null)}
+                                            >
                                                 <UserX className="h-4 w-4" />
                                                 Unassign
                                             </Button>

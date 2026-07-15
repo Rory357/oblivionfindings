@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
+use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, TaskProvider
 {
+    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites', 'reports.viewAny'];
+
     public function sourceKey(): string
     {
         return 'incident';
@@ -47,7 +51,17 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
     public function tasks(User $user, array $filters = []): array
     {
         $query = ClientIncident::query()
-            ->with(['client:id,first_name,last_name'])
+            ->with([
+                'client:id,first_name,last_name',
+                'site:id,name',
+                'controlRoomAlert:id,reference_number',
+                'hsEvent:id,reference_number',
+            ])
+            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyClientIncidentScope(
+                $q,
+                $user,
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             // viewAssigned-only staff see just their assigned clients' incidents,
             // exactly as IncidentController::index scopes the register.
             ->when(
@@ -70,7 +84,7 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
             ->pluck('name', 'id');
 
         return $incidents->map(function (ClientIncident $incident) use ($assigneeNames) {
-            $client = $incident->client;
+            $journey = IncidentJourneyTaskContext::make($incident);
 
             return new TaskItem(
                 id: 'incident-'.$incident->id,
@@ -92,14 +106,16 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
                         'name' => (string) $assigneeNames[$incident->investigation_assigned_to],
                     ]
                     : null,
-                client: $client
-                    ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
-                    : null,
+                client: $journey['person'] ?? null,
+                site: $journey['site'] ?? null,
                 dueAt: null,
                 createdAt: optional($incident->created_at)->toIso8601String(),
-                link: "/incidents/{$incident->id}",
+                link: "/incidents?incident={$incident->id}",
                 type: 'Incident',
                 description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
+                journey: $journey,
+                sourceContext: str_replace('_', ' ', (string) ($incident->source ?: 'incident report')),
+                actionLabel: 'Review incident',
             );
         })->all();
     }
@@ -133,6 +149,11 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
             // Lock the parent before checking lifecycle state or inserting work so
             // this writer serialises with incident closure.
             $incident = ClientIncident::query()
+                ->tap(fn ($query) => app(UserSiteAccessService::class)->applyClientIncidentScope(
+                    $query,
+                    $actor,
+                    self::SITE_BYPASS_PERMISSIONS,
+                ))
                 ->when(
                     ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
                     fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($actor->id)),
@@ -161,7 +182,7 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
                 'created_by' => $actor->id,
             ]);
 
-            return "/incidents/{$incident->id}";
+            return "/incidents?incident={$incident->id}";
         }, 3);
 
         // The /tasks split controller sends the assignment FYI — do NOT fire

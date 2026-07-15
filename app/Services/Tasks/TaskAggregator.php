@@ -50,29 +50,29 @@ class TaskAggregator
     public static function defaultProviders(): array
     {
         return [
-            new ClientIncidentProvider(),
-            new Providers\IncidentFollowupProvider(),
-            new Providers\HsEventProvider(),
-            new Providers\HsInvestigationProvider(),
-            new Providers\HsCorrectiveActionProvider(),
-            new Providers\SiteHazardProvider(),
-            new Providers\WorkplaceInjuryProvider(),
-            new Providers\SafeguardingConcernProvider(),
-            new Providers\SafeguardingActionPlanProvider(),
-            new Providers\ControlRoomAlertProvider(),
-            new Providers\FleetIncidentProvider(),
-            new Providers\FleetMaintenanceProvider(),
-            new Providers\MedicationErrorProvider(),
-            new Providers\CdLossReportProvider(),
-            new Providers\DataBreachProvider(),
-            new Providers\DataSubjectRequestProvider(),
-            new Providers\ActionItemProvider(),
-            new Providers\HrCaseProvider(),
-            new Providers\SiteChecklistRunProvider(),
-            new Providers\ShiftTaskProvider(),
-            new Providers\RespiteTaskProvider(),
-            new Providers\FirstAidFollowupProvider(),
-            new Providers\RestraintReviewProvider(),
+            new ClientIncidentProvider,
+            new Providers\IncidentFollowupProvider,
+            new Providers\HsEventProvider,
+            new Providers\HsInvestigationProvider,
+            new Providers\HsCorrectiveActionProvider,
+            new Providers\SiteHazardProvider,
+            new Providers\WorkplaceInjuryProvider,
+            new Providers\SafeguardingConcernProvider,
+            new Providers\SafeguardingActionPlanProvider,
+            new Providers\ControlRoomAlertProvider,
+            new Providers\FleetIncidentProvider,
+            new Providers\FleetMaintenanceProvider,
+            new Providers\MedicationErrorProvider,
+            new Providers\CdLossReportProvider,
+            new Providers\DataBreachProvider,
+            new Providers\DataSubjectRequestProvider,
+            new Providers\ActionItemProvider,
+            new Providers\HrCaseProvider,
+            new Providers\SiteChecklistRunProvider,
+            new Providers\ShiftTaskProvider,
+            new Providers\RespiteTaskProvider,
+            new Providers\FirstAidFollowupProvider,
+            new Providers\RestraintReviewProvider,
         ];
     }
 
@@ -159,11 +159,13 @@ class TaskAggregator
             }
 
             foreach ($provider->tasks($user, $filters) as $item) {
-                $items[] = $item;
+                // A provider retry or legacy duplicate must not create two
+                // tickets for the same canonical source record.
+                $items[$item->id] ??= $item;
             }
         }
 
-        $items = $this->filterItems($items, $user, $filters);
+        $items = $this->filterItems(array_values($items), $user, $filters);
 
         usort($items, function (TaskItem $a, TaskItem $b) {
             // Overdue first, then severity, then due date (nulls last), newest last.
@@ -304,7 +306,16 @@ class TaskAggregator
 
         $q = trim((string) ($filters['q'] ?? ''));
         if ($q !== '') {
-            $haystack = strtolower(($item->ref ?? '').' '.$item->title.' '.($item->description ?? ''));
+            $journeyReferences = collect(data_get($item->journey, 'references', []))
+                ->filter()
+                ->implode(' ');
+            $haystack = strtolower(implode(' ', array_filter([
+                $item->ref,
+                $journeyReferences,
+                $item->title,
+                $item->description,
+                $item->sourceContext,
+            ])));
             if (! str_contains($haystack, strtolower($q))) {
                 return false;
             }

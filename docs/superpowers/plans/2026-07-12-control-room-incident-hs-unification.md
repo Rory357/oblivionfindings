@@ -988,46 +988,56 @@ git commit -m "feat(control-room): unify the command-centre module shell"
 - Test: `tests/Feature/Console/ReconcileIncidentJourneysTest.php`
 - Test: `tests/Feature/Navigation/ControlRoomNavigationTest.php`
 
-- [ ] **Step 1: Write failing Universal Tasks journey-contract tests**
+- [x] **Step 1: Write failing Universal Tasks journey-contract tests**
 
 For the five journey entry paths, assert that `/tasks` shows every genuinely actionable Alert, Incident follow-up, H&S investigation and corrective action exactly once, with the source module, official references, incident-time site, authorised person label, owner, due/SLA state and canonical deep link. Assert tenant/site/sensitivity isolation, active-by-default behaviour, explicit completed history, and stable filtering/search by any official reference.
 
-- [ ] **Step 2: Write failing transfer and deduplication tests**
+- [x] **Step 2: Write failing transfer and deduplication tests**
 
 Transferring an operational task to H&S must remove the source responsibility from active work and expose the one linked corrective action. Retries must not duplicate it. Keep separate accountable work—such as incident review and a corrective action—separate, but group it under one journey summary so staff understand why multiple actions exist.
 
-- [ ] **Step 3: Implement the Universal Tasks contract**
+- [x] **Step 3: Implement the Universal Tasks contract**
 
 Keep `/tasks` as the application-wide hub and Control Room `My queue` as a filtered specialist view. Extend `TaskItem` with journey references/source context, make every provider reuse canonical permissions and site scopes, and link rows to the source workspace. Use the shared status/date/reference language from Task 9. Do not create a second task lifecycle or allow Universal Tasks mutations to bypass source-module gates.
 
-- [ ] **Step 4: Write failing dry-run/apply/rerun tests**
+- [x] **Step 4: Write failing dry-run/apply/rerun tests**
 
 Seed missing H&S, inconsistent direct links, duplicate incident alerts, missing references, WorkSafe projection drift, missing site snapshot, dismissed-active data, and existing managed H&S events without acceptance. Dry-run reports counts without mutation; apply repairs deterministic cases and records ambiguities; a second apply reports zero repairs.
 
-- [ ] **Step 5: Implement reconciler issue/result types**
+- [x] **Step 5: Implement reconciler issue/result types**
 
 Return counts for `missing_hs`, `link_mismatch`, `duplicate_alert`, `missing_reference`, `worksafe_drift`, `missing_site`, `dismissed_active`, `acceptance_backfill`, and `ambiguous`.
 
-- [ ] **Step 6: Implement command**
+- [x] **Step 6: Implement command**
 
 Command: `incidents:reconcile-journeys {--apply} {--incident=} {--chunk=200}`. Default is dry-run. Apply uses chunked transactions and emits a non-zero exit only for unresolved fatal errors.
 
-- [ ] **Step 7: Clean navigation vocabulary**
+- [x] **Step 7: Clean navigation vocabulary**
 
 Rename Control Room's `My Day` entry to `My Control Room queue`/`My queue`; keep `/my-day` as the only support-worker My Day. Rename Incident Tracker to Safety handovers and Overview to Desk. Keep Universal Tasks visibly application-wide and label Control Room `My queue` as a filtered view, so the two destinations are not mistaken for duplicate task systems.
 
-- [ ] **Step 8: Run tests and a dry-run**
+- [x] **Step 8: Run tests and a dry-run**
 
 Run: `php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Console/ReconcileIncidentJourneysTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php && npm test -- resources/js/pages/tasks/tasks-incident-journey.test.tsx && php artisan incidents:reconcile-journeys`
 
 Expected: Universal Tasks shows one truthful, scoped cross-module work feed; tests pass; dry-run prints a structured report and performs no writes.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add app/Services/Incidents/IncidentJourneyReconciler.php app/Console/Commands/ReconcileIncidentJourneys.php app/Services/Tasks resources/js/pages/tasks resources/js/components/app-sidebar.tsx resources/js/pages/control-room/my-tasks.tsx tests/Feature/Tasks tests/Feature/Console tests/Feature/Navigation
 git commit -m "feat(tasks): unify incident journey work and reconciliation"
 ```
+
+**Task 14 evidence (2026-07-15):**
+
+- Universal Tasks now keeps separate source-owned responsibilities but groups them with truthful Control Room, Incident and H&S references, incident-time person/site context, source-specific next actions and canonical workspace links. Search by any official reference returns the whole journey without inventing a second task lifecycle.
+- All six journey providers now reuse the source modules' canonical tenant/site scopes. Corrective-action reassignment also revalidates the parent H&S event and site-eligible assignee at the mutation boundary.
+- Control Room sidebar vocabulary now matches the workspace strip: `Desk`, `My queue` and `Shifts`. The Control Room queue explicitly identifies Universal Tasks as the application-wide hub; `/my-day` remains the support-worker destination.
+- `AllTasksIncidentJourneyTest` passed 5 tests / 50 assertions, covering all five entry sources, reference search, site isolation, active/history separation, separate accountable work, and retry-safe transfer to one corrective action.
+- `ReconcileIncidentJourneysTest` passed 2 tests / 39 assertions. Dry-run, apply, deterministic repair, ambiguity preservation and zero-repair rerun are covered across all nine issue categories. Navigation and UI journey-reference tests passed; TypeScript, ESLint, Pint, PHP syntax and `git diff --check` passed.
+- A read-only command run against the existing MySQL test database scanned 85 legacy/demo incidents and reported 255 issues with 0 repairs. The unconfigured local SQLite attempt failed before querying because the worktree has no SQLite file; no database mutation occurred.
+- Desktop browser proof remains intentionally deferred to Tasks 15–16. No mobile/responsive/WebView testing, merge, push or deployment was performed.
 
 ---
 

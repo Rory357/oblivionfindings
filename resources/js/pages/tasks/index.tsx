@@ -3,6 +3,13 @@
  * ticket-numbered queue. Read-only: each row deep-links back to the module
  * that owns the record. Hero chrome reuses the shared hs-hero-kit (the app's
  * gold-standard command-centre chrome); semantic tokens only. */
+import {
+    ShiftContextMenu,
+    TabStrip,
+    type RosterTabItem,
+    type ShiftCtxItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -13,13 +20,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
@@ -31,6 +31,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/health-safety/components/hs-hero-kit';
+import { JourneyReferenceStrip } from '@/pages/tasks/journey-reference-strip';
 import { TaskDetailDialog } from '@/pages/tasks/task-detail-dialog';
 import {
     dueInfo,
@@ -60,12 +61,17 @@ import {
     ListChecks,
     Search,
     Siren,
-    User as UserIcon,
     UserCheck,
+    User as UserIcon,
     UserX,
     X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+    useEffect,
+    useRef,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+} from 'react';
 
 interface Filters {
     sources: string[] | null;
@@ -113,20 +119,92 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 /** Register views — the TabStrip below the hero owns these dimensions. */
-type TabKey = 'all' | 'mine' | 'following' | 'overdue' | 'unassigned' | 'week' | 'high' | 'done';
+type TabKey =
+    | 'all'
+    | 'mine'
+    | 'following'
+    | 'overdue'
+    | 'unassigned'
+    | 'week'
+    | 'high'
+    | 'done';
 
 /** Filter override applied when a tab is clicked (search + modules persist).
  *  Each entry is a full reset of every dimension the tabs own — including
  *  `following` — so switching tabs never leaves a stray dimension behind. */
 const TAB_FILTERS: Record<TabKey, Partial<Filters>> = {
-    all: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
-    mine: { assigned: 'me', overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
-    following: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false, following: true },
-    overdue: { assigned: null, overdue: true, due: null, severity: null, bucket: null, include_done: false, following: false },
-    unassigned: { assigned: 'unassigned', overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
-    week: { assigned: null, overdue: false, due: 'week', severity: null, bucket: null, include_done: false, following: false },
-    high: { assigned: null, overdue: false, due: null, severity: ['critical', 'high'], bucket: null, include_done: false, following: false },
-    done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true, following: false },
+    all: {
+        assigned: null,
+        overdue: false,
+        due: null,
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    mine: {
+        assigned: 'me',
+        overdue: false,
+        due: null,
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    following: {
+        assigned: null,
+        overdue: false,
+        due: null,
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: true,
+    },
+    overdue: {
+        assigned: null,
+        overdue: true,
+        due: null,
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    unassigned: {
+        assigned: 'unassigned',
+        overdue: false,
+        due: null,
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    week: {
+        assigned: null,
+        overdue: false,
+        due: 'week',
+        severity: null,
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    high: {
+        assigned: null,
+        overdue: false,
+        due: null,
+        severity: ['critical', 'high'],
+        bucket: null,
+        include_done: false,
+        following: false,
+    },
+    done: {
+        assigned: null,
+        overdue: false,
+        due: null,
+        severity: null,
+        bucket: ['done'],
+        include_done: true,
+        following: false,
+    },
 };
 
 function deriveTab(f: Filters): TabKey | 'none' {
@@ -141,7 +219,8 @@ function deriveTab(f: Filters): TabKey | 'none' {
     if (f.assigned === 'me') return 'mine';
     if (f.assigned === 'unassigned') return 'unassigned';
     if (f.due === 'week') return 'week';
-    if ((f.severity ?? []).slice().sort().join(',') === 'critical,high') return 'high';
+    if ((f.severity ?? []).slice().sort().join(',') === 'critical,high')
+        return 'high';
     return 'all';
 }
 
@@ -173,7 +252,9 @@ function buildParams(f: Filters, page?: number): Record<string, string> {
 
 function toggleKey(list: string[] | null, key: string): string[] {
     const current = list ?? [];
-    return current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    return current.includes(key)
+        ? current.filter((k) => k !== key)
+        : [...current, key];
 }
 
 /* ------------------------------------------------------------------ */
@@ -213,11 +294,15 @@ export default function TasksIndex({
     // Any filter change omits `page` (→ back to page 1); only the pager
     // passes an explicit page to stay within the current filter slice.
     const go = (next: Partial<Filters>, page?: number) =>
-        router.get('/tasks', buildParams({ ...filtersRef.current, ...next }, page), {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
+        router.get(
+            '/tasks',
+            buildParams({ ...filtersRef.current, ...next }, page),
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
 
     // Debounced search → shareable ?q= param.
     useEffect(() => {
@@ -231,16 +316,59 @@ export default function TasksIndex({
     }, [search]);
 
     const tab = deriveTab(filters);
-    const setTab = (id: string) => go(TAB_FILTERS[id as TabKey] ?? TAB_FILTERS.all);
+    const setTab = (id: string) =>
+        go(TAB_FILTERS[id as TabKey] ?? TAB_FILTERS.all);
 
     const TABS: RosterTabItem[] = [
-        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: stats.open || undefined },
-        { id: 'mine', label: 'Mine', icon: UserCheck, tone: 'info', badge: stats.mine || undefined },
-        { id: 'following', label: 'Following', icon: Eye, tone: 'info', badge: stats.watching || undefined },
-        { id: 'overdue', label: 'Overdue', icon: Clock, tone: 'critical', badge: stats.overdue || undefined },
-        { id: 'unassigned', label: 'Unassigned', icon: UserX, tone: 'warning', badge: stats.unassigned || undefined },
-        { id: 'week', label: 'Due this week', icon: CalendarClock, tone: 'info', badge: stats.dueWeek || undefined },
-        { id: 'high', label: 'High priority', icon: AlertTriangle, tone: 'warning', badge: stats.critical || undefined },
+        {
+            id: 'all',
+            label: 'All',
+            icon: LayoutList,
+            tone: 'primary',
+            badge: stats.open || undefined,
+        },
+        {
+            id: 'mine',
+            label: 'Mine',
+            icon: UserCheck,
+            tone: 'info',
+            badge: stats.mine || undefined,
+        },
+        {
+            id: 'following',
+            label: 'Following',
+            icon: Eye,
+            tone: 'info',
+            badge: stats.watching || undefined,
+        },
+        {
+            id: 'overdue',
+            label: 'Overdue',
+            icon: Clock,
+            tone: 'critical',
+            badge: stats.overdue || undefined,
+        },
+        {
+            id: 'unassigned',
+            label: 'Unassigned',
+            icon: UserX,
+            tone: 'warning',
+            badge: stats.unassigned || undefined,
+        },
+        {
+            id: 'week',
+            label: 'Due this week',
+            icon: CalendarClock,
+            tone: 'info',
+            badge: stats.dueWeek || undefined,
+        },
+        {
+            id: 'high',
+            label: 'High priority',
+            icon: AlertTriangle,
+            tone: 'warning',
+            badge: stats.critical || undefined,
+        },
         { id: 'done', label: 'Done', icon: CheckCircle2, tone: 'success' },
     ];
 
@@ -272,14 +400,26 @@ export default function TasksIndex({
             following: false,
         };
         setSearch('');
-        router.get('/tasks', {}, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(
+            '/tasks',
+            {},
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
     };
 
     /* ── Default view (bookmarked filter set) ── */
     const saveView = () =>
-        router.post('/tasks/default-view', { view: buildParams(filters) }, { preserveScroll: true });
+        router.post(
+            '/tasks/default-view',
+            { view: buildParams(filters) },
+            { preserveScroll: true },
+        );
     const clearDefaultView = () =>
-        router.post('/tasks/default-view', { view: [] }, { preserveScroll: true });
+        router.post(
+            '/tasks/default-view',
+            { view: [] },
+            { preserveScroll: true },
+        );
 
     /* ── Assignment (the queue's one write action) ── */
     const assign = (item: TaskItem, assigneeId: number | null) =>
@@ -298,7 +438,7 @@ export default function TasksIndex({
             menu.push(
                 {
                     icon: <Eye className="h-3.5 w-3.5" />,
-                    label: 'Open record',
+                    label: item.actionLabel ?? 'Open record',
                     sub: item.sourceLabel,
                     tone: 'primary',
                     onClick: () => router.visit(item.link!),
@@ -376,7 +516,8 @@ export default function TasksIndex({
         selectedSources.length === 0
             ? 'All modules'
             : selectedSources.length === 1
-              ? (sources.find((s) => s.key === selectedSources[0])?.label ?? '1 module')
+              ? (sources.find((s) => s.key === selectedSources[0])?.label ??
+                '1 module')
               : `${selectedSources.length} modules`;
 
     return (
@@ -390,12 +531,18 @@ export default function TasksIndex({
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ListChecks} />
                             <div className="min-w-0 flex-1">
-                                <HeroStatusPill>Work queue · live across every module</HeroStatusPill>
-                                <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">All Tasks</h1>
+                                <HeroStatusPill>
+                                    Work queue · live across every module
+                                </HeroStatusPill>
+                                <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">
+                                    All Tasks
+                                </h1>
                                 <p className="mt-1 max-w-2xl text-sm text-primary-foreground/80">
-                                    One queue across every module — incidents, corrective actions, alerts,
-                                    concerns and follow-ups you're permitted to see, each deep-linking back
-                                    to the record that owns it.
+                                    One queue across every module — incidents,
+                                    corrective actions, alerts, concerns and
+                                    follow-ups you're permitted to see, each
+                                    deep-linking back to the record that owns
+                                    it.
                                 </p>
                             </div>
                         </div>
@@ -430,7 +577,9 @@ export default function TasksIndex({
                                 label="Unassigned"
                                 value={String(stats.unassigned)}
                                 caption="need an owner"
-                                tone={stats.unassigned > 0 ? 'warning' : 'success'}
+                                tone={
+                                    stats.unassigned > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/tasks?due=week"
@@ -446,14 +595,18 @@ export default function TasksIndex({
                                 label="Overdue"
                                 value={String(stats.overdue)}
                                 caption="past their due date"
-                                tone={stats.overdue > 0 ? 'critical' : 'success'}
+                                tone={
+                                    stats.overdue > 0 ? 'critical' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/tasks?severity=critical,high"
                                 label="High priority"
                                 value={String(stats.critical)}
                                 caption="critical + high"
-                                tone={stats.critical > 0 ? 'warning' : 'success'}
+                                tone={
+                                    stats.critical > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/tasks?assigned=me"
@@ -467,17 +620,27 @@ export default function TasksIndex({
                                 label="My overdue"
                                 value={String(stats.myOverdue)}
                                 caption="chase these first"
-                                tone={stats.myOverdue > 0 ? 'critical' : 'success'}
+                                tone={
+                                    stats.myOverdue > 0 ? 'critical' : 'success'
+                                }
                             />
                         </HeroCluster>
                     </div>
                 </HeroShell>
 
                 {/* ── Register views ── */}
-                <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Task views" />
+                <TabStrip
+                    value={tab}
+                    onChange={setTab}
+                    items={TABS}
+                    ariaLabel="Task views"
+                />
 
                 {/* ── Filter bar ── */}
-                <Card unstyled className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                <Card
+                    unstyled
+                    className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5"
+                >
                     <div className="relative min-w-[240px] flex-1">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -493,7 +656,8 @@ export default function TasksIndex({
                         <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 text-xs font-medium text-muted-foreground">
                             <Bookmark className="h-3 w-3" />
                             Default view
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 type="button"
                                 aria-label="Clear default view"
                                 title="Clear default view"
@@ -507,7 +671,11 @@ export default function TasksIndex({
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="h-9" aria-label="Filter by module">
+                            <Button
+                                variant="outline"
+                                className="h-9"
+                                aria-label="Filter by module"
+                            >
                                 {moduleLabel}
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -519,7 +687,14 @@ export default function TasksIndex({
                                 <DropdownMenuCheckboxItem
                                     key={s.key}
                                     checked={selectedSources.includes(s.key)}
-                                    onCheckedChange={() => go({ sources: toggleKey(filters.sources, s.key) })}
+                                    onCheckedChange={() =>
+                                        go({
+                                            sources: toggleKey(
+                                                filters.sources,
+                                                s.key,
+                                            ),
+                                        })
+                                    }
                                     onSelect={(e) => e.preventDefault()}
                                 >
                                     {s.label}
@@ -528,18 +703,34 @@ export default function TasksIndex({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <div role="group" aria-label="Severity filter" className="flex items-center gap-1 rounded-lg bg-muted p-1">
+                    <div
+                        role="group"
+                        aria-label="Severity filter"
+                        className="flex items-center gap-1 rounded-lg bg-muted p-1"
+                    >
                         {SEVERITIES.map((s) => {
-                            const active = (filters.severity ?? []).includes(s.key);
+                            const active = (filters.severity ?? []).includes(
+                                s.key,
+                            );
                             return (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     key={s.key}
                                     type="button"
                                     aria-pressed={active}
-                                    onClick={() => go({ severity: toggleKey(filters.severity, s.key) })}
+                                    onClick={() =>
+                                        go({
+                                            severity: toggleKey(
+                                                filters.severity,
+                                                s.key,
+                                            ),
+                                        })
+                                    }
                                     className={cn(
                                         'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                                        active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                        active
+                                            ? 'bg-card text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground',
                                     )}
                                 >
                                     {s.label}
@@ -562,7 +753,12 @@ export default function TasksIndex({
                     ) : null}
 
                     {hasFilters ? (
-                        <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9"
+                            onClick={clearFilters}
+                        >
                             Clear filters
                         </Button>
                     ) : null}
@@ -582,7 +778,11 @@ export default function TasksIndex({
                                     title="No tasks match your filters"
                                     description="Try widening the module, severity or status filters — or clear them to see the whole queue."
                                     action={
-                                        <Button variant="outline" size="sm" onClick={clearFilters}>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={clearFilters}
+                                        >
                                             Clear filters
                                         </Button>
                                     }
@@ -601,13 +801,27 @@ export default function TasksIndex({
                                 <table className="w-full text-[13px]">
                                     <thead>
                                         <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                                            <th className="px-3 py-3 font-semibold">Ticket</th>
-                                            <th className="px-3 py-3 font-semibold">Title</th>
-                                            <th className="px-3 py-3 font-semibold">Severity</th>
-                                            <th className="px-3 py-3 font-semibold">Status</th>
-                                            <th className="px-3 py-3 font-semibold">Assignee</th>
-                                            <th className="px-3 py-3 font-semibold">Client / Site</th>
-                                            <th className="px-3 py-3 font-semibold">Due</th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Ticket / Journey
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Title
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Severity
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Status
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Assignee
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Client / Site
+                                            </th>
+                                            <th className="px-3 py-3 font-semibold">
+                                                Due
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -615,7 +829,8 @@ export default function TasksIndex({
                                             const due = dueInfo(item);
                                             // Row click previews in the drawer; the deep link
                                             // lives on the drawer button + context menu now.
-                                            const open = () => setSelected(item);
+                                            const open = () =>
+                                                setSelected(item);
                                             return (
                                                 <tr
                                                     key={item.id}
@@ -623,8 +838,13 @@ export default function TasksIndex({
                                                     tabIndex={0}
                                                     data-test="tasks-row"
                                                     onClick={open}
-                                                    onKeyDown={(e) => e.key === 'Enter' && open()}
-                                                    onContextMenu={(e) => openRowCtx(e, item)}
+                                                    onKeyDown={(e) =>
+                                                        e.key === 'Enter' &&
+                                                        open()
+                                                    }
+                                                    onContextMenu={(e) =>
+                                                        openRowCtx(e, item)
+                                                    }
                                                     className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
                                                 >
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -633,33 +853,74 @@ export default function TasksIndex({
                                                                 {item.ref}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-muted-foreground">—</span>
+                                                            <span className="text-muted-foreground">
+                                                                —
+                                                            </span>
                                                         )}
+                                                        <JourneyReferenceStrip
+                                                            journey={
+                                                                item.journey
+                                                            }
+                                                            compact
+                                                        />
                                                     </td>
                                                     <td className="max-w-[420px] px-3 py-2.5">
-                                                        <div className="truncate font-semibold">{item.title}</div>
+                                                        <div className="truncate font-semibold">
+                                                            {item.title}
+                                                        </div>
                                                         <div className="truncate text-xs text-muted-foreground">
-                                                            {item.type ? `${item.type} · ` : ''}
+                                                            {item.type
+                                                                ? `${item.type} · `
+                                                                : ''}
                                                             {item.sourceLabel}
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2.5">
-                                                        <StatusBadge variant={SEVERITY_VARIANT[item.severity]} size="sm">
-                                                            {humanise(item.severity)}
+                                                        <StatusBadge
+                                                            variant={
+                                                                SEVERITY_VARIANT[
+                                                                    item
+                                                                        .severity
+                                                                ]
+                                                            }
+                                                            size="sm"
+                                                        >
+                                                            {humanise(
+                                                                item.severity,
+                                                            )}
                                                         </StatusBadge>
                                                     </td>
-                                                    <td className="px-3 py-2.5 whitespace-nowrap">{humanise(item.status)}</td>
+                                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                                        {humanise(item.status)}
+                                                    </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                                         {item.assignee ? (
                                                             item.assignee.name
                                                         ) : (
-                                                            <span className="text-muted-foreground">Unassigned</span>
+                                                            <span className="text-muted-foreground">
+                                                                Unassigned
+                                                            </span>
                                                         )}
                                                     </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
-                                                        {item.client?.name ?? item.site?.name ?? '—'}
+                                                        <div>
+                                                            {item.client
+                                                                ?.name ?? '—'}
+                                                        </div>
+                                                        {item.site ? (
+                                                            <div className="text-xs">
+                                                                {item.site.name}
+                                                            </div>
+                                                        ) : null}
                                                     </td>
-                                                    <td className={cn('px-3 py-2.5 whitespace-nowrap', due.className)}>{due.label}</td>
+                                                    <td
+                                                        className={cn(
+                                                            'px-3 py-2.5 whitespace-nowrap',
+                                                            due.className,
+                                                        )}
+                                                    >
+                                                        {due.label}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -672,7 +933,8 @@ export default function TasksIndex({
 
                 {/* ── Pager ── */}
                 {total > 0 ? (
-                    <Card unstyled
+                    <Card
+                        unstyled
                         data-test="tasks-pager"
                         className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2"
                     >
@@ -705,9 +967,15 @@ export default function TasksIndex({
                 ) : null}
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
-            <TaskDetailDialog item={selected} currentUserId={currentUserId} onClose={() => setSelected(null)} />
+            <TaskDetailDialog
+                item={selected}
+                currentUserId={currentUserId}
+                onClose={() => setSelected(null)}
+            />
         </AppLayout>
     );
 }

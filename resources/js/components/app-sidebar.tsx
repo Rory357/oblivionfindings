@@ -19,11 +19,9 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
-    AlertCircle,
     AlertOctagon,
     AlertTriangle,
     ArrowLeftRight,
-    ArrowUpCircle,
     Banknote,
     BarChart3,
     Bell,
@@ -39,13 +37,9 @@ import {
     ClipboardCheck,
     ClipboardList,
     Clock,
-    Coins,
-    CreditCard,
     DollarSign,
-    Download,
     FileText,
     FlaskConical,
-    FolderOpen,
     Fuel,
     GitBranch,
     GraduationCap,
@@ -73,7 +67,6 @@ import {
     Radio,
     Receipt,
     Route,
-    Send,
     Server,
     Settings,
     Shield,
@@ -85,7 +78,6 @@ import {
     Target,
     Timer,
     Trash2,
-    TrendingUp,
     Truck,
     UserCheck,
     Users,
@@ -237,7 +229,9 @@ export function isIconActive(
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
-            (group?.items ?? []).some((sub) => matchScore(currentUrl, sub.href) > 0),
+            (group?.items ?? []).some(
+                (sub) => matchScore(currentUrl, sub.href) > 0,
+            ),
         );
     }
     return false;
@@ -1051,9 +1045,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     // Overview
     groups.push({
         label: 'Overview',
-        items: [
-            { title: 'Dashboard', href: '/emar', icon: LayoutGrid },
-        ],
+        items: [{ title: 'Dashboard', href: '/emar', icon: LayoutGrid }],
     });
 
     // Administration
@@ -1596,99 +1588,198 @@ function buildGovernanceSubPanelGroups({
     // Board Meetings — the meeting lifecycle (dashboard, meetings, packs, CEO reports)
     const boardMeetings: NavItem[] = [];
     if (can?.governance?.view) {
-        boardMeetings.push({ title: 'Dashboard', href: '/governance/dashboard', icon: Landmark });
-        boardMeetings.push({ title: 'Meetings', href: '/governance/meetings', icon: CalendarDays });
+        boardMeetings.push({
+            title: 'Dashboard',
+            href: '/governance/dashboard',
+            icon: Landmark,
+        });
+        boardMeetings.push({
+            title: 'Meetings',
+            href: '/governance/meetings',
+            icon: CalendarDays,
+        });
     }
     if (can?.governance?.packs?.view || can?.governance?.view) {
-        boardMeetings.push({ title: 'Board Packs', href: '/governance/packs', icon: FileText });
+        boardMeetings.push({
+            title: 'Board Packs',
+            href: '/governance/packs',
+            icon: FileText,
+        });
     }
     if (can?.governance?.['ceo-reports']?.view || can?.governance?.view) {
-        boardMeetings.push({ title: 'CEO Reports', href: '/governance/ceo-reports', icon: FileText });
+        boardMeetings.push({
+            title: 'CEO Reports',
+            href: '/governance/ceo-reports',
+            icon: FileText,
+        });
     }
-    if (boardMeetings.length > 0) groups.push({ label: 'Board Meetings', items: boardMeetings });
+    if (boardMeetings.length > 0)
+        groups.push({ label: 'Board Meetings', items: boardMeetings });
 
     // Decisions & Actions — resolutions, actions, evaluations
     const decisions: NavItem[] = [];
     if (can?.governance?.resolutions?.view || can?.governance?.view) {
-        decisions.push({ title: 'Resolutions', href: '/governance/resolutions', icon: ClipboardCheck });
+        decisions.push({
+            title: 'Resolutions',
+            href: '/governance/resolutions',
+            icon: ClipboardCheck,
+        });
     }
     if (can?.governance?.actions?.view || can?.governance?.view) {
-        decisions.push({ title: 'Action Items', href: '/governance/actions', icon: ClipboardList });
+        decisions.push({
+            title: 'Action Items',
+            href: '/governance/actions',
+            icon: ClipboardList,
+        });
     }
     if (can?.governance?.evaluations?.view || can?.governance?.view) {
-        decisions.push({ title: 'Board Evaluations', href: '/governance/evaluations', icon: ClipboardCheck });
+        decisions.push({
+            title: 'Board Evaluations',
+            href: '/governance/evaluations',
+            icon: ClipboardCheck,
+        });
     }
-    if (decisions.length > 0) groups.push({ label: 'Decisions & Actions', items: decisions });
+    if (decisions.length > 0)
+        groups.push({ label: 'Decisions & Actions', items: decisions });
 
     // Risk & Compliance — register, compliance calendar, clinical, Te Tiriti
     const risk: NavItem[] = [];
     if (can?.governance?.risks?.view || can?.governance?.view) {
-        risk.push({ title: 'Risk Register', href: '/governance/risks', icon: Target });
+        risk.push({
+            title: 'Risk Register',
+            href: '/governance/risks',
+            icon: Target,
+        });
     }
     if (can?.governance?.compliance?.view || can?.governance?.view) {
-        risk.push({ title: 'Compliance', href: '/governance/compliance', icon: Shield });
+        risk.push({
+            title: 'Compliance',
+            href: '/governance/compliance',
+            icon: Shield,
+        });
     }
     // Operational compliance command centre (org-wide exception roll-up) — surfaced for
     // board assurance. Distinct from the obligations register above; gate on its own view perm.
     if (can?.compliance?.view || can?.governance?.view) {
-        risk.push({ title: 'Operational Compliance', href: '/compliance', icon: ShieldCheck });
+        risk.push({
+            title: 'Operational Compliance',
+            href: '/compliance',
+            icon: ShieldCheck,
+        });
     }
     if (can?.governance?.clinical?.view || can?.governance?.view) {
-        risk.push({ title: 'Clinical Governance', href: '/governance/clinical', icon: Shield });
+        risk.push({
+            title: 'Clinical Governance',
+            href: '/governance/clinical',
+            icon: Shield,
+        });
     }
     if (can?.governance?.['te-tiriti']?.view || can?.governance?.view) {
-        risk.push({ title: 'Te Tiriti', href: '/governance/te-tiriti', icon: Landmark });
+        risk.push({
+            title: 'Te Tiriti',
+            href: '/governance/te-tiriti',
+            icon: Landmark,
+        });
     }
-    if (risk.length > 0) groups.push({ label: 'Risk & Compliance', items: risk });
+    if (risk.length > 0)
+        groups.push({ label: 'Risk & Compliance', items: risk });
 
     // Finance & Spend — budgets and spend approvals
     const finance: NavItem[] = [];
     if (can?.governance?.budgets?.view || can?.governance?.view) {
-        finance.push({ title: 'Budgets', href: '/governance/budgets', icon: DollarSign });
+        finance.push({
+            title: 'Budgets',
+            href: '/governance/budgets',
+            icon: DollarSign,
+        });
     }
     if (can?.governance?.spend?.view) {
-        finance.push({ title: 'Spend Approvals', href: '/governance/spend-approvals', icon: DollarSign });
+        finance.push({
+            title: 'Spend Approvals',
+            href: '/governance/spend-approvals',
+            icon: DollarSign,
+        });
     }
-    if (finance.length > 0) groups.push({ label: 'Finance & Spend', items: finance });
+    if (finance.length > 0)
+        groups.push({ label: 'Finance & Spend', items: finance });
 
     // Strategy & Performance — strategic plan and performance reviews
     const strategy: NavItem[] = [];
     if (can?.governance?.strategy?.view || can?.governance?.view) {
-        strategy.push({ title: 'Strategic Plan', href: '/governance/strategy', icon: Target });
+        strategy.push({
+            title: 'Strategic Plan',
+            href: '/governance/strategy',
+            icon: Target,
+        });
     }
     if (can?.governance?.performance?.view || can?.governance?.view) {
-        strategy.push({ title: 'Performance', href: '/governance/performance', icon: ClipboardCheck });
+        strategy.push({
+            title: 'Performance',
+            href: '/governance/performance',
+            icon: ClipboardCheck,
+        });
     }
     if (can?.roadmap?.view) {
-        strategy.push({ title: 'Roadmap', href: '/roadmap/dashboard', icon: Map });
+        strategy.push({
+            title: 'Roadmap',
+            href: '/roadmap/dashboard',
+            icon: Map,
+        });
     }
-    if (strategy.length > 0) groups.push({ label: 'Strategy & Performance', items: strategy });
+    if (strategy.length > 0)
+        groups.push({ label: 'Strategy & Performance', items: strategy });
 
     // Policies & Evidence — policies, documents, interests register
     const policies: NavItem[] = [];
     if (can?.governance?.policies?.view || can?.governance?.view) {
-        policies.push({ title: 'Policies', href: '/governance/policies', icon: FileText });
+        policies.push({
+            title: 'Policies',
+            href: '/governance/policies',
+            icon: FileText,
+        });
     }
     if (can?.governance?.documents?.view || can?.governance?.view) {
-        policies.push({ title: 'Documents', href: '/governance/documents', icon: FileText });
+        policies.push({
+            title: 'Documents',
+            href: '/governance/documents',
+            icon: FileText,
+        });
     }
     if (can?.governance?.interests?.view || can?.governance?.view) {
-        policies.push({ title: 'Interests Register', href: '/governance/interests', icon: ClipboardList });
+        policies.push({
+            title: 'Interests Register',
+            href: '/governance/interests',
+            icon: ClipboardList,
+        });
     }
-    if (policies.length > 0) groups.push({ label: 'Policies & Evidence', items: policies });
+    if (policies.length > 0)
+        groups.push({ label: 'Policies & Evidence', items: policies });
 
     // Admin & Settings — board members, audit log, settings
     const admin: NavItem[] = [];
     if (can?.governance?.meetings?.manage) {
-        admin.push({ title: 'Board Members', href: '/governance/admin/board-members', icon: Users });
+        admin.push({
+            title: 'Board Members',
+            href: '/governance/admin/board-members',
+            icon: Users,
+        });
     }
     if (can?.governance?.audit?.view) {
-        admin.push({ title: 'Audit Log', href: '/governance/audit-log', icon: ClipboardCheck });
+        admin.push({
+            title: 'Audit Log',
+            href: '/governance/audit-log',
+            icon: ClipboardCheck,
+        });
     }
     if (can?.governance?.settings?.view) {
-        admin.push({ title: 'Governance Settings', href: '/governance/settings', icon: Shield });
+        admin.push({
+            title: 'Governance Settings',
+            href: '/governance/settings',
+            icon: Shield,
+        });
     }
-    if (admin.length > 0) groups.push({ label: 'Admin & Settings', items: admin });
+    if (admin.length > 0)
+        groups.push({ label: 'Admin & Settings', items: admin });
 
     return groups;
 }
@@ -1730,7 +1821,11 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.finance?.ap?.view) {
         // Purchases & Payables hub — bills, purchase orders, vendors, credit notes
         // and payment runs are now tabs here.
-        ap.push({ title: 'Payables', href: '/finance/payables', icon: Receipt });
+        ap.push({
+            title: 'Payables',
+            href: '/finance/payables',
+            icon: Receipt,
+        });
     }
 
     const ar: NavItem[] = [];
@@ -1963,18 +2058,18 @@ function buildControlRoomSubPanelGroups({
     const live: NavItem[] = [];
     if (can?.controlRoom?.viewAny) {
         live.push({
-            title: 'Command Centre',
+            title: 'Desk',
             href: '/control-room',
             icon: LayoutDashboard,
         });
         live.push({
-            title: 'My Day',
+            title: 'My queue',
             href: '/control-room/my-tasks',
             icon: CheckCircle2,
         });
         live.push({ title: 'Live Map', href: '/control-room/map', icon: Map });
         live.push({
-            title: 'Active Shifts',
+            title: 'Shifts',
             href: '/control-room/shifts',
             icon: Clock,
         });
@@ -3081,58 +3176,68 @@ export function AppSidebarMobile({
                                         />
                                     </Button>
                                     {isExpanded &&
-                                        (groups ?? []).filter(Boolean).map((group) => (
-                                            <div
-                                                key={group.label}
-                                                className="ml-4"
-                                            >
-                                                <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
-                                                    {group.label}
-                                                </div>
-                                                {(group.items ?? []).map((sub) => (
-                                                    <Link
-                                                        key={resolveUrl(
-                                                            sub.href,
-                                                        )}
-                                                        href={sub.href}
-                                                        aria-current={
-                                                            isSubItemActive(
-                                                                currentUrl,
-                                                                sub.href,
-                                                            )
-                                                                ? 'page'
-                                                                : undefined
-                                                        }
-                                                        prefetch
-                                                        className={cn(
-                                                            'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
-                                                            isSubItemActive(
-                                                                currentUrl,
-                                                                sub.href,
-                                                            )
-                                                                ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                                        )}
-                                                    >
-                                                        {sub.icon && (
-                                                            <SidebarItemIcon
-                                                                icon={sub.icon}
-                                                            />
-                                                        )}
-                                                        <span>{sub.title}</span>
-                                                        {sub.badge != null &&
-                                                            sub.badge > 0 && (
-                                                                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                                                    {sub.badge >
-                                                                    9
-                                                                        ? '9+'
-                                                                        : sub.badge}
+                                        (groups ?? [])
+                                            .filter(Boolean)
+                                            .map((group) => (
+                                                <div
+                                                    key={group.label}
+                                                    className="ml-4"
+                                                >
+                                                    <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
+                                                        {group.label}
+                                                    </div>
+                                                    {(group.items ?? []).map(
+                                                        (sub) => (
+                                                            <Link
+                                                                key={resolveUrl(
+                                                                    sub.href,
+                                                                )}
+                                                                href={sub.href}
+                                                                aria-current={
+                                                                    isSubItemActive(
+                                                                        currentUrl,
+                                                                        sub.href,
+                                                                    )
+                                                                        ? 'page'
+                                                                        : undefined
+                                                                }
+                                                                prefetch
+                                                                className={cn(
+                                                                    'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                                                    isSubItemActive(
+                                                                        currentUrl,
+                                                                        sub.href,
+                                                                    )
+                                                                        ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
+                                                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                                                )}
+                                                            >
+                                                                {sub.icon && (
+                                                                    <SidebarItemIcon
+                                                                        icon={
+                                                                            sub.icon
+                                                                        }
+                                                                    />
+                                                                )}
+                                                                <span>
+                                                                    {sub.title}
                                                                 </span>
-                                                            )}
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        ))}
+                                                                {sub.badge !=
+                                                                    null &&
+                                                                    sub.badge >
+                                                                        0 && (
+                                                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                                                            {sub.badge >
+                                                                            9
+                                                                                ? '9+'
+                                                                                : sub.badge}
+                                                                        </span>
+                                                                    )}
+                                                            </Link>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            ))}
                                     {item.dividerAfter && (
                                         <div className="mx-4 my-1 border-b border-sidebar-border/30" />
                                     )}
