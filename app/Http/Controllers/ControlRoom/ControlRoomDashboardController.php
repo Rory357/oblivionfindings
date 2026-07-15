@@ -65,6 +65,8 @@ class ControlRoomDashboardController extends Controller
             // query path or a competing workflow.
             'alerts' => fn () => $live()['worklist'],
             'stats' => fn () => $live()['stats'],
+            'by_source' => fn () => $live()['by_source'],
+            'active_shift' => fn () => $live()['active_shift'],
             'recent_activity' => fn () => $live()['activity'],
         ]);
     }

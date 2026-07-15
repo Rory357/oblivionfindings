@@ -42,8 +42,11 @@ class AlertWorklistQuery
         $this->siteAccess->applyAlertScope($query, $user, self::BYPASS_PERMISSIONS);
         $this->applyLens($query, (string) ($filters['lens'] ?? 'active'), $user);
 
+        if (filled($filters['site_id'] ?? null)) {
+            $this->siteAccess->applyAlertSiteScopeForSiteIds($query, [(int) $filters['site_id']]);
+        }
+
         $query
-            ->when(filled($filters['site_id'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.site_id', (int) $filters['site_id']))
             ->when(filled($filters['severity'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.severity', $filters['severity']))
             ->when(filled($filters['source'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.source', $filters['source']))
             ->when(filled($filters['queue_id'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.queue_id', (int) $filters['queue_id']))

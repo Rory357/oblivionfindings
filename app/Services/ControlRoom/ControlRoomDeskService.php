@@ -3,6 +3,7 @@
 namespace App\Services\ControlRoom;
 
 use App\Models\AuditLog;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
@@ -167,7 +168,43 @@ class ControlRoomDeskService
                 'stale_after_seconds' => 90,
             ],
             'stats' => $this->legacyStats($aggregate),
+            'by_source' => $this->bySource($user, $filters['site_id']),
+            'active_shift' => $this->activeShift($user),
         ];
+    }
+
+    /** @return array<string, int> */
+    private function bySource(User $user, ?int $siteId): array
+    {
+        $query = ControlRoomAlert::query();
+        $this->scopeAlerts($query, $user, $siteId);
+
+        return $query
+            ->select('control_room_alerts.source', DB::raw('COUNT(*) as aggregate'))
+            ->groupBy('control_room_alerts.source')
+            ->pluck('aggregate', 'source')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+    }
+
+    /** @return array{name: string, lead_name: string|null, started_at: string|null}|null */
+    private function activeShift(User $user): ?array
+    {
+        if (! $this->siteAccess->isUnrestrictedPlatformUser($user)) {
+            return null;
+        }
+
+        $shift = Shift::query()
+            ->with('shiftLead:id,name')
+            ->active()
+            ->latest('starts_at')
+            ->first();
+
+        return $shift ? [
+            'name' => $shift->name,
+            'lead_name' => $shift->shiftLead?->name,
+            'started_at' => $shift->starts_at?->toIso8601String(),
+        ] : null;
     }
 
     /** @param array<string, mixed> $filters @return array<string, mixed> */

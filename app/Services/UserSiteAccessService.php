@@ -34,7 +34,8 @@ class UserSiteAccessService
     public function accessibleSiteIds(?User $user, array $bypassPermissions = []): array
     {
         $cacheKey = implode('|', [
-            $user ? (string) ($user->getKey() ?? spl_object_id($user)) : 'guest',
+            $user ? (string) ($user->getKey() ?? 'unsaved') : 'guest',
+            $user ? (string) spl_object_id($user) : 'guest',
             (string) ($user?->organization_id ?? 'platform'),
             implode(',', $bypassPermissions),
         ]);
