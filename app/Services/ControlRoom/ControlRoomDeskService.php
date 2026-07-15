@@ -273,6 +273,8 @@ class ControlRoomDeskService
 
         $active = "'".implode("','", self::ACTIVE_STATUSES)."'";
         $terminal = "'".implode("','", ControlRoomAlert::TERMINAL_STATUSES)."'";
+        $unsnoozed = '(control_room_alerts.snoozed_until IS NULL OR control_room_alerts.snoozed_until <= ?)';
+        $now = now();
         $responseAverage = DB::connection()->getDriverName() === 'sqlite'
             ? "AVG(CASE WHEN control_room_alerts.triggered_at >= ? AND desk_sla.responded_at IS NOT NULL THEN (strftime('%s', desk_sla.responded_at) - strftime('%s', control_room_alerts.triggered_at)) / 60.0 END)"
             : 'AVG(CASE WHEN control_room_alerts.triggered_at >= ? AND desk_sla.responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, control_room_alerts.triggered_at, desk_sla.responded_at) END)';
@@ -290,18 +292,18 @@ class ControlRoomDeskService
             ->selectRaw("SUM(CASE WHEN control_room_alerts.status = 'triaging' THEN 1 ELSE 0 END) as triaging_count")
             ->selectRaw("SUM(CASE WHEN control_room_alerts.status = 'resolved' THEN 1 ELSE 0 END) as resolved_count")
             ->selectRaw("SUM(CASE WHEN control_room_alerts.status = 'closed' THEN 1 ELSE 0 END) as closed_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) THEN 1 ELSE 0 END) as active_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND control_room_alerts.severity = 'critical' THEN 1 ELSE 0 END) as critical_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND control_room_alerts.severity = 'high' THEN 1 ELSE 0 END) as high_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND control_room_alerts.escalation_level > 0 THEN 1 ELSE 0 END) as escalated_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND control_room_alerts.assigned_to_user_id IS NULL THEN 1 ELSE 0 END) as unassigned_count")
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND control_room_alerts.assigned_to_user_id = ? THEN 1 ELSE 0 END) as my_alerts_count", [$user->id])
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND (desk_sla.acknowledge_breached = 1 OR desk_sla.response_breached = 1 OR desk_sla.resolution_breached = 1 OR (desk_sla.acknowledged_at IS NULL AND desk_sla.acknowledge_deadline < CURRENT_TIMESTAMP) OR (desk_sla.responded_at IS NULL AND desk_sla.response_deadline < CURRENT_TIMESTAMP) OR (desk_sla.resolved_at IS NULL AND desk_sla.resolution_deadline < CURRENT_TIMESTAMP)) THEN 1 ELSE 0 END) as sla_breached_count")
-            ->selectRaw("MIN(CASE WHEN control_room_alerts.status IN ({$active}) THEN control_room_alerts.triggered_at END) as oldest_open_at")
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} THEN 1 ELSE 0 END) as active_count", [$now])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND control_room_alerts.severity = 'critical' THEN 1 ELSE 0 END) as critical_count", [$now])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND control_room_alerts.severity = 'high' THEN 1 ELSE 0 END) as high_count", [$now])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND control_room_alerts.escalation_level > 0 THEN 1 ELSE 0 END) as escalated_count", [$now])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND control_room_alerts.assigned_to_user_id IS NULL THEN 1 ELSE 0 END) as unassigned_count", [$now])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND control_room_alerts.assigned_to_user_id = ? THEN 1 ELSE 0 END) as my_alerts_count", [$now, $user->id])
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND (desk_sla.acknowledge_breached = 1 OR desk_sla.response_breached = 1 OR desk_sla.resolution_breached = 1 OR (desk_sla.acknowledged_at IS NULL AND desk_sla.acknowledge_deadline < CURRENT_TIMESTAMP) OR (desk_sla.responded_at IS NULL AND desk_sla.response_deadline < CURRENT_TIMESTAMP) OR (desk_sla.resolved_at IS NULL AND desk_sla.resolution_deadline < CURRENT_TIMESTAMP)) THEN 1 ELSE 0 END) as sla_breached_count", [$now])
+            ->selectRaw("MIN(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} THEN control_room_alerts.triggered_at END) as oldest_open_at", [$now])
             ->selectRaw('SUM(CASE WHEN control_room_alerts.triggered_at >= ? THEN 1 ELSE 0 END) as alerts_24h', [now()->subDay()])
             ->selectRaw("SUM(CASE WHEN control_room_alerts.triggered_at >= ? AND control_room_alerts.status IN ('resolved', 'closed') THEN 1 ELSE 0 END) as resolved_24h", [now()->subDay()])
             ->selectRaw("{$responseAverage} as avg_response_minutes", [now()->subDay()])
-            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND desk_incident.id IS NULL THEN 1 ELSE 0 END) as needs_incident")
+            ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$active}) AND {$unsnoozed} AND desk_incident.id IS NULL THEN 1 ELSE 0 END) as needs_incident", [$now])
             ->selectRaw("SUM(CASE WHEN desk_hs.handover_status = 'awaiting_acceptance' THEN 1 ELSE 0 END) as awaiting_health_safety")
             ->selectRaw("SUM(CASE WHEN desk_hs.handover_status = 'accepted' AND desk_hs.status <> 'closed' THEN 1 ELSE 0 END) as accepted_in_progress")
             ->selectRaw("SUM(CASE WHEN control_room_alerts.status IN ({$terminal}) AND desk_hs.status <> 'closed' THEN 1 ELSE 0 END) as operational_complete_governance_open")

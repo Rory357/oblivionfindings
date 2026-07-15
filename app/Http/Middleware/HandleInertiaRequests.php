@@ -83,6 +83,7 @@ class HandleInertiaRequests extends Middleware
                 "tasks.nav.{$user->id}",
                 now()->addMinutes(5),
                 function () use ($user) {
+                    $this->preparePermissionLookup($user);
                     $taskAggregator = app(TaskAggregator::class);
                     $view = $taskAggregator->sourcesFor($user) !== [];
 
@@ -353,8 +354,16 @@ class HandleInertiaRequests extends Middleware
         return once(fn () => Cache::remember(
             sprintf('user:%d:capabilities:%s', $user->id, self::PERMISSIONS_CACHE_VERSION),
             300,
-            fn () => $this->buildUserPermissions($user),
+            fn () => $this->buildUserPermissions($this->preparePermissionLookup($user)),
         ));
+    }
+
+    protected function preparePermissionLookup(User $user): User
+    {
+        return $user->loadMissing([
+            'permissionOverrides:id,key',
+            'roles.permissions:id,key',
+        ]);
     }
 
     protected function buildUserPermissions($user): array

@@ -138,6 +138,7 @@ class ControlRoomSafetyHandoverTest extends TestCase
             $this->operator,
             'Accepted for governance',
         );
+        $accepted->alert->forceFill(['snoozed_until' => now()->addHour()])->saveQuietly();
         $governanceOpen = $this->journey('CR-2026-0323');
         $governanceOpen->alert->forceFill(['status' => ControlRoomAlert::STATUS_RESOLVED])->saveQuietly();
         $complete = $this->journey('CR-2026-0324');
@@ -162,6 +163,14 @@ class ControlRoomSafetyHandoverTest extends TestCase
         $expectLens('accepted_in_progress', $accepted->alert->id);
         $expectLens('operational_complete_governance_open', $governanceOpen->alert->id);
         $expectLens('complete', $complete->alert->id);
+
+        $this->actingAs($this->operator)
+            ->get('/control-room/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('filters.lens', 'attention')
+                ->where('journeys.data', fn ($rows) => collect($rows)->pluck('alert.id')->contains($accepted->alert->id))
+            );
 
         ControlRoomAlert::factory()->count(27)->create([
             'site_id' => $this->site->id,

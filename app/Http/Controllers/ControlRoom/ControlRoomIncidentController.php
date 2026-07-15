@@ -51,7 +51,7 @@ class ControlRoomIncidentController extends Controller
 
         $filters = $request->only([
             'lens', 'severity', 'status', 'client_id', 'site_id',
-            'date_from', 'date_to', 'search', 'source_type',
+            'date_from', 'date_to', 'search',
         ]);
         $filters['lens'] = in_array($filters['lens'] ?? null, $this->handoverLensKeys(), true)
             ? $filters['lens']
@@ -102,14 +102,6 @@ class ControlRoomIncidentController extends Controller
         $siteAccess->applySiteScope($sitesQuery, $user, $bypassPermissions);
         $sites = $sitesQuery->get(['id', 'name']);
 
-        $clientsQuery = Client::query()->orderBy('first_name');
-        $siteAccess->applyClientScope($clientsQuery, $user, $bypassPermissions);
-        $clients = $clientsQuery->get(['id', 'first_name', 'last_name'])
-            ->map(fn ($client) => [
-                'id' => $client->id,
-                'name' => trim($client->first_name.' '.$client->last_name),
-            ]);
-
         $lenses = collect([
             ['key' => 'attention', 'label' => 'Needs attention', 'help' => 'Operational or governance work is still open.'],
             ['key' => 'needs_incident', 'label' => 'Needs incident', 'help' => 'Create the formal incident record and H&S handover.'],
@@ -123,7 +115,6 @@ class ControlRoomIncidentController extends Controller
 
         return Inertia::render('control-room/incidents', [
             'journeys' => $this->paginatorPayload($journeys),
-            'incidents' => $this->legacyIncidentFeed($request, $user, $filters),
             'filters' => $filters,
             'lenses' => $lenses,
             'stats' => [
@@ -135,12 +126,6 @@ class ControlRoomIncidentController extends Controller
                 'complete' => (int) $lensCounts->get('complete', 0),
             ],
             'sites' => $sites,
-            'clients' => $clients,
-            'can' => [
-                'createAlert' => $user->canDo('controlRoom.alerts.create'),
-                'createIncident' => $user->canDo('controlRoom.alerts.manage') && $user->canDo('incidents.create'),
-                'manageHealthSafety' => $user->canDo('hazards.manage'),
-            ],
             'detail' => fn () => $request->filled('alert')
                 ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
                 : null,
@@ -197,7 +182,7 @@ class ControlRoomIncidentController extends Controller
             'needs_incident' => $query->actionable()->notSnoozed()->doesntHave('clientIncident'),
             'awaiting_health_safety' => $query->whereHas('hsEvent', fn (Builder $event) => $event
                 ->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)),
-            'accepted_in_progress' => $query->actionable()->notSnoozed()
+            'accepted_in_progress' => $query->actionable()
                 ->whereHas('hsEvent', fn (Builder $event) => $event
                     ->where('handover_status', HsEvent::HANDOVER_ACCEPTED)
                     ->where('status', '!=', HsEvent::STATUS_CLOSED)),
@@ -217,7 +202,7 @@ class ControlRoomIncidentController extends Controller
                     ->orWhereHas('hsEvent', fn (Builder $event) => $event
                         ->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE))
                     ->orWhere(function (Builder $accepted) {
-                        $accepted->actionable()->notSnoozed()
+                        $accepted->actionable()
                             ->whereHas('hsEvent', fn (Builder $event) => $event
                                 ->where('handover_status', HsEvent::HANDOVER_ACCEPTED)
                                 ->where('status', '!=', HsEvent::STATUS_CLOSED));
@@ -347,165 +332,6 @@ class ControlRoomIncidentController extends Controller
                 'to' => $paginator->lastItem(),
             ],
         ];
-    }
-
-    /**
-     * Keep the previous response contract while pagination happens in SQL.
-     * The desktop page no longer reads this compatibility prop.
-     *
-     * @param  array<string, mixed>  $filters
-     * @return array<string, mixed>
-     */
-    private function legacyIncidentFeed(Request $request, User $user, array $filters): array
-    {
-        $dateFrom = ! empty($filters['date_from'])
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(30)->startOfDay();
-        $dateTo = ! empty($filters['date_to'])
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
-        $rows = collect();
-
-        if (empty($filters['source_type']) || $filters['source_type'] === 'client_incident') {
-            $query = ClientIncident::query()
-                ->with(['client.site', 'site:id,name', 'reporter:id,name'])
-                ->where('status', '!=', 'draft')
-                ->whereBetween('occurred_at', [$dateFrom, $dateTo]);
-            $this->siteAccess()->applyClientIncidentScope($query, $user, $this->alertBypassPermissions());
-            $this->applyLegacyFilters($query, $filters, 'occurred_at');
-            $rows->push(...$query->limit(25)->get()->map(fn (ClientIncident $incident) => [
-                'id' => 'ci_'.$incident->id,
-                'source_type' => 'client_incident',
-                'source_id' => $incident->id,
-                'title' => $incident->title ?: 'Incident: '.ucfirst($incident->type ?? 'General'),
-                'description' => $incident->description,
-                'severity' => $incident->severity ?? 'medium',
-                'status' => $incident->status,
-                'client_name' => $incident->client?->full_name ?? 'Unknown',
-                'site_name' => $incident->site?->name ?? $incident->client?->site?->name ?? 'Unknown',
-                'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                'reporter_name' => $incident->reporter?->name ?? 'Unknown',
-                'type_label' => ucfirst(str_replace('_', ' ', $incident->type ?? 'incident')),
-                'immediate_action' => $incident->immediate_action_taken ?? $incident->immediate_action,
-                'requires_followup' => (bool) $incident->requires_followup,
-                'location' => $incident->location,
-            ]));
-        }
-
-        if (empty($filters['source_type']) || $filters['source_type'] === 'medication_error') {
-            $query = MedicationError::query()
-                ->with(['client.site', 'reportedBy:id,name'])
-                ->whereBetween('reported_at', [$dateFrom, $dateTo]);
-            $this->applyMedicationErrorScope($query, $user);
-            $this->applyLegacyFilters($query, $filters, 'reported_at');
-            $rows->push(...$query->limit(25)->get()->map(fn (MedicationError $error) => [
-                'id' => 'me_'.$error->id,
-                'source_type' => 'medication_error',
-                'source_id' => $error->id,
-                'title' => 'Medication Error: '.ucfirst(str_replace('_', ' ', $error->error_type ?? 'Unknown')),
-                'description' => $error->description,
-                'severity' => $error->severity ?? 'medium',
-                'status' => $error->status,
-                'client_name' => $error->client?->full_name ?? 'Unknown',
-                'site_name' => $error->client?->site?->name ?? 'Unknown',
-                'occurred_at' => $error->reported_at?->toIso8601String(),
-                'reporter_name' => $error->reportedBy?->name ?? 'Unknown',
-                'type_label' => ucfirst(str_replace('_', ' ', $error->error_type ?? 'medication error')),
-                'immediate_action' => $error->immediate_action,
-                'requires_followup' => false,
-                'location' => null,
-            ]));
-        }
-
-        if (empty($filters['source_type']) || $filters['source_type'] === 'safeguarding') {
-            $query = SafeguardingConcern::query()
-                ->with(['reportedBy:id,name', 'site:id,name'])
-                ->whereBetween('occurred_at', [$dateFrom, $dateTo]);
-            $this->applySafeguardingScope($query, $user);
-            $this->applyLegacyFilters($query, $filters, 'occurred_at');
-            $rows->push(...$query->limit(25)->get()->map(fn (SafeguardingConcern $concern) => [
-                'id' => 'sg_'.$concern->id,
-                'source_type' => 'safeguarding',
-                'source_id' => $concern->id,
-                'title' => 'Safeguarding: '.ucfirst(str_replace('_', ' ', $concern->concern_type ?? 'Concern')),
-                'description' => $concern->description,
-                'severity' => $concern->severity ?? 'high',
-                'status' => $concern->status,
-                'client_name' => $concern->subject_name ?? 'Unknown',
-                'site_name' => $concern->site?->name ?? 'Unknown',
-                'occurred_at' => $concern->occurred_at?->toIso8601String(),
-                'reporter_name' => $concern->reportedBy?->name ?? $concern->reported_by_name ?? 'Unknown',
-                'type_label' => ucfirst(str_replace('_', ' ', $concern->abuse_category ?? $concern->concern_type ?? 'safeguarding')),
-                'immediate_action' => $concern->immediate_actions,
-                'requires_followup' => (bool) $concern->requires_external_referral,
-                'location' => $concern->location,
-            ]));
-        }
-
-        $sorted = $rows->sortBy([
-            fn (array $left, array $right) => $this->severityRank($left['severity']) <=> $this->severityRank($right['severity']),
-            fn (array $left, array $right) => strcmp($right['occurred_at'] ?? '', $left['occurred_at'] ?? ''),
-        ])->values();
-        $page = max(1, (int) $request->input('legacy_page', 1));
-        $paginator = new LengthAwarePaginator(
-            $sorted->forPage($page, 25)->values(),
-            $sorted->count(),
-            25,
-            $page,
-            ['path' => $request->url(), 'pageName' => 'legacy_page'],
-        );
-
-        return $paginator->toArray();
-    }
-
-    /** @param array<string, mixed> $filters */
-    private function applyLegacyFilters(Builder $query, array $filters, string $dateColumn): void
-    {
-        if (! empty($filters['severity'])) {
-            $query->where('severity', $filters['severity']);
-        }
-        if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-        if (! empty($filters['client_id']) && $query->getModel() instanceof SafeguardingConcern === false) {
-            $query->where('client_id', $filters['client_id']);
-        }
-        if (! empty($filters['site_id'])) {
-            if ($query->getModel() instanceof SafeguardingConcern) {
-                $query->where('site_id', $filters['site_id']);
-            } else {
-                $query->whereHas('client', fn (Builder $client) => $client->where('site_id', $filters['site_id']));
-            }
-        }
-        if (! empty($filters['search'])) {
-            $search = (string) $filters['search'];
-            $model = $query->getModel();
-            $query->where(function (Builder $nested) use ($search, $model) {
-                $nested->where('description', 'like', "%{$search}%")
-                    ->orWhere('reference_number', 'like', "%{$search}%");
-                if ($model instanceof ClientIncident) {
-                    $nested->orWhere('title', 'like', "%{$search}%");
-                } elseif ($model instanceof MedicationError) {
-                    $nested->orWhere('error_type', 'like', "%{$search}%");
-                } elseif ($model instanceof SafeguardingConcern) {
-                    $nested->orWhere('concern_type', 'like', "%{$search}%")
-                        ->orWhere('subject_name', 'like', "%{$search}%");
-                }
-            });
-        }
-        $query->whereNotNull($dateColumn);
-    }
-
-    private function severityRank(?string $severity): int
-    {
-        return match ($severity) {
-            'critical' => 0,
-            'major', 'high' => 1,
-            'moderate', 'medium' => 2,
-            'minor', 'low' => 3,
-            'near_miss' => 4,
-            default => 5,
-        };
     }
 
     /**

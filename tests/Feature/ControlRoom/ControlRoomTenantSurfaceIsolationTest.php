@@ -132,7 +132,7 @@ class ControlRoomTenantSurfaceIsolationTest extends TestCase
             );
     }
 
-    public function test_tenant_report_manager_incident_feed_excludes_foreign_medication_and_safeguarding_records(): void
+    public function test_tenant_report_manager_incident_tracker_uses_only_the_scoped_canonical_journey(): void
     {
         $manager = $this->adminForOrganization(1);
         $localSite = Site::factory()->create(['tenant_id' => 1]);
@@ -146,9 +146,9 @@ class ControlRoomTenantSurfaceIsolationTest extends TestCase
             'site_id' => $foreignSite->id,
         ]);
 
-        $localMedicationError = $this->medicationError($localClient, $manager, 'Local medication error');
+        $this->medicationError($localClient, $manager, 'Local medication error');
         $this->medicationError($foreignClient, $manager, 'Foreign medication error');
-        $localSafeguarding = $this->safeguardingConcern(
+        $this->safeguardingConcern(
             $localSite,
             $manager,
             'Local safeguarding concern',
@@ -159,22 +159,27 @@ class ControlRoomTenantSurfaceIsolationTest extends TestCase
             'Foreign safeguarding concern',
         );
 
-        $expectedIds = ['me_'.$localMedicationError->id, 'sg_'.$localSafeguarding->id];
+        $localAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $localSite->id,
+            'client_id' => $localClient->id,
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $foreignSite->id,
+            'client_id' => $foreignClient->id,
+        ]);
 
         $this->actingAs($manager)
             ->get('/control-room/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('incidents.total', 2)
-                ->where('incidents.data', fn ($incidents) => collect($incidents)
-                    ->pluck('id')
-                    ->sort()
-                    ->values()
-                    ->all() === collect($expectedIds)->sort()->values()->all())
+                ->where('journeys.meta.total', 1)
+                ->where('journeys.data.0.alert.id', $localAlert->id)
+                ->where('journeys.data.0.person.id', $localClient->id)
+                ->where('journeys.data.0.site.id', $localSite->id)
                 ->has('sites', 1)
                 ->where('sites.0.id', $localSite->id)
-                ->has('clients', 1)
-                ->where('clients.0.id', $localClient->id)
+                ->missing('incidents')
+                ->missing('clients')
             );
     }
 

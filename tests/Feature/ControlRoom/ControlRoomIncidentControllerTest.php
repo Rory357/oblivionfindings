@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -62,26 +64,48 @@ class ControlRoomIncidentControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_index_renders_unified_feed(): void
+    public function test_index_renders_only_the_canonical_handover_feed(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/control-room/incidents')
+        $response = $this->actingAs($this->admin)
+            ->get('/control-room/incidents');
+
+        $response
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/incidents')
-                ->has('incidents.data')
+                ->has('journeys.data')
                 ->has('stats')
                 ->has('filters')
                 ->has('sites')
-                ->has('clients')
-                ->has('can')
+                ->missing('incidents')
+                ->missing('clients')
+                ->missing('can')
             );
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $version = app(HandleInertiaRequests::class)->version(request());
+        $this->actingAs($this->admin)
+            ->get('/control-room/incidents', [
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => $version,
+                'X-Inertia-Partial-Component' => 'control-room/incidents',
+                'X-Inertia-Partial-Data' => 'journeys,stats,filters,sites',
+            ])
+            ->assertOk()
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonMissingPath('props.incidents');
+
+        $queries = collect(DB::getQueryLog())->pluck('query')->implode("\n");
+        DB::disableQueryLog();
+
+        $this->assertStringNotContainsString('medication_errors', $queries);
+        $this->assertStringNotContainsString('safeguarding_concerns', $queries);
     }
 
-    public function test_feed_resolves_the_client_full_name(): void
+    public function test_canonical_handover_feed_resolves_the_client_full_name(): void
     {
-        // Regression: the feed read Client->name (which doesn't exist — the
-        // model appends full_name), so every client incident showed "Unknown".
         $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
         $client = Client::factory()->create([
             'organization_id' => 1,
@@ -90,16 +114,11 @@ class ControlRoomIncidentControllerTest extends TestCase
             'last_name' => 'Kingi',
         ]);
 
-        ClientIncident::create([
+        $alert = ControlRoomAlert::factory()->open()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
-            'reported_by' => $this->admin->id,
-            'title' => 'Feed name check',
-            'type' => 'behaviour',
             'severity' => 'low',
-            'status' => 'submitted',
-            'occurred_at' => now()->subHour(),
-            'description' => 'Feed name check',
+            'notes' => 'Canonical feed name check',
         ]);
 
         $this->actingAs($this->admin)
@@ -107,7 +126,8 @@ class ControlRoomIncidentControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/incidents')
-                ->where('incidents.data.0.client_name', 'Aroha Kingi')
+                ->where('journeys.data.0.alert.id', $alert->id)
+                ->where('journeys.data.0.person.name', 'Aroha Kingi')
             );
     }
 

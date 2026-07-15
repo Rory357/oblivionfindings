@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\ControlRoomDeskService;
 use App\Services\ControlRoom\ControlRoomReportService;
+use App\Services\Tasks\TaskAggregator;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,16 @@ class ControlRoomDeskTest extends TestCase
         $site = Site::factory()->create(['name' => 'Kōwhai House']);
         $viewer = $this->siteBoundUser($site, ['controlRoom.viewAny', 'controlRoom.alerts.manage']);
 
+        $this->mock(TaskAggregator::class, function ($mock): void {
+            $mock->shouldReceive('sourcesFor')
+                ->once()
+                ->andReturn([['key' => 'control_room_alerts', 'label' => 'Control Room alerts']]);
+            $mock->shouldReceive('badgeCountFor')->once()->andReturn(7);
+        });
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
         $this->actingAs($viewer)
             ->get('/control-room')
             ->assertOk()
@@ -49,8 +60,16 @@ class ControlRoomDeskTest extends TestCase
                 ->has('sites')
                 ->has('staff')
                 ->has('can')
+                ->where('auth.can.tasks.view', true)
+                ->where('auth.can.tasks.badge', 7)
                 ->missing('analytics')
             );
+
+        $permissionQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'permission_user')
+            || str_contains($query['query'], 'role_permission'));
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(10, $permissionQueries->count(), $permissionQueries->pluck('query')->implode("\n"));
     }
 
     public function test_worklist_matches_the_shared_priority_query_and_excludes_dismissed_and_snoozed_alerts(): void
@@ -80,13 +99,22 @@ class ControlRoomDeskTest extends TestCase
             ->pluck('control_room_alerts.id')
             ->all();
 
-        $this->actingAs($viewer)
-            ->get('/control-room?site_id='.$site->id)
+        $version = app(HandleInertiaRequests::class)->version(request());
+        $response = $this->actingAs($viewer)
+            ->get('/control-room?site_id='.$site->id, [
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => $version,
+                'X-Inertia-Partial-Component' => 'control-room/index',
+                'X-Inertia-Partial-Data' => 'hero,worklist,handover',
+            ])
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('worklist.data', fn ($rows) => collect($rows)->pluck('id')->all() === $expected)
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.hero.active', 2)
+            ->assertJsonPath('props.hero.critical', 1)
+            ->assertJsonPath('props.hero.unassigned', 2)
+            ->assertJsonPath('props.handover.needs_incident', 2);
 
+        $this->assertSame($expected, collect($response->json('props.worklist.data'))->pluck('id')->all());
         $this->assertSame([$critical->id, $high->id], $expected);
     }
 

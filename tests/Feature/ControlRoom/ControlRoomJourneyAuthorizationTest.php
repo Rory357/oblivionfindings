@@ -29,7 +29,7 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_site_bound_operator_only_receives_accessible_incidents_sites_and_clients(): void
+    public function test_site_bound_operator_only_receives_accessible_canonical_journeys_and_sites(): void
     {
         $siteA = Site::factory()->create(['type' => 'house']);
         $siteB = Site::factory()->create(['type' => 'house']);
@@ -56,7 +56,7 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             'tier' => 1,
             'is_active' => true,
         ]);
-        ControlRoomAlert::factory()->open()->create([
+        $visibleAlert = ControlRoomAlert::factory()->open()->create([
             'queue_id' => $queue->id,
             'site_id' => $siteA->id,
             'client_id' => $clientA->id,
@@ -79,13 +79,13 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             ->get('/control-room/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
-                ->where('incidents.data.0.id', 'ci_'.$visible->id)
-                ->where('incidents.data.0.source_id', $visible->id)
+                ->has('journeys.data', 1)
+                ->where('journeys.data.0.alert.id', $visibleAlert->id)
+                ->where('journeys.data.0.person.id', $clientA->id)
                 ->has('sites', 1)
                 ->where('sites.0.id', $siteA->id)
-                ->has('clients', 1)
-                ->where('clients.0.id', $clientA->id)
+                ->missing('incidents')
+                ->missing('clients')
             );
 
         $this->actingAs($operator)
@@ -359,9 +359,10 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
             ->get('/control-room/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 2)
+                ->has('journeys.data', 2)
                 ->has('sites', 2)
-                ->has('clients', 2)
+                ->missing('incidents')
+                ->missing('clients')
             );
 
         $this->actingAs($globalOperator)
