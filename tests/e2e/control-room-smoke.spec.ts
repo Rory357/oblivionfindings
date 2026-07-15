@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { collectConsoleErrors, expectNoConsoleErrors } from './helpers';
 import {
@@ -86,6 +88,19 @@ test.describe('control room — smoke', () => {
         await expect(
             page.getByPlaceholder('Reference, incident, H&S or summary'),
         ).toBeVisible();
+
+        const evidenceDirectory = resolve(
+            process.cwd(),
+            'output',
+            'playwright',
+        );
+        mkdirSync(evidenceDirectory, { recursive: true });
+        await page.screenshot({
+            path: resolve(
+                evidenceDirectory,
+                'control-room-dashboard-first-viewport.png',
+            ),
+        });
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(errors);

@@ -1,0 +1,44 @@
+{
+  "incident": {
+    "id": 168,
+    "reference": "INC-2026-0096",
+    "source": "manual",
+    "status": "submitted",
+    "site_id": 9401,
+    "alert_id": 69,
+    "hs_event_id": 42,
+    "is_notifiable": true,
+    "worksafe_status": "acknowledged",
+    "worksafe_reference": "WS-E2E-9401"
+  },
+  "alert": {
+    "id": 69,
+    "reference": "CR-2026-0067",
+    "status": "open",
+    "notes": null,
+    "incident_claim": 168,
+    "tasks": 0,
+    "evidence_packs": 0,
+    "evidence_items": 0
+  },
+  "health_safety": {
+    "id": 42,
+    "reference": "HS-2026-0041",
+    "status": "closed",
+    "handover_status": "accepted",
+    "owner_user_id": 107,
+    "accepted_by_user_id": 107,
+    "accepted_at": "2026-07-15T08:58:37+00:00",
+    "worksafe_notifiable": true,
+    "worksafe_status": "acknowledged",
+    "worksafe_reference": "WS-E2E-9401",
+    "investigations": 1,
+    "corrective_actions": 1,
+    "dispositions": 1
+  },
+  "counts": {
+    "source_events": 1,
+    "candidate_alerts": 1,
+    "medication_errors": 0
+  }
+}

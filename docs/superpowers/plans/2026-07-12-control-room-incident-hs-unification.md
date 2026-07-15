@@ -1054,35 +1054,35 @@ git commit -m "feat(tasks): unify incident journey work and reconciliation"
 - Modify: `tests/e2e/control-room-smoke.spec.ts`
 - Test evidence: `output/playwright/incident-handover/`
 
-- [ ] **Step 1: Add deterministic role/site/client fixtures**
+- [x] **Step 1: Add deterministic role/site/client fixtures**
 
 Seeder creates site `Playwright Incident Handover House`, client `Playwright Aroha Handover`, assigned support worker, coordinator/operator, incident reviewer, H&S owner, and independent H&S verifier. It returns IDs/references through a machine-readable manifest and is safe to rerun.
 
-- [ ] **Step 2: Add `readIncidentJourney()` database invariant helper**
+- [x] **Step 2: Add `readIncidentJourney()` database invariant helper**
 
 Return exact counts, IDs, references, direct links, alert/incident/H&S states, acceptance, WorkSafe, investigation, recommendations/dispositions, corrective actions, and timestamps. Poll with `expect.poll()` after writes.
 
-- [ ] **Step 3: Implement Scenario 1 — existing alert to accepted H&S**
+- [x] **Step 3: Implement Scenario 1 — existing alert to accepted H&S**
 
 Drive dashboard → alert workspace → create incident and hand over → H&S awaiting worklist → accept. Assert retry idempotency and preserved alert notes/tasks/evidence.
 
-- [ ] **Step 4: Implement Scenario 2 — support-worker draft then submit**
+- [x] **Step 4: Implement Scenario 2 — support-worker draft then submit**
 
 Assert draft creates no H&S/alert; submit same incident creates one awaiting H&S event and no alert for medium severity; accept; support worker sees read-only acceptance without governance controls.
 
-- [ ] **Step 5: Implement Scenario 3 — high/notifiable full governance**
+- [x] **Step 5: Implement Scenario 3 — high/notifiable full governance**
 
 Assert automatic single alert, WorkSafe count equality, separate operational/incident/H&S states, acceptance, notify/acknowledge, investigation, recommendation disposition, corrective-action separation of duties, and governance closure.
 
-- [ ] **Step 6: Implement Scenario 4 — sensor fall confirmation**
+- [x] **Step 6: Implement Scenario 4 — sensor fall confirmation**
 
 Assert existing alert reused, evidence visible, one incident/H&S, retry stable, accepted in H&S, then operationally resolved.
 
-- [ ] **Step 7: Implement Scenario 5 — two similar incidents and medication correlation**
+- [x] **Step 7: Implement Scenario 5 — two similar incidents and medication correlation**
 
 Create two same-client/type incidents within 30 minutes and verify distinct alert correlation when escalated. Include the medication-origin incident as one of the two and prove its signal enriches rather than duplicates the journey.
 
-- [ ] **Step 8: Update stale selectors and run desktop only**
+- [x] **Step 8: Update stale selectors and run desktop only**
 
 Run:
 
@@ -1093,12 +1093,19 @@ npx playwright test tests/e2e/incident-handover.spec.ts --project=chromium-deskt
 
 Expected: five scenarios pass, zero console errors, no serious/critical Axe violations, screenshots/invariant JSON exist, and no mobile project runs.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add database/seeders/IncidentHandoverE2ESeeder.php tests/e2e output/playwright/incident-handover
 git commit -m "test(incidents): prove five desktop handover journeys"
 ```
+
+**Task 15 completion evidence (2026-07-15):**
+
+- Deterministic MySQL fixtures cover the operator/coordinator, support worker, incident reviewer, H&S owner and independent H&S verifier at one isolated site. The fixture seeder is safe to rerun and the browser helper returns machine-readable role/site/client identities.
+- The five desktop scenarios passed both independently and in the final combined run. Each scenario wrote a current PNG plus database invariant JSON under `output/playwright/incident-handover/`; the reports contain generated CR/INC/HS references, direct-link IDs, separate lifecycle states, H&S acceptance and exact source counts.
+- Scenario 1 preserved the original Control Room note, task and evidence through handover; scenario 2 proved truthful draft/submit behaviour plus an independent reviewer close while H&S remained open/accepted; scenario 3 completed WorkSafe, investigation, recommendation disposition, corrective action, independent verification and governance closure; scenario 4 reused the sensor alert/evidence; scenario 5 kept similar manual and medication incidents distinct while enriching one journey.
+- The authoritative combined desktop-only command passed 37 tests in 5.7 minutes with exit 0 on port 4196. No mobile, responsive or WebView project ran. Product/test implementation was committed across `76bb0a4d5`, `86d9af286`, `0cd1a26c7`, `f388fbd81` and the final Universal Tasks/reviewer fix `0b54cce572`.
 
 ---
 
@@ -1109,13 +1116,13 @@ git commit -m "test(incidents): prove five desktop handover journeys"
 - Create: `docs/audits/control-room-incidents-hs-completion-audit-2026-07-12.md`
 - Modify: `docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md`
 
-- [ ] **Step 1: Run focused PHP suites**
+- [x] **Step 1: Run focused PHP suites**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom tests/Feature/HealthSafety tests/Feature/IncidentControllerTest.php tests/Feature/Incidents tests/Unit/ControlRoom
 ```
 
-- [ ] **Step 2: Run frontend unit, type, formatting, and builds**
+- [x] **Step 2: Run frontend unit, type, formatting, and builds**
 
 ```powershell
 npm test
@@ -1125,23 +1132,23 @@ npm run build
 npx vite build --ssr
 ```
 
-- [ ] **Step 3: Run the five desktop scenarios fresh**
+- [x] **Step 3: Run the five desktop scenarios fresh**
 
-Use a clean deterministic fixture run on port 4187 and the `chromium-desktop` project only. Record the exact commit and URL in the audit.
+Use a clean deterministic fixture run on port 4196 and the `chromium-desktop` project only. Record the exact commit and URL in the audit.
 
-- [ ] **Step 4: Run role/site manual browser checks**
+- [x] **Step 4: Run role/site manual browser checks**
 
 Verify coordinator, support worker, incident reviewer, H&S owner, and H&S verifier. Confirm no out-of-scope row/picker/action, no dead link/403 advertised action, and H&S acceptance visible from all three modules.
 
-- [ ] **Step 5: Re-audit R1–R21 requirement by requirement**
+- [x] **Step 5: Re-audit R1–R21 requirement by requirement**
 
 For every ledger row, cite a current test result, route/payload, database invariant, screenshot, or manual browser observation. Mark missing/indirect evidence as open and return to the owning task; do not mark completion from absence of findings.
 
-- [ ] **Step 6: Re-audit the original ten findings and dashboard target**
+- [x] **Step 6: Re-audit the original ten findings and dashboard target**
 
 Confirm permission/site isolation, dashboard first viewport, metrics/lifecycle, active sorting, shared visual grammar, bidirectional handover, truthful reporting, one WorkSafe source, closure/shift acceptance, and automated coverage. Record any remaining P0/P1 and fix it before proceeding.
 
-- [ ] **Step 7: Run reconciliation dry-run and inspect git state**
+- [x] **Step 7: Run reconciliation dry-run and inspect git state**
 
 ```powershell
 php artisan incidents:reconcile-journeys
@@ -1150,7 +1157,7 @@ git status --short
 git log --oneline --decorate -20
 ```
 
-- [ ] **Step 8: Complete the plan and audit documents**
+- [x] **Step 8: Complete the plan and audit documents**
 
 Check every task box only when its evidence exists. Add exact test counts, build exits, browser routes, screenshots, invariant files, remaining low-priority boundaries, and deployment boundary to the completion audit.
 
@@ -1160,6 +1167,14 @@ Check every task box only when its evidence exists. Add exact test counts, build
 git add docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md docs/audits/control-room-incidents-hs-completion-audit-2026-07-12.md
 git commit -m "docs(control-room): record unified journey completion audit"
 ```
+
+**Task 16 completion evidence (2026-07-15; final evidence commit pending Step 9):**
+
+- The relevant backend run passed 1,351 tests / 9,454 assertions, and the final Universal Tasks/reviewer regression pack passed 6 tests / 53 assertions. The frontend run passed 69 files / 298 tests; TypeScript, scoped branch Prettier, scoped Pint and `git diff --check` passed. Client and SSR production builds both exited 0.
+- The final combined production-built browser run on `http://127.0.0.1:4196` passed 37/37 tests in 5.7 minutes using only `chromium-desktop`. A focused dashboard evidence rerun passed 1/1 with zero serious/critical Axe findings and wrote the audited 1440 × 1000 first-viewport capture.
+- The completion audit maps every R1–R21 requirement and each original audit gap to current code, route, test, browser or invariant evidence. The re-audit found and fixed one P1 in `ShiftTaskProvider` (`Shift::user` was not a valid relationship and could break the shared Tasks badge/reviewer login); commit `0b54cce572` uses `Shift::staff`, and no P0/P1 remains open in scope.
+- The reconciliation command was run read-only against the shared test database: 85 incidents scanned, 255 legacy/demo issues reported, 0 repairs. Apply remains a deployment action requiring target backup and explicit review.
+- The Playwright runner and PHP preview closed normally; port 4196 had no listener afterward. No mobile/WebView work, merge, push or deployment was performed.
 
 ---
 
