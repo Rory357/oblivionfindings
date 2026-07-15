@@ -211,6 +211,21 @@ test.describe('desktop incident handover journeys', () => {
             },
         );
 
+        await loginAsFixture(page, manifest.users.reviewer);
+        await postLaravel(page, `/incidents/${incidentId}/review`, {
+            review_notes:
+                'Incident facts reviewed independently from H&S governance.',
+        });
+        await postLaravel(page, `/incidents/${incidentId}/close`, {
+            closed_outcome: 'Incident review complete',
+            closed_notes:
+                'The factual incident record is complete; H&S governance remains independent.',
+        });
+        invariant = readIncidentJourney(incidentId);
+        expect(invariant.incident.status).toBe('closed');
+        expect(invariant.health_safety?.status).toBe('open');
+        expect(invariant.health_safety?.handover_status).toBe('accepted');
+
         await loginAsFixture(page, manifest.users.worker);
         await page.goto(`/incidents?incident=${incidentId}`);
         await expect(page.getByText('Accepted into H&S')).toBeVisible();
