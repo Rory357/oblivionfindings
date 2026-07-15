@@ -853,15 +853,15 @@ git commit -m "feat(control-room): unify alerts and safety handovers"
 - Modify: `resources/js/pages/control-room/shifts.tsx`
 - Test: `tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php`
 
-- [ ] **Step 1: Write failing prepared/accepted state tests**
+- [x] **Step 1: Write failing prepared/accepted state tests**
 
 Preparing requires an incoming lead and explicit review of every critical/high alert. It stores structured snapshots and leaves the outgoing shift active. Only the selected incoming lead can accept. Acceptance atomically completes outgoing and activates incoming, recording actor/time once.
 
-- [ ] **Step 2: Write the reactivation regression test**
+- [x] **Step 2: Write the reactivation regression test**
 
 Calling the legacy acknowledge route on a completed shift must never set that shift back to active or create two active shifts.
 
-- [ ] **Step 3: Implement service API**
+- [x] **Step 3: Implement service API**
 
 ```php
 public function prepare(Shift $outgoing, User $incomingLead, array $reviewedAlertIds, User $actor, int $expectedVersion): Shift;
@@ -870,20 +870,27 @@ public function accept(Shift $outgoing, User $actor, int $expectedVersion): Shif
 
 Snapshots use the canonical alert presenter and include reference, summary, person/site, owner, SLA, tasks, incident/H&S state, and next action.
 
-- [ ] **Step 4: Add autosave/resume and version conflict UI**
+- [x] **Step 4: Add autosave/resume and version conflict UI**
 
 Persist draft fields after changes, show `Saved`, require incoming lead before final review, make snapshot rows openable, and show a conflict message when the version changed.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php tests/Feature/ControlRoom/ControlRoomHandoverControllerTest.php tests/Feature/ControlRoom/ControlRoomShiftControllerTest.php`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add app/Services/ControlRoom/ControlRoomShiftHandoverService.php app/Http/Controllers/ControlRoom app/Models/ControlRoom/Shift.php routes/control-room.php resources/js/pages/control-room/shifts tests/Feature/ControlRoom
 git commit -m "feat(control-room): require incoming handover acceptance"
 ```
+
+**Task 12 completion evidence — 2026-07-15**
+
+- The former one-click completion flow is replaced by an autosaved, resumable `Prepared → Accepted` contract. The outgoing lead must explicitly review every visible active critical/high alert; only the selected eligible incoming lead can accept; the outgoing shift remains active until that acceptance atomically completes it and creates one incoming active shift.
+- The frozen snapshot uses the canonical alert worklist presenter and carries official reference, summary, person/site, assignee, SLA, open tasks, incident/H&S journey state, and canonical next action. Carry-forward priorities are linked alert IDs rather than free-text pseudo-tickets, with a direct Universal Tasks link for application-wide work.
+- Optimistic version checks prevent stale draft/prepare/accept writes. Transaction locks, idempotent re-acceptance, legacy-route guarding, and the active-shift start guard prevent duplicate active shifts, reactivation of history, and bypass of prepared acceptance.
+- Focused PHP gate: 17 tests / 165 assertions. TypeScript, targeted ESLint, Prettier, Pint, PHP lint, and `git diff --check` passed. Specification and code-quality self-reviews passed; no mobile, WebView, browser, merge, push, or deployment work was included.
 
 ---
 

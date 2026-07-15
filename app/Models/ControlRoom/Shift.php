@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class Shift extends Model
 {
@@ -91,33 +93,22 @@ class Shift extends Model
 
     public static function startNew(User $shiftLead, ?string $name = null, array $teamMembers = []): self
     {
-        // End any active shifts
-        static::active()->update([
-            'status' => 'completed',
-            'ends_at' => now(),
-        ]);
+        return DB::transaction(function () use ($shiftLead, $name, $teamMembers): self {
+            if (static::query()->active()->lockForUpdate()->first(['id'])) {
+                throw ValidationException::withMessages([
+                    'shift' => 'Complete the active shift through an accepted handover before starting another.',
+                ]);
+            }
 
-        return static::create([
-            'name' => $name ?? 'Shift '.now()->format('Y-m-d H:i'),
-            'starts_at' => now(),
-            'status' => 'active',
-            'shift_lead_user_id' => $shiftLead->id,
-            'team_members' => $teamMembers,
-            'open_alerts_at_start' => ControlRoomAlert::unresolved()->count(),
-        ]);
-    }
-
-    public function handover(User $toUser, string $notes, array $priorityItems = []): void
-    {
-        $this->update([
-            'status' => 'completed',
-            'ends_at' => now(),
-            'open_alerts_at_end' => ControlRoomAlert::unresolved()->count(),
-            'handover_notes' => $notes,
-            'priority_items' => $priorityItems,
-            'handed_over_to_user_id' => $toUser->id,
-            'handed_over_at' => now(),
-        ]);
+            return static::create([
+                'name' => $name ?? 'Shift '.now()->format('Y-m-d H:i'),
+                'starts_at' => now(),
+                'status' => 'active',
+                'shift_lead_user_id' => $shiftLead->id,
+                'team_members' => $teamMembers,
+                'open_alerts_at_start' => ControlRoomAlert::unresolved()->count(),
+            ]);
+        });
     }
 
     public function incrementCreated(): void

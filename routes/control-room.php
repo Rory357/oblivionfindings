@@ -217,8 +217,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.shifts.store');
         Route::get('/control-room/shifts/{shift}/handover', [ControlRoomHandoverController::class, 'show'])
             ->name('control-room.shifts.handover-page');
+        Route::patch('/control-room/shifts/{shift}/handover/draft', [ControlRoomShiftController::class, 'saveHandoverDraft'])
+            ->name('control-room.shifts.handover-draft');
         Route::post('/control-room/shifts/{shift}/handover', [ControlRoomShiftController::class, 'handover'])
             ->name('control-room.shifts.handover');
+        Route::post('/control-room/shifts/{shift}/accept-handover', [ControlRoomShiftController::class, 'acceptHandover'])
+            ->name('control-room.shifts.accept-handover');
         Route::post('/control-room/shifts/{shift}/acknowledge-handover', [ControlRoomShiftController::class, 'acknowledgeHandover'])
             ->name('control-room.shifts.acknowledge-handover');
         Route::post('/control-room/shifts/{shift}/note', [ControlRoomShiftController::class, 'addNote'])

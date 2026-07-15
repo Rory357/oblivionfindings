@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -35,7 +35,6 @@ import {
     Plus,
     TrendingUp,
     User,
-    X,
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -58,8 +57,10 @@ interface ActiveShift {
     alerts_created: number;
     alerts_resolved: number;
     alerts_escalated: number;
-    handover_notes: string | null;
-    priority_items: string[];
+    handover_status: 'none' | 'prepared' | 'accepted';
+    handover_version: number;
+    handover_prepared_at: string | null;
+    incoming_lead: StaffMember | null;
 }
 
 interface OperatorNote {
@@ -94,6 +95,7 @@ interface Props {
     openAlertsCount: number;
     criticalAlertsCount: number;
     staff: StaffMember[];
+    eligibleLeads: StaffMember[];
     can: {
         manage: boolean;
     };
@@ -154,6 +156,7 @@ export default function ControlRoomShifts({
     openAlertsCount,
     criticalAlertsCount,
     staff,
+    eligibleLeads,
     can,
 }: Props) {
     // New shift form state
@@ -296,14 +299,16 @@ export default function ControlRoomShifts({
                                                         <SelectValue placeholder="Select shift lead" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {staff.map((s) => (
-                                                            <SelectItem
-                                                                key={s.id}
-                                                                value={s.id.toString()}
-                                                            >
-                                                                {s.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {eligibleLeads.map(
+                                                            (s) => (
+                                                                <SelectItem
+                                                                    key={s.id}
+                                                                    value={s.id.toString()}
+                                                                >
+                                                                    {s.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -375,6 +380,15 @@ export default function ControlRoomShifts({
                                         <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                             Active
                                         </Badge>
+                                        {activeShift.handover_status ===
+                                            'prepared' && (
+                                            <Badge
+                                                variant="outline"
+                                                className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                            >
+                                                Handover prepared
+                                            </Badge>
+                                        )}
                                     </CardTitle>
                                     <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
                                         <span className="flex items-center gap-1">
@@ -546,9 +560,14 @@ export default function ControlRoomShifts({
                                         </Dialog>
                                         <Button size="sm" asChild>
                                             {/* Handover is a guided, stepped page — summary, notes, incoming team, confirm. */}
-                                            <Link href={`/control-room/shifts/${activeShift.id}/handover`}>
+                                            <Link
+                                                href={`/control-room/shifts/${activeShift.id}/handover`}
+                                            >
                                                 <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                Begin Handover
+                                                {activeShift.handover_status ===
+                                                'prepared'
+                                                    ? 'Review Prepared Handover'
+                                                    : 'Prepare Handover'}
                                             </Link>
                                         </Button>
                                     </div>
@@ -556,6 +575,33 @@ export default function ControlRoomShifts({
                             </div>
                         </CardHeader>
                         <CardContent>
+                            {activeShift.handover_status === 'prepared' && (
+                                <div className="mb-5 flex items-center justify-between gap-6 rounded-lg border border-status-warning/30 bg-status-warning-bg/40 p-4">
+                                    <div>
+                                        <p className="font-semibold">
+                                            Ownership has not changed yet
+                                        </p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Prepared for{' '}
+                                            {activeShift.incoming_lead?.name ??
+                                                'the incoming lead'}{' '}
+                                            on{' '}
+                                            {formatDateTime(
+                                                activeShift.handover_prepared_at,
+                                            )}
+                                            . This shift remains active until
+                                            they accept.
+                                        </p>
+                                    </div>
+                                    <Button asChild variant="outline">
+                                        <Link
+                                            href={`/control-room/shifts/${activeShift.id}/handover`}
+                                        >
+                                            Open handover
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
                             {/* Team Members */}
                             {activeShift.team_members.length > 0 && (
                                 <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -690,14 +736,18 @@ export default function ControlRoomShifts({
                                                             <SelectValue placeholder="Select shift lead" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {staff.map((s) => (
-                                                                <SelectItem
-                                                                    key={s.id}
-                                                                    value={s.id.toString()}
-                                                                >
-                                                                    {s.name}
-                                                                </SelectItem>
-                                                            ))}
+                                                            {eligibleLeads.map(
+                                                                (s) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            s.id
+                                                                        }
+                                                                        value={s.id.toString()}
+                                                                    >
+                                                                        {s.name}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
