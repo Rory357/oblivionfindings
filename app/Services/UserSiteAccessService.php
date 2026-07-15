@@ -24,23 +24,35 @@ class UserSiteAccessService
     /** @var array<string, int|null> */
     private array $alertSiteTenantCache = [];
 
+    /** @var array<string, array<int, int>> */
+    private array $accessibleSiteIdsCache = [];
+
     /**
      * @param  array<int, string>  $bypassPermissions
      * @return array<int, int>
      */
     public function accessibleSiteIds(?User $user, array $bypassPermissions = []): array
     {
+        $cacheKey = implode('|', [
+            $user ? (string) ($user->getKey() ?? spl_object_id($user)) : 'guest',
+            (string) ($user?->organization_id ?? 'platform'),
+            implode(',', $bypassPermissions),
+        ]);
+        if (array_key_exists($cacheKey, $this->accessibleSiteIdsCache)) {
+            return $this->accessibleSiteIdsCache[$cacheKey];
+        }
+
         if (! $user || $this->canSkipTenantScope($user, $bypassPermissions)) {
-            return [];
+            return $this->accessibleSiteIdsCache[$cacheKey] = [];
         }
 
         $organizationId = $this->organizationId($user);
         if ($organizationId === null) {
-            return [];
+            return $this->accessibleSiteIdsCache[$cacheKey] = [];
         }
 
         if ($this->canBypass($user, $bypassPermissions)) {
-            return Site::query()
+            return $this->accessibleSiteIdsCache[$cacheKey] = Site::query()
                 ->where('tenant_id', $organizationId)
                 ->orderBy('id')
                 ->pluck('id')
@@ -68,7 +80,7 @@ class UserSiteAccessService
             ->all();
 
         if ($assignedSiteIds === []) {
-            return [];
+            return $this->accessibleSiteIdsCache[$cacheKey] = [];
         }
 
         $tenantSiteIds = Site::query()
@@ -78,7 +90,7 @@ class UserSiteAccessService
             ->map(fn ($siteId) => (int) $siteId)
             ->all();
 
-        return array_values(array_filter(
+        return $this->accessibleSiteIdsCache[$cacheKey] = array_values(array_filter(
             $assignedSiteIds,
             fn (int $siteId) => in_array($siteId, $tenantSiteIds, true),
         ));

@@ -348,6 +348,12 @@ class User extends Authenticatable
 
     public function hasRole(string ...$roles): bool
     {
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->contains(
+                fn (Role $role) => in_array($role->name, $roles, true),
+            );
+        }
+
         return $this->roles()
             ->whereIn('name', $roles)
             ->exists();
@@ -356,6 +362,27 @@ class User extends Authenticatable
     public function canDo(string $permissionKey): bool
     {
         $permissionKeys = $this->permissionLookupKeys($permissionKey);
+
+        if ($this->relationLoaded('permissionOverrides')
+            && $this->relationLoaded('roles')
+            && $this->roles->every(fn (Role $role) => $role->relationLoaded('permissions'))) {
+            $overrides = $this->permissionOverrides
+                ->filter(fn (Permission $permission) => in_array($permission->key, $permissionKeys, true));
+
+            if ($overrides->contains(fn (Permission $permission) => ! (bool) $permission->pivot->allowed)) {
+                return false;
+            }
+
+            if ($overrides->contains(fn (Permission $permission) => (bool) $permission->pivot->allowed)) {
+                return true;
+            }
+
+            return $this->roles->contains(
+                fn (Role $role) => $role->permissions->contains(
+                    fn (Permission $permission) => in_array($permission->key, $permissionKeys, true),
+                ),
+            );
+        }
 
         // 1) explicit deny override wins
         $deny = $this->permissionOverrides()

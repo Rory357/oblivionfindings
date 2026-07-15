@@ -22,6 +22,12 @@ export type AlertWorklistRow = {
     status: AlertStatusKey;
     severity: AlertSeverityKey;
     priority: { level: string; rank: number; reason: string };
+    playbook?: {
+        name: string | null;
+        status: string;
+        completed_steps: number;
+        total_steps: number;
+    } | null;
     triggered_at: string | null;
     next_deadline_at: string | null;
     sla: { status: AlertSlaStatusKey | null; next_deadline_at: string | null };

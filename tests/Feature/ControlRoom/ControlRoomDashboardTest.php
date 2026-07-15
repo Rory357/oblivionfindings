@@ -114,13 +114,17 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/index')
+                ->has('hero')
+                ->has('worklist')
+                ->has('handover')
+                ->has('activity')
+                ->has('freshness')
                 ->has('alerts')
                 ->has('stats')
-                ->has('daily_trend')
-                ->has('by_severity')
                 ->has('staff')
                 ->has('filters')
                 ->has('can')
+                ->missing('analytics')
             );
     }
 
@@ -202,13 +206,13 @@ class ControlRoomDashboardTest extends TestCase
                 ->where('alerts.data.0.id', $resolved->id));
     }
 
-    public function test_dashboard_daily_trend_has_14_entries(): void
+    public function test_dashboard_defers_historical_trends_from_the_initial_live_desk(): void
     {
         $this->actingAs($this->admin)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('daily_trend', 14)
+                ->missing('analytics')
             );
     }
 
@@ -227,7 +231,7 @@ class ControlRoomDashboardTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('alerts.data.0.id', $alert->id)
                 ->where('alerts.data.0.sla_status', null)
-                ->has('sla_daily_trend', 0)
+                ->missing('analytics')
             );
     }
 

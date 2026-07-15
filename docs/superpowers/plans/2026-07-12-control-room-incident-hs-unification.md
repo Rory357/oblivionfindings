@@ -722,6 +722,11 @@ git commit -m "feat(ui): share incident journey command-centre language"
 
 - Create: `app/Services/ControlRoom/ControlRoomDeskService.php`
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomDashboardController.php`
+- Modify: `app/Services/ControlRoom/AlertWorklistQuery.php`
+- Modify: `app/Services/ControlRoom/AlertWorklistPresenter.php`
+- Modify: `app/Services/UserSiteAccessService.php`
+- Modify: `app/Models/User.php`
+- Modify: `app/Providers/AppServiceProvider.php`
 - Replace: `resources/js/pages/control-room/index.tsx`
 - Create: `resources/js/components/control-room/dashboard/control-room-hero.tsx`
 - Create: `resources/js/components/control-room/dashboard/live-desk-panel.tsx`
@@ -732,36 +737,45 @@ git commit -m "feat(ui): share incident journey command-centre language"
 - Test: `tests/Feature/ControlRoom/ControlRoomDeskTest.php`
 - Test: `resources/js/components/control-room/dashboard/control-room-dashboard.test.tsx`
 
-- [ ] **Step 1: Write failing controller-contract and query-budget tests**
+- [x] **Step 1: Write failing controller-contract and query-budget tests**
 
 Assert props `hero`, `worklist`, `queues`, `handover`, `activity`, `filters`, `freshness`, and optional `analytics`. Assert worklist IDs/order match `AlertWorklistQuery`, dismissed/snoozed excluded, response time is calculated from `responded_at` rather than acknowledgement, an unavailable response average remains null rather than `0m`, and a live partial reload runs no analytics query.
 
-- [ ] **Step 2: Write failing DOM-order and accessibility tests**
+- [x] **Step 2: Write failing DOM-order and accessibility tests**
 
 Assert the operational workflow ribbon, hero actions, Now and Continuity clusters, filters, and priority worklist render before service health; historical charts are absent until Analytics opens; freshness has Updated/Refreshing/Stale text.
 
-- [ ] **Step 3: Implement the Desk service and deferred analytics**
+- [x] **Step 3: Implement the Desk service and deferred analytics**
 
 Wrap Inertia props in closures. Make analytics optional and 60–120 second cached. Poll only live props and pause while `document.hidden`. Detect new critical alerts by stable IDs.
 
-- [ ] **Step 4: Build the desktop composition**
+- [x] **Step 4: Build the desktop composition**
 
 First viewport: workflow ribbon → hero/filters → priority worklist plus continuity panel. Remove duplicate KPI cards, quick-stat row, and charts-before-work. Keep only Last 24 hours summary with an Analytics link.
 
-- [ ] **Step 5: Verify performance contract**
+- [x] **Step 5: Verify performance contract**
 
 Record query count for the live partial endpoint. Target at most 15 SQL statements and no analytics query. If the target is exceeded, replace cloned counts with conditional aggregates before proceeding.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `php artisan test tests/Feature/ControlRoom/ControlRoomDeskTest.php tests/Feature/ControlRoom/ControlRoomDashboardTest.php && npm test -- resources/js/components/control-room/dashboard/control-room-dashboard.test.tsx`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/ControlRoom/ControlRoomDeskService.php app/Http/Controllers/ControlRoom/ControlRoomDashboardController.php resources/js/pages/control-room/index.tsx resources/js/components/control-room/dashboard tests/Feature/ControlRoom resources/js/components/control-room/dashboard/control-room-dashboard.test.tsx
 git commit -m "feat(control-room): rebuild dashboard as live desk"
 ```
+
+**Task 10 evidence (2026-07-15):**
+
+- RED proof first failed on the missing Desk service and dashboard components. The completed contract exposes live `hero`, canonical `worklist`, `queues`, `handover`, `activity`, `filters` and `freshness`; `analytics` is permission-gated, optional, cached for 90 seconds and absent from the initial response and live polling path.
+- The dashboard now leads with the shared incident-response ribbon, one operational hero, explicit Now/Continuity groups, a deterministic priority worklist, H&S handover continuity, real queue-pressure filters and readable Updated/Refreshing/Stale service health. Historical analytics opens from the Last 24 hours strip and gives loading feedback instead of blocking the Desk.
+- Polling requests only the six live props every 30 seconds, pauses while `document.hidden`, does not write repeated dashboard-view audit records and detects newly visible critical alerts by stable IDs. Dismissed and currently snoozed alerts remain outside the live worklist.
+- The query-budget gate passed at no more than 15 live-data SQL statements. Repeated RBAC/site checks now reuse request-scoped access state while retaining tenant, site, client-integrity and selected-site precedence rules; the canonical site-access regressions passed 24 tests / 97 assertions.
+- The combined new and legacy dashboard run passed 35 tests / 375 assertions. A final Desk plus access-safety run passed 24 tests / 97 assertions, including the new queue-filter contract. The dashboard component suite passed 3 tests; `npm run types`, focused ESLint, PHP syntax, Pint, Prettier and `git diff --check` exited cleanly.
+- No desktop browser E2E, mobile/responsive/WebView test, merge, push or deployment was performed in Task 10. Browser proof remains deliberately scheduled for Tasks 15–16 after the workflow surfaces are complete.
 
 ---
 

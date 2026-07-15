@@ -37,10 +37,6 @@ class AlertWorklistQuery
                 'playbookRun.playbook:id,name,code',
                 'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,site_id',
                 'hsEvent:id,reference_number,control_room_alert_id,handover_status,owner_user_id,status,severity,worksafe_notifiable,worksafe_status',
-                'hsEvent.owner:id,name',
-                'tasks:id,alert_id,title,status,priority,due_at,assigned_to_user_id',
-                'evidencePacks:id,alert_id,title,status,item_count',
-                'communications:id,alert_id,subject,status,sent_at,delivered_at',
             ]);
 
         $this->siteAccess->applyAlertScope($query, $user, self::BYPASS_PERMISSIONS);
@@ -50,12 +46,17 @@ class AlertWorklistQuery
             ->when(filled($filters['site_id'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.site_id', (int) $filters['site_id']))
             ->when(filled($filters['severity'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.severity', $filters['severity']))
             ->when(filled($filters['source'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.source', $filters['source']))
+            ->when(filled($filters['queue_id'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.queue_id', (int) $filters['queue_id']))
             ->when(filled($filters['assigned_to'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.assigned_to_user_id', (int) $filters['assigned_to']))
+            ->when(filled($filters['escalation_level'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.escalation_level', '>=', (int) $filters['escalation_level']))
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $q) => $q->whereDate('control_room_alerts.triggered_at', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $q) => $q->whereDate('control_room_alerts.triggered_at', '<=', $filters['date_to']))
             ->when(filled($filters['q'] ?? null), function (Builder $q) use ($filters): void {
                 $term = '%'.trim((string) $filters['q']).'%';
                 $q->where(function (Builder $search) use ($term): void {
                     $search->where('control_room_alerts.reference_number', 'like', $term)
                         ->orWhere('control_room_alerts.alert_type', 'like', $term)
+                        ->orWhere('control_room_alerts.notes', 'like', $term)
                         ->orWhereHas('clientIncident', fn (Builder $incident) => $incident->where('reference_number', 'like', $term))
                         ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', $term));
                 });

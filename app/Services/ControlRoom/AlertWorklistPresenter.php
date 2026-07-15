@@ -46,6 +46,12 @@ class AlertWorklistPresenter
             'status' => $alert->status,
             'severity' => $alert->severity,
             'priority' => $this->priority->describe($alert),
+            'playbook' => $alert->playbookRun ? [
+                'name' => $alert->playbookRun->playbook?->name,
+                'status' => $alert->playbookRun->status,
+                'completed_steps' => (int) $alert->playbookRun->completed_steps,
+                'total_steps' => (int) $alert->playbookRun->total_steps,
+            ] : null,
             'triggered_at' => $alert->triggered_at?->toIso8601String(),
             'next_deadline_at' => $deadline?->toIso8601String(),
             'sla' => [
