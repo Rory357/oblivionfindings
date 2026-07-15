@@ -28,11 +28,7 @@ export function resetMedicationReadinessFixtures() {
 export function resetRosteringReadinessFixtures(
     options: { assignmentShiftStatus?: 'draft' | 'scheduled' } = {},
 ) {
-    runArtisan([
-        'db:seed',
-        '--class=RosteringProductionDemoSeeder',
-        '--force',
-    ]);
+    runArtisan(['db:seed', '--class=RosteringProductionDemoSeeder', '--force']);
 
     const assignmentShiftStatus = options.assignmentShiftStatus ?? 'scheduled';
 

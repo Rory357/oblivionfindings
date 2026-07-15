@@ -3,7 +3,14 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@inertiajs/react', () => ({
-    Link: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
+    Link: ({
+        href,
+        children,
+        ...props
+    }: {
+        href: string;
+        children: ReactNode;
+    }) => (
         <a href={href} {...props}>
             {children}
         </a>
@@ -69,7 +76,9 @@ describe('Control Room linked H&S handover', () => {
         expect(row).toHaveTextContent('Accepted into H&S');
         expect(row).toHaveTextContent('owner Moana Rangi');
         expect(row).toHaveTextContent('accepted by Tama Lewis');
-        expect(screen.getByText('Health & Safety event').closest('a')).toBeNull();
+        expect(
+            screen.getByText('Health & Safety event').closest('a'),
+        ).toBeNull();
     });
 
     it('shows awaiting acceptance and links only when the viewer can open H&S', () => {
@@ -89,9 +98,8 @@ describe('Control Room linked H&S handover', () => {
         );
 
         expect(screen.getByText(/Awaiting H&S acceptance/)).toBeInTheDocument();
-        expect(screen.getByText('Health & Safety event').closest('a')).toHaveAttribute(
-            'href',
-            '/health-safety/events/17',
-        );
+        expect(
+            screen.getByText('Health & Safety event').closest('a'),
+        ).toHaveAttribute('href', '/health-safety/events/17');
     });
 });

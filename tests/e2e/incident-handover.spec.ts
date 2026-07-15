@@ -475,7 +475,9 @@ echo json_encode(['id' => \\App\\Models\\ClientIncident::query()->where('control
             },
         );
         await page.goto(`/health-safety/events/${invariant.health_safety?.id}`);
-        await page.getByRole('button', { name: /Handover Accepted into H&S/ }).click();
+        await page
+            .getByRole('button', { name: /Handover Accepted into H&S/ })
+            .click();
         await expect(
             page.getByText('Fall sensor confidence 98%; bathroom zone.'),
         ).toBeVisible();
