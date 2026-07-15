@@ -824,6 +824,11 @@ class MedicationErrorsTest extends TestCase
         $signal = Signal::query()->sole();
 
         $this->assertSame($incident->id, $error->client_incident_id);
+        $this->assertMatchesRegularExpression(
+            '/^INC-\d{4}-\d{4}$/',
+            (string) $incident->reference_number,
+            'Every medication-created incident must receive an official incident reference.',
+        );
         $this->assertSame($event->id, $incident->hs_event_id);
         $this->assertSame($alert->id, $incident->control_room_alert_id);
         $this->assertSame($alert->id, $event->control_room_alert_id);

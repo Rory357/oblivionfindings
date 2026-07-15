@@ -35,6 +35,7 @@ class ContentSecurityPolicyTest extends TestCase
         $this->assertStringContainsString("default-src 'self'", $csp);
         $this->assertStringContainsString("script-src 'self' 'nonce-", $csp);
         $this->assertStringContainsString("style-src 'self' 'unsafe-inline' https://fonts.bunny.net", $csp);
+        $this->assertStringContainsString("connect-src 'self' https://fonts.bunny.net", $csp);
         $this->assertStringContainsString("object-src 'none'", $csp);
         $this->assertStringContainsString("base-uri 'self'", $csp);
         $this->assertStringContainsString("frame-ancestors 'none'", $csp);

@@ -1,18 +1,73 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { collectConsoleErrors, expectNoConsoleErrors, loginAsStaff } from './helpers';
+import { collectConsoleErrors, expectNoConsoleErrors } from './helpers';
+import {
+    loginAsFixture,
+    seedIncidentHandoverFixtures,
+} from './incident-handover-helpers';
 
 /**
  * Full Control Room alert lifecycle — the regression guard for the six
  * frontend↔backend payload-key mismatches found during the readiness audit
  * (see `docs/control-room-readiness-plan.md`, P0 / B1).
  *
- * Each test seeds its own alert via `POST /control-room/alerts` (the admin user
- * has `controlRoom.alerts.create`) so tests do not depend on demo seeders
- * including a Control Room fixture.
+ * Each test seeds its own alert via `POST /control-room/alerts` using the
+ * deterministic Control Room operator fixture, so database refreshes do not
+ * make the suite depend on a shared demo administrator account.
  */
 
 type CreatedAlert = { id: number; status: string };
+
+async function openAlertWorkspace(
+    page: Page,
+    alert: CreatedAlert,
+): Promise<Locator> {
+    await page.goto(`/control-room/alerts/${alert.id}`);
+
+    const workspace = page.getByRole('dialog', { name: /^Alert CR-/ });
+    await expect(workspace).toBeVisible();
+    await expect(
+        workspace
+            .getByText('Playwright Lifecycle Alert', { exact: true })
+            .first(),
+    ).toBeVisible();
+
+    return workspace;
+}
+
+async function expectWorkspaceStatus(workspace: Locator, label: string) {
+    // Scope to the semantic footer because the lifecycle guide intentionally
+    // shows every possible stage as well as the alert's live status.
+    await expect(
+        workspace.getByRole('contentinfo').getByText(label, { exact: true }),
+    ).toBeVisible({ timeout: 20_000 });
+}
+
+async function acknowledgeAlert(workspace: Locator) {
+    await workspace
+        .getByRole('button', { name: 'Acknowledge', exact: true })
+        .click();
+    await expect(
+        workspace.getByText('Acknowledge alert', { exact: true }).first(),
+    ).toBeVisible();
+    await workspace
+        .getByRole('button', { name: 'Acknowledge alert', exact: true })
+        .click();
+    await expectWorkspaceStatus(workspace, 'Acknowledged');
+}
+
+async function startTriage(workspace: Locator) {
+    await workspace
+        .getByRole('button', { name: 'Start triage', exact: true })
+        .click();
+    await expect(
+        workspace.getByText('Start triage', { exact: true }).first(),
+    ).toBeVisible();
+    await workspace
+        .getByRole('button', { name: 'Start triage', exact: true })
+        .click();
+    await expectWorkspaceStatus(workspace, 'Triaging');
+}
 
 async function getXsrfToken(page: Page): Promise<string> {
     const cookies = await page.context().cookies();
@@ -23,6 +78,7 @@ async function getXsrfToken(page: Page): Promise<string> {
 
 async function createAlert(
     page: Page,
+    siteId: number,
     overrides: Partial<{
         source: string;
         alert_type: string;
@@ -42,6 +98,7 @@ async function createAlert(
             source: 'manual',
             alert_type: 'Playwright Lifecycle Alert',
             severity: 'high',
+            site_id: siteId,
             ...overrides,
         },
     });
@@ -57,128 +114,167 @@ async function createAlert(
 }
 
 test.describe('control room — alert lifecycle (show page)', () => {
+    test.setTimeout(60_000);
+
+    let operator: ReturnType<
+        typeof seedIncidentHandoverFixtures
+    >['users']['operator'];
+    let siteId: number;
+
+    test.beforeAll(() => {
+        const manifest = seedIncidentHandoverFixtures();
+        operator = manifest.users.operator;
+        siteId = manifest.site.id;
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
             testInfo.project.name.includes('mobile'),
             'Show-page lifecycle interactions are covered on desktop; mobile runs smoke only.',
         );
-        await loginAsStaff(page);
+        await loginAsFixture(page, operator);
     });
 
     test('acknowledge open alert', async ({ page }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
-        await expect(page.getByRole('heading', { name: 'Playwright Lifecycle Alert' })).toBeVisible();
-
-        await page.getByRole('button', { name: /^Acknowledge/ }).click();
-
-        // Backend transitions to `ack`. The hero badge text is rendered with the
-        // raw status value.
-        await expect(page.getByText(/^ack$/i).first()).toBeVisible();
+        const workspace = await openAlertWorkspace(page, alert);
+        await acknowledgeAlert(workspace);
 
         expectNoConsoleErrors(errors);
     });
 
     test('triage acknowledged alert', async ({ page }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
-        await page.getByRole('button', { name: /^Acknowledge/ }).click();
-        await expect(page.getByText(/^ack$/i).first()).toBeVisible();
-
-        await page.getByRole('button', { name: /^Start Triage/ }).click();
-        await expect(page.getByText(/^triaging$/i).first()).toBeVisible();
+        const workspace = await openAlertWorkspace(page, alert);
+        await acknowledgeAlert(workspace);
+        await startTriage(workspace);
 
         expectNoConsoleErrors(errors);
     });
 
-    test('resolve sends `resolution_notes` — guards readiness-plan B1.1', async ({ page }) => {
+    test('resolve sends `resolution_notes` — guards readiness-plan B1.1', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
-        await page.getByRole('button', { name: /^Acknowledge/ }).click();
-        await expect(page.getByText(/^ack$/i).first()).toBeVisible();
-        await page.getByRole('button', { name: /^Start Triage/ }).click();
-        await expect(page.getByText(/^triaging$/i).first()).toBeVisible();
+        const workspace = await openAlertWorkspace(page, alert);
+        await acknowledgeAlert(workspace);
+        await startTriage(workspace);
 
-        await page.getByRole('button', { name: /^Resolve/ }).click();
-        await page
-            .getByLabel('Resolution Notes')
+        await workspace
+            .getByRole('button', { name: 'Resolve', exact: true })
+            .click();
+        await workspace
+            .getByLabel('Resolution notes')
             .fill('E2E resolved — all clear');
-        await page
-            .getByRole('button', { name: /Resolve$/ })
-            .last()
+        await workspace.getByRole('button', { name: 'Next' }).click();
+        await workspace
+            .getByRole('button', { name: 'Resolve alert', exact: true })
             .click();
 
-        await expect(page.getByText(/^resolved$/i).first()).toBeVisible();
+        await expectWorkspaceStatus(workspace, 'Resolved');
         expectNoConsoleErrors(errors);
     });
 
-    test('escalate sends `escalation_reason` — guards readiness-plan B1.2', async ({ page }) => {
+    test('escalate sends `escalation_reason` — guards readiness-plan B1.2', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
+        const workspace = await openAlertWorkspace(page, alert);
 
-        await page.getByRole('button', { name: /^Escalate/ }).click();
-        await page
-            .getByLabel('Escalation Reason')
+        await workspace
+            .getByRole('button', { name: 'Escalate', exact: true })
+            .click();
+        await workspace
+            .getByLabel('Reason for escalating')
             .fill('E2E escalation reason');
-        await page
-            .getByRole('button', { name: /Escalate to L1/ })
+        await workspace
+            .getByRole('button', { name: 'Escalate to L1', exact: true })
             .click();
 
-        await expect(page.locator('main').getByText('L1', { exact: true }).first()).toBeVisible();
+        await expect(
+            workspace.getByText('L1', { exact: true }).last(),
+        ).toBeVisible();
         expectNoConsoleErrors(errors);
     });
 
-    test('add note sends `note` — guards readiness-plan B1.3', async ({ page }) => {
+    test('add note sends `note` — guards readiness-plan B1.3', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
+        const workspace = await openAlertWorkspace(page, alert);
+        await workspace.getByRole('button', { name: /^Notes & comms/ }).click();
 
-        const textarea = page.getByPlaceholder('Add a note...');
+        const textarea = workspace.getByPlaceholder('Add an operator note…');
         await textarea.fill('E2E note from Playwright');
-        await textarea.press('Enter');
+        await workspace
+            .getByRole('button', { name: 'Note', exact: true })
+            .click();
 
-        await expect(page.getByText('E2E note from Playwright')).toBeVisible();
+        await expect(
+            workspace.getByText('E2E note from Playwright', { exact: true }),
+        ).toBeVisible();
         expectNoConsoleErrors(errors);
     });
 
-    test('assign sends `assigned_to_user_id` — guards readiness-plan B1.4', async ({ page }) => {
+    test('assign sends `assigned_to_user_id` — guards readiness-plan B1.4', async ({
+        page,
+    }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
+        const workspace = await openAlertWorkspace(page, alert);
+        await workspace
+            .getByRole('button', { name: 'Assign', exact: true })
+            .click();
 
-        const assignSelect = page.getByRole('combobox').last();
+        const assignSelect = workspace.getByRole('combobox', {
+            name: 'Select a staff member',
+        });
         await assignSelect.click();
         const firstAssignee = page.getByRole('option').first();
         const assigneeName = (await firstAssignee.textContent())?.trim() ?? '';
         await firstAssignee.click();
+        await workspace.getByRole('button', { name: /^Assign to / }).click();
 
-        await expect(page.getByLabel('Details').getByText(assigneeName, { exact: true })).toBeVisible();
+        await expect(
+            workspace.getByText(assigneeName, { exact: true }).first(),
+        ).toBeVisible();
+        await expect(
+            workspace.getByRole('button', { name: 'Reassign', exact: true }),
+        ).toBeVisible();
         expectNoConsoleErrors(errors);
     });
 
-    test('playbook step buttons hit the correct routes — guards readiness-plan B1.5', async ({ page }) => {
+    test('playbook step buttons hit the correct routes — guards readiness-plan B1.5', async ({
+        page,
+    }) => {
         // This test depends on a playbook being attached automatically by a
         // matching SignalRule; without one the Playbook tab won't render.
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
+        const workspace = await openAlertWorkspace(page, alert);
 
-        const playbookTab = page.getByRole('tab', { name: /Playbook/ });
-        if (await playbookTab.isVisible()) {
-            await playbookTab.click();
-            await page.getByRole('button', { name: /Complete step/i }).first().click();
-            await expect(page.getByText(/in_progress|completed/i).first()).toBeVisible();
+        await workspace.getByRole('button', { name: /^Playbook/ }).click();
+        const completeStep = workspace
+            .getByRole('button', { name: /Complete step/i })
+            .first();
+        if (await completeStep.isVisible()) {
+            await completeStep.click();
+            await completeStep.click();
+            await expect(
+                workspace.getByText(/in progress|completed/i).first(),
+            ).toBeVisible();
         }
 
         expectNoConsoleErrors(errors);
@@ -186,7 +282,7 @@ test.describe('control room — alert lifecycle (show page)', () => {
 
     test('close resolved alert', async ({ page }) => {
         const errors = collectConsoleErrors(page);
-        const alert = await createAlert(page);
+        const alert = await createAlert(page, siteId);
 
         // Drive the lifecycle directly via the API so this test only exercises
         // the close action through the page.
@@ -197,18 +293,30 @@ test.describe('control room — alert lifecycle (show page)', () => {
             'X-XSRF-TOKEN': xsrf,
         };
 
-        await page.request.post(`/control-room/alerts/${alert.id}/acknowledge`, { headers });
-        await page.request.post(`/control-room/alerts/${alert.id}/triage`, { headers });
+        await page.request.post(
+            `/control-room/alerts/${alert.id}/acknowledge`,
+            { headers },
+        );
+        await page.request.post(`/control-room/alerts/${alert.id}/triage`, {
+            headers,
+        });
         await page.request.post(`/control-room/alerts/${alert.id}/resolve`, {
             headers,
             data: { resolution_notes: 'API resolved for close-test setup' },
         });
 
-        await page.goto(`/control-room/alerts/${alert.id}`);
-        await expect(page.getByText(/^resolved$/i).first()).toBeVisible();
+        const workspace = await openAlertWorkspace(page, alert);
+        await expectWorkspaceStatus(workspace, 'Resolved');
 
-        await page.getByRole('button', { name: /^Close/ }).click();
-        await expect(page.getByText(/^closed$/i).first()).toBeVisible();
+        await workspace
+            .getByRole('contentinfo')
+            .getByRole('button', { name: 'Close', exact: true })
+            .click();
+        await workspace.getByLabel('Closing note').fill('E2E closure verified');
+        await workspace
+            .getByRole('button', { name: 'Close alert', exact: true })
+            .click();
+        await expectWorkspaceStatus(workspace, 'Closed');
 
         expectNoConsoleErrors(errors);
     });

@@ -185,6 +185,10 @@ export function runLaravelPhp(code: string) {
     }
 }
 
+export function runLaravelJson<T>(code: string): T {
+    return JSON.parse(runLaravelPhp(code)) as T;
+}
+
 export async function loginAs(
     page: Page,
     email: string,

@@ -1030,7 +1030,7 @@ function IncidentTable({
                                             ? formatDateTime(i.occurred_at)
                                             : '—'}
                                     </div>
-                                    <div className="mt-0.5 text-[11px] text-muted-foreground/60">
+                                    <div className="mt-0.5 text-[11px] text-muted-foreground">
                                         {i.ref ?? `INC-${i.id}`}
                                     </div>
                                 </td>

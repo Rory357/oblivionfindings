@@ -422,6 +422,7 @@ class IncidentJourneyService
 
     private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
     {
+        $this->ensureOfficialIncidentReference($incident);
         $hsEvent = null;
 
         if ($incident->hs_event_id !== null) {
@@ -481,6 +482,17 @@ class IncidentJourneyService
         }
 
         return $hsEvent;
+    }
+
+    private function ensureOfficialIncidentReference(ClientIncident $incident): void
+    {
+        if (filled($incident->reference_number)) {
+            return;
+        }
+
+        $incident->forceFill([
+            'reference_number' => $this->references->next(ClientIncident::REFERENCE_PREFIX),
+        ])->saveQuietly();
     }
 
     private function lockedAlertForIncident(ClientIncident $incident, HsEvent $hsEvent): ?ControlRoomAlert

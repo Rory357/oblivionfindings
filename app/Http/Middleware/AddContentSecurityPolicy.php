@@ -93,7 +93,9 @@ class AddContentSecurityPolicy
                 'https://server.arcgisonline.com',
             ]),
             "media-src 'self'",
-            "connect-src 'self'",
+            // The document preconnects to Bunny Fonts before loading its stylesheet.
+            // Browsers evaluate that connection hint against connect-src.
+            "connect-src 'self' https://fonts.bunny.net",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
