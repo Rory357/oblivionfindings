@@ -1161,20 +1161,21 @@ git log --oneline --decorate -20
 
 Check every task box only when its evidence exists. Add exact test counts, build exits, browser routes, screenshots, invariant files, remaining low-priority boundaries, and deployment boundary to the completion audit.
 
-- [ ] **Step 9: Commit final evidence**
+- [x] **Step 9: Commit final evidence**
 
 ```powershell
 git add docs/superpowers/plans/2026-07-12-control-room-incident-hs-unification.md docs/audits/control-room-incidents-hs-completion-audit-2026-07-12.md
 git commit -m "docs(control-room): record unified journey completion audit"
 ```
 
-**Task 16 completion evidence (2026-07-15; final evidence commit pending Step 9):**
+**Task 16 completion evidence (2026-07-15):**
 
 - The relevant backend run passed 1,351 tests / 9,454 assertions, and the final Universal Tasks/reviewer regression pack passed 6 tests / 53 assertions. The frontend run passed 69 files / 298 tests; TypeScript, scoped branch Prettier, scoped Pint and `git diff --check` passed. Client and SSR production builds both exited 0.
 - The final combined production-built browser run on `http://127.0.0.1:4196` passed 37/37 tests in 5.7 minutes using only `chromium-desktop`. A focused dashboard evidence rerun passed 1/1 with zero serious/critical Axe findings and wrote the audited 1440 × 1000 first-viewport capture.
 - The completion audit maps every R1–R21 requirement and each original audit gap to current code, route, test, browser or invariant evidence. The re-audit found and fixed one P1 in `ShiftTaskProvider` (`Shift::user` was not a valid relationship and could break the shared Tasks badge/reviewer login); commit `0b54cce572` uses `Shift::staff`, and no P0/P1 remains open in scope.
 - The reconciliation command was run read-only against the shared test database: 85 incidents scanned, 255 legacy/demo issues reported, 0 repairs. Apply remains a deployment action requiring target backup and explicit review.
 - The Playwright runner and PHP preview closed normally; port 4196 had no listener afterward. No mobile/WebView work, merge, push or deployment was performed.
+- The final product fix is committed at `0b54cce572`; the completion audit, current screenshots/invariants and dashboard evidence are committed at `34f2a74fea`.
 
 ---
 
