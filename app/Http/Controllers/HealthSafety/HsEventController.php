@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
@@ -498,6 +499,7 @@ class HsEventController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(20),
             'controlRoomAlert.tasks.assignedTo:id,name',
+            'controlRoomAlert.tasks.transferredCorrectiveAction:id,source_control_room_task_id',
             'creator:id,name',
             'owner:id,name',
             'acceptedBy:id,name',
@@ -544,8 +546,8 @@ class HsEventController extends Controller
         $assignableStaff = [];
         if ($canManage) {
             $assignableStaff = $this->handoverOwnerQuery($hsEvent, $currentUser)
+                ->with(['permissionOverrides', 'roles.permissions'])
                 ->orderBy('name')
-                ->limit(200)
                 ->get(['id', 'name'])
                 ->filter(fn (User $user): bool => $user->canDo('hazards.manage'))
                 ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
@@ -554,7 +556,13 @@ class HsEventController extends Controller
         }
 
         $correctiveActions = $hsEvent->correctiveActions()
-            ->with(['assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name'])
+            ->with([
+                'assignedTo:id,name',
+                'completedBy:id,name',
+                'verifiedBy:id,name',
+                'hsInvestigation:id,recommendations',
+                'sourceControlRoomTask:id,title',
+            ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date')
             ->get()
@@ -579,6 +587,8 @@ class HsEventController extends Controller
                 'effectiveness_confirmed' => $a->effectiveness_confirmed,
                 'hs_investigation_id' => $a->hs_investigation_id,
                 'recommendation_index' => $a->recommendation_index,
+                'recommendation' => $this->correctiveActionRecommendation($a),
+                'source' => $this->correctiveActionSource($a),
             ]);
 
         $riskAssessments = $hsEvent->riskAssessments()
@@ -662,6 +672,25 @@ class HsEventController extends Controller
             'assignee' => $task->assignedTo?->name,
             'due_at' => $task->due_at?->toIso8601String(),
         ])->values() ?? collect();
+        $unresolvedControlRoomTasks = $canManage && $alert
+            ? $alert->tasks
+                ->reject(fn (AlertTask $task): bool => in_array($task->status, AlertTask::TERMINAL_STATUSES, true)
+                    || $task->transferred_to_hs_corrective_action_id !== null
+                    || $task->transferred_at !== null
+                    || $task->transferred_by_user_id !== null
+                    || $task->transferredCorrectiveAction !== null)
+                ->map(fn (AlertTask $task) => [
+                    'id' => $task->id,
+                    'reference' => "CR task #{$task->id}",
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'status' => $task->status,
+                    'priority' => $task->priority,
+                    'due_at' => $task->due_at?->toIso8601String(),
+                ])
+                ->values()
+                ->all()
+            : [];
         $canAccept = $canManage
             && $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE
             && $hsEvent->source_type === ClientIncident::class
@@ -793,6 +822,10 @@ class HsEventController extends Controller
             'attachments' => $handoverAttachments,
             'close_gate' => $closureGate,
             'assignable_staff' => $assignableStaff,
+            'action_handover' => [
+                'eligible_owners' => $assignableStaff,
+                'unresolved_control_room_tasks' => $unresolvedControlRoomTasks,
+            ],
             'can' => [
                 'manage' => $canManage,
                 'override_closure' => $currentUser->canDo('healthSafety.overrideClosure'),
@@ -887,6 +920,8 @@ class HsEventController extends Controller
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
                 'completedBy:id,name',
+                'hsInvestigation:id,recommendations',
+                'sourceControlRoomTask:id,title',
             ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date');
@@ -929,6 +964,8 @@ class HsEventController extends Controller
             'can_verify' => $canManage
                 && $a->status === 'completed'
                 && $a->completed_by_user_id !== $currentUserId,
+            'recommendation' => $this->correctiveActionRecommendation($a),
+            'source' => $this->correctiveActionSource($a),
             'event' => $a->hsEvent ? [
                 'id' => $a->hsEvent->id,
                 'reference_number' => $a->hsEvent->reference_number,
@@ -1020,6 +1057,46 @@ class HsEventController extends Controller
                 'viewReports' => (bool) ($request->user()?->canDo('governance.view') ?? false),
             ],
         ]);
+    }
+
+    private function correctiveActionRecommendation(HsCorrectiveAction $action): ?string
+    {
+        if ($action->recommendation_index === null) {
+            return null;
+        }
+
+        $recommendation = data_get(
+            $action->hsInvestigation?->recommendations,
+            "{$action->recommendation_index}.description",
+        );
+
+        return is_string($recommendation) && filled($recommendation)
+            ? $recommendation
+            : null;
+    }
+
+    /**
+     * @return array{type: string, id?: int, reference?: string, title?: string, reason?: string|null}
+     */
+    private function correctiveActionSource(HsCorrectiveAction $action): array
+    {
+        if ($action->sourceControlRoomTask) {
+            return [
+                'type' => 'control_room_task',
+                'id' => $action->sourceControlRoomTask->id,
+                'reference' => "CR task #{$action->sourceControlRoomTask->id}",
+                'title' => $action->sourceControlRoomTask->title,
+            ];
+        }
+
+        if ($action->recommendation_index !== null) {
+            return [
+                'type' => 'new_responsibility',
+                'reason' => $action->description,
+            ];
+        }
+
+        return ['type' => 'standalone'];
     }
 
     private function legacyActionTab(Request $request): string

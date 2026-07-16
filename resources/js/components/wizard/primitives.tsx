@@ -179,7 +179,7 @@ export function SelectInput({
     ariaLabel?: string;
 }) {
     return (
-        <Select value={value || undefined} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange}>
             <SelectTrigger className="w-full" aria-label={ariaLabel ?? placeholder}>
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>

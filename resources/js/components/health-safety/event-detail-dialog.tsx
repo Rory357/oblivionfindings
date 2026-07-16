@@ -15,6 +15,10 @@
  * Write actions (close / WorkSafe / investigation / corrective actions) are added
  * to the Options bar as their backend lands — an action appears only when it can
  * actually run (no stubs). */
+import {
+    CorrectiveActionHandoverPane,
+    type CorrectiveActionHandover,
+} from '@/components/health-safety/corrective-action-handover-pane';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { Button } from '@/components/ui/button';
@@ -140,6 +144,16 @@ export type EventCorrectiveAction = {
     effectiveness_confirmed: boolean | null;
     hs_investigation_id: number | null;
     recommendation_index: number | null;
+    recommendation: string | null;
+    source:
+        | {
+              type: 'control_room_task';
+              id: number;
+              reference: string;
+              title: string;
+          }
+        | { type: 'new_responsibility'; reason: string | null }
+        | { type: 'standalone' };
 };
 
 export type EventRiskAssessment = {
@@ -310,6 +324,7 @@ export type EventDetail = {
         }>;
     };
     assignable_staff: Array<{ id: number; name: string }>;
+    action_handover: CorrectiveActionHandover;
     can: { manage: boolean; override_closure: boolean };
 };
 
@@ -2202,7 +2217,7 @@ function RecommendationDispositionPane({
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <StepHead
                 icon={ListChecks}
                 title={`Recommendation ${recommendationIndex + 1} outcome`}
@@ -2231,45 +2246,74 @@ function RecommendationDispositionPane({
                     options={RECOMMENDATION_OUTCOMES}
                 />
             </Field>
-            {raisesAction ? (
+            {raisesAction && current?.corrective_action ? (
                 <InfoCard icon={ListChecks} tone="info">
-                    Recording this outcome creates or reuses one linked
-                    corrective action. The action must then be completed and
-                    independently verified before closure.
+                    <p className="font-semibold">
+                        This recommendation is already handed over.
+                    </p>
+                    <p className="mt-1">
+                        {current.corrective_action.reference_number} is{' '}
+                        {titleCase(current.corrective_action.status)}. Open the
+                        corrective-actions section to continue the work.
+                    </p>
                 </InfoCard>
-            ) : form.data.disposition ? (
-                <Field
-                    label="Reason"
-                    required
-                    error={form.errors.reason}
-                    hint="Recorded in the audit trail"
-                >
-                    <Textarea
-                        rows={4}
-                        value={form.data.reason}
-                        onChange={(event) =>
-                            form.setData('reason', event.target.value)
-                        }
-                        placeholder="Explain why this recommendation does not need a new corrective action."
-                    />
-                </Field>
+            ) : raisesAction ? (
+                <CorrectiveActionHandoverPane
+                    eventId={d.id}
+                    investigationId={inv.id}
+                    recommendationIndex={recommendationIndex}
+                    recommendation={recommendation}
+                    handover={d.action_handover}
+                    onDone={onDone}
+                />
+            ) : (
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    {form.data.disposition ? (
+                        <Field
+                            label="Reason"
+                            required
+                            error={form.errors.reason}
+                            hint="Recorded in the audit trail"
+                        >
+                            <Textarea
+                                rows={4}
+                                value={form.data.reason}
+                                onChange={(event) =>
+                                    form.setData('reason', event.target.value)
+                                }
+                                placeholder="Explain why this recommendation does not need a new corrective action."
+                            />
+                        </Field>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onDone}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={
+                                form.processing ||
+                                !form.data.disposition ||
+                                (needsReason && !form.data.reason.trim())
+                            }
+                        >
+                            Record outcome
+                        </Button>
+                    </div>
+                </form>
+            )}
+            {raisesAction && current?.corrective_action ? (
+                <div className="flex justify-end">
+                    <Button type="button" variant="outline" onClick={onDone}>
+                        Done
+                    </Button>
+                </div>
             ) : null}
-            <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    disabled={
-                        form.processing ||
-                        !form.data.disposition ||
-                        (needsReason && !form.data.reason.trim())
-                    }
-                >
-                    Record outcome
-                </Button>
-            </div>
-        </form>
+        </div>
     );
 }
 
@@ -2311,7 +2355,10 @@ function AddCorrectiveActionPane({
             return;
         }
         if (!form.data.assigned_to_user_id) {
-            form.setError('assigned_to_user_id', 'Choose the person responsible.');
+            form.setError(
+                'assigned_to_user_id',
+                'Choose the person responsible.',
+            );
             return;
         }
         if (!form.data.due_date) {
@@ -3948,6 +3995,25 @@ function ActionsSection({
                                             ? ' · overdue'
                                             : ''}
                                     </p>
+                                    {a.recommendation ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Recommendation: {a.recommendation}
+                                        </p>
+                                    ) : null}
+                                    {a.source.type === 'control_room_task' ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Transferred from Control Room task:{' '}
+                                            {a.source.reference} ·{' '}
+                                            {a.source.title}
+                                        </p>
+                                    ) : a.source.type ===
+                                      'new_responsibility' ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            New responsibility:{' '}
+                                            {a.source.reason ??
+                                                'Reason not recorded'}
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span

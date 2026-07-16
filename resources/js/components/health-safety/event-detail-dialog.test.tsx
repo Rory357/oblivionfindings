@@ -170,6 +170,13 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
             { id: 8, name: 'Moana Rangi' },
             { id: 9, name: 'Tama Lewis' },
         ],
+        action_handover: {
+            eligible_owners: [
+                { id: 8, name: 'Moana Rangi' },
+                { id: 9, name: 'Tama Lewis' },
+            ],
+            unresolved_control_room_tasks: [],
+        },
         can: { manage: true, override_closure: false },
         handover: {
             status: 'awaiting_acceptance',
@@ -902,5 +909,119 @@ describe('EventDetailDialog recommendation outcomes', () => {
                 reason: 'Residual risk is within tolerance.',
             },
         );
+    });
+
+    it('opens the focused ownership handover for a corrective-action outcome', () => {
+        const detail = eventDetail({
+            investigations: [
+                {
+                    id: 31,
+                    reference_number: 'INV-2026-0031',
+                    investigation_type: 'standard',
+                    status: 'completed',
+                    methodology: '5_whys',
+                    lead_investigator_name: 'Moana Rangi',
+                    started_at: '2026-07-14T03:00:00Z',
+                    target_completion_date: '2026-07-21',
+                    completed_at: '2026-07-15T01:00:00Z',
+                    is_overdue: false,
+                    has_findings: true,
+                    has_recommendations: true,
+                    recommendation_count: 1,
+                    immediate_causes: [],
+                    root_causes: [],
+                    contributing_factors: [],
+                    findings_summary: 'Controls were reviewed.',
+                    recommendations: [
+                        {
+                            description:
+                                'Install a permanent bathroom safety rail.',
+                            priority: 'high',
+                            disposition: null,
+                        },
+                    ],
+                    lessons_learned: null,
+                },
+            ],
+        } as Partial<EventDetail>);
+
+        renderDialog(detail);
+        fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Choose outcome' }));
+        fireEvent.click(screen.getByRole('combobox', { name: /Outcome/ }));
+        fireEvent.click(
+            screen.getByRole('option', {
+                name: 'Raise a corrective action',
+            }),
+        );
+
+        expect(
+            screen.getByRole('combobox', { name: 'Action owner' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', {
+                name: 'Create and hand over action',
+            }),
+        ).toBeDisabled();
+        expect(
+            screen.queryByRole('button', { name: 'Record outcome' }),
+        ).not.toBeInTheDocument();
+    });
+});
+
+describe('EventDetailDialog corrective-action provenance', () => {
+    it('shows the recommendation, owner, due date and transferred task', () => {
+        renderDialog(
+            eventDetail({
+                corrective_actions: [
+                    {
+                        id: 61,
+                        reference_number: 'CA-2026-0061',
+                        title: 'Install a permanent bathroom safety rail.',
+                        action_type: 'corrective',
+                        priority: 'high',
+                        status: 'open',
+                        assigned_to_name: 'Playwright Incident Reviewer',
+                        due_date: '2026-08-31',
+                        is_overdue: false,
+                        completed_at: null,
+                        completed_by_user_id: null,
+                        completed_by_name: null,
+                        can_verify: false,
+                        verified_at: null,
+                        verified_by_name: null,
+                        effectiveness_confirmed: null,
+                        hs_investigation_id: 31,
+                        recommendation_index: 0,
+                        recommendation:
+                            'Install a permanent bathroom safety rail.',
+                        source: {
+                            type: 'control_room_task',
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Replace the unsafe bathroom rail',
+                        },
+                    },
+                ],
+            }),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Corrective actions/ }),
+        );
+
+        expect(
+            screen.getByText('Playwright Incident Reviewer', { exact: false }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Recommendation: Install a permanent bathroom safety rail.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Transferred from Control Room task: CR task #501 · Replace the unsafe bathroom rail',
+            ),
+        ).toBeInTheDocument();
     });
 });

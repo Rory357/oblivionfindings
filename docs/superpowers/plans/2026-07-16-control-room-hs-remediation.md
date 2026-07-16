@@ -732,7 +732,7 @@ git commit -m "feat(health-safety): require explicit corrective action ownership
 - Modify: `tests/Feature/HealthSafety/HsRecommendationDispositionTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing UI tests**
+- [x] **Step 1: Write failing UI tests**
 
 Prove the pane:
 
@@ -755,14 +755,14 @@ await user.click(screen.getByLabelText('Transfer this operational task'));
 expect(screen.getByRole('button', { name: 'Create and hand over action' })).toBeEnabled();
 ```
 
-- [ ] **Step 2: Run tests and prove missing UI**
+- [x] **Step 2: Run tests and prove missing UI**
 
 ```powershell
 npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/health-safety/corrective-action-handover-pane.test.tsx
 php artisan test tests/Feature/HealthSafety/HsRecommendationDispositionTest.php
 ```
 
-- [ ] **Step 3: Expose eligible owners and unresolved source tasks**
+- [x] **Step 3: Expose eligible owners and unresolved source tasks**
 
 Payload shape:
 
@@ -779,7 +779,7 @@ Payload shape:
 ],
 ```
 
-- [ ] **Step 4: Implement the focused pane**
+- [x] **Step 4: Implement the focused pane**
 
 Post:
 
@@ -796,21 +796,21 @@ After success, refresh the event detail and show:
 
 `Assigned to {owner} · due {date} · source task transferred to {reference}`
 
-- [ ] **Step 5: Make the register show ownership and source**
+- [x] **Step 5: Make the register show ownership and source**
 
 The corrective-actions register row/detail must show owner, due date, recommendation, and:
 
 - `Transferred from Control Room task: {title}`; or
 - `New responsibility: {reason}`.
 
-- [ ] **Step 6: Re-run tests**
+- [x] **Step 6: Re-run tests**
 
 ```powershell
 npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/health-safety/corrective-action-handover-pane.test.tsx
 php artisan test tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/HealthSafety/HsCorrectiveActionsRegisterTest.php
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Http/Controllers/HealthSafety/HsEventController.php resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/corrective-actions/index.tsx resources/js/components/health-safety/corrective-action-handover-pane.tsx resources/js/components/health-safety/corrective-action-handover-pane.test.tsx tests/Feature/HealthSafety/HsRecommendationDispositionTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md

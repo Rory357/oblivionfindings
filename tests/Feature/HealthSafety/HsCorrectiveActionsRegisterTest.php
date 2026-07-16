@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -32,6 +36,11 @@ class HsCorrectiveActionsRegisterTest extends TestCase
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => $user->organization_id,
+            'user_id' => $user->id,
+            'secondary_site_ids' => [],
+        ]);
 
         return $user;
     }
@@ -124,6 +133,75 @@ class HsCorrectiveActionsRegisterTest extends TestCase
                 ->where('actions.data.0.id', $action->id)
                 ->where('actions.data.0.event.status', HsEvent::STATUS_MONITORING)
                 ->where('actions.data.0.event.monitoring', true)
+            );
+    }
+
+    public function test_register_exposes_recommendation_owner_due_date_and_transferred_task_source(): void
+    {
+        $owner = $this->hsOfficer();
+        $alert = ControlRoomAlert::factory()->triaging()->create();
+        $event = HsEvent::factory()->create(['control_room_alert_id' => $alert->id]);
+        $investigation = HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $event->id,
+        ]);
+        $task = AlertTask::query()->create([
+            'alert_id' => $alert->id,
+            'title' => 'Replace the unsafe bathroom rail',
+            'created_by_user_id' => $owner->id,
+            'status' => AlertTask::STATUS_TRANSFERRED,
+            'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+            'transferred_at' => now(),
+            'transferred_by_user_id' => $owner->id,
+        ]);
+        $action = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
+            'hs_investigation_id' => $investigation->id,
+            'recommendation_index' => 0,
+            'source_control_room_task_id' => $task->id,
+            'assigned_to_user_id' => $owner->id,
+            'due_date' => '2026-08-31',
+        ]);
+        $task->update(['transferred_to_hs_corrective_action_id' => $action->id]);
+
+        $this->actingAs($owner)
+            ->get('/health-safety/corrective-actions')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('actions.data.0.id', $action->id)
+                ->where('actions.data.0.assigned_to_name', $owner->name)
+                ->where('actions.data.0.due_date', '2026-08-31')
+                ->where(
+                    'actions.data.0.recommendation',
+                    'Implement wet floor signage procedure',
+                )
+                ->where('actions.data.0.source.type', 'control_room_task')
+                ->where('actions.data.0.source.title', $task->title)
+            );
+    }
+
+    public function test_register_exposes_new_responsibility_reason(): void
+    {
+        $owner = $this->hsOfficer();
+        $investigation = HsInvestigation::factory()->completed()->create();
+        $action = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $investigation->hs_event_id,
+            'hs_investigation_id' => $investigation->id,
+            'recommendation_index' => 1,
+            'assigned_to_user_id' => $owner->id,
+            'due_date' => '2026-09-15',
+            'description' => 'No current operational task covers the training work.',
+        ]);
+
+        $this->actingAs($owner)
+            ->get('/health-safety/corrective-actions')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('actions.data.0.id', $action->id)
+                ->where('actions.data.0.source.type', 'new_responsibility')
+                ->where(
+                    'actions.data.0.source.reason',
+                    'No current operational task covers the training work.',
+                )
             );
     }
 
