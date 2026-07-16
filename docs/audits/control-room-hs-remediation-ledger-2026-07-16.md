@@ -23,17 +23,17 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | D-01 | 8, 9 | — | — | — | — | Open |
 | D-02 | 2, 3, 4 | Tasks 2–4: nullable explicit decision schema; conservative migration/report; transactional decision API; actor/time/reason/source audit; idempotent retries; completed-notification protection; truthful structured closure gate; open/accepted decision enforcement with post-closure statutory notification/acknowledgement progression; nested nullable presentation; capability-gated record/update/notify/acknowledge controls and deep links; exact status copy with unknown-state warning; decision provenance; register/worklist truth; view-only protection; state-specific direct action links | Schema/report: 5 tests, 29 assertions; Task 3 H&S/incident/source regression: 155 tests, 1,246 assertions; Task 4 backend: 44 tests, 433 assertions; frontend: 17 tests; clean generated-route typecheck, targeted ESLint, and Pint; local migrate/rollback/re-migrate passed; 57 undecided and 0 inconsistent | — | — | Active |
 | D-03 | 10 | — | — | — | — | Open |
-| D-04 | 5, 6, 7 | — | — | — | — | Open |
+| D-04 | 5, 6, 7 | Task 5 foundation: corrective actions now carry a nullable unique source Control Room task, reciprocal and legacy-compatible relations, and an evidence attachment relation | Task 5 schema/reconciliation: 9 tests, 59 assertions; migration apply/rollback/re-apply passed | — | — | Active |
 | D-05 | 15, 16 | — | — | — | — | Open |
 | D-06 | 10 | — | — | — | — | Open |
-| D-07 | 5, 6, 10 | — | — | — | — | Open |
+| D-07 | 5, 6, 10 | Task 5 foundation: transfer writes both the canonical reciprocal source link and legacy task pointer; retry resolves the reciprocal action first and does not create duplicate work | Task 5 schema/reconciliation: 9 tests, 59 assertions; database uniqueness proves one source task cannot create two actions | — | — | Active |
 | D-08 | 12, 13 | — | — | — | — | Open |
 | D-09 | 11 | — | — | — | — | Open |
 | D-10 | 14 | — | — | — | — | Open |
 | D-11 | 17 | — | — | — | — | Open |
 | D-12 | 9 | — | — | — | — | Open |
 | D-13 | 17 | — | — | — | — | Open |
-| D-14 | 6, 7, 10 | — | — | — | — | Open |
+| D-14 | 6, 7, 10 | Task 5 foundation: corrective-action provenance now identifies the exact source operational task and preserves legacy pointer compatibility | Task 5 schema/reconciliation: 9 tests, 59 assertions | — | — | Active |
 | D-15 | 18 | — | — | — | — | Open |
 | D-16 | 11, 18 | — | — | — | — | Open |
 | D-17 | 17 | — | — | — | — | Open |
@@ -98,6 +98,8 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | WorkSafe governance component | `npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx` | Final post-review verification: 1 file passed, 17 tests passed, 3.48s; includes forced deep-link denial and unknown-state warning | 0 | 2026-07-16 22:22 NZST | Pass |
 | Task 4 targeted ESLint | `npx eslint resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/events/index.tsx resources/js/pages/health-safety/components/worklists.tsx resources/js/pages/health-safety/events/show.tsx` | Post-review verification: zero errors and zero warnings | 0 | 2026-07-16 22:13 NZST | Pass |
 | Task 4 targeted Pint | `vendor\bin\pint app/Services/HealthSafety/HsEventService.php app/Http/Controllers/HealthSafety/HsEventController.php tests/Feature/HealthSafety/HsEventRegisterTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsEventWorksafeTest.php` | Clean | 0 | 2026-07-16 22:12 NZST | Pass |
+| Corrective-action source ownership schema and reconciliation | `php artisan test tests/Feature/HealthSafety/HsCorrectiveActionOwnershipSchemaTest.php tests/Feature/Tasks/AllTasksIncidentJourneyTest.php` | Post-format verification: 9 tests passed, 59 assertions, 162.59s | 0 | 2026-07-16 22:50 NZST | Pass |
+| Corrective-action source migration cycle | Apply `2026_07_16_000200`; rollback the same path; re-apply | Apply, rollback, and re-apply all exited 0; unique foreign key restored | 0 | 2026-07-16 22:43 NZST | Pass |
 | Full backend | `php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature/HealthSafety tests/Feature/Tasks` | — | — | — | Open |
 | Frontend unit/component | Plan Task 20 command | — | — | — | Open |
 | Route generation | `php artisan wayfinder:generate` | Generated actions and routes successfully using an ephemeral local application key; generated output remains ignored | 0 | 2026-07-16 21:54 NZST | Pass |
@@ -164,7 +166,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | Implementation plan | `7a642efac` | 21 tasks, 157 checkpoints, D-01–D-19 mapped | Pass |
 | Audit baseline and ledger | `7a642efac` baseline | Authoritative audit copied with normalized-content equality; backend 23/193 and frontend 13/13 reproduced before the checkpoint commit | Active |
 | WorkSafe domain | Task 2 checkpoint `a2f7e1866`; Task 3 checkpoint `8ab2b35af`; Task 4 checkpoint pending | Explicit schema/migration/report plus decision API, audit, authorization, source attribution, compatibility projection, notification guard, truthful closure requirements, nullable decision presentation, status-specific controls, register/worklist truth, and direct action links; live browser and deployment evidence remain open | Active |
-| Corrective-action ownership/evidence | — | — | Open |
+| Corrective-action ownership/evidence | Task 5 checkpoint pending | Unique reciprocal Control Room task source, legacy-compatible lookup, H&S attachment relation, and retry-safe transfer population are implemented; required owner/due-date UI and evidence lifecycle remain in Tasks 6–9 | Active |
 | Universal Tasks and permission recovery | — | — | Open |
 | Evidence continuity and closure gates | — | — | Open |
 | Shift handover and UI reliability | — | — | Open |
@@ -189,3 +191,9 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 - The Task 4 review found and closed four important gaps before checkpoint: decision lifecycle conditions are enforced in the domain and presenter; pending closure requirements link to notification rather than decision; unknown statuses cannot be presented as acknowledged; and internal closure no longer dead-ends outstanding statutory notification or acknowledgement.
 - Task 4 focused verification is green: 44 backend tests with 433 assertions, 17 frontend tests, zero targeted ESLint findings, clean targeted Pint, a clean generated-route TypeScript check, and a clean diff.
 - D-02 remains Active until production-built browser and live deployment evidence pass; no part of that acceptance is deferred.
+- Task 4 is committed at `4ab769ac0`.
+- Task 5 was observed red with 4 expected failures: missing source column/relationship, reciprocal preference, database uniqueness, and transfer-service source persistence.
+- Task 5 now adds the unique nullable `source_control_room_task_id`, reciprocal source-task and attachment relations, reciprocal-first/legacy-fallback task lookup, transfer-service duplicate validation, and atomic population of both the canonical source and compatibility pointer.
+- Task 5 migration apply, rollback, and re-apply all passed locally.
+- Task 5 post-format verification is green: 9 tests passed with 59 assertions.
+- D-04, D-07, and D-14 remain Active because required owner selection, explicit responsibility choice, task acceptance/reconciliation, and browser/live proof continue in Tasks 6–10; none is deferred.

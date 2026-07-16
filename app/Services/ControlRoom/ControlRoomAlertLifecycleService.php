@@ -628,11 +628,15 @@ class ControlRoomAlertLifecycleService
         return DB::transaction(function () use ($task, $actor): HsCorrectiveAction {
             $alert = $this->lockAlertForTask($task);
             $locked = $this->lockTaskForAlert($task, $alert);
+            $hasReciprocalAction = HsCorrectiveAction::query()
+                ->where('source_control_room_task_id', $locked->id)
+                ->exists();
 
             if ($locked->status === AlertTask::STATUS_TRANSFERRED
                 || $locked->transferred_to_hs_corrective_action_id !== null
                 || $locked->transferred_at !== null
-                || $locked->transferred_by_user_id !== null) {
+                || $locked->transferred_by_user_id !== null
+                || $hasReciprocalAction) {
                 $event = $this->lockCanonicalHealthSafetyEvent($alert);
                 $this->assertHealthSafetyTransferBoundary($alert, $event, $actor);
 
@@ -652,6 +656,7 @@ class ControlRoomAlertLifecycleService
             $action = $this->correctiveActions->createStandalone($event, [
                 'title' => $locked->title,
                 'description' => $locked->description,
+                'source_control_room_task_id' => $locked->id,
                 'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
                 'priority' => $locked->priority ?: HsCorrectiveAction::PRIORITY_MEDIUM,
                 'assigned_to_user_id' => $owner->id,
@@ -791,6 +796,24 @@ class ControlRoomAlertLifecycleService
         AlertTask $task,
         HsEvent $event,
     ): HsCorrectiveAction {
+        $reciprocalAction = HsCorrectiveAction::query()
+            ->where('source_control_room_task_id', $task->id)
+            ->where('hs_event_id', $event->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($reciprocalAction) {
+            if ($task->status !== AlertTask::STATUS_TRANSFERRED
+                || $task->transferred_at === null
+                || $task->transferred_by_user_id === null) {
+                throw new InvalidArgumentException(
+                    "Task '{$task->title}' already sources a corrective action but its transfer record is incomplete.",
+                );
+            }
+
+            return $reciprocalAction;
+        }
+
         if ($task->status !== AlertTask::STATUS_TRANSFERRED
             || $task->transferred_to_hs_corrective_action_id === null
             || $task->transferred_at === null

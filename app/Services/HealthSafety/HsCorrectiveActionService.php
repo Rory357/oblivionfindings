@@ -20,15 +20,15 @@ use Illuminate\Support\Facades\Log;
 class HsCorrectiveActionService
 {
     /* ------------------------------------------------------------------ */
-    /*  Creation                                                           */
+    /*  Creation */
     /* ------------------------------------------------------------------ */
 
     /**
      * Create a corrective action from an investigation recommendation.
      *
      * @param  HsInvestigation  $investigation  Source investigation (must be completed or have findings)
-     * @param  int              $recommendationIndex  Zero-based index into recommendations JSON array
-     * @param  array            $overrides  Optional field overrides (assigned_to, due_date, etc.)
+     * @param  int  $recommendationIndex  Zero-based index into recommendations JSON array
+     * @param  array  $overrides  Optional field overrides (assigned_to, due_date, etc.)
      *
      * @throws \InvalidArgumentException if recommendation doesn't exist or action already exists
      */
@@ -108,6 +108,7 @@ class HsCorrectiveActionService
             $action = HsCorrectiveAction::create([
                 'hs_event_id' => $hsEvent->id,
                 'hs_investigation_id' => $data['hs_investigation_id'] ?? null,
+                'source_control_room_task_id' => $data['source_control_room_task_id'] ?? null,
                 'organization_id' => $hsEvent->organization_id,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'action_type' => $data['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
@@ -164,7 +165,7 @@ class HsCorrectiveActionService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Lifecycle transitions                                              */
+    /*  Lifecycle transitions */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -323,7 +324,7 @@ class HsCorrectiveActionService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Query helpers                                                       */
+    /*  Query helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -383,7 +384,7 @@ class HsCorrectiveActionService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     private function assertTransition(HsCorrectiveAction $action, string $targetStatus): void

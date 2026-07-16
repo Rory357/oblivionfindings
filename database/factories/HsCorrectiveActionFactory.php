@@ -16,6 +16,7 @@ class HsCorrectiveActionFactory extends Factory
     {
         return [
             'hs_event_id' => HsEvent::factory()->high(),
+            'source_control_room_task_id' => null,
             'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
             'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
             'priority' => fake()->randomElement(['low', 'medium', 'high', 'critical']),

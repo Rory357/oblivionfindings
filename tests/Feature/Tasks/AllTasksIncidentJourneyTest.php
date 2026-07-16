@@ -268,6 +268,8 @@ it('replaces transferred operational work with one retry-safe H&S responsibility
 
     expect($retried->id)->toBe($first->id)
         ->and($task->fresh()->status)->toBe(AlertTask::STATUS_TRANSFERRED)
+        ->and($first->fresh()->source_control_room_task_id)->toBe($task->id)
+        ->and($task->fresh()->transferredCorrectiveAction->is($first))->toBeTrue()
         ->and($items->where('id', 'corrective_action-'.$first->id))->toHaveCount(1)
         ->and($items->pluck('id')->contains("alert_task-{$task->id}"))->toBeFalse()
         ->and(HsCorrectiveAction::query()->whereKey($first->id)->count())->toBe(1);
