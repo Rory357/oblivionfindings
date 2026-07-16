@@ -130,6 +130,10 @@ class HsCorrectiveActionEvidenceController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
                 $this->assertAttachmentBelongsTo($action, $attachment);
+                $this->assertRemovalPreservesCompletedEvidence(
+                    $action,
+                    $attachment,
+                );
 
                 $disk = $attachment->disk ?: 'private';
                 if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
@@ -225,5 +229,23 @@ class HsCorrectiveActionEvidenceController extends Controller
                 && $attachment->attachable_type === $action->getMorphClass(),
             404,
         );
+    }
+
+    private function assertRemovalPreservesCompletedEvidence(
+        HsCorrectiveAction $action,
+        HsAttachment $attachment,
+    ): void {
+        if ($action->status !== HsCorrectiveAction::STATUS_COMPLETED
+            || filled($action->completion_notes)
+            || ! empty($action->completion_evidence_paths)
+            || $action->attachments()
+                ->whereKeyNot($attachment->id)
+                ->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'evidence' => 'Keep at least one completion note or file while this action awaits verification.',
+        ]);
     }
 }

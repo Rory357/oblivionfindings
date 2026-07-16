@@ -15,6 +15,7 @@ use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -385,26 +386,32 @@ class HsCorrectiveActionService
      */
     public function start(HsCorrectiveAction $action, ?int $assigneeId = null): HsCorrectiveAction
     {
-        $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
+        return DB::transaction(function () use ($action, $assigneeId): HsCorrectiveAction {
+            $action = HsCorrectiveAction::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
 
-        $updates = [
-            'status' => HsCorrectiveAction::STATUS_IN_PROGRESS,
-            'updated_by' => auth()->id(),
-        ];
+            $updates = [
+                'status' => HsCorrectiveAction::STATUS_IN_PROGRESS,
+                'updated_by' => auth()->id(),
+            ];
 
-        if ($assigneeId && ! $action->assigned_to_user_id) {
-            $updates['assigned_to_user_id'] = $assigneeId;
-            $updates['assigned_by_user_id'] = auth()->id();
-            $updates['assigned_at'] = now();
-        }
+            if ($assigneeId && ! $action->assigned_to_user_id) {
+                $updates['assigned_to_user_id'] = $assigneeId;
+                $updates['assigned_by_user_id'] = auth()->id();
+                $updates['assigned_at'] = now();
+            }
 
-        $action->update($updates);
+            $action->update($updates);
 
-        Log::info('HsCorrectiveActionService: action started', [
-            'action_id' => $action->id,
-        ]);
+            Log::info('HsCorrectiveActionService: action started', [
+                'action_id' => $action->id,
+            ]);
 
-        return $action;
+            return $action;
+        });
     }
 
     /**
@@ -415,31 +422,41 @@ class HsCorrectiveActionService
      */
     public function complete(HsCorrectiveAction $action, array $data): HsCorrectiveAction
     {
-        $this->assertTransition($action, HsCorrectiveAction::STATUS_COMPLETED);
+        return DB::transaction(function () use ($action, $data): HsCorrectiveAction {
+            $action = HsCorrectiveAction::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertTransition($action, HsCorrectiveAction::STATUS_COMPLETED);
 
-        $hasEvidence = ! empty(trim($data['completion_notes'] ?? ''))
-            || ! empty($data['completion_evidence_paths']);
+            $completionNotes = $data['completion_notes'] ?? $action->completion_notes;
+            $completionEvidencePaths = $data['completion_evidence_paths']
+                ?? $action->completion_evidence_paths;
+            $hasEvidence = filled($completionNotes)
+                || ! empty($completionEvidencePaths)
+                || $action->attachments()->exists();
 
-        if (! $hasEvidence) {
-            throw new InvalidArgumentException(
-                'Cannot complete action without completion notes or evidence.'
-            );
-        }
+            if (! $hasEvidence) {
+                throw new InvalidArgumentException(
+                    'Cannot complete action without completion notes or evidence.'
+                );
+            }
 
-        $action->update([
-            'status' => HsCorrectiveAction::STATUS_COMPLETED,
-            'completed_at' => now(),
-            'completed_by_user_id' => $data['completed_by_user_id'] ?? auth()->id(),
-            'completion_notes' => $data['completion_notes'] ?? $action->completion_notes,
-            'completion_evidence_paths' => $data['completion_evidence_paths'] ?? $action->completion_evidence_paths,
-            'updated_by' => auth()->id(),
-        ]);
+            $action->update([
+                'status' => HsCorrectiveAction::STATUS_COMPLETED,
+                'completed_at' => now(),
+                'completed_by_user_id' => $data['completed_by_user_id'] ?? auth()->id(),
+                'completion_notes' => $completionNotes,
+                'completion_evidence_paths' => $completionEvidencePaths,
+                'updated_by' => auth()->id(),
+            ]);
 
-        Log::info('HsCorrectiveActionService: action completed', [
-            'action_id' => $action->id,
-        ]);
+            Log::info('HsCorrectiveActionService: action completed', [
+                'action_id' => $action->id,
+            ]);
 
-        return $action;
+            return $action;
+        });
     }
 
     /**
@@ -447,21 +464,25 @@ class HsCorrectiveActionService
      */
     public function returnForRework(HsCorrectiveAction $action, string $reason): HsCorrectiveAction
     {
-        $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
+        return DB::transaction(function () use ($action, $reason): HsCorrectiveAction {
+            $action = HsCorrectiveAction::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
 
-        $action->update([
-            'status' => HsCorrectiveAction::STATUS_IN_PROGRESS,
-            'verification_notes' => $reason,
-            'completed_at' => null,
-            'completed_by_user_id' => null,
-            'updated_by' => auth()->id(),
-        ]);
+            $action->update([
+                'status' => HsCorrectiveAction::STATUS_IN_PROGRESS,
+                'verification_notes' => $reason,
+                'updated_by' => auth()->id(),
+            ]);
 
-        Log::info('HsCorrectiveActionService: action returned for rework', [
-            'action_id' => $action->id,
-        ]);
+            Log::info('HsCorrectiveActionService: action returned for rework', [
+                'action_id' => $action->id,
+            ]);
 
-        return $action;
+            return $action;
+        });
     }
 
     /**
@@ -472,38 +493,62 @@ class HsCorrectiveActionService
      */
     public function verify(HsCorrectiveAction $action, array $data): HsCorrectiveAction
     {
-        $this->assertTransition($action, HsCorrectiveAction::STATUS_VERIFIED);
+        return DB::transaction(function () use ($action, $data): HsCorrectiveAction {
+            $action = HsCorrectiveAction::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertTransition($action, HsCorrectiveAction::STATUS_VERIFIED);
 
-        $verifierId = $data['verified_by_user_id'] ?? auth()->id();
+            if (! ($data['evidence_reviewed'] ?? false)) {
+                throw ValidationException::withMessages([
+                    'evidence_reviewed' => 'Review the owner submission before verifying this action.',
+                ]);
+            }
 
-        // Separation of duties: verifier should not be the completer
-        if ($verifierId && $verifierId === $action->completed_by_user_id) {
-            throw new InvalidArgumentException(
-                'Verifier must be a different person than the action completer (separation of duties).'
-            );
-        }
+            $verifierId = $data['verified_by_user_id'] ?? auth()->id();
 
-        if (! isset($data['effectiveness_confirmed'])) {
-            throw new InvalidArgumentException(
-                'Verification must include an effectiveness assessment (effectiveness_confirmed).'
-            );
-        }
+            // Separation of duties: the action owner and completer must not verify.
+            if ($verifierId && (
+                $verifierId === $action->assigned_to_user_id
+                || $verifierId === $action->completed_by_user_id
+            )) {
+                throw new InvalidArgumentException(
+                    'Verifier must be a different person than the action owner and completer (separation of duties).'
+                );
+            }
 
-        $action->update([
-            'status' => HsCorrectiveAction::STATUS_VERIFIED,
-            'verified_at' => now(),
-            'verified_by_user_id' => $verifierId,
-            'verification_notes' => $data['verification_notes'] ?? null,
-            'effectiveness_confirmed' => $data['effectiveness_confirmed'],
-            'updated_by' => auth()->id(),
-        ]);
+            if (! isset($data['effectiveness_confirmed'])) {
+                throw new InvalidArgumentException(
+                    'Verification must include an effectiveness assessment (effectiveness_confirmed).'
+                );
+            }
 
-        Log::info('HsCorrectiveActionService: action verified', [
-            'action_id' => $action->id,
-            'effectiveness_confirmed' => $data['effectiveness_confirmed'],
-        ]);
+            $hasEvidence = filled($action->completion_notes)
+                || ! empty($action->completion_evidence_paths)
+                || $action->attachments()->exists();
+            if (! $hasEvidence) {
+                throw ValidationException::withMessages([
+                    'evidence_reviewed' => 'Completion evidence is no longer available. Return the action for rework.',
+                ]);
+            }
 
-        return $action;
+            $action->update([
+                'status' => HsCorrectiveAction::STATUS_VERIFIED,
+                'verified_at' => now(),
+                'verified_by_user_id' => $verifierId,
+                'verification_notes' => $data['verification_notes'] ?? null,
+                'effectiveness_confirmed' => $data['effectiveness_confirmed'],
+                'updated_by' => auth()->id(),
+            ]);
+
+            Log::info('HsCorrectiveActionService: action verified', [
+                'action_id' => $action->id,
+                'effectiveness_confirmed' => $data['effectiveness_confirmed'],
+            ]);
+
+            return $action;
+        });
     }
 
     /**
@@ -514,9 +559,12 @@ class HsCorrectiveActionService
      */
     public function close(HsCorrectiveAction $action, ?int $closedBy = null): HsCorrectiveAction
     {
-        $this->assertTransition($action, HsCorrectiveAction::STATUS_CLOSED);
-
-        return DB::transaction(function () use ($action, $closedBy) {
+        return DB::transaction(function () use ($action, $closedBy): HsCorrectiveAction {
+            $action = HsCorrectiveAction::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertTransition($action, HsCorrectiveAction::STATUS_CLOSED);
             $action->update([
                 'status' => HsCorrectiveAction::STATUS_CLOSED,
                 'closed_at' => now(),

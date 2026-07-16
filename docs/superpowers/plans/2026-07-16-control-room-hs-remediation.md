@@ -255,7 +255,7 @@ php artisan test tests/Feature/HealthSafety/HsWorksafeDecisionSchemaTest.php tes
 
 Expected: migration, rollback, re-migration, command, and both test files pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add database/migrations/2026_07_16_000100_make_hs_worksafe_decision_explicit.php app/Console/Commands/ReportHsWorksafeDecisionCounts.php app/Models/HsEvent.php database/factories/HsEventFactory.php tests/Feature/HealthSafety/HsWorksafeDecisionSchemaTest.php tests/Feature/Console/ReportHsWorksafeDecisionCountsTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
@@ -942,6 +942,7 @@ git commit -m "feat(health-safety): add private action evidence"
 - Modify: `app/Services/HealthSafety/HsCorrectiveActionService.php`
 - Modify: `app/Http/Controllers/HealthSafety/HsCorrectiveActionController.php`
 - Modify: `app/Http/Controllers/HealthSafety/HsEventController.php`
+- Modify: `app/Models/HsCorrectiveAction.php`
 - Create: `app/Support/HealthSafety/HsCorrectiveActionPresenter.php`
 - Create: `app/Support/HealthSafety/HsCorrectiveActionActivityLabels.php`
 - Modify: `tests/Feature/HealthSafety/HsCorrectiveActionTest.php`
@@ -951,7 +952,7 @@ git commit -m "feat(health-safety): add private action evidence"
 - Modify: `resources/js/pages/health-safety/corrective-actions/index.tsx`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing lifecycle and payload tests**
+- [x] **Step 1: Write failing lifecycle and payload tests**
 
 Prove:
 
@@ -975,14 +976,14 @@ Expected payload fragment:
 ->where('detail.corrective_actions.0.history.0.label', 'Action returned for rework');
 ```
 
-- [ ] **Step 2: Run tests and confirm the current presenter fails**
+- [x] **Step 2: Run tests and confirm the current presenter fails**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsCorrectiveActionPresentationTest.php
 npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx
 ```
 
-- [ ] **Step 3: Require evidence acknowledgement server-side**
+- [x] **Step 3: Require evidence acknowledgement server-side**
 
 Controller validation:
 
@@ -1002,7 +1003,7 @@ if (! ($data['evidence_reviewed'] ?? false)) {
 }
 ```
 
-- [ ] **Step 4: Build one presenter for event and register surfaces**
+- [x] **Step 4: Build one presenter for event and register surfaces**
 
 ```php
 return [
@@ -1035,7 +1036,7 @@ Map audit actions to labels such as:
 - `Action independently verified`;
 - `Action closed`.
 
-- [ ] **Step 5: Rebuild the verifier pane in evidence-first order**
+- [x] **Step 5: Rebuild the verifier pane in evidence-first order**
 
 Sections:
 
@@ -1053,7 +1054,7 @@ const canVerify =
     detail.can.verify_corrective_actions;
 ```
 
-- [ ] **Step 6: Re-run focused tests**
+- [x] **Step 6: Re-run focused tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsCorrectiveActionPresentationTest.php tests/Feature/HealthSafety/HsCorrectiveActionsRegisterTest.php

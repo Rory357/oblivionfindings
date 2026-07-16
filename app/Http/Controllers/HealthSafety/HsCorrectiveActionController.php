@@ -105,14 +105,16 @@ class HsCorrectiveActionController extends Controller
     /** Complete (in_progress → completed) with evidence. */
     public function complete(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event);
+        $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
-        $data = $request->validate(['completion_notes' => ['required', 'string', 'max:2000']]);
+        $data = $request->validate([
+            'completion_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
 
         try {
             $this->service->complete($action, [
-                'completion_notes' => $data['completion_notes'],
+                'completion_notes' => $data['completion_notes'] ?? null,
                 'completed_by_user_id' => $request->user()->id,
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -122,21 +124,23 @@ class HsCorrectiveActionController extends Controller
         return back()->with('success', 'Corrective action completed.');
     }
 
-    /** Verify (completed → verified) — enforces verifier ≠ completer + effectiveness. */
+    /** Verify (completed → verified) — enforces strict-site evidence review and separation of duties. */
     public function verify(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event);
+        $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate([
-            'effectiveness_confirmed' => ['required', 'boolean'],
+            'evidence_reviewed' => ['accepted'],
+            'effective' => ['required', 'boolean'],
             'verification_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         try {
             $this->service->verify($action, [
                 'verified_by_user_id' => $request->user()->id,
-                'effectiveness_confirmed' => $request->boolean('effectiveness_confirmed'),
+                'evidence_reviewed' => true,
+                'effectiveness_confirmed' => $request->boolean('effective'),
                 'verification_notes' => $data['verification_notes'] ?? null,
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -149,7 +153,7 @@ class HsCorrectiveActionController extends Controller
     /** Close (verified → closed); auto-advances the event to monitoring when all resolved. */
     public function close(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event);
+        $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
         try {
@@ -164,7 +168,7 @@ class HsCorrectiveActionController extends Controller
     /** Return for rework (completed → in_progress) with a reason. */
     public function returnForRework(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event);
+        $event = $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
@@ -183,10 +187,20 @@ class HsCorrectiveActionController extends Controller
         abort_unless($action->hs_event_id === $event->id, 404);
     }
 
-    private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
-    {
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    private function resolveAccessibleEvent(
+        Request $request,
+        HsEvent $event,
+        array $bypassPermissions = ['healthSafety.viewAllSites'],
+    ): HsEvent {
         $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope($query, $request->user(), ['healthSafety.viewAllSites']);
+        $this->siteAccess->applyHsEventScope(
+            $query,
+            $request->user(),
+            $bypassPermissions,
+        );
 
         return $query->findOrFail($event->id);
     }

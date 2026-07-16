@@ -101,6 +101,11 @@ type ActionRow = {
     completed_by_user_id: number | null;
     completed_by_name: string | null;
     can_verify: boolean;
+    evidence: {
+        load_state: 'loaded' | 'unavailable';
+        attachments: Array<{ id: number }>;
+    };
+    rework: { latest_reason: string | null };
     recommendation: string | null;
     source:
         | {
@@ -1021,6 +1026,15 @@ function ActionTable({
                                                         'Reason not recorded'}
                                                 </span>
                                             ) : null}
+                                            {action.rework.latest_reason ? (
+                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-status-warning">
+                                                    Returned for rework:{' '}
+                                                    {
+                                                        action.rework
+                                                            .latest_reason
+                                                    }
+                                                </span>
+                                            ) : null}
                                             <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                                 {titleCase(action.action_type)}
                                             </span>
@@ -1142,13 +1156,23 @@ function ActionTable({
                                                 Overdue
                                             </FlagBadge>
                                         ) : null}
-                                        {awaiting ? (
+                                        {awaiting &&
+                                        action.evidence.load_state ===
+                                            'loaded' ? (
                                             <FlagBadge
                                                 icon={ShieldCheck}
                                                 tone="info"
                                                 title="Completed — needs a different person to verify"
                                             >
                                                 Verify
+                                            </FlagBadge>
+                                        ) : awaiting ? (
+                                            <FlagBadge
+                                                icon={ShieldAlert}
+                                                tone="warning"
+                                                title="Completion evidence could not be loaded; verification is unavailable"
+                                            >
+                                                Evidence unavailable
                                             </FlagBadge>
                                         ) : null}
                                         {unassigned ? (

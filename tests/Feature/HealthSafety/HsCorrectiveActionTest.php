@@ -17,7 +17,9 @@ use App\Notifications\AppEventNotification;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class HsCorrectiveActionTest extends TestCase
@@ -506,13 +508,35 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_can_complete_action_with_notes(): void
     {
+        $completer = User::factory()->create();
         $action = HsCorrectiveAction::factory()->inProgress()->create();
 
+        $this->actingAs($completer);
         $result = $this->service->complete($action, [
             'completion_notes' => 'Signage installed in all corridors.',
+            'completed_by_user_id' => $completer->id,
         ]);
 
         $this->assertEquals(HsCorrectiveAction::STATUS_COMPLETED, $result->status);
+        $this->assertNotNull($result->completed_at);
+        $this->assertSame($completer->id, $result->completed_by_user_id);
+    }
+
+    public function test_can_complete_action_with_a_retained_attachment_instead_of_notes(): void
+    {
+        $action = HsCorrectiveAction::factory()->inProgress()->create();
+        $action->attachments()->create([
+            'uploaded_by' => User::factory()->create()->id,
+            'original_name' => 'after-photo.jpg',
+            'path' => "health-safety/corrective-actions/{$action->id}/after-photo.jpg",
+            'disk' => 'private',
+            'mime_type' => 'image/jpeg',
+            'size_bytes' => 120,
+        ]);
+
+        $result = $this->service->complete($action, []);
+
+        $this->assertSame(HsCorrectiveAction::STATUS_COMPLETED, $result->status);
         $this->assertNotNull($result->completed_at);
     }
 
@@ -528,12 +552,21 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_can_return_for_rework(): void
     {
-        $action = HsCorrectiveAction::factory()->completed()->create();
+        $completer = User::factory()->create();
+        $completedAt = now()->subHour()->startOfSecond();
+        $action = HsCorrectiveAction::factory()->completed()->create([
+            'completed_at' => $completedAt,
+            'completed_by_user_id' => $completer->id,
+            'completion_notes' => 'Installed signage in the main corridor.',
+        ]);
 
         $result = $this->service->returnForRework($action, 'Signage not in all areas.');
 
         $this->assertEquals(HsCorrectiveAction::STATUS_IN_PROGRESS, $result->status);
-        $this->assertNull($result->completed_at);
+        $this->assertSame($completedAt->toIso8601String(), $result->completed_at?->toIso8601String());
+        $this->assertSame($completer->id, $result->completed_by_user_id);
+        $this->assertSame('Installed signage in the main corridor.', $result->completion_notes);
+        $this->assertSame('Signage not in all areas.', $result->verification_notes);
     }
 
     public function test_can_verify_action(): void
@@ -543,6 +576,7 @@ class HsCorrectiveActionTest extends TestCase
 
         $result = $this->service->verify($action, [
             'verified_by_user_id' => $verifier->id,
+            'evidence_reviewed' => true,
             'effectiveness_confirmed' => true,
             'verification_notes' => 'All signage confirmed in place.',
         ]);
@@ -564,8 +598,68 @@ class HsCorrectiveActionTest extends TestCase
 
         $this->service->verify($action, [
             'verified_by_user_id' => $completer->id,
+            'evidence_reviewed' => true,
             'effectiveness_confirmed' => true,
         ]);
+    }
+
+    public function test_action_owner_cannot_verify_when_another_user_completed(): void
+    {
+        $owner = User::factory()->create();
+        $completer = User::factory()->create();
+        $action = HsCorrectiveAction::factory()->completed()->create([
+            'assigned_to_user_id' => $owner->id,
+            'completed_by_user_id' => $completer->id,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('action owner and completer');
+
+        $this->service->verify($action, [
+            'verified_by_user_id' => $owner->id,
+            'evidence_reviewed' => true,
+            'effectiveness_confirmed' => true,
+        ]);
+    }
+
+    public function test_verification_requires_evidence_acknowledgement(): void
+    {
+        $action = HsCorrectiveAction::factory()->completed()->create();
+
+        try {
+            $this->service->verify($action, [
+                'verified_by_user_id' => User::factory()->create()->id,
+                'effectiveness_confirmed' => true,
+            ]);
+            $this->fail('Verification must require explicit evidence acknowledgement.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Review the owner submission before verifying this action.'],
+                $exception->errors()['evidence_reviewed'] ?? [],
+            );
+        }
+    }
+
+    public function test_verification_rechecks_that_completion_evidence_is_still_retained(): void
+    {
+        $action = HsCorrectiveAction::factory()->completed()->create([
+            'completion_notes' => null,
+            'completion_evidence_paths' => null,
+        ]);
+
+        try {
+            $this->service->verify($action, [
+                'verified_by_user_id' => User::factory()->create()->id,
+                'evidence_reviewed' => true,
+                'effectiveness_confirmed' => true,
+            ]);
+            $this->fail('Verification must fail when no completion evidence remains.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Completion evidence is no longer available. Return the action for rework.'],
+                $exception->errors()['evidence_reviewed'] ?? [],
+            );
+        }
     }
 
     public function test_verification_requires_effectiveness_assessment(): void
@@ -577,6 +671,7 @@ class HsCorrectiveActionTest extends TestCase
 
         $this->service->verify($action, [
             'verified_by_user_id' => User::factory()->create()->id,
+            'evidence_reviewed' => true,
         ]);
     }
 
@@ -602,8 +697,49 @@ class HsCorrectiveActionTest extends TestCase
 
         $this->service->verify($action, [
             'verified_by_user_id' => User::factory()->create()->id,
+            'evidence_reviewed' => true,
             'effectiveness_confirmed' => true,
         ]);
+    }
+
+    public function test_stale_lifecycle_requests_recheck_the_locked_status(): void
+    {
+        $staleVerification = HsCorrectiveAction::factory()->completed()->create();
+        DB::table('hs_corrective_actions')
+            ->where('id', $staleVerification->id)
+            ->update(['status' => HsCorrectiveAction::STATUS_IN_PROGRESS]);
+
+        try {
+            $this->service->verify($staleVerification, [
+                'verified_by_user_id' => User::factory()->create()->id,
+                'evidence_reviewed' => true,
+                'effectiveness_confirmed' => true,
+            ]);
+            $this->fail('A stale completed model must not verify after rework.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(
+                HsCorrectiveAction::STATUS_IN_PROGRESS,
+                $staleVerification->fresh()->status,
+            );
+        }
+
+        $staleReturn = HsCorrectiveAction::factory()->completed()->create();
+        DB::table('hs_corrective_actions')
+            ->where('id', $staleReturn->id)
+            ->update(['status' => HsCorrectiveAction::STATUS_VERIFIED]);
+
+        try {
+            $this->service->returnForRework(
+                $staleReturn,
+                'Stale return must not overwrite verification.',
+            );
+            $this->fail('A stale completed model must not overwrite verification.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(
+                HsCorrectiveAction::STATUS_VERIFIED,
+                $staleReturn->fresh()->status,
+            );
+        }
     }
 
     public function test_cannot_close_uncompleted_action(): void

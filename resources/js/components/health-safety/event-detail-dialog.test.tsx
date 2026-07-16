@@ -190,7 +190,12 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
             ],
             unresolved_control_room_tasks: [],
         },
-        can: { manage: true, override_closure: false },
+        can: {
+            manage: true,
+            override_closure: false,
+            manage_corrective_action_lifecycle: true,
+            verify_corrective_actions: true,
+        },
         handover: {
             status: 'awaiting_acceptance',
             owner: null,
@@ -418,7 +423,12 @@ describe('EventDetailDialog closure governance', () => {
     it('shows the override decision only to an authorised user and posts the reason', () => {
         renderDialog(
             eventDetail({
-                can: { manage: true, override_closure: true },
+                can: {
+                    manage: true,
+                    override_closure: true,
+                    manage_corrective_action_lifecycle: true,
+                    verify_corrective_actions: true,
+                },
             } as Partial<EventDetail>),
         );
 
@@ -626,7 +636,12 @@ describe('EventDetailDialog WorkSafe governance', () => {
         renderDialog(
             eventDetail({
                 handover: acceptedHandover,
-                can: { manage: false, override_closure: false },
+                can: {
+                    manage: false,
+                    override_closure: false,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
                 worksafe: {
                     ...eventDetail().worksafe,
                     can_decide: false,
@@ -746,7 +761,12 @@ describe('EventDetailDialog WorkSafe governance', () => {
 
     it('does not open forced WorkSafe mutation panes without capability', () => {
         const viewOnly = eventDetail({
-            can: { manage: false, override_closure: false },
+            can: {
+                manage: false,
+                override_closure: false,
+                manage_corrective_action_lifecycle: false,
+                verify_corrective_actions: false,
+            },
             worksafe: {
                 ...eventDetail().worksafe,
                 can_decide: false,
@@ -999,6 +1019,10 @@ describe('EventDetailDialog corrective-action provenance', () => {
                         priority: 'high',
                         status: 'open',
                         assigned_to_name: 'Playwright Incident Reviewer',
+                        owner: {
+                            id: 8,
+                            name: 'Playwright Incident Reviewer',
+                        },
                         due_date: '2026-08-31',
                         is_overdue: false,
                         completed_at: null,
@@ -1018,10 +1042,22 @@ describe('EventDetailDialog corrective-action provenance', () => {
                             reference: 'CR task #501',
                             title: 'Replace the unsafe bathroom rail',
                         },
+                        source_task: {
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Replace the unsafe bathroom rail',
+                        },
                         evidence: {
                             can_upload: true,
+                            completion_notes: null,
+                            legacy_paths: [],
+                            completed_by: null,
+                            completed_at: null,
+                            load_state: 'loaded',
                             attachments: [],
                         },
+                        rework: { latest_reason: null },
+                        history: [],
                     },
                 ],
             }),
@@ -1058,6 +1094,10 @@ describe('EventDetailDialog corrective-action provenance', () => {
                         priority: 'high',
                         status: 'in_progress',
                         assigned_to_name: 'Playwright Incident Reviewer',
+                        owner: {
+                            id: 8,
+                            name: 'Playwright Incident Reviewer',
+                        },
                         due_date: '2026-08-31',
                         is_overdue: false,
                         completed_at: null,
@@ -1077,8 +1117,18 @@ describe('EventDetailDialog corrective-action provenance', () => {
                             reference: 'CR task #501',
                             title: 'Replace the unsafe bathroom rail',
                         },
+                        source_task: {
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Replace the unsafe bathroom rail',
+                        },
                         evidence: {
                             can_upload: true,
+                            completion_notes: null,
+                            legacy_paths: [],
+                            completed_by: null,
+                            completed_at: null,
+                            load_state: 'loaded',
                             attachments: [
                                 {
                                     id: 701,
@@ -1094,6 +1144,8 @@ describe('EventDetailDialog corrective-action provenance', () => {
                                 },
                             ],
                         },
+                        rework: { latest_reason: null },
+                        history: [],
                     },
                 ],
             }),
@@ -1166,7 +1218,12 @@ describe('EventDetailDialog corrective-action provenance', () => {
     it('lets an assigned non-manager owner reach the uploader without lifecycle controls', () => {
         renderDialog(
             eventDetail({
-                can: { manage: false, override_closure: false },
+                can: {
+                    manage: false,
+                    override_closure: false,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
                 corrective_actions: [
                     {
                         id: 62,
@@ -1176,6 +1233,7 @@ describe('EventDetailDialog corrective-action provenance', () => {
                         priority: 'medium',
                         status: 'in_progress',
                         assigned_to_name: 'Assigned action owner',
+                        owner: { id: 80, name: 'Assigned action owner' },
                         due_date: '2026-09-01',
                         is_overdue: false,
                         completed_at: null,
@@ -1189,10 +1247,18 @@ describe('EventDetailDialog corrective-action provenance', () => {
                         recommendation_index: null,
                         recommendation: null,
                         source: { type: 'standalone' },
+                        source_task: null,
                         evidence: {
                             can_upload: true,
+                            completion_notes: null,
+                            legacy_paths: [],
+                            completed_by: null,
+                            completed_at: null,
+                            load_state: 'loaded',
                             attachments: [],
                         },
+                        rework: { latest_reason: null },
+                        history: [],
                     },
                 ],
             }),
@@ -1207,6 +1273,217 @@ describe('EventDetailDialog corrective-action provenance', () => {
         ).toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: /Mark complete/ }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('presents verification evidence first and requires explicit review acknowledgement', () => {
+        renderDialog(
+            eventDetail({
+                can: {
+                    manage: true,
+                    override_closure: false,
+                    manage_corrective_action_lifecycle: true,
+                    verify_corrective_actions: true,
+                },
+                corrective_actions: [
+                    {
+                        id: 63,
+                        reference_number: 'CA-2026-0063',
+                        title: 'Install permanent anti-slip surfacing.',
+                        action_type: 'corrective',
+                        priority: 'high',
+                        status: 'completed',
+                        assigned_to_name: 'Assigned action owner',
+                        owner: { id: 81, name: 'Assigned action owner' },
+                        due_date: '2026-08-31',
+                        is_overdue: false,
+                        completed_at: '2026-08-20T03:00:00Z',
+                        completed_by_user_id: 81,
+                        completed_by_name: 'Assigned action owner',
+                        can_verify: true,
+                        verified_at: null,
+                        verified_by_name: null,
+                        effectiveness_confirmed: null,
+                        hs_investigation_id: 31,
+                        recommendation_index: 0,
+                        recommendation:
+                            'Install permanent anti-slip surfacing.',
+                        source: {
+                            type: 'control_room_task',
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Make the loading bay safe',
+                        },
+                        source_task: {
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Make the loading bay safe',
+                        },
+                        evidence: {
+                            can_upload: false,
+                            completion_notes:
+                                'Installed surfacing and photographed the finished work.',
+                            legacy_paths: ['legacy/contractor-sign-off.pdf'],
+                            completed_by: {
+                                id: 81,
+                                name: 'Assigned action owner',
+                            },
+                            completed_at: '2026-08-20T03:00:00Z',
+                            load_state: 'loaded',
+                            attachments: [
+                                {
+                                    id: 703,
+                                    original_name: 'after-photo.jpg',
+                                    mime_type: 'image/jpeg',
+                                    size_bytes: 4096,
+                                    description: 'Wide-angle completion photo',
+                                    uploaded_by: 'Assigned action owner',
+                                    created_at: '2026-08-20T03:00:00Z',
+                                    download_url:
+                                        '/health-safety/events/17/corrective-actions/63/evidence/703',
+                                    can_remove: true,
+                                },
+                            ],
+                        },
+                        rework: {
+                            latest_reason: 'Add a wider-angle photo.',
+                        },
+                        history: [
+                            {
+                                label: 'Owner resubmitted evidence',
+                                actor: 'Assigned action owner',
+                                occurred_at: '2026-08-20T03:00:00Z',
+                            },
+                            {
+                                label: 'Action returned for rework',
+                                actor: 'Independent verifier',
+                                occurred_at: '2026-08-19T03:00:00Z',
+                            },
+                        ],
+                    },
+                ],
+            }),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Corrective actions/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+
+        expect(screen.getByText('What was required')).toBeInTheDocument();
+        expect(
+            screen.getByText('What the owner submitted'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Prior rework and resubmission'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Verifier decision')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Installed surfacing and photographed the finished work.',
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getByText('after-photo.jpg')).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', {
+                name: 'Remove evidence after-photo.jpg',
+            }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Add a wider-angle photo.'),
+        ).toBeInTheDocument();
+
+        const verify = screen.getByRole('button', { name: 'Verify action' });
+        expect(verify).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'I reviewed the owner submission and retained evidence',
+            }),
+        );
+        expect(verify).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('radio', {
+                name: 'Not effective',
+            }),
+        );
+        expect(verify).toBeEnabled();
+        fireEvent.click(verify);
+
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/corrective-actions/63/verify',
+            expect.objectContaining({
+                evidence_reviewed: true,
+                effective: false,
+            }),
+        );
+    });
+
+    it('disables verification when retained evidence could not be loaded', () => {
+        renderDialog(
+            eventDetail({
+                can: {
+                    manage: true,
+                    override_closure: false,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+                corrective_actions: [
+                    {
+                        id: 64,
+                        reference_number: 'CA-2026-0064',
+                        title: 'Replace the failed emergency light.',
+                        action_type: 'corrective',
+                        priority: 'critical',
+                        status: 'completed',
+                        assigned_to_name: 'Assigned action owner',
+                        owner: { id: 82, name: 'Assigned action owner' },
+                        due_date: '2026-08-22',
+                        is_overdue: false,
+                        completed_at: '2026-08-20T04:00:00Z',
+                        completed_by_user_id: 82,
+                        completed_by_name: 'Assigned action owner',
+                        can_verify: true,
+                        verified_at: null,
+                        verified_by_name: null,
+                        effectiveness_confirmed: null,
+                        hs_investigation_id: null,
+                        recommendation_index: null,
+                        recommendation: null,
+                        source: { type: 'standalone' },
+                        source_task: null,
+                        evidence: {
+                            can_upload: false,
+                            completion_notes: null,
+                            legacy_paths: [],
+                            completed_by: {
+                                id: 82,
+                                name: 'Assigned action owner',
+                            },
+                            completed_at: '2026-08-20T04:00:00Z',
+                            load_state: 'unavailable',
+                            attachments: [],
+                        },
+                        rework: { latest_reason: null },
+                        history: [],
+                    },
+                ],
+            }),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Corrective actions/ }),
+        );
+
+        expect(
+            screen.getByText(
+                'Completion evidence could not be loaded. Verification is unavailable.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Verify' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Return for rework' }),
         ).not.toBeInTheDocument();
     });
 });

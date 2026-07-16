@@ -133,6 +133,7 @@ export type EventCorrectiveAction = {
     priority: string;
     status: string;
     assigned_to_name: string | null;
+    owner: { id: number; name: string } | null;
     due_date: string | null;
     is_overdue: boolean;
     completed_at: string | null;
@@ -155,8 +156,18 @@ export type EventCorrectiveAction = {
           }
         | { type: 'new_responsibility'; reason: string | null }
         | { type: 'standalone' };
+    source_task: {
+        id: number;
+        reference: string;
+        title: string;
+    } | null;
     evidence: {
         can_upload: boolean;
+        completion_notes: string | null;
+        legacy_paths: string[];
+        completed_by: { id: number; name: string } | null;
+        completed_at: string | null;
+        load_state: 'loaded' | 'unavailable';
         attachments: Array<{
             id: number;
             original_name: string;
@@ -169,6 +180,13 @@ export type EventCorrectiveAction = {
             can_remove: boolean;
         }>;
     };
+    rework: { latest_reason: string | null };
+    history: Array<{
+        label: string;
+        actor: string | null;
+        occurred_at: string | null;
+        detail?: string | null;
+    }>;
 };
 
 export type EventRiskAssessment = {
@@ -340,7 +358,12 @@ export type EventDetail = {
     };
     assignable_staff: Array<{ id: number; name: string }>;
     action_handover: CorrectiveActionHandover;
-    can: { manage: boolean; override_closure: boolean };
+    can: {
+        manage: boolean;
+        override_closure: boolean;
+        manage_corrective_action_lifecycle: boolean;
+        verify_corrective_actions: boolean;
+    };
 };
 
 export type EventSectionKey =
@@ -2524,7 +2547,7 @@ function CompleteActionPane({
             />
             <Field
                 label="What was done"
-                required
+                hint="Required when no completion file is retained"
                 error={form.errors.completion_notes}
             >
                 <Textarea
@@ -2545,7 +2568,15 @@ function CompleteActionPane({
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        (!form.data.completion_notes.trim() &&
+                            ca.evidence.attachments.length === 0 &&
+                            ca.evidence.legacy_paths.length === 0)
+                    }
+                >
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
@@ -2566,10 +2597,12 @@ function ActionEvidencePanel({
     d,
     ca,
     allowUpload = false,
+    allowRemove = true,
 }: {
     d: EventDetail;
     ca: EventCorrectiveAction;
     allowUpload?: boolean;
+    allowRemove?: boolean;
 }) {
     const [description, setDescription] = useState('');
     const [uploads, setUploads] = useState<EvidenceUploadState[]>([]);
@@ -2634,6 +2667,15 @@ function ActionEvidencePanel({
         uploadNext(0);
     };
 
+    if (evidence.load_state === 'unavailable') {
+        return ca.status === 'completed' ? (
+            <InfoCard icon={ShieldAlert} tone="warn">
+                Completion evidence could not be loaded. Verification is
+                unavailable.
+            </InfoCard>
+        ) : null;
+    }
+
     if (
         evidence.attachments.length === 0 &&
         (!allowUpload || !evidence.can_upload)
@@ -2688,7 +2730,7 @@ function ActionEvidencePanel({
                                     <ExternalLink className="h-3.5 w-3.5" />
                                     Download
                                 </a>
-                                {attachment.can_remove ? (
+                                {allowRemove && attachment.can_remove ? (
                                     <ArmedButton
                                         label="Remove evidence"
                                         icon={Trash2}
@@ -2787,9 +2829,20 @@ function VerifyActionPane({
     onDone: () => void;
 }) {
     const form = useForm<{
-        effectiveness_confirmed: boolean;
+        evidence_reviewed: boolean;
+        effective: boolean | null;
         verification_notes: string;
-    }>({ effectiveness_confirmed: true, verification_notes: '' });
+    }>({
+        evidence_reviewed: false,
+        effective: null,
+        verification_notes: '',
+    });
+    const canVerify =
+        ca.evidence.load_state === 'loaded' &&
+        form.data.evidence_reviewed &&
+        form.data.effective !== null &&
+        d.can.verify_corrective_actions &&
+        ca.can_verify;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -2818,48 +2871,190 @@ function VerifyActionPane({
             />
             <InfoCard icon={ShieldCheck} tone="warn">
                 Separation of duties — the verifier must be a different person
-                than whoever completed this action
+                than the action owner and whoever completed it
                 {ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
             </InfoCard>
-            <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                    type="checkbox"
-                    checked={form.data.effectiveness_confirmed}
-                    onChange={(e) =>
-                        form.setData(
-                            'effectiveness_confirmed',
-                            e.target.checked,
-                        )
-                    }
-                    className="h-4 w-4 rounded border-border"
-                />
-                The action is effective
-            </label>
-            <Field
-                label="Verification notes"
-                hint="Optional"
-                error={form.errors.verification_notes}
-            >
-                <Textarea
-                    rows={3}
-                    value={form.data.verification_notes}
-                    onChange={(e) =>
-                        form.setData('verification_notes', e.target.value)
-                    }
-                />
-            </Field>
+            <VerificationSection title="What was required">
+                <p className="text-sm font-semibold text-foreground">
+                    {ca.recommendation ?? ca.title}
+                </p>
+                <dl className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div>
+                        <dt className="font-semibold text-foreground">Owner</dt>
+                        <dd>
+                            {ca.owner?.name ??
+                                ca.assigned_to_name ??
+                                'Unassigned'}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="font-semibold text-foreground">
+                            Due date
+                        </dt>
+                        <dd>
+                            {ca.due_date
+                                ? formatDateTime(ca.due_date)
+                                : 'Not recorded'}
+                        </dd>
+                    </div>
+                </dl>
+                {ca.source_task ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Source: {ca.source_task.reference} ·{' '}
+                        {ca.source_task.title}
+                    </p>
+                ) : null}
+            </VerificationSection>
+            <VerificationSection title="What the owner submitted">
+                {ca.evidence.load_state === 'loaded' ? (
+                    <>
+                        <p className="text-sm text-foreground">
+                            {ca.evidence.completion_notes ??
+                                'No completion notes were entered.'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {ca.evidence.completed_by?.name
+                                ? `Submitted by ${ca.evidence.completed_by.name}`
+                                : 'Submitter not recorded'}
+                            {ca.evidence.completed_at
+                                ? ` · ${formatDateTime(ca.evidence.completed_at)}`
+                                : ''}
+                        </p>
+                        <ActionEvidencePanel
+                            d={d}
+                            ca={ca}
+                            allowRemove={false}
+                        />
+                        {ca.evidence.legacy_paths.length ? (
+                            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                {ca.evidence.legacy_paths.map((path) => (
+                                    <li key={path}>Legacy evidence: {path}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </>
+                ) : (
+                    <InfoCard icon={ShieldAlert} tone="warn">
+                        Completion evidence could not be loaded. Verification is
+                        unavailable.
+                    </InfoCard>
+                )}
+            </VerificationSection>
+            <VerificationSection title="Prior rework and resubmission">
+                {ca.rework.latest_reason ? (
+                    <p className="text-sm text-foreground">
+                        {ca.rework.latest_reason}
+                    </p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No prior rework was recorded.
+                    </p>
+                )}
+                {ca.history.length ? (
+                    <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {ca.history.map((entry, index) => (
+                            <li
+                                key={`${entry.label}-${entry.occurred_at}-${index}`}
+                            >
+                                <span className="font-semibold text-foreground">
+                                    {entry.label}
+                                </span>
+                                {entry.actor ? ` · ${entry.actor}` : ''}
+                                {entry.occurred_at
+                                    ? ` · ${formatDateTime(entry.occurred_at)}`
+                                    : ''}
+                            </li>
+                        ))}
+                    </ol>
+                ) : null}
+            </VerificationSection>
+            <VerificationSection title="Verifier decision">
+                <label className="flex items-start gap-2 text-sm text-foreground">
+                    <input
+                        type="checkbox"
+                        checked={form.data.evidence_reviewed}
+                        onChange={(e) =>
+                            form.setData('evidence_reviewed', e.target.checked)
+                        }
+                        className="mt-0.5 h-4 w-4 rounded border-border"
+                    />
+                    I reviewed the owner submission and retained evidence
+                </label>
+                <fieldset className="mt-3">
+                    <legend className="text-sm font-semibold text-foreground">
+                        Is the action effective?
+                    </legend>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                            <input
+                                type="radio"
+                                name={`corrective-action-${ca.id}-effective`}
+                                checked={form.data.effective === true}
+                                onChange={() => form.setData('effective', true)}
+                                className="h-4 w-4 border-border"
+                            />
+                            Effective
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                            <input
+                                type="radio"
+                                name={`corrective-action-${ca.id}-effective`}
+                                checked={form.data.effective === false}
+                                onChange={() =>
+                                    form.setData('effective', false)
+                                }
+                                className="h-4 w-4 border-border"
+                            />
+                            Not effective
+                        </label>
+                    </div>
+                </fieldset>
+                <div className="mt-3">
+                    <Field
+                        label="Verification notes"
+                        hint="Optional"
+                        error={form.errors.verification_notes}
+                    >
+                        <Textarea
+                            rows={3}
+                            value={form.data.verification_notes}
+                            onChange={(e) =>
+                                form.setData(
+                                    'verification_notes',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                    </Field>
+                </div>
+            </VerificationSection>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button type="submit" disabled={form.processing || !canVerify}>
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
-                    Verify
+                    Verify action
                 </Button>
             </div>
         </form>
+    );
+}
+
+function VerificationSection({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="rounded-xl border border-border bg-muted/20 p-3">
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            <div className="mt-2">{children}</div>
+        </section>
     );
 }
 
@@ -2985,10 +3180,12 @@ function CorrectiveActionControls({
     onPane: (p: ActivePane) => void;
 }) {
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}`;
+    const canManageStrictLifecycle = d.can.manage_corrective_action_lifecycle;
     // Write controls require manage AND a live event — no lifecycle moves once closed.
     if (!d.can.manage || d.status === 'closed') return null;
     if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status))
         return null;
+    if (ca.status !== 'open' && !canManageStrictLifecycle) return null;
 
     return (
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
@@ -3006,7 +3203,7 @@ function CorrectiveActionControls({
                         }
                     />
                 ) : null}
-                {ca.status === 'in_progress' ? (
+                {ca.status === 'in_progress' && canManageStrictLifecycle ? (
                     <Button
                         size="sm"
                         onClick={() =>
@@ -3017,18 +3214,23 @@ function CorrectiveActionControls({
                         complete
                     </Button>
                 ) : null}
-                {ca.status === 'completed' ? (
+                {ca.status === 'completed' && canManageStrictLifecycle ? (
                     <>
                         <Button
                             size="sm"
-                            disabled={!ca.can_verify}
+                            disabled={
+                                !ca.can_verify ||
+                                ca.evidence.load_state !== 'loaded'
+                            }
                             onClick={() =>
                                 onPane({ kind: 'ca_verify', actionId: ca.id })
                             }
                             title={
-                                ca.can_verify
-                                    ? undefined
-                                    : 'A different person must verify this action.'
+                                ca.evidence.load_state !== 'loaded'
+                                    ? 'Completion evidence could not be loaded.'
+                                    : ca.can_verify
+                                      ? undefined
+                                      : 'A different person must verify this action.'
                             }
                         >
                             <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />{' '}
@@ -3046,7 +3248,7 @@ function CorrectiveActionControls({
                         </Button>
                     </>
                 ) : null}
-                {ca.status === 'verified' ? (
+                {ca.status === 'verified' && canManageStrictLifecycle ? (
                     <ArmedButton
                         label="Close"
                         icon={CheckCircle2}
@@ -3060,11 +3262,11 @@ function CorrectiveActionControls({
                     />
                 ) : null}
             </div>
-            {ca.status === 'completed' ? (
+            {ca.status === 'completed' && canManageStrictLifecycle ? (
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                     <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />A
-                    different person must verify this action than whoever
-                    completed it
+                    different person must verify this action than its owner or
+                    whoever completed it
                     {ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
                 </p>
             ) : null}
@@ -4262,6 +4464,12 @@ function ActionsSection({
                                                 'Reason not recorded'}
                                         </p>
                                     ) : null}
+                                    {a.rework.latest_reason ? (
+                                        <p className="mt-1 text-xs text-status-warning">
+                                            Returned for rework:{' '}
+                                            {a.rework.latest_reason}
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span
@@ -4311,7 +4519,7 @@ function ActionsSection({
             <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Separation of duties: a corrective action must be verified by
-                someone other than the person who completed it.
+                someone other than its owner or the person who completed it.
             </p>
         </div>
     );

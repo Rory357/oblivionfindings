@@ -132,6 +132,8 @@ class HsCorrectiveActionEvidenceTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.corrective_actions.0.evidence.can_upload', false)
                 ->has('detail.corrective_actions.0.evidence.attachments', 0)
+                ->where('detail.corrective_actions.0.rework.latest_reason', null)
+                ->has('detail.corrective_actions.0.history', 0)
             );
         $this->actingAs($otherTenantManager)
             ->get($this->downloadUrl($event, $action, $attachment))
@@ -190,6 +192,41 @@ class HsCorrectiveActionEvidenceTest extends TestCase
                 'deleted_at' => null,
             ]);
         }
+    }
+
+    public function test_completed_action_cannot_remove_its_last_retained_evidence_file(): void
+    {
+        Storage::fake('private');
+        [$owner, $event, $action, $site] = $this->actionJourney();
+        $manager = $this->staffAtSite($site, 'health_safety_officer');
+        $action->update([
+            'status' => HsCorrectiveAction::STATUS_COMPLETED,
+            'completion_notes' => null,
+            'completion_evidence_paths' => null,
+            'completed_at' => now(),
+            'completed_by_user_id' => $owner->id,
+        ]);
+        $attachment = $this->attachment($action, $owner, 'only-proof.jpg');
+        Storage::disk('private')->put($attachment->path, 'image');
+
+        $this->actingAs($owner)
+            ->delete($this->deleteUrl($event, $action, $attachment))
+            ->assertSessionHasErrors('evidence');
+        Storage::disk('private')->assertExists($attachment->path);
+        $this->assertDatabaseHas('hs_attachments', [
+            'id' => $attachment->id,
+            'deleted_at' => null,
+        ]);
+
+        $this->actingAs($manager)
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where(
+                    'detail.corrective_actions.0.evidence.attachments.0.can_remove',
+                    false,
+                )
+            );
     }
 
     public function test_cross_action_attachment_idor_is_not_found(): void

@@ -126,6 +126,11 @@ class HsCorrectiveAction extends Model
         return $this->morphMany(HsAttachment::class, 'attachable');
     }
 
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'auditable');
+    }
+
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');

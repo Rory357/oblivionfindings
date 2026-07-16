@@ -25,6 +25,7 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\HsCorrectiveActionPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -40,6 +41,7 @@ class HsEventController extends Controller
     public function __construct(
         private readonly HsEventService $events,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly HsCorrectiveActionPresenter $correctiveActionPresenter,
     ) {}
 
     /**
@@ -565,63 +567,39 @@ class HsEventController extends Controller
             'hsInvestigation:id,recommendations',
             'sourceControlRoomTask:id,title',
         ];
-        if ($canAccessActionEvidence) {
-            $correctiveActionRelations[] = 'attachments.uploader:id,name';
-        }
 
         $correctiveActions = $hsEvent->correctiveActions()
             ->with($correctiveActionRelations)
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date')
-            ->get()
-            ->map(fn (HsCorrectiveAction $a) => [
-                'id' => $a->id,
-                'reference_number' => $a->reference_number,
-                'title' => $a->title,
-                'action_type' => $a->action_type,
-                'priority' => $a->priority,
-                'status' => $a->status,
-                'assigned_to_name' => $a->assignedTo?->name,
-                'due_date' => $a->due_date?->toDateString(),
-                'is_overdue' => $a->isOverdue(),
-                'completed_at' => $a->completed_at?->toIso8601String(),
-                'completed_by_user_id' => $a->completed_by_user_id,
-                'completed_by_name' => $a->completedBy?->name,
-                'can_verify' => $canManage
-                    && $a->status === 'completed'
-                    && $a->completed_by_user_id !== $currentUserId,
-                'verified_at' => $a->verified_at?->toIso8601String(),
-                'verified_by_name' => $a->verifiedBy?->name,
-                'effectiveness_confirmed' => $a->effectiveness_confirmed,
-                'hs_investigation_id' => $a->hs_investigation_id,
-                'recommendation_index' => $a->recommendation_index,
-                'recommendation' => $this->correctiveActionRecommendation($a),
-                'source' => $this->correctiveActionSource($a),
-                'evidence' => [
-                    'can_upload' => $canAccessActionEvidence
-                        && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
-                        && $a->acceptsEvidenceChanges(),
-                    'attachments' => ($canAccessActionEvidence
-                        && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
-                        && $a->relationLoaded('attachments')
-                            ? $a->attachments
-                            : collect())
-                        ->map(fn ($attachment) => [
-                            'id' => $attachment->id,
-                            'original_name' => $attachment->original_name,
-                            'mime_type' => $attachment->mime_type,
-                            'size_bytes' => $attachment->size_bytes,
-                            'description' => $attachment->description,
-                            'uploaded_by' => $attachment->uploader?->name,
-                            'created_at' => $attachment->created_at?->toIso8601String(),
-                            'download_url' => "/health-safety/events/{$hsEvent->id}/corrective-actions/{$a->id}/evidence/{$attachment->id}",
-                            'can_remove' => $canAccessActionEvidence
-                                && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
-                                && $a->acceptsEvidenceChanges(),
-                        ])
-                        ->values(),
-                ],
-            ]);
+            ->get();
+        $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_LOADED;
+        if ($canAccessActionEvidence) {
+            try {
+                $correctiveActions
+                    ->filter(fn (HsCorrectiveAction $action): bool => $canManage
+                        || (int) $action->assigned_to_user_id === (int) $currentUserId)
+                    ->load([
+                        'attachments.uploader:id,name',
+                        'auditLogs' => fn ($query) => $query
+                            ->with('user:id,name')
+                            ->orderBy('created_at')
+                            ->orderBy('id'),
+                    ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+                $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_UNAVAILABLE;
+            }
+        }
+        $correctiveActions = $correctiveActions->map(
+            fn (HsCorrectiveAction $action) => $this->correctiveActionPresenter->present(
+                $action,
+                $currentUser,
+                $canManage,
+                $canAccessActionEvidence,
+                $evidenceLoadState,
+            ),
+        );
 
         $riskAssessments = $hsEvent->riskAssessments()
             ->with(['assessedBy:id,name'])
@@ -861,6 +839,9 @@ class HsEventController extends Controller
             'can' => [
                 'manage' => $canManage,
                 'override_closure' => $currentUser->canDo('healthSafety.overrideClosure'),
+                'manage_corrective_action_lifecycle' => $canManage
+                    && $canAccessActionEvidence,
+                'verify_corrective_actions' => $canManage && $canAccessActionEvidence,
             ],
         ];
     }
@@ -952,6 +933,7 @@ class HsEventController extends Controller
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
                 'completedBy:id,name',
+                'verifiedBy:id,name',
                 'hsInvestigation:id,recommendations',
                 'sourceControlRoomTask:id,title',
             ])
@@ -979,25 +961,40 @@ class HsEventController extends Controller
             });
         }
 
-        $actions = $query->paginate(25)->withQueryString()->through(fn (HsCorrectiveAction $a) => [
-            'id' => $a->id,
-            'reference_number' => $a->reference_number,
-            'title' => $a->title,
-            'action_type' => $a->action_type,
-            'priority' => $a->priority,
-            'status' => $a->status,
-            'assigned_to_name' => $a->assignedTo?->name,
-            'due_date' => $a->due_date?->toDateString(),
-            'is_overdue' => $a->isOverdue(),
-            'completed_at' => $a->completed_at?->toIso8601String(),
-            'verified_at' => $a->verified_at?->toIso8601String(),
-            'completed_by_user_id' => $a->completed_by_user_id,
-            'completed_by_name' => $a->completedBy?->name,
-            'can_verify' => $canManage
-                && $a->status === 'completed'
-                && $a->completed_by_user_id !== $currentUserId,
-            'recommendation' => $this->correctiveActionRecommendation($a),
-            'source' => $this->correctiveActionSource($a),
+        $actions = $query->paginate(25)->withQueryString();
+        $pageActions = $actions->getCollection();
+        $strictEventIds = HsEvent::query()
+            ->whereKey($pageActions->pluck('hs_event_id')->filter()->unique()->all());
+        $this->siteAccess->applyHsEventScope(
+            $strictEventIds,
+            $request->user(),
+            [],
+        );
+        $strictEventIds = $strictEventIds->pluck('id')->map(fn ($id) => (int) $id);
+        $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_LOADED;
+        try {
+            $pageActions
+                ->filter(fn (HsCorrectiveAction $action): bool => $strictEventIds->contains((int) $action->hs_event_id)
+                    && ($canManage || (int) $action->assigned_to_user_id === (int) $currentUserId))
+                ->load([
+                    'attachments.uploader:id,name',
+                    'auditLogs' => fn ($query) => $query
+                        ->with('user:id,name')
+                        ->orderBy('created_at')
+                        ->orderBy('id'),
+                ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_UNAVAILABLE;
+        }
+        $actions = $actions->through(fn (HsCorrectiveAction $a) => [
+            ...$this->correctiveActionPresenter->present(
+                $a,
+                $request->user(),
+                $canManage,
+                $strictEventIds->contains((int) $a->hs_event_id),
+                $evidenceLoadState,
+            ),
             'event' => $a->hsEvent ? [
                 'id' => $a->hsEvent->id,
                 'reference_number' => $a->hsEvent->reference_number,
@@ -1089,46 +1086,6 @@ class HsEventController extends Controller
                 'viewReports' => (bool) ($request->user()?->canDo('governance.view') ?? false),
             ],
         ]);
-    }
-
-    private function correctiveActionRecommendation(HsCorrectiveAction $action): ?string
-    {
-        if ($action->recommendation_index === null) {
-            return null;
-        }
-
-        $recommendation = data_get(
-            $action->hsInvestigation?->recommendations,
-            "{$action->recommendation_index}.description",
-        );
-
-        return is_string($recommendation) && filled($recommendation)
-            ? $recommendation
-            : null;
-    }
-
-    /**
-     * @return array{type: string, id?: int, reference?: string, title?: string, reason?: string|null}
-     */
-    private function correctiveActionSource(HsCorrectiveAction $action): array
-    {
-        if ($action->sourceControlRoomTask) {
-            return [
-                'type' => 'control_room_task',
-                'id' => $action->sourceControlRoomTask->id,
-                'reference' => "CR task #{$action->sourceControlRoomTask->id}",
-                'title' => $action->sourceControlRoomTask->title,
-            ];
-        }
-
-        if ($action->recommendation_index !== null) {
-            return [
-                'type' => 'new_responsibility',
-                'reason' => $action->description,
-            ];
-        }
-
-        return ['type' => 'standalone'];
     }
 
     private function legacyActionTab(Request $request): string
