@@ -1,8 +1,18 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const inertia = vi.hoisted(() => ({ post: vi.fn() }));
+const inertia = vi.hoisted(() => ({
+    post: vi.fn(),
+    routerPost: vi.fn(),
+    routerDelete: vi.fn(),
+}));
 
 vi.mock('@inertiajs/react', async () => {
     const React = await import('react');
@@ -20,7 +30,10 @@ vi.mock('@inertiajs/react', async () => {
                 {children}
             </a>
         ),
-        router: { post: vi.fn() },
+        router: {
+            post: inertia.routerPost,
+            delete: inertia.routerDelete,
+        },
         usePage: () => ({ props: { flash: {} } }),
         useForm: <T extends Record<string, unknown>>(initial: T) => {
             const [data, setDataState] = React.useState(initial);
@@ -276,7 +289,11 @@ function renderDialog(
     );
 }
 
-beforeEach(() => inertia.post.mockReset());
+beforeEach(() => {
+    inertia.post.mockReset();
+    inertia.routerPost.mockReset();
+    inertia.routerDelete.mockReset();
+});
 afterEach(cleanup);
 
 describe('EventDetailDialog control-room handover', () => {
@@ -1001,6 +1018,10 @@ describe('EventDetailDialog corrective-action provenance', () => {
                             reference: 'CR task #501',
                             title: 'Replace the unsafe bathroom rail',
                         },
+                        evidence: {
+                            can_upload: true,
+                            attachments: [],
+                        },
                     },
                 ],
             }),
@@ -1023,5 +1044,169 @@ describe('EventDetailDialog corrective-action provenance', () => {
                 'Transferred from Control Room task: CR task #501 · Replace the unsafe bathroom rail',
             ),
         ).toBeInTheDocument();
+    });
+
+    it('retains completion notes while evidence uploads and exposes download and removal', () => {
+        renderDialog(
+            eventDetail({
+                corrective_actions: [
+                    {
+                        id: 61,
+                        reference_number: 'CA-2026-0061',
+                        title: 'Install a permanent bathroom safety rail.',
+                        action_type: 'corrective',
+                        priority: 'high',
+                        status: 'in_progress',
+                        assigned_to_name: 'Playwright Incident Reviewer',
+                        due_date: '2026-08-31',
+                        is_overdue: false,
+                        completed_at: null,
+                        completed_by_user_id: null,
+                        completed_by_name: null,
+                        can_verify: false,
+                        verified_at: null,
+                        verified_by_name: null,
+                        effectiveness_confirmed: null,
+                        hs_investigation_id: 31,
+                        recommendation_index: 0,
+                        recommendation:
+                            'Install a permanent bathroom safety rail.',
+                        source: {
+                            type: 'control_room_task',
+                            id: 501,
+                            reference: 'CR task #501',
+                            title: 'Replace the unsafe bathroom rail',
+                        },
+                        evidence: {
+                            can_upload: true,
+                            attachments: [
+                                {
+                                    id: 701,
+                                    original_name: 'after-photo.jpg',
+                                    mime_type: 'image/jpeg',
+                                    size_bytes: 2048,
+                                    description: 'Completed installation',
+                                    uploaded_by: 'Playwright Incident Reviewer',
+                                    created_at: '2026-08-20T02:00:00Z',
+                                    download_url:
+                                        '/health-safety/events/17/corrective-actions/61/evidence/701',
+                                    can_remove: true,
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Corrective actions/ }),
+        );
+        expect(screen.getByText('after-photo.jpg')).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Download after-photo.jpg' }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17/corrective-actions/61/evidence/701',
+        );
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Remove evidence after-photo.jpg',
+            }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Confirm Remove evidence after-photo.jpg',
+            }),
+        );
+        expect(inertia.routerDelete).toHaveBeenCalledWith(
+            '/health-safety/events/17/corrective-actions/61/evidence/701',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Mark complete/ }));
+        const notes = screen.getByRole('textbox', { name: /What was done/ });
+        fireEvent.change(notes, {
+            target: { value: 'Installed and photographed the new rail.' },
+        });
+        const file = new File(['image'], 'wide-angle.jpg', {
+            type: 'image/jpeg',
+        });
+        const signOff = new File(['document'], 'contractor-sign-off.pdf', {
+            type: 'application/pdf',
+        });
+        fireEvent.change(screen.getByLabelText('Add completion evidence'), {
+            target: { files: [file, signOff] },
+        });
+
+        expect(
+            screen.getByText('Uploading wide-angle.jpg'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Queued contractor-sign-off.pdf'),
+        ).toBeInTheDocument();
+        expect(inertia.routerPost).toHaveBeenCalledWith(
+            '/health-safety/events/17/corrective-actions/61/evidence',
+            expect.objectContaining({ file }),
+            expect.objectContaining({
+                forceFormData: true,
+                preserveScroll: true,
+            }),
+        );
+        const uploadOptions = inertia.routerPost.mock.calls[0]?.[2] as
+            | { onError?: () => void }
+            | undefined;
+        act(() => uploadOptions?.onError?.());
+        expect(
+            screen.getByText('Upload failed for wide-angle.jpg'),
+        ).toBeInTheDocument();
+        expect(notes).toHaveValue('Installed and photographed the new rail.');
+    });
+
+    it('lets an assigned non-manager owner reach the uploader without lifecycle controls', () => {
+        renderDialog(
+            eventDetail({
+                can: { manage: false, override_closure: false },
+                corrective_actions: [
+                    {
+                        id: 62,
+                        reference_number: 'CA-2026-0062',
+                        title: 'Complete the assigned repair.',
+                        action_type: 'corrective',
+                        priority: 'medium',
+                        status: 'in_progress',
+                        assigned_to_name: 'Assigned action owner',
+                        due_date: '2026-09-01',
+                        is_overdue: false,
+                        completed_at: null,
+                        completed_by_user_id: null,
+                        completed_by_name: null,
+                        can_verify: false,
+                        verified_at: null,
+                        verified_by_name: null,
+                        effectiveness_confirmed: null,
+                        hs_investigation_id: null,
+                        recommendation_index: null,
+                        recommendation: null,
+                        source: { type: 'standalone' },
+                        evidence: {
+                            can_upload: true,
+                            attachments: [],
+                        },
+                    },
+                ],
+            }),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Corrective actions/ }),
+        );
+
+        expect(
+            screen.getByLabelText('Add completion evidence'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /Mark complete/ }),
+        ).not.toBeInTheDocument();
     });
 });

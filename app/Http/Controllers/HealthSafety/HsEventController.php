@@ -542,6 +542,9 @@ class HsEventController extends Controller
 
         $canManage = $currentUser->canDo('hazards.manage');
         $currentUserId = $currentUser->id;
+        $evidenceScope = HsEvent::query()->whereKey($hsEvent->id);
+        $this->siteAccess->applyHsEventScope($evidenceScope, $currentUser, []);
+        $canAccessActionEvidence = $evidenceScope->exists();
 
         $assignableStaff = [];
         if ($canManage) {
@@ -555,14 +558,19 @@ class HsEventController extends Controller
                 ->all();
         }
 
+        $correctiveActionRelations = [
+            'assignedTo:id,name',
+            'completedBy:id,name',
+            'verifiedBy:id,name',
+            'hsInvestigation:id,recommendations',
+            'sourceControlRoomTask:id,title',
+        ];
+        if ($canAccessActionEvidence) {
+            $correctiveActionRelations[] = 'attachments.uploader:id,name';
+        }
+
         $correctiveActions = $hsEvent->correctiveActions()
-            ->with([
-                'assignedTo:id,name',
-                'completedBy:id,name',
-                'verifiedBy:id,name',
-                'hsInvestigation:id,recommendations',
-                'sourceControlRoomTask:id,title',
-            ])
+            ->with($correctiveActionRelations)
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date')
             ->get()
@@ -589,6 +597,30 @@ class HsEventController extends Controller
                 'recommendation_index' => $a->recommendation_index,
                 'recommendation' => $this->correctiveActionRecommendation($a),
                 'source' => $this->correctiveActionSource($a),
+                'evidence' => [
+                    'can_upload' => $canAccessActionEvidence
+                        && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
+                        && $a->acceptsEvidenceChanges(),
+                    'attachments' => ($canAccessActionEvidence
+                        && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
+                        && $a->relationLoaded('attachments')
+                            ? $a->attachments
+                            : collect())
+                        ->map(fn ($attachment) => [
+                            'id' => $attachment->id,
+                            'original_name' => $attachment->original_name,
+                            'mime_type' => $attachment->mime_type,
+                            'size_bytes' => $attachment->size_bytes,
+                            'description' => $attachment->description,
+                            'uploaded_by' => $attachment->uploader?->name,
+                            'created_at' => $attachment->created_at?->toIso8601String(),
+                            'download_url' => "/health-safety/events/{$hsEvent->id}/corrective-actions/{$a->id}/evidence/{$attachment->id}",
+                            'can_remove' => $canAccessActionEvidence
+                                && ($canManage || (int) $a->assigned_to_user_id === (int) $currentUserId)
+                                && $a->acceptsEvidenceChanges(),
+                        ])
+                        ->values(),
+                ],
             ]);
 
         $riskAssessments = $hsEvent->riskAssessments()

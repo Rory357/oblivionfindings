@@ -22,6 +22,7 @@ import {
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { Button } from '@/components/ui/button';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -154,6 +155,20 @@ export type EventCorrectiveAction = {
           }
         | { type: 'new_responsibility'; reason: string | null }
         | { type: 'standalone' };
+    evidence: {
+        can_upload: boolean;
+        attachments: Array<{
+            id: number;
+            original_name: string;
+            mime_type: string | null;
+            size_bytes: number | null;
+            description: string | null;
+            uploaded_by: string | null;
+            created_at: string | null;
+            download_url: string;
+            can_remove: boolean;
+        }>;
+    };
 };
 
 export type EventRiskAssessment = {
@@ -2521,6 +2536,7 @@ function CompleteActionPane({
                     placeholder="Describe the evidence that this action is complete."
                 />
             </Field>
+            <ActionEvidencePanel d={d} ca={ca} allowUpload />
             <InfoCard icon={ShieldCheck} tone="info">
                 A different person must verify this action — separation of
                 duties.
@@ -2537,6 +2553,227 @@ function CompleteActionPane({
                 </Button>
             </div>
         </form>
+    );
+}
+
+type EvidenceUploadState = {
+    key: string;
+    name: string;
+    status: 'queued' | 'uploading' | 'uploaded' | 'failed';
+};
+
+function ActionEvidencePanel({
+    d,
+    ca,
+    allowUpload = false,
+}: {
+    d: EventDetail;
+    ca: EventCorrectiveAction;
+    allowUpload?: boolean;
+}) {
+    const [description, setDescription] = useState('');
+    const [uploads, setUploads] = useState<EvidenceUploadState[]>([]);
+    const evidence = ca.evidence;
+    const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}/evidence`;
+
+    const updateUpload = (
+        key: string,
+        status: EvidenceUploadState['status'],
+    ) => {
+        setUploads((current) =>
+            current.map((upload) =>
+                upload.key === key ? { ...upload, status } : upload,
+            ),
+        );
+    };
+
+    const uploadFiles = (files: File[]) => {
+        const selectionId = `${Date.now()}-${Math.random()}`;
+        const queue = files.map((file, index) => ({
+            file,
+            key: `${file.name}-${file.lastModified}-${selectionId}-${index}`,
+        }));
+        setUploads((current) => [
+            ...current,
+            ...queue.map(({ file, key }, index) => ({
+                key,
+                name: file.name,
+                status:
+                    index === 0 ? ('uploading' as const) : ('queued' as const),
+            })),
+        ]);
+
+        const uploadNext = (index: number) => {
+            const item = queue[index];
+            if (!item) return;
+            updateUpload(item.key, 'uploading');
+
+            router.post(
+                base,
+                {
+                    file: item.file,
+                    description: description.trim() || null,
+                },
+                {
+                    forceFormData: true,
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: (page) => {
+                        const failed = Boolean(
+                            (page.props as { flash?: { error?: string } }).flash
+                                ?.error,
+                        );
+                        updateUpload(item.key, failed ? 'failed' : 'uploaded');
+                    },
+                    onError: () => updateUpload(item.key, 'failed'),
+                    onFinish: () => uploadNext(index + 1),
+                },
+            );
+        };
+
+        uploadNext(0);
+    };
+
+    if (
+        evidence.attachments.length === 0 &&
+        (!allowUpload || !evidence.can_upload)
+    ) {
+        return null;
+    }
+
+    return (
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-sm font-bold">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    Completion evidence
+                </p>
+                {evidence.attachments.length ? (
+                    <span className="text-xs text-muted-foreground">
+                        {evidence.attachments.length}{' '}
+                        {evidence.attachments.length === 1 ? 'file' : 'files'}
+                    </span>
+                ) : null}
+            </div>
+
+            {evidence.attachments.length ? (
+                <ul className="mt-2 space-y-2">
+                    {evidence.attachments.map((attachment) => (
+                        <li
+                            key={attachment.id}
+                            className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background/70 p-2.5"
+                        >
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">
+                                    {attachment.original_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(attachment.size_bytes ?? 0)}
+                                    {attachment.uploaded_by
+                                        ? ` · ${attachment.uploaded_by}`
+                                        : ''}
+                                </p>
+                                {attachment.description ? (
+                                    <p className="mt-1 text-xs text-foreground">
+                                        {attachment.description}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <a
+                                    href={attachment.download_url}
+                                    aria-label={`Download ${attachment.original_name}`}
+                                    className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    Download
+                                </a>
+                                {attachment.can_remove ? (
+                                    <ArmedButton
+                                        label="Remove evidence"
+                                        icon={Trash2}
+                                        ariaLabel={`Remove evidence ${attachment.original_name}`}
+                                        onConfirm={() =>
+                                            router.delete(
+                                                attachment.download_url,
+                                                {
+                                                    preserveScroll: true,
+                                                    preserveState: true,
+                                                },
+                                            )
+                                        }
+                                    />
+                                ) : null}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                    No completion evidence uploaded yet.
+                </p>
+            )}
+
+            {allowUpload && evidence.can_upload ? (
+                <div className="mt-3 grid gap-2 border-t border-border pt-3">
+                    <Field
+                        label="Evidence description"
+                        hint="Optional — applied to selected files"
+                    >
+                        <Input
+                            value={description}
+                            onChange={(event) =>
+                                setDescription(event.target.value)
+                            }
+                            placeholder="e.g. After photo and contractor sign-off"
+                        />
+                    </Field>
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring hover:bg-primary/10">
+                        <Paperclip className="h-4 w-4" />
+                        Add completion evidence
+                        <input
+                            aria-label="Add completion evidence"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                            multiple
+                            className="sr-only"
+                            onChange={(event) =>
+                                uploadFiles(
+                                    Array.from(event.target.files ?? []),
+                                )
+                            }
+                        />
+                    </label>
+                    {uploads.length ? (
+                        <ul
+                            className="space-y-1 text-xs"
+                            aria-label="Evidence upload status"
+                        >
+                            {uploads.map((upload) => (
+                                <li
+                                    key={upload.key}
+                                    className={
+                                        upload.status === 'failed'
+                                            ? 'text-status-critical'
+                                            : upload.status === 'uploaded'
+                                              ? 'text-status-success'
+                                              : 'text-muted-foreground'
+                                    }
+                                >
+                                    {upload.status === 'queued'
+                                        ? `Queued ${upload.name}`
+                                        : upload.status === 'uploading'
+                                          ? `Uploading ${upload.name}`
+                                          : upload.status === 'uploaded'
+                                            ? `Uploaded ${upload.name}`
+                                            : `Upload failed for ${upload.name}`}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
@@ -2690,15 +2927,23 @@ function ArmedButton({
     label,
     icon: Icon,
     onConfirm,
+    ariaLabel,
 }: {
     label: string;
     icon: ComponentType<{ className?: string }>;
     onConfirm: () => void;
+    ariaLabel?: string;
 }) {
     const [arming, setArming] = useState(false);
     if (!arming) {
         return (
-            <Button size="sm" variant="outline" onClick={() => setArming(true)}>
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label={ariaLabel}
+                onClick={() => setArming(true)}
+            >
                 <Icon className="mr-1.5 h-3.5 w-3.5" /> {label}
             </Button>
         );
@@ -2706,7 +2951,9 @@ function ArmedButton({
     return (
         <span className="inline-flex items-center gap-1">
             <Button
+                type="button"
                 size="sm"
+                aria-label={ariaLabel ? `Confirm ${ariaLabel}` : undefined}
                 onClick={() => {
                     onConfirm();
                     setArming(false);
@@ -2715,6 +2962,7 @@ function ArmedButton({
                 <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> {label}?
             </Button>
             <Button
+                type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => setArming(false)}
@@ -4041,6 +4289,12 @@ function ActionsSection({
                                         : 'not yet effective'}
                                 </p>
                             ) : null}
+
+                            <ActionEvidencePanel
+                                d={d}
+                                ca={a}
+                                allowUpload={a.evidence.can_upload}
+                            />
 
                             {canAct ? (
                                 <CorrectiveActionControls

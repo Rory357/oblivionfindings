@@ -177,6 +177,14 @@ class HsCorrectiveAction extends Model
         return $query->where('status', self::STATUS_COMPLETED);
     }
 
+    public function acceptsEvidenceChanges(): bool
+    {
+        return ! in_array($this->status, [
+            self::STATUS_VERIFIED,
+            self::STATUS_CLOSED,
+        ], true);
+    }
+
     public function scopeForAssignee($query, int $userId)
     {
         return $query->where('assigned_to_user_id', $userId);

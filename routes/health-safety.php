@@ -5,6 +5,7 @@ use App\Http\Controllers\HealthSafety\FirstAidController;
 use App\Http\Controllers\HealthSafety\HazardousSubstanceController;
 use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
 use App\Http\Controllers\HealthSafety\HsCorrectiveActionController;
+use App\Http\Controllers\HealthSafety\HsCorrectiveActionEvidenceController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
 use App\Http\Controllers\HealthSafety\HsInvestigationController;
@@ -49,6 +50,16 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'show'])->name('risk-assessments.show');
         Route::get('/risk-assessments/{assessment}/attachments/{attachment}/download', [HsRiskAssessmentController::class, 'downloadAttachment'])->name('risk-assessments.attachments.download');
     });
+
+    // Corrective-action evidence is participant-authorized in the controller.
+    // The assigned owner can upload/download/remove evidence without receiving
+    // governance-wide hazards.manage permission.
+    Route::post('/events/{event}/corrective-actions/{action}/evidence', [HsCorrectiveActionEvidenceController::class, 'store'])
+        ->name('events.corrective-actions.evidence.store');
+    Route::get('/events/{event}/corrective-actions/{action}/evidence/{attachment}', [HsCorrectiveActionEvidenceController::class, 'download'])
+        ->name('events.corrective-actions.evidence.download');
+    Route::delete('/events/{event}/corrective-actions/{action}/evidence/{attachment}', [HsCorrectiveActionEvidenceController::class, 'destroy'])
+        ->name('events.corrective-actions.evidence.destroy');
 
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {

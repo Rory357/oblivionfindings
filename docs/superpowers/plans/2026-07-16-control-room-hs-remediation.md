@@ -399,7 +399,7 @@ php artisan test tests/Feature/HealthSafety/HsEventWorksafeTest.php tests/Featur
 
 Expected: all tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add app/Http/Requests/HealthSafety/RecordHsWorksafeDecisionRequest.php app/Http/Controllers/HealthSafety/HsWorksafeDecisionController.php app/Services/HealthSafety/HsEventService.php app/Http/Controllers/HealthSafety/HsEventController.php routes/health-safety.php tests/Feature/HealthSafety/HsEventWorksafeTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsWorksafeDecisionAuthorizationTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
@@ -831,7 +831,7 @@ git commit -m "feat(health-safety): add corrective action handover"
 - Modify: `resources/js/pages/health-safety/corrective-actions/index.tsx`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing storage and authorization tests**
+- [x] **Step 1: Write failing storage and authorization tests**
 
 Cover:
 
@@ -845,7 +845,7 @@ Cover:
 - database failure deletes the newly stored file;
 - missing storage file returns 404 and does not expose a path.
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php
@@ -853,7 +853,7 @@ php artisan test tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php
 
 Expected: missing request/controller/routes fail.
 
-- [ ] **Step 3: Implement strict upload validation**
+- [x] **Step 3: Implement strict upload validation**
 
 ```php
 return [
@@ -867,7 +867,7 @@ return [
 ];
 ```
 
-- [ ] **Step 4: Implement private storage with compensation**
+- [x] **Step 4: Implement private storage with compensation**
 
 ```php
 $path = $request->file('file')->store(
@@ -893,7 +893,7 @@ try {
 
 Download response must include `X-Content-Type-Options: nosniff`.
 
-- [ ] **Step 5: Add routes**
+- [x] **Step 5: Add routes**
 
 ```php
 Route::post('/events/{event}/corrective-actions/{action}/evidence', [HsCorrectiveActionEvidenceController::class, 'store'])
@@ -906,7 +906,7 @@ Route::delete('/events/{event}/corrective-actions/{action}/evidence/{attachment}
 
 Place these routes in the authenticated H&S route group rather than the blanket `hazards.manage` group. The controller must authorize each operation against site access, action ownership, H&S management permission, and current lifecycle state so the assigned action owner can upload evidence without receiving governance-wide mutation rights.
 
-- [ ] **Step 6: Add upload/remove UI**
+- [x] **Step 6: Add upload/remove UI**
 
 Show retained files before completion:
 
@@ -921,7 +921,7 @@ Show retained files before completion:
 
 Display per-file upload state, authenticated download, and removal. A failed upload must not clear completion notes.
 
-- [ ] **Step 7: Re-run backend and frontend tests**
+- [x] **Step 7: Re-run backend and frontend tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php
