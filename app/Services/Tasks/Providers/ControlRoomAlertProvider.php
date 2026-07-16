@@ -5,6 +5,7 @@ namespace App\Services\Tasks\Providers;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -44,14 +45,17 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
     public function canAssign(User $user): bool
     {
         // Mirrors routes/control-room.php: POST /alerts/{alert}/assign|unassign
-        // → permission:controlRoom.alerts.assign.
-        return $user->canDo('controlRoom.alerts.assign');
+        // → permission:controlRoom.alerts.assign, plus the canonical readable
+        // destination required by the controller's shared access concern.
+        return $user->canDo('controlRoom.alerts.assign')
+            && app(ControlRoomAlertAccessService::class)->canRead($user);
     }
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
         DB::transaction(function () use ($actor, $assigneeId, $id): void {
-            $access = app(UserSiteAccessService::class);
+            $alertAccess = app(ControlRoomAlertAccessService::class);
+            $siteAccess = app(UserSiteAccessService::class);
             $freshActor = User::query()->whereKey($actor->id)->first();
             if (! $freshActor || ! $this->canAssign($freshActor)) {
                 throw ValidationException::withMessages([
@@ -63,11 +67,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             // queue item cannot bypass tenant access or terminal-state gates.
             $alert = ControlRoomAlert::query()
                 ->whereKey($id)
-                ->tap(fn ($query) => $access->applyAlertScope(
-                    $query,
-                    $freshActor,
-                    self::ALERT_BYPASS_PERMISSIONS,
-                ))
+                ->tap(fn ($query) => $alertAccess->applyReadableScope($query, $freshActor))
                 ->lockForUpdate()
                 ->first();
 
@@ -87,7 +87,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             if ($assigneeId !== null) {
                 $assignee = User::staff()
                     ->whereKey($assigneeId)
-                    ->tap(fn ($query) => $access->applyControlRoomAssigneeScope(
+                    ->tap(fn ($query) => $siteAccess->applyControlRoomAssigneeScope(
                         $query,
                         $freshActor,
                         self::ALERT_BYPASS_PERMISSIONS,
@@ -144,8 +144,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
 
     public function canView(User $user): bool
     {
-        return $user->canDo('controlRoom.viewAny')
-            || $user->canDo('controlRoom.alerts.view');
+        return app(ControlRoomAlertAccessService::class)->canList($user);
     }
 
     public function tasks(User $user, array $filters = []): array
@@ -181,11 +180,10 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             );
         }
 
+        $access = app(ControlRoomAlertAccessService::class);
         $query = ControlRoomAlert::query()
             ->with($with)
-            // Same site scoping as the Control Room index (applyAlertScope) —
-            // the queue must never show alerts the module itself would hide.
-            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyAlertScope($q, $user, self::ALERT_BYPASS_PERMISSIONS))
+            ->tap(fn ($q) => $access->applyVisibleScope($q, $user))
             ->when(
                 $includeSearchContext,
                 fn ($q) => $q->whereHas(
@@ -193,6 +191,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                     fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
                 ),
             )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('triggered_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
@@ -200,11 +199,21 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             $query->actionable();
         }
 
-        return $query->get()->map(function (ControlRoomAlert $alert) use ($includeSearchContext) {
+        return $query->get()->map(function (ControlRoomAlert $alert) use (
+            $access,
+            $filters,
+            $includeSearchContext,
+            $user,
+        ) {
             $journey = IncidentJourneyTaskContext::make(
                 $alert->clientIncident,
                 $alert,
                 includeSearchContext: $includeSearchContext,
+            );
+            $destination = $access->destinationForScopedAlert(
+                $alert,
+                $user,
+                $filters['return_to'] ?? null,
             );
             $client = $journey['person'] ?? ($alert->client ? [
                 'id' => $alert->client->id,
@@ -241,12 +250,12 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                 site: $site,
                 dueAt: optional($alert->due_at)->toIso8601String(),
                 createdAt: optional($alert->created_at)->toIso8601String(),
-                link: "/control-room/alerts/{$alert->id}",
+                link: $destination['href'],
                 type: 'Alert',
                 description: $alert->notes ? str($alert->notes)->limit(140)->toString() : null,
                 journey: $journey,
                 sourceContext: str_replace('_', ' ', (string) ($alert->source ?: $alert->alert_type)),
-                actionLabel: 'Continue Control Room response',
+                actionLabel: $destination['label'],
                 displayState: match ($alert->status) {
                     ControlRoomAlert::STATUS_OPEN => 'Awaiting response',
                     ControlRoomAlert::STATUS_ACK => 'Acknowledged',
@@ -266,6 +275,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                             ->all(),
                     ]))
                     : [],
+                actionHelp: $destination['help'],
             );
         })->all();
     }

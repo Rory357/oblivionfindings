@@ -6,6 +6,7 @@ use App\Models\FleetVehicleBooking;
 use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
+use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\Sites\Calendar\Providers\FleetServiceScheduleObligationProvider;
 use App\Services\Tasks\TaskAggregator;
@@ -32,7 +33,7 @@ function makeFleetMaintenanceUser(array $permissionKeys): User
 }
 
 /* ------------------------------------------------------------------ */
-/*  Reference numbers (WO- / BK-)                                      */
+/*  Reference numbers (WO- / BK-) */
 /* ------------------------------------------------------------------ */
 
 it('assigns a WO- reference number to a new work order', function () {
@@ -54,7 +55,7 @@ it('keeps an explicitly supplied work order reference', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Calendar: FleetServiceScheduleObligationProvider                   */
+/*  Calendar: FleetServiceScheduleObligationProvider */
 /* ------------------------------------------------------------------ */
 
 it('surfaces an active service schedule as a calendar obligation', function () {
@@ -106,7 +107,7 @@ it('skips inactive schedules and schedules for other sites', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Tasks: FleetMaintenanceProvider                                    */
+/*  Tasks: FleetMaintenanceProvider */
 /* ------------------------------------------------------------------ */
 
 it('returns an overdue work order on /tasks for a permitted user', function () {
@@ -145,6 +146,136 @@ it('returns a service schedule due this week as a task', function () {
     expect($item)->not->toBeNull()
         ->and($item->title)->toContain('Hiace 2')
         ->and($item->link)->toBe('/fleet-assets/maintenance/schedules');
+});
+
+it('keeps composite fleet task identities distinct through detail and following actions', function () {
+    $user = makeFleetMaintenanceUser(['fleet.viewAny']);
+    $recordId = 9001;
+    $asset = Asset::factory()->vehicle()->create(['name' => 'Shared identity vehicle']);
+    $order = FleetWorkOrder::factory()->create([
+        'id' => $recordId,
+        'asset_id' => $asset->id,
+        'status' => 'open',
+        'due_at' => now()->subDay(),
+    ]);
+    $schedule = FleetServiceSchedule::unguarded(
+        fn () => FleetServiceSchedule::create([
+            'id' => $recordId,
+            'asset_id' => $asset->id,
+            'name' => 'Shared identity service',
+            'next_due_at' => now()->addDays(2),
+            'is_active' => true,
+        ]),
+    );
+
+    $this->actingAs($user)
+        ->getJson('/tasks/detail?'.http_build_query([
+            'source' => 'fleet_work_order',
+            'id' => $recordId,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('item.id', 'fleet_work_order-'.$order->id)
+        ->assertJsonPath('item.link', "/fleet-assets/maintenance/work-orders/{$order->id}");
+
+    $this->actingAs($user)
+        ->getJson('/tasks/detail?'.http_build_query([
+            'source' => 'fleet_service_schedule',
+            'id' => $recordId,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('item.id', 'fleet_service_schedule-'.$schedule->id)
+        ->assertJsonPath('item.link', '/fleet-assets/maintenance/schedules');
+
+    $this->actingAs($user)
+        ->post("/tasks/fleet_work_order/{$recordId}/watch", ['watching' => true])
+        ->assertRedirect();
+    $this->actingAs($user)
+        ->post("/tasks/fleet_service_schedule/{$recordId}/watch", ['watching' => true])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('task_watchers', [
+        'source' => 'fleet_work_order',
+        'item_id' => $recordId,
+        'user_id' => $user->id,
+    ]);
+    $this->assertDatabaseHas('task_watchers', [
+        'source' => 'fleet_service_schedule',
+        'item_id' => $recordId,
+        'user_id' => $user->id,
+    ]);
+
+    $followingIds = collect((new TaskAggregator)->itemsFor($user, [
+        'following' => true,
+    ]))->pluck('id');
+
+    expect($followingIds)
+        ->toContain('fleet_work_order-'.$recordId)
+        ->toContain('fleet_service_schedule-'.$recordId);
+
+    TaskWatcher::query()->create([
+        'source' => 'fleet_maintenance',
+        'item_id' => $recordId,
+        'user_id' => $user->id,
+    ]);
+    $legacyUser = makeFleetMaintenanceUser(['fleet.viewAny']);
+    TaskWatcher::query()->create([
+        'source' => 'fleet_maintenance',
+        'item_id' => $recordId,
+        'user_id' => $legacyUser->id,
+    ]);
+
+    $workOrderWatcherIds = collect(
+        (new TaskAggregator)->authorizedWatcherIdsFor(
+            'fleet_work_order',
+            $recordId,
+        ),
+    )->sort()->values()->all();
+    $scheduleWatcherIds = collect(
+        (new TaskAggregator)->authorizedWatcherIdsFor(
+            'fleet_service_schedule',
+            $recordId,
+        ),
+    )->sort()->values()->all();
+    $legacyFollowingIds = collect((new TaskAggregator)->itemsFor($legacyUser, [
+        'following' => true,
+    ]))->pluck('id');
+
+    expect($workOrderWatcherIds)->toBe(collect([
+        $user->id,
+        $legacyUser->id,
+    ])->sort()->values()->all())
+        ->and($scheduleWatcherIds)->toBe([$user->id])
+        ->and($legacyFollowingIds)->toContain('fleet_work_order-'.$recordId)
+        ->not->toContain('fleet_service_schedule-'.$recordId);
+
+    $this->actingAs($user)
+        ->getJson('/tasks/detail?'.http_build_query([
+            'source' => 'fleet_work_order',
+            'id' => $recordId,
+        ]))
+        ->assertOk()
+        ->assertJsonCount(2, 'watchers');
+
+    $this->assertDatabaseHas('task_watchers', [
+        'source' => 'fleet_maintenance',
+        'item_id' => $recordId,
+        'user_id' => $user->id,
+    ]);
+
+    $order->update(['status' => 'completed']);
+    $legacyOpenIds = collect((new TaskAggregator)->itemsFor($legacyUser, [
+        'following' => true,
+    ]))->pluck('id');
+    $legacyHistoryIds = collect((new TaskAggregator)->itemsFor($legacyUser, [
+        'following' => true,
+        'include_done' => true,
+    ]))->pluck('id');
+
+    expect($legacyOpenIds)
+        ->not->toContain('fleet_service_schedule-'.$recordId)
+        ->and($legacyHistoryIds)
+        ->toContain('fleet_work_order-'.$recordId)
+        ->not->toContain('fleet_service_schedule-'.$recordId);
 });
 
 it('hides fleet maintenance items from a user without fleet or asset permissions', function () {

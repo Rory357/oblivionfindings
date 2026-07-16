@@ -13,7 +13,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class SafeguardingConcernProvider implements TaskProvider, HasModelClass, AssignableTaskProvider, SplittableTaskProvider
+class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelClass, SplittableTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -93,6 +93,7 @@ class SafeguardingConcernProvider implements TaskProvider, HasModelClass, Assign
     {
         $query = SafeguardingConcern::query()
             ->with(['assignedTo:id,name', 'site:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('reported_at')
             ->limit(300);
 

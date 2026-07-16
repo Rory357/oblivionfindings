@@ -34,6 +34,7 @@ import {
     useRef,
     useState,
     type ReactNode,
+    type RefObject,
 } from 'react';
 import { JourneyReferenceStrip } from './journey-reference-strip';
 import {
@@ -42,6 +43,7 @@ import {
     humanise,
     SEVERITY_VARIANT,
     taskNumericId,
+    taskRecordSource,
     taskStateLabel,
     type NamedRef,
     type TaskDetail,
@@ -313,10 +315,14 @@ export function TaskDetailDialog({
     item,
     currentUserId,
     onClose,
+    returnTo,
+    triggerRef,
 }: {
     item: TaskItem | null;
     currentUserId: number;
     onClose: () => void;
+    returnTo: string;
+    triggerRef: RefObject<HTMLElement | null>;
 }) {
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     const [loading, setLoading] = useState(false);
@@ -329,31 +335,35 @@ export function TaskDetailDialog({
     // Guards against a slow response landing after the user opened another row.
     const seq = useRef(0);
 
-    const fetchDetail = useCallback(async (target: TaskItem) => {
-        const mySeq = ++seq.current;
-        setLoading(true);
-        setError(null);
-        try {
-            const params = new URLSearchParams({
-                source: target.source,
-                id: taskNumericId(target),
-            });
-            const res = await fetch(`/tasks/detail?${params.toString()}`, {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = (await res.json()) as TaskDetail;
-            if (seq.current === mySeq) setDetail(data);
-        } catch {
-            if (seq.current === mySeq)
-                setError(
-                    'Could not load this task. It may have been removed, or you may not have access.',
-                );
-        } finally {
-            if (seq.current === mySeq) setLoading(false);
-        }
-    }, []);
+    const fetchDetail = useCallback(
+        async (target: TaskItem) => {
+            const mySeq = ++seq.current;
+            setLoading(true);
+            setError(null);
+            try {
+                const params = new URLSearchParams({
+                    source: taskRecordSource(target),
+                    id: taskNumericId(target),
+                    return_to: returnTo,
+                });
+                const res = await fetch(`/tasks/detail?${params.toString()}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = (await res.json()) as TaskDetail;
+                if (seq.current === mySeq) setDetail(data);
+            } catch {
+                if (seq.current === mySeq)
+                    setError(
+                        'Could not load this task. It may have been removed, or you may not have access.',
+                    );
+            } finally {
+                if (seq.current === mySeq) setLoading(false);
+            }
+        },
+        [returnTo],
+    );
 
     useEffect(() => {
         if (!item) return;
@@ -371,7 +381,7 @@ export function TaskDetailDialog({
         if (!item) return;
         setAssigning(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/assign`,
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/assign`,
             { assignee_id: assigneeId },
             {
                 preserveState: true,
@@ -388,8 +398,11 @@ export function TaskDetailDialog({
         if (!item) return;
         setWatchBusy(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/watch`,
-            { watching: !detail?.isWatching },
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/watch`,
+            {
+                watching: !detail?.isWatching,
+                return_to: returnTo,
+            },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -406,7 +419,7 @@ export function TaskDetailDialog({
         if (!item) return;
         setSplitBusy(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/split`,
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/split`,
             data,
             {
                 preserveScroll: true,
@@ -422,6 +435,7 @@ export function TaskDetailDialog({
     const due = display ? dueInfo(display) : null;
     const assignedToMe = display?.assignee?.id === currentUserId;
     const childLabel = item ? childLabelFor(item.source) : 'follow-up';
+    const canOpen = detail?.canOpen ?? Boolean(display?.link);
 
     return (
         <Dialog
@@ -431,6 +445,10 @@ export function TaskDetailDialog({
             <DialogContent
                 data-test="tasks-detail-dialog"
                 className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    requestAnimationFrame(() => triggerRef.current?.focus());
+                }}
             >
                 {display ? (
                     <>
@@ -627,17 +645,16 @@ export function TaskDetailDialog({
 
                         {/* ── Footer actions ── */}
                         <div className="flex flex-wrap items-center gap-2 border-t border-border p-4">
-                            <Button
-                                className="flex-1"
-                                disabled={!display.link}
-                                onClick={() =>
-                                    display.link && router.visit(display.link)
-                                }
-                            >
-                                <ExternalLink className="h-4 w-4" />
-                                {display.actionLabel ?? 'Open record'}
-                            </Button>
-                            {detail ? (
+                            {canOpen && display.link ? (
+                                <Button
+                                    className="flex-1"
+                                    onClick={() => router.visit(display.link!)}
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                    {display.actionLabel ?? 'Open record'}
+                                </Button>
+                            ) : null}
+                            {detail?.canWatch ? (
                                 <Button
                                     variant={
                                         detail.isWatching

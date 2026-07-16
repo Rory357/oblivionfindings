@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class FirstAidFollowupProvider implements TaskProvider, HasModelClass
+class FirstAidFollowupProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -40,6 +40,7 @@ class FirstAidFollowupProvider implements TaskProvider, HasModelClass
                 'record.site:id,name',
                 'assignedTo:id,name',
             ])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 

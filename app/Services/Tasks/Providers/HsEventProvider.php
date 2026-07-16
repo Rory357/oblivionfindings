@@ -82,6 +82,7 @@ class HsEventProvider implements HasModelClass, TaskProvider
                     fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
                 ),
             )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('occurred_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 

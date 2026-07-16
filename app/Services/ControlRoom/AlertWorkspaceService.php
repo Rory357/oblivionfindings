@@ -11,7 +11,6 @@ use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Collection;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Assembles the full workspace payload behind the Alert Workspace dialog —
@@ -22,6 +21,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class AlertWorkspaceService
 {
     public function __construct(
+        private ControlRoomAlertAccessService $access,
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
@@ -32,23 +32,8 @@ class AlertWorkspaceService
      */
     public function build(User $user, int $alertId): ?array
     {
-        if (! $user->canDo('controlRoom.viewAny')) {
-            return null;
-        }
-
-        $alert = ControlRoomAlert::query()->find($alertId);
+        $alert = $this->access->findVisible($user, $alertId);
         if (! $alert) {
-            return null;
-        }
-
-        try {
-            $this->siteAccess->assertCanAccessAlert(
-                $user,
-                $alert,
-                $this->bypassPermissions(),
-                'You are not authorized to access alerts for this site.',
-            );
-        } catch (HttpException) {
             return null;
         }
 
@@ -115,6 +100,7 @@ class AlertWorkspaceService
 
         $linkedIncident = $alert->clientIncident;
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+        $capabilities = $this->access->capabilitiesForScopedAlert($user);
 
         return [
             'alert' => [
@@ -276,12 +262,7 @@ class AlertWorkspaceService
             ] : null,
             'audit_logs' => $auditLogs,
             'can' => [
-                'manage' => $user->canDo('controlRoom.alerts.manage'),
-                'assign' => $user->canDo('controlRoom.alerts.assign'),
-                'escalate' => $user->canDo('controlRoom.alerts.escalate'),
-                'create' => $user->canDo('controlRoom.alerts.create'),
-                'create_incident' => $user->canDo('controlRoom.alerts.manage')
-                    && $user->canDo('incidents.create'),
+                ...$capabilities,
                 'view_incident' => $canViewIncident,
                 'view_health_safety' => $user->canDo('hazards.view'),
             ],
@@ -360,14 +341,6 @@ class AlertWorkspaceService
         ];
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private function bypassPermissions(): array
-    {
-        return ['reports.viewAny'];
-    }
-
     private function assignableStaff(User $user): Collection
     {
         if (! $user->canDo('controlRoom.alerts.assign') && ! $user->canDo('controlRoom.alerts.manage')) {
@@ -375,7 +348,11 @@ class AlertWorkspaceService
         }
 
         $staffQuery = User::staff()->orderBy('name');
-        $this->siteAccess->applyControlRoomAssigneeScope($staffQuery, $user, $this->bypassPermissions());
+        $this->siteAccess->applyControlRoomAssigneeScope(
+            $staffQuery,
+            $user,
+            ['reports.viewAny'],
+        );
 
         return $staffQuery->get(['id', 'name', 'email']);
     }

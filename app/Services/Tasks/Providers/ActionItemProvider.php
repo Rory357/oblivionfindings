@@ -10,7 +10,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class ActionItemProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class ActionItemProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -70,6 +70,7 @@ class ActionItemProvider implements TaskProvider, HasModelClass, AssignableTaskP
     {
         $query = ActionItem::query()
             ->with('assignedTo:id,name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 

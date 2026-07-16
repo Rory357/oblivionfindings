@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class FleetIncidentProvider implements TaskProvider, HasModelClass
+class FleetIncidentProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -34,6 +34,7 @@ class FleetIncidentProvider implements TaskProvider, HasModelClass
     {
         $query = FleetIncident::query()
             ->with(['asset:id,name', 'assignedTo:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('occurred_at')
             ->limit(300);
 

@@ -130,6 +130,7 @@ export type WorkspaceAlert = {
 };
 
 export type AlertWorkspaceDetail = {
+    return_to?: string;
     alert: WorkspaceAlert;
     playbook_run: {
         id: number;
@@ -196,7 +197,9 @@ export type AlertWorkspaceDetail = {
         created_at: string;
     }>;
     can: {
+        view: boolean;
         manage: boolean;
+        watch: boolean;
         assign: boolean;
         escalate: boolean;
         create: boolean;
@@ -641,7 +644,11 @@ export function AlertWorkspaceDialog({
     const footerEnd = action ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
-                href={`/control-room/alerts/${a.id}`}
+                href={
+                    d.return_to
+                        ? `/control-room/alerts/${a.id}?return_to=${encodeURIComponent(d.return_to)}`
+                        : `/control-room/alerts/${a.id}`
+                }
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
                 <ExternalLink className="h-4 w-4" /> Full page
@@ -742,7 +749,7 @@ export function AlertWorkspaceDialog({
         </div>
     );
 
-    const railExtra = <WatchToggle d={d} />;
+    const railExtra = d.can.watch ? <WatchToggle d={d} /> : null;
 
     return (
         <WizardShell
@@ -830,7 +837,7 @@ export function AlertWorkspaceDialog({
 /*  Watch toggle (rail)                                                */
 /* ------------------------------------------------------------------ */
 
-function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
+export function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
     const a = d.alert;
     const [busy, setBusy] = useState(false);
     const [adding, setAdding] = useState(false);
@@ -838,6 +845,10 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
 
     const watcherIds = new Set(d.watchers.map((w) => w.user_id));
     const addable = d.staff.filter((s) => !watcherIds.has(s.id));
+
+    if (!d.can.watch) {
+        return null;
+    }
 
     const toggle = () => {
         setBusy(true);

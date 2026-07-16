@@ -22,6 +22,7 @@ vi.mock('@inertiajs/react', () => ({
 
 import {
     LinkedSection,
+    WatchToggle,
     type AlertWorkspaceDetail,
 } from './alert-workspace-dialog';
 
@@ -101,5 +102,27 @@ describe('Control Room linked H&S handover', () => {
         expect(
             screen.getByText('Health & Safety event').closest('a'),
         ).toHaveAttribute('href', '/health-safety/events/17');
+    });
+});
+
+describe('Control Room workspace permissions', () => {
+    it('does not render the manage-only watcher action for a read-only viewer', () => {
+        render(
+            <WatchToggle
+                d={
+                    {
+                        alert: { id: 41 },
+                        can: { manage: false, watch: false },
+                        watchers: [],
+                        staff: [],
+                        is_watching: false,
+                    } as unknown as AlertWorkspaceDetail
+                }
+            />,
+        );
+
+        expect(
+            screen.queryByRole('button', { name: /Watch this alert/ }),
+        ).not.toBeInTheDocument();
     });
 });

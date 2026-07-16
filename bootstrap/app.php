@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnforceTwoFactorPolicy;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -53,5 +55,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (
+            RecoverableTaskAuthorizationException $exception,
+            Request $request,
+        ) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                ], 403);
+            }
+
+            return redirect($exception->returnTo)
+                ->with('error', $exception->getMessage());
+        });
     })->create();

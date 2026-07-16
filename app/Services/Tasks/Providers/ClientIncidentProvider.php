@@ -97,6 +97,7 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
                 $includeSearchContext,
                 fn ($q) => TaskSearch::applyIncidentJourneyPredicate($q, $filters),
             )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('occurred_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 

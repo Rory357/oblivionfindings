@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Models\AuditLog;
 use App\Models\TaskWatcher;
 use App\Models\User;
@@ -60,11 +61,17 @@ class AllTasksController extends Controller
             'following' => filter_var($params['following'] ?? false, FILTER_VALIDATE_BOOL),
             'include_done' => filter_var($params['done'] ?? false, FILTER_VALIDATE_BOOL),
         ];
+        $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
+            $request->getRequestUri(),
+        ) ?? '/tasks';
 
         // Stable stats and ordinary results use the normal capped dashboard
         // feed. Explicit incident-journey search adds one scoped deep pass
         // rather than re-running every provider or expanding unrelated feeds.
-        $items = $aggregator->itemsFor($user, ['include_done' => $filters['include_done']]);
+        $items = $aggregator->itemsFor($user, [
+            'include_done' => $filters['include_done'],
+            'return_to' => $returnTo,
+        ]);
         $searchItems = $items;
 
         if (TaskSearch::hasQuery($filters)) {
@@ -75,6 +82,7 @@ class AllTasksController extends Controller
                     'sources' => $journeySources,
                     'include_done' => $filters['include_done'],
                     'q' => $filters['q'],
+                    'return_to' => $returnTo,
                 ]);
                 $searchItems = $aggregator->mergeItems($items, $deepMatches);
             }
@@ -119,23 +127,31 @@ class AllTasksController extends Controller
 
         $provider = $aggregator->providerFor($source);
         abort_unless($provider !== null && $provider->canView($user), 404);
+        $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
+            $request->query('return_to'),
+        ) ?? '/tasks';
 
-        // Resolve through the provider's own feed so per-row visibility rules
-        // (confidentiality, need-to-know redaction) hold for the drawer too.
-        // Try the open-only window first — it's the one the list renders — and
-        // only then the include_done window, so a row that is on screen can
-        // never 404 just because closed items pushed it past the feed cap.
-        $item = collect($provider->tasks($user))
-            ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}")
-            ?? collect($provider->tasks($user, ['include_done' => true]))
-                ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}");
+        // Resolve through the provider's exact-record path so per-row
+        // visibility rules (confidentiality, need-to-know redaction) hold for
+        // the drawer without inheriting presentation caps or search predicates.
+        // Try the open state first, then include terminal records.
+        $item = $aggregator->findItemFor(
+            $user,
+            $source,
+            $id,
+            $this->providerFiltersForReturnTo($returnTo),
+        );
 
         abort_if($item === null, 404);
 
+        $canOpen = $item->link !== null;
+        $withholdSecondaryDetail = $item->restricted || ! $canOpen;
+
         $timeline = [];
         // Need-to-know rows get no timeline: audit actors reveal the reporter
-        // and investigators — exactly what the owning register redacts.
-        if ($provider instanceof HasModelClass && ! $item->restricted) {
+        // and investigators — exactly what the owning register redacts. A
+        // no-destination row likewise exposes only its owner guidance.
+        if ($provider instanceof HasModelClass && ! $withholdSecondaryDetail) {
             $timeline = AuditLog::query()
                 ->where('auditable_type', $provider->modelClass())
                 ->where('auditable_id', $id)
@@ -157,18 +173,19 @@ class AllTasksController extends Controller
         // sensitive concern points at the investigators the register redacts)
         // — but the caller's OWN follow-state is always returned so the toggle
         // still works.
-        $isWatching = TaskWatcher::query()
-            ->where('source', $source)
-            ->where('item_id', $id)
-            ->where('user_id', $user->id)
-            ->exists();
-
-        $watchers = $item->restricted
+        $visibleWatcherIds = $withholdSecondaryDetail
+            ? []
+            : $aggregator->visibleWatcherIdsFor($source, $id);
+        $isWatching = $canOpen
+            && $aggregator->isUserWatching($user, $source, $id);
+        $watchers = $withholdSecondaryDetail
             ? []
             : TaskWatcher::query()
-                ->where('source', $source)
+                ->whereIn('source', $aggregator->watcherSourceKeysFor($source))
                 ->where('item_id', $id)
+                ->whereIn('user_id', $visibleWatcherIds)
                 ->join('users', 'users.id', '=', 'task_watchers.user_id')
+                ->distinct()
                 ->orderBy('users.name')
                 ->get(['users.id', 'users.name'])
                 ->map(fn ($row) => ['id' => (int) $row->id, 'name' => (string) $row->name])
@@ -177,11 +194,17 @@ class AllTasksController extends Controller
         return response()->json([
             'item' => $item->toArray(),
             'timeline' => $timeline,
-            'canAssign' => $provider instanceof AssignableTaskProvider && $provider->canAssign($user),
+            'canOpen' => $canOpen,
+            'canWatch' => $canOpen,
+            'canAssign' => $canOpen
+                && $provider instanceof AssignableTaskProvider
+                && $provider->canAssign($user),
             'watchers' => $watchers,
-            'watchersHidden' => $item->restricted,
+            'watchersHidden' => $withholdSecondaryDetail,
             'isWatching' => $isWatching,
-            'canSplit' => $provider instanceof SplittableTaskProvider && $provider->canView($user),
+            'canSplit' => $canOpen
+                && $provider instanceof SplittableTaskProvider
+                && $provider->canView($user),
         ]);
     }
 
@@ -202,9 +225,10 @@ class AllTasksController extends Controller
         abort_unless($provider instanceof AssignableTaskProvider, 400, 'This record type cannot be assigned from the queue.');
 
         if (! $provider->canAssign($user)) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'You do not have permission to assign this record.',
-            ]);
+            return back()->with(
+                'error',
+                'You do not have permission to assign this record.',
+            );
         }
 
         $assigneeId = isset($validated['assignee_id']) ? (int) $validated['assignee_id'] : null;
@@ -224,7 +248,13 @@ class AllTasksController extends Controller
             Cache::forget("tasks.nav.{$assigneeId}");
         }
 
-        TaskAssignmentNotifier::notify($user, $provider, $id, $assigneeId);
+        TaskAssignmentNotifier::notify(
+            $user,
+            $provider,
+            $id,
+            $assigneeId,
+            $aggregator,
+        );
 
         return back()->with('success', $assigneeId === null ? 'Task unassigned.' : 'Task assigned.');
     }
@@ -241,29 +271,42 @@ class AllTasksController extends Controller
 
         $validated = $request->validate([
             'watching' => ['required', 'boolean'],
+            'return_to' => ['nullable', 'string', 'max:2048'],
         ]);
 
-        $provider = $aggregator->providerFor($source);
-        abort_unless($provider !== null && $provider->canView($user), 404);
-
-        if ($validated['watching']) {
-            TaskWatcher::query()->firstOrCreate([
-                'source' => $source,
-                'item_id' => $id,
-                'user_id' => $user->id,
-            ]);
-        } else {
+        if (! $validated['watching']) {
             TaskWatcher::query()
-                ->where('source', $source)
+                ->whereIn('source', $aggregator->watcherSourceKeysFor($source))
                 ->where('item_id', $id)
                 ->where('user_id', $user->id)
                 ->delete();
+
+            Cache::forget("tasks.nav.{$user->id}");
+
+            return back()->with('success', 'Stopped following.');
         }
+
+        $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
+            $validated['return_to'] ?? null,
+        ) ?? '/tasks';
+        $item = $aggregator->findItemFor(
+            $user,
+            $source,
+            $id,
+            $this->providerFiltersForReturnTo($returnTo),
+        );
+        abort_unless($item?->link !== null, 404);
+
+        TaskWatcher::query()->firstOrCreate([
+            'source' => $source,
+            'item_id' => $id,
+            'user_id' => $user->id,
+        ]);
 
         // The badge helper counts watched items, so its cache must refresh.
         Cache::forget("tasks.nav.{$user->id}");
 
-        return back()->with('success', $validated['watching'] ? 'Following this task.' : 'Stopped following.');
+        return back()->with('success', 'Following this task.');
     }
 
     /**
@@ -410,6 +453,14 @@ class AllTasksController extends Controller
         }
 
         return $keys;
+    }
+
+    /**
+     * @return array{return_to: string}
+     */
+    private function providerFiltersForReturnTo(string $returnTo): array
+    {
+        return ['return_to' => $returnTo];
     }
 
     /**

@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A user "following" a company-wide /tasks work item. Watchers receive FYI
  * notifications when a watched item is reassigned or falls overdue, without
- * owning it. Keyed on the provider source key + the source record's numeric
- * id (TaskItems are never persisted — see TaskAggregator).
+ * owning it. Keyed on the TaskItem identity source + the source record's
+ * numeric id (normally the provider key; composite providers use a subtype).
  */
 class TaskWatcher extends Model
 {

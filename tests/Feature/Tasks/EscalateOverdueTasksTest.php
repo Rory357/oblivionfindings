@@ -1,7 +1,12 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoomAlert;
 use App\Models\Permission;
+use App\Models\Site;
+use App\Models\TaskWatcher;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
@@ -11,9 +16,14 @@ beforeEach(function () {
 });
 
 /** A user with the given permission keys granted via overrides. */
-function makeEscalationUser(array $permissionKeys): User
+function makeEscalationUser(array $permissionKeys, ?Site $site = null): User
 {
-    $user = User::factory()->create(['approved_at' => now()]);
+    $attributes = ['approved_at' => now()];
+    if ($site) {
+        $attributes['organization_id'] = $site->tenant_id;
+    }
+
+    $user = User::factory()->create($attributes);
 
     foreach ($permissionKeys as $permissionKey) {
         $permission = Permission::query()->firstOrCreate(
@@ -23,12 +33,36 @@ function makeEscalationUser(array $permissionKeys): User
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ]);
+    }
+
     return $user;
 }
 
+function makeEscalationIncident(Site $site): ClientIncident
+{
+    $client = Client::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'site_id' => $site->id,
+    ]);
+
+    return ClientIncident::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'status' => 'submitted',
+    ]);
+}
+
 it('records a level-1 escalation for an overdue assigned follow-up and is idempotent', function () {
-    $user = makeEscalationUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeEscalationUser(['incidents.viewAny'], $site);
+    $incident = makeEscalationIncident($site);
     $followup = $incident->followups()->create([
         'assigned_to_user_id' => $user->id,
         'due_at' => now()->subDay(),
@@ -65,8 +99,9 @@ it('records a level-1 escalation for an overdue assigned follow-up and is idempo
 });
 
 it('escalates a 3-day-overdue item to level 2', function () {
-    $user = makeEscalationUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeEscalationUser(['incidents.viewAny'], $site);
+    $incident = makeEscalationIncident($site);
     $followup = $incident->followups()->create([
         'assigned_to_user_id' => $user->id,
         'due_at' => now()->subDays(4),
@@ -80,4 +115,37 @@ it('escalates a 3-day-overdue item to level 2', function () {
         ->where('item_id', $followup->id)
         ->whereIn('level', [1, 2])
         ->count())->toBe(2);
+});
+
+it('prunes an out-of-scope watcher before overdue task notifications are sent', function () {
+    $localSite = Site::factory()->create();
+    $foreignSite = Site::factory()->create([
+        'tenant_id' => $localSite->tenant_id,
+    ]);
+    $assignee = makeEscalationUser([
+        'controlRoom.viewAny',
+        'controlRoom.alerts.view',
+    ], $localSite);
+    $staleWatcher = makeEscalationUser([
+        'controlRoom.alerts.view',
+    ], $foreignSite);
+    $alert = ControlRoomAlert::factory()->triaging()->create([
+        'site_id' => $localSite->id,
+        'assigned_to_user_id' => $assignee->id,
+        'due_at' => now()->subDay(),
+    ]);
+    TaskWatcher::query()->create([
+        'source' => 'alert',
+        'item_id' => $alert->id,
+        'user_id' => $staleWatcher->id,
+    ]);
+
+    $this->artisan('tasks:escalate')->assertExitCode(0);
+
+    expect($staleWatcher->fresh()->notifications()->count())->toBe(0)
+        ->and(TaskWatcher::query()
+            ->where('source', 'alert')
+            ->where('item_id', $alert->id)
+            ->where('user_id', $staleWatcher->id)
+            ->exists())->toBeFalse();
 });

@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class WorkplaceInjuryProvider implements TaskProvider, HasModelClass
+class WorkplaceInjuryProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -35,6 +35,7 @@ class WorkplaceInjuryProvider implements TaskProvider, HasModelClass
     {
         $query = WorkplaceInjury::query()
             ->with(['user:id,name', 'site:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('injury_date')
             ->limit(300);
 

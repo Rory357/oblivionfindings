@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class RespiteTaskProvider implements TaskProvider, HasModelClass
+class RespiteTaskProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -35,6 +35,7 @@ class RespiteTaskProvider implements TaskProvider, HasModelClass
     {
         $query = RespiteTask::query()
             ->with('assignedTo:id,name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 

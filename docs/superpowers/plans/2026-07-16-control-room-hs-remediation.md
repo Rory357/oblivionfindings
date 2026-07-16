@@ -1201,7 +1201,7 @@ Final Task 10 result: 24 backend tests passed with 223 assertions and 3
 frontend tests passed. TypeScript, targeted ESLint, Prettier, Pint, PHP syntax,
 and diff integrity are clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add app/Http/Controllers/AllTasksController.php app/Services/Tasks app/Services/Tasks/Providers resources/js/pages/tasks/types.ts resources/js/pages/tasks/index.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/tasks-incident-journey.test.tsx tests/Feature/Tasks/AllTasksIncidentJourneyTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
@@ -1215,19 +1215,37 @@ git commit -m "feat(tasks): show truthful journey responsibility state"
 - Create: `app/Services/ControlRoom/ControlRoomAlertAccessService.php`
 - Create: `app/Exceptions/RecoverableTaskAuthorizationException.php`
 - Modify: `app/Services/Tasks/Providers/ControlRoomAlertProvider.php`
+- Create: `app/Services/Tasks/Contracts/ProvidesTaskSourceAliases.php`
+- Modify: `app/Services/Tasks/Contracts/TaskProvider.php`
+- Modify: `app/Services/Tasks/TaskAggregator.php`
+- Modify: `app/Services/Tasks/TaskAssignmentNotifier.php`
+- Modify: `app/Services/Tasks/TaskItem.php`
+- Modify: `app/Models/TaskWatcher.php`
+- Modify: all registered `app/Services/Tasks/Providers/*Provider.php` exact-record queries
+- Modify: `app/Console/Commands/EscalateOverdueTasks.php`
 - Modify: `app/Services/ControlRoom/AlertWorkspaceService.php`
 - Modify: `app/Http/Controllers/ControlRoom/Concerns/AuthorizesControlRoomAlertAccess.php`
+- Modify: `app/Http/Controllers/ControlRoom/ControlRoomAlertController.php`
 - Modify: `app/Http/Controllers/AllTasksController.php`
 - Modify: `bootstrap/app.php`
+- Modify: `routes/control-room.php`
+- Modify: `resources/js/components/control-room/alert-workspace-dialog.tsx`
+- Modify: `resources/js/components/control-room/alert-workspace-dialog.test.tsx`
+- Modify: `resources/js/pages/control-room/show.tsx`
+- Create: `resources/js/pages/control-room/show.test.tsx`
 - Modify: `resources/js/pages/tasks/index.tsx`
 - Modify: `resources/js/pages/tasks/task-detail-dialog.tsx`
 - Modify: `resources/js/pages/tasks/types.ts`
 - Create: `resources/js/pages/tasks/task-detail-dialog.test.tsx`
 - Modify: `tests/Feature/Tasks/AllTasksIncidentJourneyTest.php`
 - Create: `tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php`
+- Modify: `tests/Feature/Tasks/TaskWatchersTest.php`
+- Modify: `tests/Feature/Tasks/EscalateOverdueTasksTest.php`
+- Modify: `tests/Feature/FleetAssets/FleetMaintenanceWiringTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomAlertNestedProvenanceTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing permission-parity tests**
+- [x] **Step 1: Write failing permission-parity tests**
 
 Prove:
 
@@ -1238,7 +1256,7 @@ Prove:
 - a permission revoked between list and click returns to `/tasks` with `q`, module, bucket, and other filters preserved plus a plain message;
 - no tested path ends on a bare 403.
 
-- [ ] **Step 2: Write failing focus and Back tests**
+- [x] **Step 2: Write failing focus and Back tests**
 
 ```tsx
 const rowButton = screen.getByRole('button', { name: /Open CR-2026-2135/ });
@@ -1249,14 +1267,14 @@ expect(rowButton).toHaveFocus();
 
 Also prove Close restores focus and browser Back returns to the same filtered URL.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```powershell
 php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php
 npx vitest run resources/js/pages/tasks/task-detail-dialog.test.tsx
 ```
 
-- [ ] **Step 4: Centralize the Control Room access decision**
+- [x] **Step 4: Centralize the Control Room access decision**
 
 ```php
 public function destinationFor(ControlRoomAlert $alert, User $user): array
@@ -1275,7 +1293,7 @@ public function destinationFor(ControlRoomAlert $alert, User $user): array
 
 Use the same service from the provider, workspace payload, and controller concern.
 
-- [ ] **Step 5: Preserve task queue context**
+- [x] **Step 5: Preserve task queue context**
 
 Add `return_to` containing only an internal `/tasks` URL with validated query keys. On authorization drift:
 
@@ -1286,7 +1304,7 @@ throw new RecoverableTaskAuthorizationException(
 );
 ```
 
-- [ ] **Step 6: Register a narrowly scoped exception renderer**
+- [x] **Step 6: Register a narrowly scoped exception renderer**
 
 In `bootstrap/app.php`:
 
@@ -1306,7 +1324,7 @@ $exceptions->render(function (
 
 The exception constructor must accept only a validated internal `/tasks` URL. All unrelated authorization failures retain the normal 403 behavior.
 
-- [ ] **Step 7: Restore focus explicitly**
+- [x] **Step 7: Restore focus explicitly**
 
 Keep a ref to the invoking row and pass it into the dialog:
 
@@ -1319,19 +1337,36 @@ onOpenChange={(open) => {
 
 Do not focus `document.body`.
 
-- [ ] **Step 8: Re-run tests**
+- [x] **Step 8: Re-run tests**
 
 ```powershell
 php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php
 npx vitest run resources/js/pages/tasks/task-detail-dialog.test.tsx resources/js/pages/tasks/tasks-incident-journey.test.tsx
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add app/Services/ControlRoom/ControlRoomAlertAccessService.php app/Exceptions/RecoverableTaskAuthorizationException.php app/Services/Tasks/Providers/ControlRoomAlertProvider.php app/Services/ControlRoom/AlertWorkspaceService.php app/Http/Controllers/ControlRoom/Concerns/AuthorizesControlRoomAlertAccess.php app/Http/Controllers/AllTasksController.php bootstrap/app.php resources/js/pages/tasks/index.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/types.ts resources/js/pages/tasks/task-detail-dialog.test.tsx tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
 git commit -m "fix(tasks): align actions with role permissions"
 ```
+
+Final Task 11 result:
+
+- the Control Room provider, alert workspace, deep-link controller, and Universal Tasks drawer share one permission/site decision;
+- role-aware actions are `Continue Control Room response`, `View alert`, or `No action for you` with owner guidance;
+- validated internal `return_to` recovery preserves the exact filtered task URL without weakening unrelated 403 responses;
+- Escape and Close restore the invoking row, while the alert page and browser Back return to the same filtered queue;
+- exact-record authorization is independent of provider feed caps and search predicates across all 23 providers;
+- watcher mutation, detail, assignment notification, and overdue notification paths enforce current per-record access, prune stale rows only on write/notification paths, keep restricted own-follow state private but usable, and allow unfollow after permission revocation;
+- the composite Fleet provider uses stable subtype identities for colliding numeric IDs and deterministic legacy ownership that cannot change with lifecycle or due-window state.
+
+Final verification on 2026-07-17:
+
+- backend: 177 tests passed with 1,246 assertions across the 11-file Control Room, Universal Tasks, watcher, escalation, incident-journey, and Fleet regression matrix;
+- frontend: 4 files passed with 12 tests;
+- TypeScript, targeted ESLint, Prettier, Pint, PHP syntax across 43 changed/new files, and `git diff --check` are clean;
+- independent review iterated through every authorization, watcher, cap, composite-identity, lifecycle, privacy, and focus finding; final re-review returned no findings.
 
 ## Task 12: Capture typed immediate controls and require them for serious incidents
 

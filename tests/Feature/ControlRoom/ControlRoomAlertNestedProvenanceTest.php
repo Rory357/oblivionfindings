@@ -419,8 +419,15 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
             'organization_id' => (int) $site->tenant_id,
             'approved_at' => now(),
         ]);
-        $permission = Permission::query()->where('key', 'controlRoom.viewAny')->firstOrFail();
-        $viewer->permissionOverrides()->sync([$permission->id => ['allowed' => true]]);
+        $permissions = Permission::query()
+            ->whereIn('key', [
+                'controlRoom.viewAny',
+                'controlRoom.alerts.view',
+            ])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->sync($permissions);
 
         HrEmployeeProfile::factory()->create([
             'tenant_id' => (int) $site->tenant_id,

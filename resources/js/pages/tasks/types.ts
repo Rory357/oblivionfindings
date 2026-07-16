@@ -17,6 +17,8 @@ export interface TimelineEntry {
 export interface TaskDetail {
     item: TaskItem;
     timeline: TimelineEntry[];
+    canOpen: boolean;
+    canWatch: boolean;
     canAssign: boolean;
     watchers: NamedRef[];
     /** True when the follower list is withheld (need-to-know restricted row). */
@@ -111,10 +113,16 @@ export function dueInfo(item: TaskItem): { label: string; className: string } {
     };
 }
 
-/** Composite queue ids are "{source}-{modelId}"; the numeric tail addresses
- *  the record in /tasks/detail and /tasks/{source}/{id}/assign. */
+/** Queue ids end in "-{modelId}". The numeric tail addresses the source
+ * record; the prefix is the exact action identity for composite providers. */
 export function taskNumericId(item: TaskItem): string {
     return item.id.slice(item.id.lastIndexOf('-') + 1);
+}
+
+/** Stable action/persistence source. This equals `source` for ordinary
+ * providers and the subtype prefix for composite providers. */
+export function taskRecordSource(item: TaskItem): string {
+    return item.id.slice(0, item.id.lastIndexOf('-'));
 }
 
 /** The word for the child record a split produces, keyed by owning module.

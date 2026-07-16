@@ -4,10 +4,10 @@ namespace App\Services\Tasks;
 
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /**
  * The company-wide work-item feed: unions open incidents, corrective
@@ -33,6 +33,19 @@ class TaskAggregator
      * @var array<int, array<string, true>>
      */
     private array $watchedMemo = [];
+
+    /**
+     * @var array<string, array{
+     *   authorized: array<int, int>,
+     *   stale_rows: array<int, int>,
+     *   stale_users: array<int, int>,
+     *   pruned: bool
+     * }>
+     */
+    private array $watcherAccessMemo = [];
+
+    /** @var array<string, string|null> */
+    private array $legacySourceAliasMemo = [];
 
     /**
      * @param  TaskProvider[]|null  $providers  Defaults to the full registry.
@@ -104,12 +117,208 @@ class TaskAggregator
     public function providerFor(string $sourceKey): ?TaskProvider
     {
         foreach ($this->providers as $provider) {
-            if ($provider->sourceKey() === $sourceKey) {
+            if ($provider->sourceKey() === $sourceKey
+                || ($provider instanceof ProvidesTaskSourceAliases
+                    && in_array($sourceKey, $provider->sourceAliases(), true))) {
                 return $provider;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Resolve one item through its provider's real permission and record scope.
+     *
+     * @param  array{
+     *   q?: string|null,
+     *   return_to?: string
+     * }  $filters
+     */
+    public function findItemFor(
+        User $user,
+        string $source,
+        int $id,
+        array $filters = [],
+    ): ?TaskItem {
+        $provider = $this->providerFor($source);
+        if (! $provider || ! $provider->canView($user)) {
+            return null;
+        }
+
+        $itemIds = ["{$source}-{$id}"];
+        if ($provider->sourceKey() === $source
+            && $provider instanceof ProvidesTaskSourceAliases) {
+            $legacyAlias = $this->legacySourceAliasFor($provider, $id);
+            $itemIds = $legacyAlias ? ["{$legacyAlias}-{$id}"] : $itemIds;
+        }
+        $exactFilters = [
+            ...$filters,
+            'id' => $id,
+        ];
+        $item = collect($provider->tasks($user, $exactFilters))
+            ->first(fn (TaskItem $candidate) => in_array($candidate->id, $itemIds, true));
+        if ($item) {
+            return $item;
+        }
+
+        return collect($provider->tasks($user, [
+            ...$exactFilters,
+            'include_done' => true,
+        ]))->first(fn (TaskItem $candidate) => in_array($candidate->id, $itemIds, true));
+    }
+
+    public function canWatchItemFor(User $user, string $source, int $id): bool
+    {
+        return $this->findItemFor($user, $source, $id)?->link !== null;
+    }
+
+    /**
+     * Return only watchers who can still open the exact record, pruning stale
+     * cross-site, confidential, revoked-permission, and no-destination rows.
+     *
+     * @param  array<int, int>  $excludeUserIds
+     * @return array<int, int>
+     */
+    public function authorizedWatcherIdsFor(
+        string $source,
+        int $id,
+        array $excludeUserIds = [],
+    ): array {
+        $memoKey = $this->resolveWatcherAccess($source, $id);
+        $access = &$this->watcherAccessMemo[$memoKey];
+
+        if (! $access['pruned'] && $access['stale_rows'] !== []) {
+            TaskWatcher::query()
+                ->whereIn('id', $access['stale_rows'])
+                ->delete();
+
+            foreach ($access['stale_users'] as $userId) {
+                unset($this->watchedMemo[$userId]);
+            }
+
+            $access['pruned'] = true;
+        }
+
+        return array_values(array_diff(
+            $access['authorized'],
+            array_map('intval', $excludeUserIds),
+        ));
+    }
+
+    /**
+     * Read-only counterpart for detail payloads: stale rows are filtered from
+     * names/counts but remain untouched until a write/notification path prunes.
+     *
+     * @return array<int, int>
+     */
+    public function visibleWatcherIdsFor(string $source, int $id): array
+    {
+        $memoKey = $this->resolveWatcherAccess($source, $id);
+
+        return $this->watcherAccessMemo[$memoKey]['authorized'];
+    }
+
+    public function isUserWatching(User $user, string $source, int $id): bool
+    {
+        $rows = TaskWatcher::query()
+            ->whereIn('source', $this->watcherSourceKeysFor($source))
+            ->where('item_id', $id)
+            ->where('user_id', $user->id)
+            ->pluck('source');
+
+        if ($rows->contains($source)) {
+            return true;
+        }
+
+        $provider = $this->providerFor($source);
+
+        return $provider instanceof ProvidesTaskSourceAliases
+            && $provider->sourceKey() !== $source
+            && $rows->contains($provider->sourceKey())
+            && $this->legacySourceAliasFor($provider, $id) === $source;
+    }
+
+    /**
+     * Include the old composite provider key when reading/deleting followers,
+     * while all new writes use the exact subtype alias supplied by the item.
+     *
+     * @return string[]
+     */
+    public function watcherSourceKeysFor(string $source): array
+    {
+        $provider = $this->providerFor($source);
+        if (! $provider instanceof ProvidesTaskSourceAliases
+            || $provider->sourceKey() === $source) {
+            return [$source];
+        }
+
+        return [$source, $provider->sourceKey()];
+    }
+
+    private function resolveWatcherAccess(string $source, int $id): string
+    {
+        $memoKey = "{$source}|{$id}";
+        if (array_key_exists($memoKey, $this->watcherAccessMemo)) {
+            return $memoKey;
+        }
+
+        $authorized = [];
+        $staleRows = [];
+        $staleUsers = [];
+        $watchers = TaskWatcher::query()
+            ->with('user')
+            ->whereIn('source', $this->watcherSourceKeysFor($source))
+            ->where('item_id', $id)
+            ->get();
+        $provider = $this->providerFor($source);
+        $legacyOwnerAlias = $provider instanceof ProvidesTaskSourceAliases
+            ? $this->legacySourceAliasFor($provider, $id)
+            : null;
+
+        foreach ($watchers as $watcher) {
+            if (! $watcher->user) {
+                $staleRows[] = (int) $watcher->id;
+                $staleUsers[] = (int) $watcher->user_id;
+
+                continue;
+            }
+
+            $isLegacyCompositeRow = $provider instanceof ProvidesTaskSourceAliases
+                && $provider->sourceKey() !== $source
+                && $watcher->source === $provider->sourceKey();
+
+            if ($isLegacyCompositeRow) {
+                // A legacy row owned by another subtype is ignored, never
+                // pruned. Ownership comes from record existence, so it cannot
+                // switch when a record completes or leaves a due-date window.
+                if ($legacyOwnerAlias !== $source) {
+                    continue;
+                }
+
+                if ($this->canWatchItemFor($watcher->user, $source, $id)) {
+                    $authorized[(int) $watcher->user_id] = (int) $watcher->user_id;
+
+                    continue;
+                }
+            } elseif ($this->canWatchItemFor($watcher->user, $source, $id)) {
+                $authorized[(int) $watcher->user_id] = (int) $watcher->user_id;
+
+                continue;
+            }
+
+            $staleRows[] = (int) $watcher->id;
+            $staleUsers[] = (int) $watcher->user_id;
+        }
+
+        $this->watcherAccessMemo[$memoKey] = [
+            'authorized' => array_values($authorized),
+            'stale_rows' => array_values(array_unique($staleRows)),
+            'stale_users' => array_values(array_unique($staleUsers)),
+            'pruned' => false,
+        ];
+
+        return $memoKey;
     }
 
     /**
@@ -264,7 +473,7 @@ class TaskAggregator
             'myOverdue' => count(array_filter($mine, fn (TaskItem $i) => $i->isOverdue())),
             'watching' => count(array_filter(
                 $open,
-                fn (TaskItem $i) => isset($watched[$i->source.'|'.Str::afterLast($i->id, '-')]),
+                fn (TaskItem $i) => $this->isWatched($i, $watched),
             )),
         ];
     }
@@ -357,12 +566,49 @@ class TaskAggregator
 
         // following=true: only items the user is watching (task_watchers).
         if (! empty($filters['following'])) {
-            $key = $item->source.'|'.Str::afterLast($item->id, '-');
-            if (! isset($this->watchedKeysFor($user)[$key])) {
+            if (! $this->isWatched($item, $this->watchedKeysFor($user))) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * @param  array<string, true>  $watched
+     */
+    private function isWatched(TaskItem $item, array $watched): bool
+    {
+        $id = $item->numericId();
+        $identityKey = $item->identitySource().'|'.$id;
+        if (isset($watched[$identityKey])) {
+            return true;
+        }
+
+        if ($item->identitySource() === $item->source
+            || ! isset($watched[$item->source.'|'.$id])) {
+            return false;
+        }
+
+        $provider = $this->providerFor($item->source);
+
+        // Compatibility for rows written before composite providers gained
+        // subtype identities. Record existence fixes one historical owner;
+        // open/done presentation changes can never remap it.
+        return $provider instanceof ProvidesTaskSourceAliases
+            && $this->legacySourceAliasFor($provider, $id) === $item->identitySource();
+    }
+
+    private function legacySourceAliasFor(
+        ProvidesTaskSourceAliases $provider,
+        int $id,
+    ): ?string {
+        $memoKey = $provider::class.'|'.$id;
+
+        if (! array_key_exists($memoKey, $this->legacySourceAliasMemo)) {
+            $this->legacySourceAliasMemo[$memoKey] = $provider->legacySourceAliasForId($id);
+        }
+
+        return $this->legacySourceAliasMemo[$memoKey];
     }
 }

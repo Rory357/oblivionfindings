@@ -11,7 +11,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class SafeguardingActionPlanProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -96,6 +96,7 @@ class SafeguardingActionPlanProvider implements TaskProvider, HasModelClass, Ass
     {
         $query = SafeguardingActionPlan::query()
             ->with(['concern:id,reference_number,is_sensitive', 'assignedTo:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 

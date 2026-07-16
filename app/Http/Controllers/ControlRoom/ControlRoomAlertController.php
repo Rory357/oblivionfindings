@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
@@ -17,6 +18,7 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
@@ -434,13 +436,24 @@ class ControlRoomAlertController extends Controller
     public function show(Request $request, ControlRoomAlert $alert)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
-        $this->assertCanAccessAlert($user, $alert);
+        abort_unless($user, 403);
+        $access = app(ControlRoomAlertAccessService::class);
+        $access->assertCanView(
+            $alert,
+            $user,
+            $request->query('return_to'),
+        );
+        $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
+            $request->query('return_to'),
+        ) ?? ($user->canDo('controlRoom.viewAny')
+            ? '/control-room/alerts'
+            : '/tasks?sources=alert');
 
         // Deep-link fallback for the alert workspace: same payload as the
         // ?alert= modal-over-list on every Control Room surface.
         $detail = app(AlertWorkspaceService::class)->build($user, $alert->id);
         abort_unless($detail !== null, 404);
+        $detail['return_to'] = $returnTo;
 
         return Inertia::render('control-room/show', $detail);
     }
@@ -1175,11 +1188,9 @@ class ControlRoomAlertController extends Controller
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
     {
-        $this->siteAccess()->assertCanAccessAlert(
-            $user,
+        app(ControlRoomAlertAccessService::class)->assertCanView(
             $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
+            $user,
         );
     }
 

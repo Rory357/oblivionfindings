@@ -3,6 +3,7 @@
 namespace App\Services\Tasks;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * Normalised company-wide work item — the single shape returned by the
@@ -69,6 +70,21 @@ class TaskItem
         return $this->overdue ??= $this->bucket !== self::BUCKET_DONE
             && $this->dueAt !== null
             && Carbon::parse($this->dueAt)->isPast();
+    }
+
+    /**
+     * Stable action/persistence identity. Usually this equals `source`; a
+     * composite provider can emit subtype-prefixed ids such as
+     * `fleet_work_order-42` beneath the `fleet_maintenance` list source.
+     */
+    public function identitySource(): string
+    {
+        return Str::beforeLast($this->id, '-');
+    }
+
+    public function numericId(): int
+    {
+        return (int) Str::afterLast($this->id, '-');
     }
 
     /**

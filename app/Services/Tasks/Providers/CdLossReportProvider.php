@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class CdLossReportProvider implements TaskProvider, HasModelClass
+class CdLossReportProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -34,6 +34,7 @@ class CdLossReportProvider implements TaskProvider, HasModelClass
     {
         $query = ControlledDrugLossReport::query()
             ->with('client:id,first_name,last_name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('discovered_at')
             ->limit(300);
 

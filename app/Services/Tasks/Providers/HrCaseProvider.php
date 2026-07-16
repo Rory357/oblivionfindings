@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  * the controller's tenant scoping, and the title/description never expose the
  * case title or narrative — only the humanised case type.
  */
-class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     use ResolvesHrTenant;
 
@@ -77,6 +77,7 @@ class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvi
         $query = HrCase::forTenant($tenantId)
             ->with('assignedTo:id,name')
             ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('opened_at')
             ->limit(300);
 

@@ -83,6 +83,7 @@ class HsInvestigationProvider implements HasModelClass, TaskProvider
                     fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
                 ),
             )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 

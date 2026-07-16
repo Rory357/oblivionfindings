@@ -47,12 +47,14 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
             ->name('control-room.alerts.index');
-
-        Route::get('/control-room/alerts/{alert}', [ControlRoomAlertController::class, 'show'])
-            ->whereNumber('alert')
-            ->name('control-room.alerts.show');
-
     });
+
+    // Direct alert reads use the centralized view/manage decision so the
+    // narrower controlRoom.alerts.view permission can open a read-only alert,
+    // and task-origin permission drift can recover to the filtered queue.
+    Route::get('/control-room/alerts/{alert}', [ControlRoomAlertController::class, 'show'])
+        ->whereNumber('alert')
+        ->name('control-room.alerts.show');
 
     Route::middleware('permission:controlRoom.reports.view|controlRoom.viewAny')->group(function () {
         // Reports — main dashboard and individual metric endpoints

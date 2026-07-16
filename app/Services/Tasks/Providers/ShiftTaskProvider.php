@@ -55,6 +55,7 @@ class ShiftTaskProvider implements HasModelClass, TaskProvider
                     $q->where('user_id', $user->id);
                 }
             })
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 
