@@ -71,16 +71,19 @@ class HsEventClosureTest extends TestCase
                 HsEvent::factory()->worksafeUndecided()->create(),
                 false,
                 'Record the WorkSafe notifiability decision before closing this event.',
+                'worksafe-decision',
             ],
             'explicit false closes regulatory gate' => [
                 HsEvent::factory()->worksafeNotNotifiable($actor)->create(),
                 true,
                 null,
+                'worksafe-decision',
             ],
             'true pending blocks' => [
                 HsEvent::factory()->worksafeNotifiable($actor)->create(),
                 false,
                 'Record the WorkSafe notification before closing this event.',
+                'worksafe-notify',
             ],
             'true notified closes regulatory gate' => [
                 HsEvent::factory()->worksafeNotifiable($actor)->create([
@@ -90,6 +93,7 @@ class HsEventClosureTest extends TestCase
                 ]),
                 true,
                 null,
+                'worksafe-decision',
             ],
             'true acknowledged closes regulatory gate' => [
                 HsEvent::factory()->worksafeNotifiable($actor)->create([
@@ -100,10 +104,11 @@ class HsEventClosureTest extends TestCase
                 ]),
                 true,
                 null,
+                'worksafe-decision',
             ],
         ];
 
-        foreach ($events as $label => [$event, $expected, $blocker]) {
+        foreach ($events as $label => [$event, $expected, $blocker, $action]) {
             $gate = $service->closureGate($event);
             $requirement = collect($gate['requirements'])->firstWhere('key', 'worksafe_decision');
 
@@ -111,7 +116,7 @@ class HsEventClosureTest extends TestCase
             $this->assertNotNull($requirement, $label);
             $this->assertSame($expected, $requirement['complete'], $label);
             $this->assertSame(
-                "/health-safety/events/{$event->id}?action=worksafe-decision",
+                "/health-safety/events/{$event->id}?action={$action}",
                 $requirement['href'],
                 $label,
             );

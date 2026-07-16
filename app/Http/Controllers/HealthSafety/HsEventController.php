@@ -119,7 +119,7 @@ class HsEventController extends Controller
             'site_name' => $e->site?->name,
             'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : null,
             'staff_name' => $e->staff?->name,
-            'worksafe_notifiable' => (bool) $e->worksafe_notifiable,
+            'worksafe_notifiable' => $e->worksafe_notifiable,
             'worksafe_status' => $e->worksafe_status,
             'handover' => [
                 'status' => $e->handover_status,
@@ -501,6 +501,7 @@ class HsEventController extends Controller
             'creator:id,name',
             'owner:id,name',
             'acceptedBy:id,name',
+            'worksafeDecidedBy:id,name',
         ]);
 
         $investigations = $hsEvent->investigations()
@@ -666,11 +667,26 @@ class HsEventController extends Controller
             && $hsEvent->source_type === ClientIncident::class
             && $sourceIncident?->status !== 'draft'
             && $sourceIncident?->submitted_at !== null;
+        $canDecideWorksafe = $canManage
+            && $hsEvent->status !== HsEvent::STATUS_CLOSED
+            && in_array($hsEvent->handover_status, [
+                HsEvent::HANDOVER_ACCEPTED,
+                HsEvent::HANDOVER_NOT_REQUIRED,
+            ], true);
+        $canNotifyWorksafe = $canManage
+            && $hsEvent->worksafe_notifiable === true
+            && $hsEvent->worksafe_status === HsEvent::WORKSAFE_PENDING;
+        $canAcknowledgeWorksafe = $canManage
+            && $hsEvent->worksafe_status === HsEvent::WORKSAFE_NOTIFIED;
         $nextAction = match (true) {
             $canAccept => ['label' => 'Accept this H&S handover', 'href' => null],
-            $canManage && $hsEvent->worksafe_notifiable && $hsEvent->worksafe_status === HsEvent::WORKSAFE_PENDING => [
+            $canDecideWorksafe && $hsEvent->worksafe_notifiable === null => [
+                'label' => 'Record the WorkSafe decision',
+                'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-decision",
+            ],
+            $canNotifyWorksafe => [
                 'label' => 'Record the WorkSafe notification',
-                'href' => "/health-safety/events/{$hsEvent->id}",
+                'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-notify",
             ],
             $canManage && $hsEvent->investigation_required && ! $hsEvent->hasCompletedInvestigation() => [
                 'label' => 'Continue the H&S investigation',
@@ -697,14 +713,25 @@ class HsEventController extends Controller
             'client' => $hsEvent->client ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
             'staff' => $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
             'asset' => $hsEvent->asset ? ['id' => $hsEvent->asset->id, 'name' => $hsEvent->asset->name] : null,
-            'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
-            'worksafe_status' => $hsEvent->worksafe_status,
-            'worksafe_reference' => $hsEvent->worksafe_reference,
-            'worksafe_notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
-            'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
-            'worksafe_method' => $hsEvent->worksafe_method,
-            'worksafe_site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
-            'worksafe_reason' => null,
+            'worksafe' => [
+                'notifiable' => $hsEvent->worksafe_notifiable,
+                'status' => $hsEvent->worksafe_status,
+                'decision_reason' => $hsEvent->worksafe_decision_reason,
+                'decision_source' => $hsEvent->worksafe_decision_source,
+                'decided_at' => $hsEvent->worksafe_decided_at?->toIso8601String(),
+                'decided_by' => $hsEvent->worksafeDecidedBy ? [
+                    'id' => $hsEvent->worksafeDecidedBy->id,
+                    'name' => $hsEvent->worksafeDecidedBy->name,
+                ] : null,
+                'reference' => $hsEvent->worksafe_reference,
+                'notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
+                'acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
+                'method' => $hsEvent->worksafe_method,
+                'site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
+                'can_decide' => $canDecideWorksafe,
+                'can_notify' => $canNotifyWorksafe,
+                'can_acknowledge' => $canAcknowledgeWorksafe,
+            ],
             'investigation_required' => (bool) $hsEvent->investigation_required,
             'control_room_alert' => $hsEvent->controlRoomAlert ? [
                 'id' => $hsEvent->controlRoomAlert->id,

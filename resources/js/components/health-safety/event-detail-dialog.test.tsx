@@ -88,7 +88,11 @@ vi.mock('@/components/wizard/shell', async () => {
     };
 });
 
-import { EventDetailDialog, type EventDetail } from './event-detail-dialog';
+import {
+    EventDetailDialog,
+    type EventActionKey,
+    type EventDetail,
+} from './event-detail-dialog';
 
 function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
     return {
@@ -104,14 +108,23 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
         client: null,
         staff: null,
         asset: null,
-        worksafe_notifiable: false,
-        worksafe_status: null,
-        worksafe_reference: null,
-        worksafe_notified_at: null,
-        worksafe_acknowledged_at: null,
-        worksafe_method: null,
-        worksafe_site_preserved: false,
-        worksafe_reason: null,
+        worksafe: {
+            notifiable: false,
+            status: null,
+            decision_reason:
+                'The event does not meet the statutory notification threshold.',
+            decision_source: 'manual',
+            decided_at: '2026-07-14T02:20:00Z',
+            decided_by: { id: 9, name: 'Tama Lewis' },
+            reference: null,
+            notified_at: null,
+            acknowledged_at: null,
+            method: null,
+            site_preserved: false,
+            can_decide: true,
+            can_notify: false,
+            can_acknowledge: false,
+        },
         investigation_required: true,
         control_room_alert: {
             id: 11,
@@ -143,6 +156,14 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
             blockers: [
                 'Accept the H&S handover before closing this event.',
                 'Complete the required investigation before closing this event.',
+            ],
+            requirements: [
+                {
+                    key: 'worksafe_decision',
+                    complete: true,
+                    label: 'WorkSafe decision recorded — not notifiable',
+                    href: '/health-safety/events/17?action=worksafe-decision',
+                },
             ],
         },
         assignable_staff: [
@@ -234,9 +255,17 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
     } as EventDetail;
 }
 
-function renderDialog(detail = eventDetail()) {
+function renderDialog(
+    detail = eventDetail(),
+    initialAction: EventActionKey | null = null,
+) {
     return render(
-        <EventDetailDialog detail={detail} open onClose={() => {}} />,
+        <EventDetailDialog
+            detail={detail}
+            open
+            initialAction={initialAction}
+            onClose={() => {}}
+        />,
     );
 }
 
@@ -387,6 +416,365 @@ describe('EventDetailDialog closure governance', () => {
                 override_reason: 'Executive statutory direction.',
             },
         );
+    });
+});
+
+describe('EventDetailDialog WorkSafe governance', () => {
+    const acceptedHandover: EventDetail['handover'] = {
+        status: 'accepted',
+        owner: { id: 8, name: 'Moana Rangi' },
+        accepted_by: { id: 9, name: 'Tama Lewis' },
+        accepted_at: '2026-07-14T02:15:00Z',
+        notes: null,
+        can_accept: false,
+    };
+
+    it('shows an undecided state and records an explicit reasoned choice', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    notifiable: null,
+                    status: null,
+                    decision_reason: null,
+                    decision_source: null,
+                    decided_at: null,
+                    decided_by: null,
+                    reference: null,
+                    notified_at: null,
+                    acknowledged_at: null,
+                    method: null,
+                    site_preserved: false,
+                    can_decide: true,
+                    can_notify: false,
+                    can_acknowledge: false,
+                },
+                close_gate: {
+                    acceptance_ok: true,
+                    worksafe_ok: false,
+                    investigation_ok: false,
+                    recommendations_ok: false,
+                    actions_ok: true,
+                    blockers: [
+                        'Record the WorkSafe notifiability decision before closing this event.',
+                    ],
+                    requirements: [
+                        {
+                            key: 'worksafe_decision',
+                            complete: false,
+                            label: 'Record the WorkSafe notifiability decision',
+                            href: '/health-safety/events/17?action=worksafe-decision',
+                        },
+                    ],
+                },
+            }),
+        );
+
+        expect(screen.getByText('Decision not recorded')).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Record WorkSafe decision',
+            }),
+        );
+
+        expect(screen.getByLabelText('Notifiable')).toBeInTheDocument();
+        expect(screen.getByLabelText('Not notifiable')).toBeInTheDocument();
+        expect(screen.getByLabelText('Decision rationale')).toBeRequired();
+
+        fireEvent.click(screen.getByLabelText('Notifiable'));
+        fireEvent.change(screen.getByLabelText('Decision rationale'), {
+            target: {
+                value: 'The hospital admission meets the statutory notification threshold.',
+            },
+        });
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Record WorkSafe decision',
+            }),
+        );
+
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/worksafe/decision',
+            {
+                notifiable: true,
+                reason: 'The hospital admission meets the statutory notification threshold.',
+                source: 'manual',
+            },
+        );
+    });
+
+    it('shows an explicit not-notifiable decision with actor time and reason', () => {
+        renderDialog(eventDetail({ handover: acceptedHandover }));
+
+        expect(
+            screen.getByText('Not notifiable — decision recorded'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'The event does not meet the statutory notification threshold.',
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getAllByText(/Tama Lewis/).length).toBeGreaterThan(0);
+        expect(
+            screen.getByRole('button', {
+                name: 'Update WorkSafe decision',
+            }),
+        ).toBeEnabled();
+    });
+
+    it('shows notification pending with the notify action', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    notifiable: true,
+                    status: 'pending',
+                    decision_reason:
+                        'The serious injury meets the statutory notification threshold.',
+                    can_notify: true,
+                },
+            }),
+        );
+
+        expect(
+            screen.getAllByText('Notification pending').length,
+        ).toBeGreaterThan(0);
+        expect(
+            screen.getByRole('button', {
+                name: 'Record WorkSafe notification',
+            }),
+        ).toBeEnabled();
+    });
+
+    it('shows notified and acknowledged states with the correct controls', () => {
+        const notified = eventDetail({
+            handover: acceptedHandover,
+            worksafe: {
+                ...eventDetail().worksafe,
+                notifiable: true,
+                status: 'notified',
+                notified_at: '2026-07-14T03:00:00Z',
+                method: 'online',
+                reference: 'WS-2026-0017',
+                can_notify: false,
+                can_acknowledge: true,
+            },
+        });
+        const { unmount } = renderDialog(notified);
+
+        expect(
+            screen.getAllByText('Notified — acknowledgement pending').length,
+        ).toBeGreaterThan(0);
+        expect(
+            screen.getByRole('button', {
+                name: 'Record acknowledgement',
+            }),
+        ).toBeEnabled();
+
+        unmount();
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    ...notified.worksafe,
+                    status: 'acknowledged',
+                    acknowledged_at: '2026-07-14T04:00:00Z',
+                    can_acknowledge: false,
+                },
+            }),
+        );
+
+        expect(screen.getAllByText('Acknowledged').length).toBeGreaterThan(0);
+        expect(
+            screen.queryByRole('button', {
+                name: 'Record acknowledgement',
+            }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', {
+                name: 'Record WorkSafe notification',
+            }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('keeps decision truth visible but removes mutation actions for a view-only user', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                can: { manage: false, override_closure: false },
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    can_decide: false,
+                    can_notify: false,
+                },
+            }),
+        );
+
+        expect(
+            screen.getByText('Not notifiable — decision recorded'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', {
+                name: 'Update WorkSafe decision',
+            }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', {
+                name: 'Record WorkSafe notification',
+            }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('uses the server closure label and direct action link', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    notifiable: null,
+                    status: null,
+                    decision_reason: null,
+                    decision_source: null,
+                    decided_at: null,
+                    decided_by: null,
+                },
+                close_gate: {
+                    acceptance_ok: true,
+                    worksafe_ok: false,
+                    investigation_ok: true,
+                    recommendations_ok: true,
+                    actions_ok: true,
+                    blockers: [
+                        'Record the WorkSafe notifiability decision before closing this event.',
+                    ],
+                    requirements: [
+                        {
+                            key: 'worksafe_decision',
+                            complete: false,
+                            label: 'Record the WorkSafe notifiability decision',
+                            href: '/health-safety/events/17?action=worksafe-decision',
+                        },
+                    ],
+                },
+            }),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+
+        expect(
+            screen.getByRole('link', {
+                name: 'Record the WorkSafe notifiability decision',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17?action=worksafe-decision',
+        );
+    });
+
+    it('uses the pending notification link and opens the notification pane', () => {
+        const pending = eventDetail({
+            handover: acceptedHandover,
+            worksafe: {
+                ...eventDetail().worksafe,
+                notifiable: true,
+                status: 'pending',
+                can_notify: true,
+            },
+            close_gate: {
+                acceptance_ok: true,
+                worksafe_ok: false,
+                investigation_ok: true,
+                recommendations_ok: true,
+                actions_ok: true,
+                blockers: [
+                    'Record the WorkSafe notification before closing this event.',
+                ],
+                requirements: [
+                    {
+                        key: 'worksafe_decision',
+                        complete: false,
+                        label: 'Record the WorkSafe notification',
+                        href: '/health-safety/events/17?action=worksafe-notify',
+                    },
+                ],
+            },
+        });
+        const { unmount } = renderDialog(pending);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        expect(
+            screen.getByRole('link', {
+                name: 'Record the WorkSafe notification',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17?action=worksafe-notify',
+        );
+
+        unmount();
+        renderDialog(pending, 'worksafe_notify');
+        expect(
+            screen.getByText('Record WorkSafe notification'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Notified at')).toBeInTheDocument();
+    });
+
+    it('does not open forced WorkSafe mutation panes without capability', () => {
+        const viewOnly = eventDetail({
+            can: { manage: false, override_closure: false },
+            worksafe: {
+                ...eventDetail().worksafe,
+                can_decide: false,
+                can_notify: false,
+                can_acknowledge: false,
+            },
+        });
+        const { unmount } = renderDialog(viewOnly, 'worksafe_decision');
+
+        expect(
+            screen.queryByLabelText('Decision rationale'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('Governance stage')).toBeInTheDocument();
+
+        unmount();
+        renderDialog(
+            eventDetail({
+                status: 'closed',
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    notifiable: true,
+                    status: 'pending',
+                    can_decide: false,
+                    can_notify: false,
+                    can_acknowledge: false,
+                },
+            }),
+            'worksafe_notify',
+        );
+
+        expect(
+            screen.queryByText('Record WorkSafe notification'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('Governance stage')).toBeInTheDocument();
+    });
+
+    it('does not present an unknown WorkSafe status as acknowledged', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    notifiable: true,
+                    status: 'legacy_unknown',
+                },
+            }),
+        );
+
+        expect(
+            screen.getAllByText('WorkSafe status needs review').length,
+        ).toBeGreaterThan(0);
+        expect(screen.queryByText('Acknowledged')).not.toBeInTheDocument();
     });
 });
 

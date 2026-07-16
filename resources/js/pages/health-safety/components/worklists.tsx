@@ -3,6 +3,7 @@
  * payload). Each row: status pill (tone+icon+label) + title/sub + owner + due. Left-click →
  * HsDetailDialog; right-click → ShiftContextMenu (View detail · View client · View staff ·
  * View register · Print) with the client/staff deep-link ids the builders emit. Tokens only. */
+import { worksafeLabel } from '@/components/health-safety/event-detail-dialog';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
@@ -300,6 +301,11 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
 function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
     return rows.map((r) => {
         const awaiting = r.status === 'pending';
+        const acknowledged = r.status === 'acknowledged';
+        const statusLabel = worksafeLabel({
+            notifiable: true,
+            status: r.status,
+        });
         const notifiedSub = [
             r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null,
             r.notified_at ? fmtDate(r.notified_at) : null,
@@ -308,9 +314,15 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
             .join(' · ');
         return {
             key: `ntf-${r.id}`,
-            pill: awaiting
-                ? { label: 'Awaiting', tone: 'critical', icon: Clock }
-                : { label: titleCase(r.status), tone: 'success', icon: Check },
+            pill: {
+                label: statusLabel,
+                tone: awaiting
+                    ? 'critical'
+                    : acknowledged
+                      ? 'success'
+                      : 'warning',
+                icon: awaiting ? Clock : acknowledged ? Check : ShieldAlert,
+            },
             title:
                 r.title ?? `${r.event_reference} · WorkSafe notifiable event`,
             sub: awaiting
@@ -340,7 +352,7 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
                     { label: 'Title', value: r.title },
                     { label: 'H&S reference', value: r.event_reference },
                     { label: 'Type', value: titleCase(r.incident_type) },
-                    { label: 'Status', value: titleCase(r.status) },
+                    { label: 'Status', value: statusLabel },
                     { label: 'Occurred', value: fmtDate(r.occurred_at) },
                     { label: 'Notified', value: fmtDate(r.notified_at) },
                     {

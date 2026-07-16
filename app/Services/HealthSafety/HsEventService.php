@@ -367,7 +367,7 @@ class HsEventService
             'key' => 'worksafe_decision',
             'complete' => $worksafeOk,
             'label' => $this->worksafeRequirementLabel($event),
-            'href' => "/health-safety/events/{$event->id}?action=worksafe-decision",
+            'href' => $this->worksafeRequirementHref($event),
         ];
 
         $hasActiveInvestigation = $event->investigations()
@@ -528,6 +528,7 @@ class HsEventService
         return DB::transaction(function () use ($event, $notifiable, $reason, $actor, $source): HsEvent {
             $incident = $this->lockIncidentForWorksafeProjection($event);
             $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            $this->assertWorksafeDecisionMutable($locked);
             $hasCompletedNotification = in_array($locked->worksafe_status, [
                 HsEvent::WORKSAFE_NOTIFIED,
                 HsEvent::WORKSAFE_ACKNOWLEDGED,
@@ -769,6 +770,30 @@ class HsEventService
             $event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED => 'WorkSafe notification acknowledged',
             default => 'Complete the WorkSafe notification record',
         };
+    }
+
+    private function worksafeRequirementHref(HsEvent $event): string
+    {
+        $action = $event->worksafe_notifiable === true
+            && $event->worksafe_status === HsEvent::WORKSAFE_PENDING
+                ? 'worksafe-notify'
+                : 'worksafe-decision';
+
+        return "/health-safety/events/{$event->id}?action={$action}";
+    }
+
+    private function assertWorksafeDecisionMutable(HsEvent $event): void
+    {
+        if ($event->status === HsEvent::STATUS_CLOSED) {
+            throw new \DomainException('A closed H&S event cannot change its WorkSafe record.');
+        }
+
+        if (! in_array($event->handover_status, [
+            HsEvent::HANDOVER_ACCEPTED,
+            HsEvent::HANDOVER_NOT_REQUIRED,
+        ], true)) {
+            throw new \DomainException('Accept the H&S handover before recording or revising the WorkSafe decision.');
+        }
     }
 
     /**

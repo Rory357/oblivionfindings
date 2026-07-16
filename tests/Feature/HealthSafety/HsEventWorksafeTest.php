@@ -190,6 +190,65 @@ class HsEventWorksafeTest extends TestCase
         $this->assertSame(HsEvent::WORKSAFE_PENDING, $audit->meta['after']['status']);
     }
 
+    public function test_decision_requires_an_open_event_with_handover_ready_for_hs(): void
+    {
+        $actor = $this->hsOfficer();
+        $awaiting = HsEvent::factory()->worksafeUndecided()->create([
+            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+        ]);
+        $closed = HsEvent::factory()->worksafeUndecided()->closed()->create([
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $payload = [
+            'notifiable' => false,
+            'reason' => 'The documented assessment does not meet the statutory threshold.',
+            'source' => 'manual',
+        ];
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$awaiting->id}/worksafe/decision", $payload)
+            ->assertSessionHas('error', fn (string $message): bool => str_contains($message, 'Accept the H&S handover'));
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$closed->id}/worksafe/decision", $payload)
+            ->assertSessionHas('error', fn (string $message): bool => str_contains($message, 'closed H&S event'));
+
+        $this->assertNull($awaiting->fresh()->worksafe_notifiable);
+        $this->assertNull($closed->fresh()->worksafe_notifiable);
+    }
+
+    public function test_notification_and_acknowledgement_can_progress_after_internal_closure(): void
+    {
+        $actor = $this->hsOfficer();
+        $closedPending = HsEvent::factory()->worksafeNotifiable($actor)->closed()->create([
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $closedNotified = HsEvent::factory()->worksafeNotifiable($actor)->closed()->create([
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_notified_at' => now(),
+            'worksafe_method' => 'online',
+        ]);
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$closedPending->id}/worksafe/notify", [
+                'notified_at' => '2026-06-18',
+                'method' => 'phone',
+            ])
+            ->assertSessionHas('success');
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$closedNotified->id}/worksafe/acknowledge", [
+                'acknowledged_at' => '2026-06-19',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(HsEvent::WORKSAFE_NOTIFIED, $closedPending->fresh()->worksafe_status);
+        $this->assertNotNull($closedPending->fresh()->worksafe_notified_at);
+        $this->assertSame(HsEvent::WORKSAFE_ACKNOWLEDGED, $closedNotified->fresh()->worksafe_status);
+        $this->assertNotNull($closedNotified->fresh()->worksafe_acknowledged_at);
+    }
+
     public function test_retrying_the_same_decision_is_idempotent_and_audited_once(): void
     {
         $actor = $this->hsOfficer();
