@@ -5,15 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
-use App\Services\NotificationService;
 use App\Services\Tasks\TaskAggregator;
+use App\Services\Tasks\TaskAssignmentNotifier;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -58,9 +61,26 @@ class AllTasksController extends Controller
             'include_done' => filter_var($params['done'] ?? false, FILTER_VALIDATE_BOOL),
         ];
 
-        // One provider pass; stats stay stable while filters slice the list.
+        // Stable stats and ordinary results use the normal capped dashboard
+        // feed. Explicit incident-journey search adds one scoped deep pass
+        // rather than re-running every provider or expanding unrelated feeds.
         $items = $aggregator->itemsFor($user, ['include_done' => $filters['include_done']]);
-        $filtered = $aggregator->filterItems($items, $user, $filters);
+        $searchItems = $items;
+
+        if (TaskSearch::hasQuery($filters)) {
+            $journeySources = TaskSearch::incidentJourneySources($filters['sources']);
+
+            if ($journeySources !== []) {
+                $deepMatches = $aggregator->itemsFor($user, [
+                    'sources' => $journeySources,
+                    'include_done' => $filters['include_done'],
+                    'q' => $filters['q'],
+                ]);
+                $searchItems = $aggregator->mergeItems($items, $deepMatches);
+            }
+        }
+
+        $filtered = $aggregator->filterItems($searchItems, $user, $filters);
 
         if ($request->query('format') === 'csv') {
             return $this->exportCsv($filtered);
@@ -204,7 +224,7 @@ class AllTasksController extends Controller
             Cache::forget("tasks.nav.{$assigneeId}");
         }
 
-        \App\Services\Tasks\TaskAssignmentNotifier::notify($user, $provider, $id, $assigneeId);
+        TaskAssignmentNotifier::notify($user, $provider, $id, $assigneeId);
 
         return back()->with('success', $assigneeId === null ? 'Task unassigned.' : 'Task assigned.');
     }
@@ -414,7 +434,7 @@ class AllTasksController extends Controller
                     $item->type,
                     $item->sourceLabel,
                     $item->severity,
-                    $item->status,
+                    $item->displayState ?? $item->status,
                     $item->assignee['name'] ?? '',
                     $item->client['name'] ?? '',
                     $item->site['name'] ?? '',
@@ -483,7 +503,7 @@ class AllTasksController extends Controller
             }
 
             $created = $item->createdAt !== null
-                ? \Illuminate\Support\Carbon::parse($item->createdAt)
+                ? Carbon::parse($item->createdAt)
                 : null;
 
             if ($created !== null && $created->gte($cutoff30)) {

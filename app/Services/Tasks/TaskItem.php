@@ -40,7 +40,26 @@ class TaskItem
         public ?array $journey = null,     // shared incident journey key, source and official references
         public ?string $sourceContext = null,
         public string $actionLabel = 'Open record',
-    ) {}
+        public ?string $displayState = null,
+        /** @var string[] Server-side search material; never serialised to the browser. */
+        public array $searchTerms = [],
+        public ?string $actionHelp = null,
+    ) {
+        $journeySearchTerms = data_get($this->journey, 'search_terms', []);
+        if (is_array($this->journey)) {
+            unset($this->journey['search_terms']);
+        }
+
+        $this->searchTerms = collect([
+            ...$this->searchTerms,
+            ...(is_array($journeySearchTerms) ? $journeySearchTerms : []),
+        ])
+            ->filter(fn ($term) => is_scalar($term) && filled((string) $term))
+            ->map(fn ($term) => (string) $term)
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     private ?bool $overdue = null;
 
@@ -89,6 +108,8 @@ class TaskItem
             'journey' => $this->journey,
             'sourceContext' => $this->sourceContext,
             'actionLabel' => $this->actionLabel,
+            'displayState' => $this->displayState,
+            'actionHelp' => $this->actionHelp,
             'overdue' => $this->isOverdue(),
         ];
     }

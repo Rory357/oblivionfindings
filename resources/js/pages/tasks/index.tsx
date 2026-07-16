@@ -38,6 +38,7 @@ import {
     humanise,
     SEVERITY_VARIANT,
     taskNumericId,
+    taskStateLabel,
     type TaskItem,
     type TaskSeverity,
 } from '@/pages/tasks/types';
@@ -499,7 +500,7 @@ export default function TasksIndex({
             x: e.clientX,
             y: e.clientY,
             tag: item.severity.toUpperCase(),
-            meta: `${item.ref ?? humanise(item.status)} · ${item.sourceLabel}`,
+            meta: `${item.ref ?? taskStateLabel(item)} · ${item.sourceLabel}`,
             items: menu,
         });
     };
@@ -891,7 +892,7 @@ export default function TasksIndex({
                                                         </StatusBadge>
                                                     </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
-                                                        {humanise(item.status)}
+                                                        {taskStateLabel(item)}
                                                     </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                                         {item.assignee ? (

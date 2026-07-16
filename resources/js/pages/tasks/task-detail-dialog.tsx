@@ -42,6 +42,7 @@ import {
     humanise,
     SEVERITY_VARIANT,
     taskNumericId,
+    taskStateLabel,
     type NamedRef,
     type TaskDetail,
     type TaskItem,
@@ -447,7 +448,7 @@ export function TaskDetailDialog({
                                     {humanise(display.severity)}
                                 </StatusBadge>
                                 <StatusBadge variant="neutral" size="sm">
-                                    {humanise(display.status)}
+                                    {taskStateLabel(display)}
                                 </StatusBadge>
                             </div>
                             <DialogTitle className="text-base leading-snug">
@@ -467,6 +468,11 @@ export function TaskDetailDialog({
                             {display.description ? (
                                 <p className="mb-4 text-sm whitespace-pre-line text-muted-foreground">
                                     {display.description}
+                                </p>
+                            ) : null}
+                            {display.actionHelp ? (
+                                <p className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg px-3 py-2 text-sm text-foreground">
+                                    {display.actionHelp}
                                 </p>
                             ) : null}
 

@@ -62,6 +62,8 @@ export interface TaskItem {
     journey?: IncidentJourney | null;
     sourceContext?: string | null;
     actionLabel?: string;
+    displayState?: string | null;
+    actionHelp?: string | null;
     overdue: boolean;
 }
 
@@ -76,6 +78,12 @@ export const SEVERITY_VARIANT: Record<TaskSeverity, StatusVariant> = {
 export function humanise(raw: string): string {
     const label = raw.replace(/[_-]/g, ' ');
     return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+export function taskStateLabel(
+    item: Pick<TaskItem, 'status' | 'displayState'>,
+) {
+    return item.displayState ?? humanise(item.status);
 }
 
 /** Relative due label + tone class. Overdue rows read critical. */

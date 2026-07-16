@@ -10,6 +10,7 @@ use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -50,13 +51,37 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            'client:id,first_name,last_name',
+            'site:id,name',
+            'investigator:id,name',
+            $includeSearchContext
+                ? 'controlRoomAlert:id,reference_number,assigned_to_user_id'
+                : 'controlRoomAlert:id,reference_number',
+            $includeSearchContext
+                ? 'hsEvent:id,reference_number,owner_user_id'
+                : 'hsEvent:id,reference_number',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'followups:id,client_incident_id,assigned_to_user_id',
+                'followups.assignedTo:id,name',
+                'controlRoomAlert.assignedTo:id,name',
+                'controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
+                'controlRoomAlert.tasks.assignedTo:id,name',
+                'hsEvent.owner:id,name',
+                'hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'hsEvent.investigations.leadInvestigator:id,name',
+                'hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'hsEvent.correctiveActions.assignedTo:id,name',
+            );
+        }
+
         $query = ClientIncident::query()
-            ->with([
-                'client:id,first_name,last_name',
-                'site:id,name',
-                'controlRoomAlert:id,reference_number',
-                'hsEvent:id,reference_number',
-            ])
+            ->with($with)
             ->tap(fn ($q) => app(UserSiteAccessService::class)->applyClientIncidentScope(
                 $q,
                 $user,
@@ -68,23 +93,22 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
                 ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
                 fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id)),
             )
+            ->when(
+                $includeSearchContext,
+                fn ($q) => TaskSearch::applyIncidentJourneyPredicate($q, $filters),
+            )
             ->orderByDesc('occurred_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->whereNotIn('status', ['closed']);
         }
 
-        $incidents = $query->get();
-
-        // Resolve investigation assignees in one query — there is no
-        // Eloquent relation for investigation_assigned_to.
-        $assigneeNames = User::query()
-            ->whereIn('id', $incidents->pluck('investigation_assigned_to')->filter()->unique())
-            ->pluck('name', 'id');
-
-        return $incidents->map(function (ClientIncident $incident) use ($assigneeNames) {
-            $journey = IncidentJourneyTaskContext::make($incident);
+        return $query->get()->map(function (ClientIncident $incident) use ($includeSearchContext) {
+            $journey = IncidentJourneyTaskContext::make(
+                $incident,
+                includeSearchContext: $includeSearchContext,
+            );
 
             return new TaskItem(
                 id: 'incident-'.$incident->id,
@@ -100,11 +124,8 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
                     default => TaskItem::BUCKET_OPEN,
                 },
                 severity: TaskItem::normaliseSeverity($incident->severity),
-                assignee: $incident->investigation_assigned_to && $assigneeNames->has($incident->investigation_assigned_to)
-                    ? [
-                        'id' => (int) $incident->investigation_assigned_to,
-                        'name' => (string) $assigneeNames[$incident->investigation_assigned_to],
-                    ]
+                assignee: $incident->investigator
+                    ? ['id' => $incident->investigator->id, 'name' => $incident->investigator->name]
                     : null,
                 client: $journey['person'] ?? null,
                 site: $journey['site'] ?? null,

@@ -928,7 +928,7 @@ php artisan test tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php
 npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add app/Http/Requests/HealthSafety/UploadHsCorrectiveActionEvidenceRequest.php app/Http/Controllers/HealthSafety/HsCorrectiveActionEvidenceController.php app/Models/HsCorrectiveAction.php routes/health-safety.php tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/corrective-actions/index.tsx docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
@@ -1076,7 +1076,12 @@ git commit -m "feat(health-safety): make verification evidence complete"
 - Modify: `app/Services/Tasks/TaskAggregator.php`
 - Modify: `app/Services/Tasks/Providers/HsCorrectiveActionProvider.php`
 - Modify: `app/Services/Tasks/Providers/ControlRoomAlertProvider.php`
+- Modify: `app/Services/Tasks/Providers/ClientIncidentProvider.php`
+- Modify: `app/Services/Tasks/Providers/IncidentFollowupProvider.php`
+- Modify: `app/Services/Tasks/Providers/HsEventProvider.php`
+- Modify: `app/Services/Tasks/Providers/HsInvestigationProvider.php`
 - Modify: `app/Services/Tasks/IncidentJourneyTaskContext.php`
+- Create: `app/Services/Tasks/TaskSearch.php`
 - Modify: `app/Http/Controllers/AllTasksController.php`
 - Modify: `resources/js/pages/tasks/types.ts`
 - Modify: `resources/js/pages/tasks/index.tsx`
@@ -1086,7 +1091,7 @@ git commit -m "feat(health-safety): make verification evidence complete"
 - Modify: `tests/Feature/Tasks/AllTasksDashboardTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing status, bucket, and search tests**
+- [x] **Step 1: Write failing status, bucket, and search tests**
 
 Backend tests must assert:
 
@@ -1109,14 +1114,14 @@ Search must find the journey by:
 
 Closed actions alone belong in done/history.
 
-- [ ] **Step 2: Run backend and frontend tests**
+- [x] **Step 2: Run backend and frontend tests**
 
 ```powershell
 php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksDashboardTest.php
 npx vitest run resources/js/pages/tasks/tasks-incident-journey.test.tsx
 ```
 
-- [ ] **Step 3: Add explicit display and search fields to `TaskItem`**
+- [x] **Step 3: Add explicit display and search fields to `TaskItem`**
 
 ```php
 public function __construct(
@@ -1127,9 +1132,12 @@ public function __construct(
 ) {}
 ```
 
-Serialize them in `toArray()`.
+Serialize `displayState` and `actionHelp` in `toArray()`. Keep `searchTerms`
+server-side only and remove journey `search_terms` before serialization so
+private narrative, witness, consequence, source-task, and owner search material
+never enters an Inertia or detail payload.
 
-- [ ] **Step 4: Map corrective-action lifecycle truth**
+- [x] **Step 4: Map corrective-action lifecycle truth**
 
 ```php
 displayState: match ($action->status) {
@@ -1143,7 +1151,7 @@ displayState: match ($action->status) {
 
 Keep `completed` and `verified` in `BUCKET_IN_PROGRESS`.
 
-- [ ] **Step 5: Expand the search haystack**
+- [x] **Step 5: Expand the search haystack**
 
 ```php
 $haystack = strtolower(implode(' ', array_filter([
@@ -1161,8 +1169,18 @@ $haystack = strtolower(implode(' ', array_filter([
 ```
 
 Populate source task title/description and incident narrative in the journey task context, not through new database columns.
+Merge every responsibility owner into that shared server-side journey haystack,
+so searching any Control Room, incident, follow-up, investigation, or corrective
+action owner returns the complete journey.
 
-- [ ] **Step 6: Render `displayState` everywhere**
+Normal dashboard feeds remain capped at 300 rows per provider and omit private
+search-only relationship graphs. When `q` is nonblank, only the six audited
+incident-journey providers use the exhaustive path. `TaskSearch` pushes the
+shared journey predicate into SQL before hydration, and the controller passes
+any selected source filter into that deep pass instead of re-running unrelated
+providers. Stable dashboard stats continue to use the normal capped feed.
+
+- [x] **Step 6: Render `displayState` everywhere**
 
 Replace `humanise(item.status)` for the primary lifecycle label with:
 
@@ -1172,17 +1190,21 @@ item.displayState ?? humanise(item.status)
 
 The row, detail dialog, stats, and history tab must agree.
 
-- [ ] **Step 7: Re-run tests**
+- [x] **Step 7: Re-run tests**
 
 ```powershell
 php artisan test tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksDashboardTest.php
 npx vitest run resources/js/pages/tasks/tasks-incident-journey.test.tsx
 ```
 
+Final Task 10 result: 24 backend tests passed with 223 assertions and 3
+frontend tests passed. TypeScript, targeted ESLint, Prettier, Pint, PHP syntax,
+and diff integrity are clean.
+
 - [ ] **Step 8: Commit**
 
 ```powershell
-git add app/Services/Tasks/TaskItem.php app/Services/Tasks/TaskAggregator.php app/Services/Tasks/Providers/HsCorrectiveActionProvider.php app/Services/Tasks/Providers/ControlRoomAlertProvider.php app/Services/Tasks/IncidentJourneyTaskContext.php app/Http/Controllers/AllTasksController.php resources/js/pages/tasks/types.ts resources/js/pages/tasks/index.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/tasks-incident-journey.test.tsx tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/Tasks/AllTasksDashboardTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add app/Http/Controllers/AllTasksController.php app/Services/Tasks app/Services/Tasks/Providers resources/js/pages/tasks/types.ts resources/js/pages/tasks/index.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/tasks-incident-journey.test.tsx tests/Feature/Tasks/AllTasksIncidentJourneyTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "feat(tasks): show truthful journey responsibility state"
 ```
 

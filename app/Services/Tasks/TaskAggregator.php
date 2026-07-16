@@ -167,6 +167,34 @@ class TaskAggregator
 
         $items = $this->filterItems(array_values($items), $user, $filters);
 
+        return $this->sortItems($items);
+    }
+
+    /**
+     * Merge canonical task sets and restore the normal queue order.
+     *
+     * @param  TaskItem[]  ...$itemSets
+     * @return TaskItem[]
+     */
+    public function mergeItems(array ...$itemSets): array
+    {
+        $items = [];
+
+        foreach ($itemSets as $itemSet) {
+            foreach ($itemSet as $item) {
+                $items[$item->id] = $item;
+            }
+        }
+
+        return $this->sortItems(array_values($items));
+    }
+
+    /**
+     * @param  TaskItem[]  $items
+     * @return TaskItem[]
+     */
+    private function sortItems(array $items): array
+    {
         usort($items, function (TaskItem $a, TaskItem $b) {
             // Overdue first, then severity, then due date (nulls last), newest last.
             if ($a->isOverdue() !== $b->isOverdue()) {
@@ -307,6 +335,7 @@ class TaskAggregator
         $q = trim((string) ($filters['q'] ?? ''));
         if ($q !== '') {
             $journeyReferences = collect(data_get($item->journey, 'references', []))
+                ->flatten()
                 ->filter()
                 ->implode(' ');
             $haystack = strtolower(implode(' ', array_filter([
@@ -315,6 +344,11 @@ class TaskAggregator
                 $item->title,
                 $item->description,
                 $item->sourceContext,
+                $item->displayState,
+                data_get($item->client, 'name'),
+                data_get($item->site, 'name'),
+                data_get($item->assignee, 'name'),
+                ...$item->searchTerms,
             ])));
             if (! str_contains($haystack, strtolower($q))) {
                 return false;
