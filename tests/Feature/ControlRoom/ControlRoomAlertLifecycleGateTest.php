@@ -318,6 +318,24 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $this->assertSame(0, HsCorrectiveAction::query()->where('hs_event_id', $event->id)->count());
     }
 
+    public function test_transfer_requires_an_explicit_due_date_before_creating_health_safety_work(): void
+    {
+        $alert = $this->alertFactory()->triaging()->create();
+        $event = $this->hsEventFactory($alert)->handoverAccepted($this->admin, $this->admin)->create([
+            'control_room_alert_id' => $alert->id,
+        ]);
+        $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS, ['due_at' => null]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->assertRedirect()
+            ->assertSessionHasErrors('task');
+
+        $this->assertSame(AlertTask::STATUS_IN_PROGRESS, $task->fresh()->status);
+        $this->assertNull($task->fresh()->transferred_to_hs_corrective_action_id);
+        $this->assertSame(0, HsCorrectiveAction::query()->where('hs_event_id', $event->id)->count());
+    }
+
     public function test_transfer_retry_rejects_a_soft_deleted_corrective_action(): void
     {
         $alert = $this->alertFactory()->triaging()->create();
@@ -485,6 +503,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             'title' => 'Operational response task',
             'priority' => 'medium',
             'status' => $status,
+            'due_at' => now()->addDays(5),
             'created_by_user_id' => $this->admin->id,
             'sort_order' => 1,
         ], $overrides));

@@ -2306,6 +2306,18 @@ function AddCorrectiveActionPane({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (!form.data.title.trim()) {
+            form.setError('title', 'Give the corrective action a title.');
+            return;
+        }
+        if (!form.data.assigned_to_user_id) {
+            form.setError('assigned_to_user_id', 'Choose the person responsible.');
+            return;
+        }
+        if (!form.data.due_date) {
+            form.setError('due_date', 'Set the date this action is due.');
+            return;
+        }
         form.post(`/health-safety/events/${d.id}/corrective-actions`, {
             preserveScroll: true,
             preserveState: true,
@@ -2365,7 +2377,7 @@ function AddCorrectiveActionPane({
                         options={ACTION_TYPES}
                     />
                 </Field>
-                <Field label="Due" error={form.errors.due_date}>
+                <Field label="Due" required error={form.errors.due_date}>
                     <Input
                         type="date"
                         value={form.data.due_date}
@@ -2377,21 +2389,29 @@ function AddCorrectiveActionPane({
             </div>
             <Field
                 label="Owner"
-                hint="Optional"
+                required
                 error={form.errors.assigned_to_user_id}
             >
                 <StaffSelect
                     value={form.data.assigned_to_user_id}
                     onChange={(v) => form.setData('assigned_to_user_id', v)}
                     staff={d.assignable_staff}
-                    placeholder="Unassigned"
+                    placeholder="Choose owner"
                 />
             </Field>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        !form.data.title.trim() ||
+                        !form.data.assigned_to_user_id ||
+                        !form.data.due_date
+                    }
+                >
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}

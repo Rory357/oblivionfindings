@@ -595,16 +595,26 @@ git commit -m "feat(health-safety): link corrective actions to source tasks"
 - Create: `app/Http/Requests/HealthSafety/StoreHsCorrectiveActionRequest.php`
 - Create: `app/Http/Requests/HealthSafety/CreateHsCorrectiveActionFromRecommendationRequest.php`
 - Modify: `app/Http/Controllers/HealthSafety/HsCorrectiveActionController.php`
+- Modify: `app/Http/Controllers/HealthSafety/HsInvestigationController.php`
+- Modify: `app/Http/Controllers/IncidentController.php`
 - Modify: `app/Services/HealthSafety/HsCorrectiveActionService.php`
 - Modify: `app/Services/ControlRoom/ControlRoomAlertLifecycleService.php`
 - Modify: `app/Services/HealthSafety/HsInvestigationService.php`
+- Modify: `app/Services/UserSiteAccessService.php`
+- Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
+- Modify: `resources/js/components/incidents/incident-detail-dialog.tsx`
+- Modify: `resources/js/components/incidents/incident-detail-dialog.test.tsx`
 - Modify: `tests/Feature/HealthSafety/HsCorrectiveActionTest.php`
 - Modify: `tests/Feature/HealthSafety/HsRecommendationDispositionTest.php`
+- Modify: `tests/Feature/HealthSafety/HsEventClosureTest.php`
+- Modify: `tests/Feature/HealthSafety/HsEventSiteIsolationTest.php`
+- Modify: `tests/Feature/HealthSafety/HsEventWorkflowTest.php`
 - Modify: `tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php`
 - Modify: `tests/Feature/Tasks/AllTasksIncidentJourneyTest.php`
+- Modify: `tests/Feature/IncidentControllerTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing creation-contract tests**
+- [x] **Step 1: Write failing creation-contract tests**
 
 Every new action path must reject:
 
@@ -627,7 +637,7 @@ expect($retry->id)->toBe($first->id)
     ->and($task->fresh()->status)->toBe(AlertTask::STATUS_TRANSFERRED);
 ```
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/Tasks/AllTasksIncidentJourneyTest.php
@@ -635,7 +645,7 @@ php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Fea
 
 Expected: owner/source-choice tests fail.
 
-- [ ] **Step 3: Add strict request contracts**
+- [x] **Step 3: Add strict request contracts**
 
 ```php
 return [
@@ -653,7 +663,7 @@ return [
 ];
 ```
 
-- [ ] **Step 4: Make creation atomic and retry-safe**
+- [x] **Step 4: Make creation atomic and retry-safe**
 
 Use one transactional service entry:
 
@@ -690,11 +700,11 @@ $task->forceFill([
 ])->save();
 ```
 
-- [ ] **Step 5: Remove ownerless defaults from standalone and bulk creation**
+- [x] **Step 5: Remove ownerless defaults from standalone and bulk creation**
 
 Do not silently suggest an owner. `bulkCreateFromRecommendations()` must accept an explicit per-recommendation assignment map or reject the call; update every current caller/test fixture.
 
-- [ ] **Step 6: Re-run focused tests**
+- [x] **Step 6: Re-run focused tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/Tasks/AllTasksIncidentJourneyTest.php
@@ -702,7 +712,7 @@ php artisan test tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Fea
 
 Expected: all creation, transfer, duplicate-prevention, and authorization tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Http/Requests/HealthSafety/StoreHsCorrectiveActionRequest.php app/Http/Requests/HealthSafety/CreateHsCorrectiveActionFromRecommendationRequest.php app/Http/Controllers/HealthSafety/HsCorrectiveActionController.php app/Services/HealthSafety/HsCorrectiveActionService.php app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Services/HealthSafety/HsInvestigationService.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php tests/Feature/HealthSafety/HsRecommendationDispositionTest.php tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/Tasks/AllTasksIncidentJourneyTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md

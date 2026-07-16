@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ClientIncident;
 use App\Models\HsCorrectiveAction;
@@ -38,6 +39,11 @@ class HsEventClosureTest extends TestCase
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => $user->organization_id,
+            'user_id' => $user->id,
+            'secondary_site_ids' => [],
+        ]);
 
         return $user;
     }
@@ -227,6 +233,13 @@ class HsEventClosureTest extends TestCase
             0,
             HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
             $actor,
+            actionData: [
+                'assigned_to_user_id' => $actor->id,
+                'due_date' => now()->addDays(14)->toDateString(),
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'responsibility_choice' => 'new_responsibility',
+                'new_responsibility_reason' => 'This verified recommendation requires a new H&S responsibility.',
+            ],
         );
         $service->dispositionRecommendation(
             $investigation->fresh(),

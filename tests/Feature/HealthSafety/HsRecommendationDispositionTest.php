@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsInvestigation;
@@ -73,25 +74,30 @@ class HsRecommendationDispositionTest extends TestCase
 
     public function test_corrective_action_disposition_creates_links_and_reuses_exactly_one_action(): void
     {
-        $actor = User::factory()->create();
+        $actor = $this->hsOfficer();
+        $retryActor = $this->hsOfficer();
         $this->actingAs($actor);
         $investigation = HsInvestigation::factory()->completed()->create();
+        $payload = $this->newResponsibilityPayload($actor);
 
         $first = $this->service->dispositionRecommendation(
             $investigation,
             0,
             HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
             $actor,
+            actionData: $payload,
         );
         $second = $this->service->dispositionRecommendation(
             $investigation->fresh(),
             0,
             HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
-            $actor,
+            $retryActor,
+            actionData: $payload,
         );
 
         $this->assertSame($first->id, $second->id);
         $this->assertSame($first->hs_corrective_action_id, $second->hs_corrective_action_id);
+        $this->assertSame($actor->id, $second->decided_by_user_id);
         $this->assertNotNull($first->hs_corrective_action_id);
         $this->assertDatabaseCount('hs_recommendation_dispositions', 1);
         $this->assertDatabaseCount('hs_corrective_actions', 1);
@@ -106,10 +112,15 @@ class HsRecommendationDispositionTest extends TestCase
 
     public function test_existing_corrective_action_must_be_linked_not_contradicted_by_a_non_action_outcome(): void
     {
-        $actor = User::factory()->create();
+        $actor = $this->hsOfficer();
         $this->actingAs($actor);
         $investigation = HsInvestigation::factory()->completed()->create();
-        app(HsCorrectiveActionService::class)->createFromRecommendation($investigation, 0);
+        app(HsCorrectiveActionService::class)->createFromRecommendation(
+            $investigation,
+            0,
+            $this->newResponsibilityPayload($actor),
+            $actor,
+        );
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('corrective action');
@@ -189,6 +200,49 @@ class HsRecommendationDispositionTest extends TestCase
         $this->assertDatabaseCount('hs_recommendation_dispositions', 0);
     }
 
+    public function test_corrective_action_endpoint_requires_complete_explicit_ownership_data(): void
+    {
+        $officer = $this->hsOfficer();
+        $investigation = HsInvestigation::factory()->completed()->create();
+        $path = "/health-safety/events/{$investigation->hs_event_id}/investigations/{$investigation->id}/recommendations/0/disposition";
+
+        $this->actingAs($officer)
+            ->post($path, [
+                'disposition' => HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+            ])
+            ->assertSessionHasErrors([
+                'assigned_to_user_id',
+                'due_date',
+                'priority',
+                'responsibility_choice',
+            ]);
+
+        $this->actingAs($officer)
+            ->post($path, [
+                'disposition' => HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                'assigned_to_user_id' => $officer->id,
+                'due_date' => '2026-08-31',
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'responsibility_choice' => 'new_responsibility',
+            ])
+            ->assertSessionHasErrors('new_responsibility_reason');
+
+        $this->actingAs($officer)
+            ->post($path, [
+                'disposition' => HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                ...$this->newResponsibilityPayload($officer),
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('hs_corrective_actions', [
+            'hs_investigation_id' => $investigation->id,
+            'recommendation_index' => 0,
+            'assigned_to_user_id' => $officer->id,
+            'due_date' => '2026-08-31',
+        ]);
+    }
+
     public function test_event_detail_exposes_each_recommendation_decision_and_closure_override_capability(): void
     {
         $actor = $this->overrideOfficer();
@@ -206,6 +260,10 @@ class HsRecommendationDispositionTest extends TestCase
             1,
             HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
             $actor,
+            actionData: $this->newResponsibilityPayload($actor, [
+                'due_date' => '2026-09-15',
+                'priority' => HsCorrectiveAction::PRIORITY_MEDIUM,
+            ]),
         );
 
         $this->actingAs($actor)
@@ -243,6 +301,11 @@ class HsRecommendationDispositionTest extends TestCase
         $user = User::factory()->create(['role' => 'health_safety_officer', 'approved_at' => now()]);
         $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
         $user->roles()->attach($role);
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => $user->organization_id,
+            'user_id' => $user->id,
+            'secondary_site_ids' => [],
+        ]);
 
         return $user;
     }
@@ -256,5 +319,17 @@ class HsRecommendationDispositionTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    /** @return array<string, mixed> */
+    private function newResponsibilityPayload(User $owner, array $overrides = []): array
+    {
+        return array_merge([
+            'assigned_to_user_id' => $owner->id,
+            'due_date' => '2026-08-31',
+            'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+            'responsibility_choice' => 'new_responsibility',
+            'new_responsibility_reason' => 'This recommendation creates a new H&S responsibility with a named owner.',
+        ], $overrides);
     }
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -141,6 +141,7 @@ function incidentDetail(): IncidentDetail {
             raiseCorrectiveAction: false,
         },
         assignable_staff: [],
+        corrective_action_owners: [],
     } as IncidentDetail;
 }
 
@@ -217,6 +218,32 @@ describe('IncidentDetailDialog H&S handover', () => {
         ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: /Health & Safety event/i }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('offers only eligible H&S owners when raising a corrective action', () => {
+        const detail = incidentDetail();
+        detail.can.raiseCorrectiveAction = true;
+        detail.assignable_staff = [
+            { id: 41, name: 'General Follow-up Assignee' },
+        ];
+        detail.corrective_action_owners = [
+            { id: 82, name: 'Eligible H&S Owner' },
+        ];
+
+        render(<InvestigationSection d={detail} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Raise corrective action' }),
+        );
+        fireEvent.click(screen.getByRole('combobox', { name: 'Choose owner' }));
+
+        expect(
+            screen.getByRole('option', { name: 'Eligible H&S Owner' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('option', {
+                name: 'General Follow-up Assignee',
+            }),
         ).not.toBeInTheDocument();
     });
 });

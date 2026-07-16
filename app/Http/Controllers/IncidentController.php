@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
@@ -465,6 +466,30 @@ class IncidentController extends Controller
         $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
         $canOpenControlRoomAlert = $incident->controlRoomAlert
             && $this->canOpenControlRoomAlert($user, $incident->controlRoomAlert);
+        $canRaiseCorrectiveAction = $user->canDo('incidents.viewAny')
+            || $user->canDo('compliance.view')
+            || $user->canDo('hazards.view');
+        $correctiveActionOwners = [];
+        if ($hsEvent && $canRaiseCorrectiveAction) {
+            $ownerQuery = User::query();
+            app(UserSiteAccessService::class)->applyHsEventStaffScope(
+                $ownerQuery,
+                $hsEvent,
+                $user,
+                ['healthSafety.viewAllSites'],
+            );
+            $correctiveActionOwners = $ownerQuery
+                ->orderBy('name')
+                ->limit(200)
+                ->get(['id', 'name'])
+                ->filter(fn (User $candidate): bool => $candidate->canDo('hazards.manage'))
+                ->map(fn (User $candidate): array => [
+                    'id' => $candidate->id,
+                    'name' => $candidate->name,
+                ])
+                ->values()
+                ->all();
+        }
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
@@ -658,12 +683,14 @@ class IncidentController extends Controller
                 'followupsManage' => $user->canDo('incidents.followups.manage'),
                 'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
                 'portalManage' => $user->canDo('incidents.portal.manage'),
-                'raiseCorrectiveAction' => $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'),
+                'raiseCorrectiveAction' => $canRaiseCorrectiveAction,
             ],
-            // Assignee options for the add-follow-up + raise-corrective-action forms.
+            // Follow-up assignees remain broader than the site-scoped H&S owner
+            // list used by the corrective-action form.
             'assignable_staff' => ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'))
                 ? User::staff()->orderBy('name')->get(['id', 'name'])
                 : [],
+            'corrective_action_owners' => $correctiveActionOwners,
         ];
     }
 
@@ -1714,19 +1741,16 @@ class IncidentController extends Controller
      * incident's HsEvent. No copy is stored on the incident — it is surfaced
      * read-only on the detail from the H&S register.
      */
-    public function raiseCorrectiveAction(Request $request, ClientIncident $incident, HsCorrectiveActionService $service)
-    {
+    public function raiseCorrectiveAction(
+        StoreHsCorrectiveActionRequest $request,
+        ClientIncident $incident,
+        HsCorrectiveActionService $service,
+    ) {
         $this->authorize('view', $incident);
         $user = $request->user();
         abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view')), 403);
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'priority' => ['nullable', 'in:low,medium,high,critical'],
-            'due_date' => ['nullable', 'date'],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
+        $data = $request->validated();
 
         $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
@@ -1740,16 +1764,14 @@ class IncidentController extends Controller
             return back()->with('error', 'The Health & Safety event is closed; corrective actions can no longer be added.');
         }
 
-        $service->createStandalone($hsEvent, [
-            'title' => $data['title'],
-            'description' => $data['description'] ?? null,
-            'action_type' => 'corrective',
-            'priority' => $data['priority'] ?? 'medium',
-            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-            'assigned_by_user_id' => $user->id,
-            'due_date' => $data['due_date'] ?? null,
-            'created_by' => $user->id,
-        ]);
+        try {
+            $service->createStandalone($hsEvent, [
+                ...$data,
+                'action_type' => 'corrective',
+            ], $user);
+        } catch (\InvalidArgumentException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', 'Corrective action raised in the Health & Safety register.');
     }

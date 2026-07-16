@@ -663,7 +663,7 @@ class ControlRoomAlertLifecycleService
                 'assigned_by_user_id' => $actor->id,
                 'due_date' => $locked->due_at?->toDateString(),
                 'created_by' => $actor->id,
-            ]);
+            ], $actor);
             $at = now();
             $locked->forceFill([
                 'status' => AlertTask::STATUS_TRANSFERRED,

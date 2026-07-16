@@ -2326,11 +2326,19 @@ class IncidentControllerTest extends TestCase
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
             ->sole();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/incidents/{$incident->id}/corrective-actions", [
                 'title' => 'Install a grab rail in the bathroom',
                 'priority' => 'high',
+                'assigned_to_user_id' => $this->admin->id,
+                'due_date' => now()->addDays(14)->toDateString(),
             ])
             ->assertRedirect();
 
@@ -2340,7 +2348,17 @@ class IncidentControllerTest extends TestCase
             'title' => 'Install a grab rail in the bathroom',
             'priority' => 'high',
             'status' => 'open',
+            'assigned_to_user_id' => $this->admin->id,
         ]);
+
+        $this->actingAs($this->admin)
+            ->get("/incidents?incident={$incident->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('detail.corrective_action_owners', 1)
+                ->where('detail.corrective_action_owners.0.id', $this->admin->id)
+                ->where('detail.corrective_action_owners.0.name', $this->admin->name)
+            );
     }
 
     public function test_raise_corrective_action_requires_permission(): void

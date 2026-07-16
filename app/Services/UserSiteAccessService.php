@@ -654,19 +654,34 @@ class UserSiteAccessService
         ?User $viewer,
         array $bypassPermissions = [],
     ): Builder {
+        $eventOrganizationId = $event->organization_id !== null
+            ? (int) $event->organization_id
+            : ($event->site_id !== null
+                ? Site::query()->whereKey($event->site_id)->value('tenant_id')
+                : null);
+        if ($eventOrganizationId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
         $query
             ->staff()
-            ->whereNotNull($query->qualifyColumn('approved_at'));
+            ->where($query->qualifyColumn('organization_id'), (int) $eventOrganizationId)
+            ->whereNotNull($query->qualifyColumn('approved_at'))
+            ->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($event, $eventOrganizationId): void {
+                $profileQuery
+                    ->where($profileQuery->qualifyColumn('tenant_id'), (int) $eventOrganizationId)
+                    ->where($profileQuery->qualifyColumn('is_active'), true);
 
-        if ($event->site_id !== null) {
-            $siteId = (int) $event->site_id;
-            $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+                if ($event->site_id === null) {
+                    return;
+                }
+
+                $siteId = (int) $event->site_id;
                 $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
                     $siteQuery->where('primary_site_id', $siteId)
                         ->orWhereJsonContains('secondary_site_ids', $siteId);
                 });
             });
-        }
 
         return $this->applyStaffScope($query, $viewer, $bypassPermissions);
     }

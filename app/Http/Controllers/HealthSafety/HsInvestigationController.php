@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
@@ -171,7 +172,52 @@ class HsInvestigationController extends Controller
                 'string',
                 'max:2000',
             ],
+            'assigned_to_user_id' => [
+                'nullable',
+                'required_if:disposition,'.HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                'integer',
+            ],
+            'due_date' => [
+                'nullable',
+                'required_if:disposition,'.HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                'date_format:Y-m-d',
+            ],
+            'priority' => [
+                'nullable',
+                'required_if:disposition,'.HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                Rule::in([
+                    HsCorrectiveAction::PRIORITY_LOW,
+                    HsCorrectiveAction::PRIORITY_MEDIUM,
+                    HsCorrectiveAction::PRIORITY_HIGH,
+                    HsCorrectiveAction::PRIORITY_CRITICAL,
+                ]),
+            ],
+            'responsibility_choice' => [
+                'nullable',
+                'required_if:disposition,'.HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                Rule::in(['transfer_task', 'new_responsibility']),
+            ],
+            'source_control_room_task_id' => [
+                'nullable',
+                'required_if:responsibility_choice,transfer_task',
+                'integer',
+            ],
+            'new_responsibility_reason' => [
+                'nullable',
+                'required_if:responsibility_choice,new_responsibility',
+                'string',
+                'min:10',
+                'max:1000',
+            ],
         ]);
+        if ($data['disposition'] === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
+            $this->assertStaffAreAssignable(
+                $request,
+                $event,
+                [(int) $data['assigned_to_user_id']],
+                'assigned_to_user_id',
+            );
+        }
 
         try {
             $this->service->dispositionRecommendation(
@@ -180,6 +226,9 @@ class HsInvestigationController extends Controller
                 $data['disposition'],
                 $request->user(),
                 $data['reason'] ?? null,
+                $data['disposition'] === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION
+                    ? $data
+                    : null,
             );
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());

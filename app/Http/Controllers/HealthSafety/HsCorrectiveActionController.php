@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\HealthSafety\CreateHsCorrectiveActionFromRecommendationRequest;
+use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
@@ -10,7 +12,6 @@ use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,37 +29,18 @@ class HsCorrectiveActionController extends Controller
     ) {}
 
     /** Add a standalone corrective action to the event. */
-    public function store(Request $request, HsEvent $event)
+    public function store(StoreHsCorrectiveActionRequest $request, HsEvent $event)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
-
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'priority' => ['required', Rule::in([
-                HsCorrectiveAction::PRIORITY_LOW,
-                HsCorrectiveAction::PRIORITY_MEDIUM,
-                HsCorrectiveAction::PRIORITY_HIGH,
-                HsCorrectiveAction::PRIORITY_CRITICAL,
-            ])],
-            'action_type' => ['nullable', Rule::in([
-                HsCorrectiveAction::TYPE_CORRECTIVE,
-                HsCorrectiveAction::TYPE_PREVENTIVE,
-                HsCorrectiveAction::TYPE_IMPROVEMENT,
-            ])],
-            'assigned_to_user_id' => ['nullable', 'integer'],
-            'due_date' => ['nullable', 'date'],
-        ]);
-        if (isset($data['assigned_to_user_id'])) {
-            $this->assertStaffIsAssignable(
-                $request,
-                $event,
-                (int) $data['assigned_to_user_id'],
-            );
-        }
+        $data = $request->validated();
+        $this->assertStaffIsAssignable(
+            $request,
+            $event,
+            (int) $data['assigned_to_user_id'],
+        );
 
         try {
-            $this->service->createStandalone($event, $data);
+            $this->service->createStandalone($event, $data, $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -67,15 +49,28 @@ class HsCorrectiveActionController extends Controller
     }
 
     /** Seed a corrective action from an investigation recommendation (E-Gap 6). */
-    public function seedFromRecommendation(Request $request, HsEvent $event, HsInvestigation $investigation)
-    {
+    public function seedFromRecommendation(
+        CreateHsCorrectiveActionFromRecommendationRequest $request,
+        HsEvent $event,
+        HsInvestigation $investigation,
+    ) {
         $event = $this->resolveAccessibleEvent($request, $event);
         abort_unless($investigation->hs_event_id === $event->id, 404);
 
-        $data = $request->validate(['recommendation_index' => ['required', 'integer', 'min:0']]);
+        $data = $request->validated();
+        $this->assertStaffIsAssignable(
+            $request,
+            $event,
+            (int) $data['assigned_to_user_id'],
+        );
 
         try {
-            $this->service->createFromRecommendation($investigation, $data['recommendation_index']);
+            $this->service->createFromRecommendation(
+                $investigation,
+                $data['recommendation_index'],
+                $data,
+                $request->user(),
+            );
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }

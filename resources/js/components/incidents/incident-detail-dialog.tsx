@@ -166,6 +166,7 @@ export type IncidentDetail = {
         raiseCorrectiveAction: boolean;
     };
     assignable_staff: Array<{ id: number; name: string }>;
+    corrective_action_owners: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{
         id: number;
         reference_number: string | null;
@@ -1567,6 +1568,17 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
             form.setError('title', 'Give the corrective action a title.');
             return;
         }
+        if (!form.data.assigned_to_user_id) {
+            form.setError(
+                'assigned_to_user_id',
+                'Choose the person responsible.',
+            );
+            return;
+        }
+        if (!form.data.due_date) {
+            form.setError('due_date', 'Set the date this action is due.');
+            return;
+        }
         form.post(`/incidents/${d.id}/corrective-actions`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -1621,18 +1633,22 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                         ]}
                     />
                 </Field>
-                <Field label="Owner">
+                <Field
+                    label="Owner"
+                    required
+                    error={form.errors.assigned_to_user_id}
+                >
                     <SelectInput
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.assignable_staff.map((s) => ({
+                        placeholder="Choose owner"
+                        options={d.corrective_action_owners.map((s) => ({
                             value: String(s.id),
                             label: s.name,
                         }))}
                     />
                 </Field>
-                <Field label="Due">
+                <Field label="Due" required error={form.errors.due_date}>
                     <Input
                         type="date"
                         value={form.data.due_date}
@@ -1655,7 +1671,16 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                 >
                     Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={
+                        form.processing ||
+                        !form.data.title.trim() ||
+                        !form.data.assigned_to_user_id ||
+                        !form.data.due_date
+                    }
+                >
                     Raise in H&amp;S register
                 </Button>
             </div>

@@ -2,11 +2,20 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\ClientIncident;
+use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
+use App\Models\User;
+use App\Notifications\AppEventNotification;
+use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 /**
  * Service for managing the HsCorrectiveAction lifecycle.
@@ -19,6 +28,14 @@ use Illuminate\Support\Facades\Log;
  */
 class HsCorrectiveActionService
 {
+    public const RESPONSIBILITY_TRANSFER_TASK = 'transfer_task';
+
+    public const RESPONSIBILITY_NEW = 'new_responsibility';
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /* ------------------------------------------------------------------ */
     /*  Creation */
     /* ------------------------------------------------------------------ */
@@ -26,69 +43,213 @@ class HsCorrectiveActionService
     /**
      * Create a corrective action from an investigation recommendation.
      *
-     * @param  HsInvestigation  $investigation  Source investigation (must be completed or have findings)
+     * @param  HsInvestigation  $investigation  Source investigation
      * @param  int  $recommendationIndex  Zero-based index into recommendations JSON array
-     * @param  array  $overrides  Optional field overrides (assigned_to, due_date, etc.)
+     * @param  array  $data  Explicit ownership, due date and responsibility source
      *
-     * @throws \InvalidArgumentException if recommendation doesn't exist or action already exists
+     * @throws InvalidArgumentException
      */
     public function createFromRecommendation(
         HsInvestigation $investigation,
         int $recommendationIndex,
-        array $overrides = [],
+        array $data,
+        User $actor,
     ): HsCorrectiveAction {
-        // Guard: investigation must have recommendations
-        $recommendations = $investigation->recommendations ?? [];
+        return DB::transaction(function () use ($investigation, $recommendationIndex, $data, $actor): HsCorrectiveAction {
+            $locked = HsInvestigation::query()
+                ->whereKey($investigation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if (! isset($recommendations[$recommendationIndex])) {
-            throw new \InvalidArgumentException(
-                "Recommendation index [{$recommendationIndex}] does not exist on investigation [{$investigation->reference_number}]."
+            $recommendations = $locked->recommendations ?? [];
+            if (! array_key_exists($recommendationIndex, $recommendations)) {
+                throw new InvalidArgumentException(
+                    "Recommendation index [{$recommendationIndex}] does not exist on investigation [{$locked->reference_number}].",
+                );
+            }
+
+            $event = HsEvent::query()
+                ->whereKey($locked->hs_event_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $ownerId = $this->requiredPositiveInteger(
+                $data,
+                'assigned_to_user_id',
+                'An eligible owner is required.',
             );
-        }
+            $dueDate = $this->requiredDueDate($data);
+            $priority = $this->requiredPriority($data);
+            $responsibilityChoice = $data['responsibility_choice'] ?? null;
+            if (! in_array($responsibilityChoice, [
+                self::RESPONSIBILITY_TRANSFER_TASK,
+                self::RESPONSIBILITY_NEW,
+            ], true)) {
+                throw new InvalidArgumentException(
+                    'A responsibility choice is required: transfer task or new responsibility.',
+                );
+            }
 
-        // Guard: no duplicate action for same investigation + recommendation index
-        $exists = HsCorrectiveAction::where('hs_investigation_id', $investigation->id)
-            ->where('recommendation_index', $recommendationIndex)
-            ->exists();
+            $disposition = HsRecommendationDisposition::query()
+                ->where('hs_investigation_id', $locked->id)
+                ->where('recommendation_index', $recommendationIndex)
+                ->lockForUpdate()
+                ->first();
+            if ($disposition
+                && $disposition->disposition !== HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
+                throw new InvalidArgumentException(
+                    'This recommendation already has a non-action outcome and cannot also create corrective work.',
+                );
+            }
 
-        if ($exists) {
-            throw new \InvalidArgumentException(
-                "A corrective action already exists for recommendation [{$recommendationIndex}] on investigation [{$investigation->reference_number}]."
-            );
-        }
+            $existing = HsCorrectiveAction::query()
+                ->where('hs_investigation_id', $locked->id)
+                ->where('recommendation_index', $recommendationIndex)
+                ->lockForUpdate()
+                ->first();
+            if ($existing) {
+                $this->assertExactRecommendationRetry(
+                    $existing,
+                    $event,
+                    $data,
+                    $ownerId,
+                    $dueDate,
+                    $priority,
+                    (string) $responsibilityChoice,
+                );
+                $this->persistCorrectiveActionDisposition(
+                    $disposition,
+                    $locked,
+                    $recommendationIndex,
+                    $existing,
+                    $actor,
+                );
 
-        $recommendation = $recommendations[$recommendationIndex];
+                return $existing->fresh([
+                    'assignedTo',
+                    'sourceControlRoomTask',
+                ]);
+            }
 
-        return DB::transaction(function () use ($investigation, $recommendation, $recommendationIndex, $overrides) {
+            if (! $locked->isCompleted()) {
+                throw new InvalidArgumentException(
+                    'Complete the investigation before handing over recommendation work.',
+                );
+            }
+            if (! $event->isOpen()) {
+                throw new InvalidArgumentException(
+                    "Cannot create corrective action on closed event [{$event->reference_number}].",
+                );
+            }
+            $this->assertAcceptedHandoverIfIncidentBacked($event);
+            $owner = $this->eligibleOwner($event, $ownerId, $actor);
+
+            $task = null;
+            $newResponsibilityReason = null;
+            if ($responsibilityChoice === self::RESPONSIBILITY_TRANSFER_TASK) {
+                $task = $this->lockTransferableTask($event, $data);
+            } else {
+                $newResponsibilityReason = trim((string) ($data['new_responsibility_reason'] ?? ''));
+                if (mb_strlen($newResponsibilityReason) < 10) {
+                    throw new InvalidArgumentException(
+                        'A reason of at least 10 characters is required for a new responsibility.',
+                    );
+                }
+            }
+
+            $recommendation = $recommendations[$recommendationIndex];
             $action = HsCorrectiveAction::create([
-                'hs_event_id' => $investigation->hs_event_id,
-                'hs_investigation_id' => $investigation->id,
-                'organization_id' => $investigation->organization_id,
+                'hs_event_id' => $event->id,
+                'hs_investigation_id' => $locked->id,
+                'source_control_room_task_id' => $task?->id,
+                'organization_id' => $event->organization_id,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'recommendation_index' => $recommendationIndex,
-                'action_type' => $overrides['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
-                'priority' => $recommendation['priority'] ?? $overrides['priority'] ?? HsCorrectiveAction::PRIORITY_MEDIUM,
-                'title' => $overrides['title'] ?? $recommendation['description'] ?? 'Corrective action',
-                'description' => $overrides['description'] ?? null,
-                'root_cause_link' => $overrides['root_cause_link'] ?? null,
+                'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
+                'priority' => $priority,
+                'title' => $data['title'] ?? $recommendation['description'] ?? 'Corrective action',
+                'description' => $responsibilityChoice === self::RESPONSIBILITY_NEW
+                    ? $newResponsibilityReason
+                    : ($data['description'] ?? $task?->description),
+                'root_cause_link' => $data['root_cause_link'] ?? null,
                 'status' => HsCorrectiveAction::STATUS_OPEN,
-                'assigned_to_user_id' => $overrides['assigned_to_user_id'] ?? null,
-                'assigned_by_user_id' => $overrides['assigned_by_user_id'] ?? auth()->id(),
-                'assigned_at' => isset($overrides['assigned_to_user_id']) ? now() : null,
-                'due_date' => $overrides['due_date'] ?? $this->suggestDueDate($recommendation['priority'] ?? 'medium'),
-                'created_by' => $overrides['created_by'] ?? auth()->id(),
+                'assigned_to_user_id' => $owner->id,
+                'assigned_by_user_id' => $actor->id,
+                'assigned_at' => now(),
+                'due_date' => $dueDate,
+                'created_by' => $actor->id,
             ]);
+
+            $transferredAt = null;
+            if ($task) {
+                $transferredAt = now();
+                $task->forceFill([
+                    'status' => AlertTask::STATUS_TRANSFERRED,
+                    'completed_at' => null,
+                    'transferred_to_hs_corrective_action_id' => $action->id,
+                    'transferred_at' => $transferredAt,
+                    'transferred_by_user_id' => $actor->id,
+                ])->save();
+            }
+
+            $this->persistCorrectiveActionDisposition(
+                $disposition,
+                $locked,
+                $recommendationIndex,
+                $action,
+                $actor,
+            );
+            $this->syncEventToCorrectiveActionStatus($event);
+
+            AuditLogger::logOrFail('healthSafety.investigation.recommendationDispositioned', $locked, [
+                'actor_id' => $actor->id,
+                'recommendation_index' => $recommendationIndex,
+                'disposition' => HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+                'reason' => null,
+                'hs_corrective_action_id' => $action->id,
+                'previous' => null,
+            ]);
+            AuditLogger::logOrFail('healthSafety.correctiveAction.handedOver', $action, [
+                'actor_id' => $actor->id,
+                'hs_investigation_id' => $locked->id,
+                'hs_event_id' => $event->id,
+                'hs_corrective_action_id' => $action->id,
+                'recommendation_index' => $recommendationIndex,
+                'assigned_to_user_id' => $owner->id,
+                'due_date' => $dueDate,
+                'priority' => $priority,
+                'responsibility_choice' => $responsibilityChoice,
+                'source_control_room_task_id' => $task?->id,
+                'new_responsibility_reason' => $newResponsibilityReason,
+            ]);
+
+            if ($task) {
+                $alert = ControlRoomAlert::query()->findOrFail($task->alert_id);
+                AuditLogger::logOrFail('controlRoom.task.transferredToHealthSafety', $alert, [
+                    'actor_id' => $actor->id,
+                    'task_id' => $task->id,
+                    'hs_event_id' => $event->id,
+                    'hs_corrective_action_id' => $action->id,
+                    'transferred_at' => $transferredAt?->toIso8601String(),
+                    'transfer_source' => 'investigation_recommendation',
+                ]);
+            }
+
+            $this->notifyOwner($action, $owner);
 
             Log::info('HsCorrectiveActionService: action created from recommendation', [
                 'action_id' => $action->id,
                 'reference' => $action->reference_number,
-                'investigation_id' => $investigation->id,
+                'investigation_id' => $locked->id,
                 'recommendation_index' => $recommendationIndex,
                 'priority' => $action->priority,
             ]);
 
-            return $action;
-        });
+            return $action->fresh([
+                'assignedTo',
+                'sourceControlRoomTask',
+            ]);
+        }, 3);
     }
 
     /**
@@ -96,45 +257,71 @@ class HsCorrectiveActionService
      *
      * Used for ad-hoc actions, or events that don't require formal investigation.
      */
-    public function createStandalone(HsEvent $hsEvent, array $data): HsCorrectiveAction
+    public function createStandalone(HsEvent $hsEvent, array $data, User $actor): HsCorrectiveAction
     {
         if (! $hsEvent->isOpen()) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 "Cannot create corrective action on closed event [{$hsEvent->reference_number}]."
             );
         }
 
-        return DB::transaction(function () use ($hsEvent, $data) {
+        return DB::transaction(function () use ($hsEvent, $data, $actor): HsCorrectiveAction {
+            $event = HsEvent::query()
+                ->whereKey($hsEvent->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (! $event->isOpen()) {
+                throw new InvalidArgumentException(
+                    "Cannot create corrective action on closed event [{$event->reference_number}].",
+                );
+            }
+
+            $owner = $this->eligibleOwner(
+                $event,
+                $this->requiredPositiveInteger($data, 'assigned_to_user_id', 'An eligible owner is required.'),
+                $actor,
+            );
+            $dueDate = $this->requiredDueDate($data);
+            $priority = $this->requiredPriority($data);
+
             $action = HsCorrectiveAction::create([
-                'hs_event_id' => $hsEvent->id,
+                'hs_event_id' => $event->id,
                 'hs_investigation_id' => $data['hs_investigation_id'] ?? null,
                 'source_control_room_task_id' => $data['source_control_room_task_id'] ?? null,
-                'organization_id' => $hsEvent->organization_id,
+                'organization_id' => $event->organization_id,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'action_type' => $data['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
-                'priority' => $data['priority'] ?? HsCorrectiveAction::PRIORITY_MEDIUM,
+                'priority' => $priority,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'root_cause_link' => $data['root_cause_link'] ?? null,
                 'status' => HsCorrectiveAction::STATUS_OPEN,
-                'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-                'assigned_by_user_id' => $data['assigned_by_user_id'] ?? auth()->id(),
-                'assigned_at' => isset($data['assigned_to_user_id']) ? now() : null,
-                'due_date' => $data['due_date'] ?? $this->suggestDueDate($data['priority'] ?? 'medium'),
-                'created_by' => $data['created_by'] ?? auth()->id(),
+                'assigned_to_user_id' => $owner->id,
+                'assigned_by_user_id' => $actor->id,
+                'assigned_at' => now(),
+                'due_date' => $dueDate,
+                'created_by' => $actor->id,
             ]);
 
-            // If event is at 'open' or 'investigating', move it to corrective_action
-            $this->syncEventToCorrectiveActionStatus($hsEvent);
+            $this->syncEventToCorrectiveActionStatus($event);
+            AuditLogger::logOrFail('healthSafety.correctiveAction.created', $action, [
+                'actor_id' => $actor->id,
+                'hs_event_id' => $event->id,
+                'assigned_to_user_id' => $owner->id,
+                'due_date' => $dueDate,
+                'priority' => $priority,
+                'source_control_room_task_id' => $action->source_control_room_task_id,
+            ]);
+            $this->notifyOwner($action, $owner);
 
             Log::info('HsCorrectiveActionService: standalone action created', [
                 'action_id' => $action->id,
                 'reference' => $action->reference_number,
-                'hs_event_id' => $hsEvent->id,
+                'hs_event_id' => $event->id,
             ]);
 
-            return $action;
-        });
+            return $action->fresh('assignedTo');
+        }, 3);
     }
 
     /**
@@ -144,10 +331,12 @@ class HsCorrectiveActionService
      *
      * @return array<HsCorrectiveAction> Created actions
      */
-    public function createFromAllRecommendations(HsInvestigation $investigation, array $defaults = []): array
-    {
+    public function createFromAllRecommendations(
+        HsInvestigation $investigation,
+        array $assignments,
+        User $actor,
+    ): array {
         $recommendations = $investigation->recommendations ?? [];
-        $created = [];
 
         foreach ($recommendations as $index => $recommendation) {
             $exists = HsCorrectiveAction::where('hs_investigation_id', $investigation->id)
@@ -158,10 +347,33 @@ class HsCorrectiveActionService
                 continue;
             }
 
-            $created[] = $this->createFromRecommendation($investigation, $index, $defaults);
+            if (! array_key_exists($index, $assignments) || ! is_array($assignments[$index])) {
+                throw new InvalidArgumentException(
+                    "An explicit ownership assignment is required for recommendation [{$index}].",
+                );
+            }
         }
 
-        return $created;
+        return DB::transaction(function () use ($investigation, $recommendations, $assignments, $actor): array {
+            $created = [];
+            foreach ($recommendations as $index => $recommendation) {
+                if (HsCorrectiveAction::query()
+                    ->where('hs_investigation_id', $investigation->id)
+                    ->where('recommendation_index', $index)
+                    ->exists()) {
+                    continue;
+                }
+
+                $created[] = $this->createFromRecommendation(
+                    $investigation,
+                    $index,
+                    $assignments[$index],
+                    $actor,
+                );
+            }
+
+            return $created;
+        }, 3);
     }
 
     /* ------------------------------------------------------------------ */
@@ -209,7 +421,7 @@ class HsCorrectiveActionService
             || ! empty($data['completion_evidence_paths']);
 
         if (! $hasEvidence) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Cannot complete action without completion notes or evidence.'
             );
         }
@@ -266,13 +478,13 @@ class HsCorrectiveActionService
 
         // Separation of duties: verifier should not be the completer
         if ($verifierId && $verifierId === $action->completed_by_user_id) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Verifier must be a different person than the action completer (separation of duties).'
             );
         }
 
         if (! isset($data['effectiveness_confirmed'])) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Verification must include an effectiveness assessment (effectiveness_confirmed).'
             );
         }
@@ -387,25 +599,224 @@ class HsCorrectiveActionService
     /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
-    private function assertTransition(HsCorrectiveAction $action, string $targetStatus): void
+    private function assertAcceptedHandoverIfIncidentBacked(HsEvent $event): void
     {
-        if (! $action->canTransitionTo($targetStatus)) {
-            throw new \InvalidArgumentException(
-                "Cannot transition corrective action from '{$action->status}' to '{$targetStatus}'."
+        $incidentBacked = $event->control_room_alert_id !== null
+            || $event->source_type === ClientIncident::class;
+        if (! $incidentBacked) {
+            return;
+        }
+
+        if ($event->handover_status !== HsEvent::HANDOVER_ACCEPTED
+            || $event->owner_user_id === null
+            || $event->accepted_by_user_id === null
+            || $event->accepted_at === null) {
+            throw new InvalidArgumentException(
+                'Health & Safety must accept the incident handover with an approved owner before recommendation work is created.',
             );
         }
     }
 
-    private function suggestDueDate(string $priority): string
+    private function eligibleOwner(HsEvent $event, int $ownerId, User $actor): User
     {
-        $days = match ($priority) {
-            HsCorrectiveAction::PRIORITY_CRITICAL => 7,
-            HsCorrectiveAction::PRIORITY_HIGH => 14,
-            HsCorrectiveAction::PRIORITY_MEDIUM => 30,
-            default => 60,
-        };
+        $query = User::query()->whereKey($ownerId);
+        $this->siteAccess->applyHsEventStaffScope(
+            $query,
+            $event,
+            $actor,
+            ['healthSafety.viewAllSites'],
+        );
+        $owner = $query->first();
 
-        return now()->addDays($days)->toDateString();
+        if (! $owner || ! $owner->canDo('hazards.manage')) {
+            throw new InvalidArgumentException(
+                'Choose an eligible approved H&S owner for this event site.',
+            );
+        }
+
+        return $owner;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function requiredPositiveInteger(array $data, string $field, string $message): int
+    {
+        $value = $data[$field] ?? null;
+        if (! is_numeric($value) || (int) $value <= 0) {
+            throw new InvalidArgumentException($message);
+        }
+
+        return (int) $value;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function requiredDueDate(array $data): string
+    {
+        $value = $data['due_date'] ?? null;
+        $date = is_string($value)
+            ? \DateTimeImmutable::createFromFormat('!Y-m-d', $value)
+            : false;
+
+        if (! $date || $date->format('Y-m-d') !== $value) {
+            throw new InvalidArgumentException('A due date in YYYY-MM-DD format is required.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function requiredPriority(array $data): string
+    {
+        $priority = $data['priority'] ?? null;
+        if (! in_array($priority, [
+            HsCorrectiveAction::PRIORITY_LOW,
+            HsCorrectiveAction::PRIORITY_MEDIUM,
+            HsCorrectiveAction::PRIORITY_HIGH,
+            HsCorrectiveAction::PRIORITY_CRITICAL,
+        ], true)) {
+            throw new InvalidArgumentException('A valid corrective action priority is required.');
+        }
+
+        return (string) $priority;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function lockTransferableTask(HsEvent $event, array $data): AlertTask
+    {
+        $taskId = $this->requiredPositiveInteger(
+            $data,
+            'source_control_room_task_id',
+            'A source Control Room task is required when transferring responsibility.',
+        );
+        if ($event->control_room_alert_id === null) {
+            throw new InvalidArgumentException(
+                'This H&S event has no Control Room journey from which a task can be transferred.',
+            );
+        }
+
+        $task = AlertTask::query()
+            ->whereKey($taskId)
+            ->lockForUpdate()
+            ->first();
+        if (! $task || (int) $task->alert_id !== (int) $event->control_room_alert_id) {
+            throw new InvalidArgumentException(
+                'Choose an unresolved Control Room task from this incident journey.',
+            );
+        }
+
+        $hasReciprocalAction = HsCorrectiveAction::query()
+            ->where('source_control_room_task_id', $task->id)
+            ->exists();
+        if (in_array($task->status, AlertTask::TERMINAL_STATUSES, true)
+            || $task->transferred_to_hs_corrective_action_id !== null
+            || $task->transferred_at !== null
+            || $task->transferred_by_user_id !== null
+            || $hasReciprocalAction) {
+            throw new InvalidArgumentException(
+                'Choose an active Control Room task that has not already been transferred.',
+            );
+        }
+
+        return $task;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function assertExactRecommendationRetry(
+        HsCorrectiveAction $action,
+        HsEvent $event,
+        array $data,
+        int $ownerId,
+        string $dueDate,
+        string $priority,
+        string $responsibilityChoice,
+    ): void {
+        $matches = (int) $action->assigned_to_user_id === $ownerId
+            && $action->due_date?->toDateString() === $dueDate
+            && $action->priority === $priority;
+
+        if ($responsibilityChoice === self::RESPONSIBILITY_TRANSFER_TASK) {
+            $taskId = $this->requiredPositiveInteger(
+                $data,
+                'source_control_room_task_id',
+                'A source Control Room task is required when transferring responsibility.',
+            );
+            $task = AlertTask::query()->whereKey($taskId)->lockForUpdate()->first();
+            $matches = $matches
+                && $task !== null
+                && (int) $task->alert_id === (int) $event->control_room_alert_id
+                && (int) $action->source_control_room_task_id === $taskId
+                && $task->status === AlertTask::STATUS_TRANSFERRED
+                && (int) $task->transferred_to_hs_corrective_action_id === (int) $action->id
+                && $task->transferred_at !== null
+                && $task->transferred_by_user_id !== null;
+        } else {
+            $reason = trim((string) ($data['new_responsibility_reason'] ?? ''));
+            $matches = $matches
+                && mb_strlen($reason) >= 10
+                && $action->source_control_room_task_id === null
+                && $action->description === $reason;
+        }
+
+        if (! $matches) {
+            throw new InvalidArgumentException(
+                'A different corrective action handover already exists for this recommendation.',
+            );
+        }
+    }
+
+    private function persistCorrectiveActionDisposition(
+        ?HsRecommendationDisposition $disposition,
+        HsInvestigation $investigation,
+        int $recommendationIndex,
+        HsCorrectiveAction $action,
+        User $actor,
+    ): HsRecommendationDisposition {
+        if ($disposition) {
+            if ($disposition->disposition !== HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION
+                || (int) $disposition->hs_corrective_action_id !== (int) $action->id) {
+                throw new InvalidArgumentException(
+                    'The existing recommendation outcome does not match this corrective action handover.',
+                );
+            }
+
+            return $disposition;
+        }
+
+        $disposition = new HsRecommendationDisposition([
+            'hs_investigation_id' => $investigation->id,
+            'recommendation_index' => $recommendationIndex,
+        ]);
+        $disposition->fill([
+            'disposition' => HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
+            'reason' => null,
+            'hs_corrective_action_id' => $action->id,
+            'decided_by_user_id' => $actor->id,
+            'decided_at' => now(),
+        ]);
+        $disposition->save();
+
+        return $disposition;
+    }
+
+    private function notifyOwner(HsCorrectiveAction $action, User $owner): void
+    {
+        $owner->notify(new AppEventNotification([
+            'title' => 'Corrective action assigned: '.$action->reference_number,
+            'message' => "{$action->title} is assigned to you and due {$action->due_date?->toDateString()}.",
+            'type' => 'health_safety_corrective_action_assigned',
+            'hs_corrective_action_id' => $action->id,
+            'hs_event_id' => $action->hs_event_id,
+            'due_date' => $action->due_date?->toDateString(),
+            'url' => "/health-safety/corrective-actions?event={$action->hs_event_id}&action={$action->id}",
+        ]));
+    }
+
+    private function assertTransition(HsCorrectiveAction $action, string $targetStatus): void
+    {
+        if (! $action->canTransitionTo($targetStatus)) {
+            throw new InvalidArgumentException(
+                "Cannot transition corrective action from '{$action->status}' to '{$targetStatus}'."
+            );
+        }
     }
 
     /**
