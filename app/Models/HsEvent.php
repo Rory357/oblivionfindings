@@ -101,6 +101,10 @@ class HsEvent extends Model
         'asset_id',
         'shift_id',
         'worksafe_notifiable',
+        'worksafe_decided_at',
+        'worksafe_decided_by_user_id',
+        'worksafe_decision_reason',
+        'worksafe_decision_source',
         'worksafe_status',
         'worksafe_reference',
         'worksafe_notified_at',
@@ -126,6 +130,7 @@ class HsEvent extends Model
         'reported_at' => 'datetime',
         'closed_at' => 'datetime',
         'worksafe_notifiable' => 'boolean',
+        'worksafe_decided_at' => 'datetime',
         'worksafe_notified_at' => 'datetime',
         'worksafe_acknowledged_at' => 'datetime',
         'worksafe_site_preserved' => 'boolean',
@@ -190,6 +195,11 @@ class HsEvent extends Model
     public function acceptedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'accepted_by_user_id');
+    }
+
+    public function worksafeDecidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'worksafe_decided_by_user_id');
     }
 
     /**

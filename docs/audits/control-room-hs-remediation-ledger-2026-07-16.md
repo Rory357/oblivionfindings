@@ -21,7 +21,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | ID | Owner task | Code evidence | Automated proof | Browser proof | Live proof | Status |
 |---|---:|---|---|---|---|---|
 | D-01 | 8, 9 | — | — | — | — | Open |
-| D-02 | 2, 3, 4 | — | — | — | — | Open |
+| D-02 | 2, 3, 4 | Task 2: nullable `hs_events.worksafe_notifiable`; decision actor/time/reason/source; conservative migration; read-only consistency command | `HsWorksafeDecisionSchemaTest` + `ReportHsWorksafeDecisionCountsTest`: 5 tests, 29 assertions; local migrate/rollback/re-migrate passed; 57 undecided and 0 inconsistent | — | — | Active |
 | D-03 | 10 | — | — | — | — | Open |
 | D-04 | 5, 6, 7 | — | — | — | — | Open |
 | D-05 | 15, 16 | — | — | — | — | Open |
@@ -91,6 +91,8 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 |---|---|---|---:|---|---|
 | Baseline backend | `php artisan test tests/Feature/HealthSafety/HsEventWorksafeTest.php tests/Feature/HealthSafety/HsEventWorkflowTest.php tests/Feature/Tasks/AllTasksIncidentJourneyTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php` | 23 tests passed, 193 assertions, 198.74s | 0 | 2026-07-16 20:39 NZST | Pass |
 | Baseline frontend | `npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx` | 3 files passed, 13 tests passed, 15.26s | 0 | 2026-07-16 20:36 NZST | Pass |
+| WorkSafe schema and report | `php artisan test tests/Feature/HealthSafety/HsWorksafeDecisionSchemaTest.php tests/Feature/Console/ReportHsWorksafeDecisionCountsTest.php` | Post-format verification: 5 tests passed, 29 assertions, 330.81s | 0 | 2026-07-16 21:04 NZST | Pass |
+| WorkSafe migration cycle | Apply prerequisite notification migration; migrate Task 2 path; report; rollback; re-migrate; report | Both migrations applied; Task 2 rollback/re-migration passed; report `{"undecided":57,"explicit_not_notifiable":0,"notifiable_pending":0,"notified":0,"acknowledged":0,"closed_legacy_false":0,"inconsistent":0}` | 0 | 2026-07-16 20:49 NZST | Pass |
 | Full backend | `php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature/HealthSafety tests/Feature/Tasks` | — | — | — | Open |
 | Frontend unit/component | Plan Task 20 command | — | — | — | Open |
 | Route generation | `php artisan wayfinder:generate` | — | — | — | Open |
@@ -156,7 +158,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | Approved design | `cf4f6fd6b` | Design specification committed | Pass |
 | Implementation plan | `7a642efac` | 21 tasks, 157 checkpoints, D-01–D-19 mapped | Pass |
 | Audit baseline and ledger | `7a642efac` baseline | Authoritative audit copied with normalized-content equality; backend 23/193 and frontend 13/13 reproduced before the checkpoint commit | Active |
-| WorkSafe domain | — | — | Open |
+| WorkSafe domain | Task 2 checkpoint commit | Explicit decision schema, conservative legacy classification, factory states, and read-only consistency command; API/UI remain open in Tasks 3–4 | Active |
 | Corrective-action ownership/evidence | — | — | Open |
 | Universal Tasks and permission recovery | — | — | Open |
 | Evidence continuity and closure gates | — | — | Open |
@@ -168,8 +170,10 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 
 ## Current checkpoint
 
-- Task 1 implementation is complete and awaiting its checkpoint commit.
-- The authoritative audit matches the canonical source after line-ending normalization: 531 lines and 47,740 normalized characters.
-- Baseline HEAD is `7a642efac9dd86e7817b1968dd307ca1b5e58008`.
-- Baseline backend verification passed: 23 tests and 193 assertions.
-- Baseline frontend verification passed: 3 files and 13 tests.
+- Task 1 is committed at `ed2eb469a`.
+- Task 2 implementation is verified for its checkpoint commit.
+- The WorkSafe schema/report tests were observed red before implementation and now pass: 5 tests and 29 assertions.
+- The local development database was missing the earlier `2026_06_18_020000_add_worksafe_notification_fields_to_hs_events` prerequisite. It was applied before the isolated Task 2 path proof.
+- The Task 2 migration, report, rollback, re-migration, and second report all exited 0.
+- Local WorkSafe report after re-migration: 57 undecided, 0 explicit false, 0 pending, 0 notified, 0 acknowledged, 0 closed legacy false, and 0 inconsistent.
+- Task 3 is next: decision API, audit trail, and truthful closure enforcement.
