@@ -11,6 +11,7 @@ use App\Models\HsRecommendationDisposition;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\HsInvestigationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,9 +44,10 @@ class HsEventClosureTest extends TestCase
 
     public function test_clean_event_closes_with_summary(): void
     {
-        $event = HsEvent::factory()->create(); // low severity → no investigation required, no actions
+        $actor = $this->hsOfficer();
+        $event = HsEvent::factory()->worksafeNotNotifiable($actor)->create();
 
-        $this->actingAs($this->hsOfficer())
+        $this->actingAs($actor)
             ->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/close", [
                 'closure_summary' => 'Resolved — controls verified, no further action.',
@@ -58,6 +60,66 @@ class HsEventClosureTest extends TestCase
         $this->assertNotNull($event->closed_at);
         $this->assertNotNull($event->closed_by);
         $this->assertNotEmpty($event->closure_summary);
+    }
+
+    public function test_worksafe_closure_truth_matrix_and_direct_action_requirement(): void
+    {
+        $actor = $this->hsOfficer();
+        $service = app(HsEventService::class);
+        $events = [
+            'unknown blocks' => [
+                HsEvent::factory()->worksafeUndecided()->create(),
+                false,
+                'Record the WorkSafe notifiability decision before closing this event.',
+            ],
+            'explicit false closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotNotifiable($actor)->create(),
+                true,
+                null,
+            ],
+            'true pending blocks' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create(),
+                false,
+                'Record the WorkSafe notification before closing this event.',
+            ],
+            'true notified closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create([
+                    'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+                    'worksafe_notified_at' => now(),
+                    'worksafe_method' => 'online',
+                ]),
+                true,
+                null,
+            ],
+            'true acknowledged closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create([
+                    'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+                    'worksafe_notified_at' => now()->subHour(),
+                    'worksafe_method' => 'online',
+                    'worksafe_acknowledged_at' => now(),
+                ]),
+                true,
+                null,
+            ],
+        ];
+
+        foreach ($events as $label => [$event, $expected, $blocker]) {
+            $gate = $service->closureGate($event);
+            $requirement = collect($gate['requirements'])->firstWhere('key', 'worksafe_decision');
+
+            $this->assertSame($expected, $gate['worksafe_ok'], $label);
+            $this->assertNotNull($requirement, $label);
+            $this->assertSame($expected, $requirement['complete'], $label);
+            $this->assertSame(
+                "/health-safety/events/{$event->id}?action=worksafe-decision",
+                $requirement['href'],
+                $label,
+            );
+
+            if ($blocker !== null) {
+                $this->assertContains($blocker, $gate['blockers'], $label);
+            }
+        }
     }
 
     public function test_close_blocked_when_required_investigation_incomplete(): void
@@ -146,13 +208,13 @@ class HsEventClosureTest extends TestCase
 
     public function test_event_closes_after_every_recommendation_is_decided_and_linked_action_is_verified(): void
     {
-        $event = HsEvent::factory()->high()->create([
+        $actor = $this->hsOfficer();
+        $event = HsEvent::factory()->high()->worksafeNotNotifiable($actor)->create([
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
         ]);
         $investigation = HsInvestigation::factory()->completed()->create([
             'hs_event_id' => $event->id,
         ]);
-        $actor = $this->hsOfficer();
         $service = app(HsInvestigationService::class);
 
         $correctiveOutcome = $service->dispositionRecommendation(

@@ -21,7 +21,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | ID | Owner task | Code evidence | Automated proof | Browser proof | Live proof | Status |
 |---|---:|---|---|---|---|---|
 | D-01 | 8, 9 | — | — | — | — | Open |
-| D-02 | 2, 3, 4 | Task 2: nullable `hs_events.worksafe_notifiable`; decision actor/time/reason/source; conservative migration; read-only consistency command | `HsWorksafeDecisionSchemaTest` + `ReportHsWorksafeDecisionCountsTest`: 5 tests, 29 assertions; local migrate/rollback/re-migrate passed; 57 undecided and 0 inconsistent | — | — | Active |
+| D-02 | 2, 3, 4 | Tasks 2–3: nullable explicit decision schema; conservative migration/report; transactional decision API; actor/time/reason/source audit; idempotent retries; completed-notification protection; truthful structured closure gate with direct action route | Schema/report: 5 tests, 29 assertions; Task 3 H&S/incident/source regression: 155 tests, 1,246 assertions; local migrate/rollback/re-migrate passed; 57 undecided and 0 inconsistent | — | — | Active |
 | D-03 | 10 | — | — | — | — | Open |
 | D-04 | 5, 6, 7 | — | — | — | — | Open |
 | D-05 | 15, 16 | — | — | — | — | Open |
@@ -93,6 +93,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | Baseline frontend | `npx vitest run resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx` | 3 files passed, 13 tests passed, 15.26s | 0 | 2026-07-16 20:36 NZST | Pass |
 | WorkSafe schema and report | `php artisan test tests/Feature/HealthSafety/HsWorksafeDecisionSchemaTest.php tests/Feature/Console/ReportHsWorksafeDecisionCountsTest.php` | Post-format verification: 5 tests passed, 29 assertions, 330.81s | 0 | 2026-07-16 21:04 NZST | Pass |
 | WorkSafe migration cycle | Apply prerequisite notification migration; migrate Task 2 path; report; rollback; re-migrate; report | Both migrations applied; Task 2 rollback/re-migration passed; report `{"undecided":57,"explicit_not_notifiable":0,"notifiable_pending":0,"notified":0,"acknowledged":0,"closed_legacy_false":0,"inconsistent":0}` | 0 | 2026-07-16 20:49 NZST | Pass |
+| WorkSafe decision API and source regression | `php artisan test tests/Feature/HealthSafety/HsEventWorksafeTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsWorksafeDecisionAuthorizationTest.php tests/Feature/HealthSafety/HsEventWorkflowTest.php tests/Feature/HealthSafety/HsEventBackboneTest.php tests/Feature/HealthSafety/HsWorksafeConsistencyTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HazardousSubstanceControllerTest.php tests/Feature/HealthSafety/FirstAidControllerTest.php tests/Feature/HealthSafety/InjuriesControllerTest.php` | Post-format verification: 155 tests passed, 1,246 assertions, 220.30s | 0 | 2026-07-16 21:37 NZST | Pass |
 | Full backend | `php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature/HealthSafety tests/Feature/Tasks` | — | — | — | Open |
 | Frontend unit/component | Plan Task 20 command | — | — | — | Open |
 | Route generation | `php artisan wayfinder:generate` | — | — | — | Open |
@@ -158,7 +159,7 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 | Approved design | `cf4f6fd6b` | Design specification committed | Pass |
 | Implementation plan | `7a642efac` | 21 tasks, 157 checkpoints, D-01–D-19 mapped | Pass |
 | Audit baseline and ledger | `7a642efac` baseline | Authoritative audit copied with normalized-content equality; backend 23/193 and frontend 13/13 reproduced before the checkpoint commit | Active |
-| WorkSafe domain | Task 2 checkpoint commit | Explicit decision schema, conservative legacy classification, factory states, and read-only consistency command; API/UI remain open in Tasks 3–4 | Active |
+| WorkSafe domain | Task 2 checkpoint `a2f7e1866`; Task 3 checkpoint pending | Explicit schema/migration/report plus decision API, audit, authorization, source attribution, compatibility projection, notification guard, and truthful closure requirements; UI remains open in Task 4 | Active |
 | Corrective-action ownership/evidence | — | — | Open |
 | Universal Tasks and permission recovery | — | — | Open |
 | Evidence continuity and closure gates | — | — | Open |
@@ -176,4 +177,6 @@ This ledger is complete only when every finding, persona, golden-journey criteri
 - The local development database was missing the earlier `2026_06_18_020000_add_worksafe_notification_fields_to_hs_events` prerequisite. It was applied before the isolated Task 2 path proof.
 - The Task 2 migration, report, rollback, re-migration, and second report all exited 0.
 - Local WorkSafe report after re-migration: 57 undecided, 0 explicit false, 0 pending, 0 notified, 0 acknowledged, 0 closed legacy false, and 0 inconsistent.
-- Task 3 is next: decision API, audit trail, and truthful closure enforcement.
+- Task 3 was observed red with 9 expected failures before implementation.
+- Task 3 now has one post-format regression result: 155 tests passed, 1,246 assertions, including decision persistence/idempotency/audit, closure truth, site/tenant authorization, incident compatibility, injury, first-aid, and hazardous-substance source creation.
+- Task 4 is next: the WorkSafe decision and notification UI.
