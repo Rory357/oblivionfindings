@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -29,6 +30,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use InvalidArgumentException;
@@ -224,7 +226,15 @@ class ControlRoomAlertController extends Controller
             'occurred_at' => ['nullable', 'date'],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $this->requiresImmediateAction(
+                    $alert,
+                    $request->input('severity'),
+                )),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'requires_followup' => ['nullable', 'boolean'],
             'location' => ['nullable', 'string', 'max:255'],
         ]);
@@ -496,6 +506,15 @@ class ControlRoomAlertController extends Controller
             'type' => ['nullable', 'string', 'max:120'],
             'severity' => ['nullable', 'string', 'in:low,medium,high'],
             'note' => ['nullable', 'string', 'max:2000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $this->requiresImmediateAction(
+                    $alert,
+                    $request->input('severity'),
+                )),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
         ]);
 
         try {
@@ -947,9 +966,17 @@ class ControlRoomAlertController extends Controller
 
         $data = $request->validate([
             'note' => ['required', 'string', 'max:2000'],
+            'purpose' => ['nullable', 'string', Rule::in(OperatorNote::PURPOSES)],
         ]);
 
-        $lifecycle->appendOperatorNote($alert, $user, $data['note'], 'note');
+        $lifecycle->appendOperatorNote(
+            $alert,
+            $user,
+            $data['note'],
+            'note',
+            OperatorNote::TYPE_NOTE,
+            $data['purpose'] ?? OperatorNote::PURPOSE_GENERAL,
+        );
 
         return back()->with('success', 'Note added.');
     }
@@ -1184,6 +1211,19 @@ class ControlRoomAlertController extends Controller
     protected function alertBypassPermissions(): array
     {
         return ['reports.viewAny'];
+    }
+
+    private function requiresImmediateAction(
+        ControlRoomAlert $alert,
+        mixed $requestedSeverity,
+    ): bool {
+        $effectiveSeverity = $alert->severity === 'critical'
+            ? 'critical'
+            : (filled($requestedSeverity)
+                ? (string) $requestedSeverity
+                : (string) $alert->severity);
+
+        return in_array($effectiveSeverity, ['high', 'critical'], true);
     }
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void

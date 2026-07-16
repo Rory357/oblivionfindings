@@ -91,6 +91,18 @@ class IncidentJourneyService
                 $attributes = $this->incidentAttributes($lockedAlert, $incident, $input, $actor);
                 $incident->forceFill($attributes)->saveQuietly();
                 $incident->refresh();
+            } elseif ($incident->status === 'submitted'
+                && blank($incident->immediate_action_taken)
+                && filled($input['immediate_action_taken'] ?? null)
+            ) {
+                $incident->forceFill([
+                    'immediate_action_taken' => trim((string) $input['immediate_action_taken']),
+                ])->saveQuietly();
+                $incident->refresh();
+            }
+
+            if ($incident->status === 'submitted') {
+                $this->assertSeriousIncidentHasImmediateAction($incident, $lockedAlert);
             }
 
             $hsEvent = $this->lockedOrCreatedHsEvent($incident, $actor);
@@ -227,6 +239,9 @@ class IncidentJourneyService
 
             $this->assertSubmitted($lockedIncident);
             $this->assertAlertMatchesIncident($lockedIncident, $lockedAlert);
+            if ($lockedIncident->status === 'submitted') {
+                $this->assertSeriousIncidentHasImmediateAction($lockedIncident, $lockedAlert);
+            }
             $alertWasPromoted = $this->promoteAlertToIncidentFloor($lockedIncident, $lockedAlert);
             $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
             $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
@@ -357,6 +372,22 @@ class IncidentJourneyService
             : ($safe['severity'] ?? $incident?->severity ?? $alert->severity ?? HsEvent::SEVERITY_LOW);
         $normalisedSeverity = HsEventService::normaliseSeverity((string) $requestedSeverity);
         $incidentSource = $this->incidentSourceForAlert($alert);
+        $hasImmediateActionInput = array_key_exists('immediate_action_taken', $safe);
+        $immediateAction = $hasImmediateActionInput
+            ? trim((string) ($safe['immediate_action_taken'] ?? ''))
+            : trim((string) ($incident?->immediate_action_taken ?? ''));
+        if (in_array($normalisedSeverity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true)
+            && $immediateAction === ''
+        ) {
+            throw new \DomainException(
+                'Immediate action is required for a high or critical Control Room incident.',
+            );
+        }
+        if ($hasImmediateActionInput) {
+            $safe['immediate_action_taken'] = $immediateAction === ''
+                ? null
+                : $immediateAction;
+        }
 
         $inputMetadata = is_array($safe['metadata'] ?? null) ? $safe['metadata'] : [];
         $existingMetadata = is_array($incident?->metadata) ? $incident->metadata : [];
@@ -396,6 +427,22 @@ class IncidentJourneyService
             'reported_by' => $actor->id,
             'control_room_alert_id' => $alert->id,
         ]);
+    }
+
+    private function assertSeriousIncidentHasImmediateAction(
+        ClientIncident $incident,
+        ControlRoomAlert $alert,
+    ): void {
+        $severity = HsEventService::normaliseSeverity((string) $incident->severity);
+        $isSerious = $alert->severity === HsEvent::SEVERITY_CRITICAL
+            || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true);
+        if ($isSerious
+            && blank($incident->immediate_action_taken)
+        ) {
+            throw new \DomainException(
+                'Immediate action is required for a high or critical Control Room incident.',
+            );
+        }
     }
 
     private function typeFromAlert(ControlRoomAlert $alert): string

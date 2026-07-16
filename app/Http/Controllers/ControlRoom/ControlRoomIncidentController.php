@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ControlRoomIncidentController extends Controller
@@ -485,6 +486,12 @@ class ControlRoomIncidentController extends Controller
             'type' => ['required', 'string', 'max:120'],
             'severity' => ['required', 'string', 'in:low,medium,high,critical'],
             'note' => ['nullable', 'string', 'max:2000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => in_array($request->input('severity'), ['high', 'critical'], true)),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
         ]);
 
         $clientQuery = Client::query()->with('site');
@@ -516,6 +523,9 @@ class ControlRoomIncidentController extends Controller
                     'submitted_at' => now(),
                     'occurred_at' => now(),
                     'description' => $data['note'] ?? null,
+                    'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
+                        ? trim((string) $data['immediate_action_taken'])
+                        : null,
                     'title' => $data['type'].' incident',
                 ]),
             );

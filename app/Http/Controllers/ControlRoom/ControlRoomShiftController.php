@@ -329,6 +329,13 @@ class ControlRoomShiftController extends Controller
             'shift_id' => $shift->id,
             'user_id' => $user->id,
             'type' => $validated['type'],
+            'purpose' => in_array(
+                $validated['type'],
+                [OperatorNote::TYPE_ESCALATION, OperatorNote::TYPE_HANDOVER],
+                true,
+            )
+                ? OperatorNote::PURPOSE_ESCALATION_HANDOVER
+                : OperatorNote::PURPOSE_GENERAL,
             'content' => $validated['content'],
             'alert_id' => $validated['alert_id'] ?? null,
             'is_pinned' => $validated['is_pinned'] ?? false,

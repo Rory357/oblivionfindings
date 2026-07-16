@@ -1376,17 +1376,26 @@ Final verification on 2026-07-17:
 - Modify: `app/Models/ControlRoom/OperatorNote.php`
 - Modify: `app/Services/ControlRoom/ControlRoomAlertLifecycleService.php`
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomAlertController.php`
+- Modify: `app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php`
+- Modify: `app/Http/Controllers/ControlRoom/ControlRoomShiftController.php`
 - Modify: `app/Services/ControlRoom/AlertWorkspaceService.php`
+- Modify: `app/Services/ControlRoom/SensorIncidentBridgeService.php`
 - Modify: `app/Services/Incidents/IncidentJourneyService.php`
 - Modify: `resources/js/components/control-room/alert-workspace-dialog.tsx`
 - Modify: `resources/js/components/control-room/alert-workspace-dialog.test.tsx`
+- Modify: `resources/js/components/control-room/alert-workspace/linked-journey.tsx`
 - Modify: `resources/js/components/control-room/flag-incident-dialog.tsx`
 - Create: `resources/js/components/control-room/flag-incident-dialog.test.tsx`
+- Modify: `tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php`
 - Modify: `tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php`
+- Modify: `tests/Feature/ControlRoom/SensorIncidentJourneyTest.php`
 - Modify: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
+- Create: `tests/Unit/ControlRoom/OperatorNotePurposeMigrationTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing typed-note and incident tests**
+- [x] **Step 1: Write failing typed-note and incident tests**
 
 Prove:
 
@@ -1399,14 +1408,14 @@ Prove:
 - low/medium incident behavior remains valid;
 - site/tenant scope remains enforced.
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php
 npx vitest run resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/control-room/flag-incident-dialog.test.tsx
 ```
 
-- [ ] **Step 3: Add the note purpose column**
+- [x] **Step 3: Add the note purpose column**
 
 ```php
 Schema::table('control_room_operator_notes', function (Blueprint $table) {
@@ -1416,7 +1425,7 @@ Schema::table('control_room_operator_notes', function (Blueprint $table) {
 
 Map existing `escalation` and `handover` types to `escalation_handover`; leave other history as `general`.
 
-- [ ] **Step 4: Persist note purpose**
+- [x] **Step 4: Persist note purpose**
 
 ```php
 public function appendOperatorNote(
@@ -1430,7 +1439,7 @@ public function appendOperatorNote(
 
 Validate the supported values and audit the purpose.
 
-- [ ] **Step 5: Prefill and validate incident immediate action**
+- [x] **Step 5: Prefill and validate incident immediate action**
 
 Presenter:
 
@@ -1455,7 +1464,7 @@ Request rule:
 ],
 ```
 
-- [ ] **Step 6: Add purpose selection and prefill notice in the UI**
+- [x] **Step 6: Add purpose selection and prefill notice in the UI**
 
 Use plain options:
 
@@ -1465,7 +1474,7 @@ Use plain options:
 
 The incident form must say where the prefill came from and allow edits before submission.
 
-- [ ] **Step 7: Re-run tests and migration rollback**
+- [x] **Step 7: Re-run tests and migration rollback**
 
 ```powershell
 php artisan migrate --path=database/migrations/2026_07_16_000300_add_purpose_to_control_room_operator_notes.php
@@ -1473,12 +1482,26 @@ php artisan test tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php
 npx vitest run resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/control-room/flag-incident-dialog.test.tsx
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
-git add database/migrations/2026_07_16_000300_add_purpose_to_control_room_operator_notes.php app/Models/ControlRoom/OperatorNote.php app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Http/Controllers/ControlRoom/ControlRoomAlertController.php app/Services/ControlRoom/AlertWorkspaceService.php app/Services/Incidents/IncidentJourneyService.php resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/control-room/flag-incident-dialog.tsx resources/js/components/control-room/flag-incident-dialog.test.tsx tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add database/migrations/2026_07_16_000300_add_purpose_to_control_room_operator_notes.php app/Models/ControlRoom/OperatorNote.php app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Http/Controllers/ControlRoom/ControlRoomAlertController.php app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php app/Http/Controllers/ControlRoom/ControlRoomShiftController.php app/Services/ControlRoom/AlertWorkspaceService.php app/Services/ControlRoom/SensorIncidentBridgeService.php app/Services/Incidents/IncidentJourneyService.php resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/control-room/alert-workspace/linked-journey.tsx resources/js/components/control-room/flag-incident-dialog.tsx resources/js/components/control-room/flag-incident-dialog.test.tsx tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php tests/Feature/ControlRoom/ControlRoomIncidentControllerTest.php tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php tests/Feature/ControlRoom/SensorIncidentJourneyTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Unit/ControlRoom/OperatorNotePurposeMigrationTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "feat(control-room): carry immediate controls into incidents"
 ```
+
+Task 12 final verification:
+
+- the typed-note and serious-incident regressions were observed red before implementation;
+- alert notes now persist one first-class `OperatorNote` row with a validated purpose, purpose-aware audit metadata, and a compatible activity-log entry;
+- the latest `immediate_controls` note is selected deterministically by `created_at` then `id`, with author/time provenance in the workspace payload;
+- high/critical alert incident creation, serious quick flags, and serious sensor confirmation require an explicit immediate-action truth at request boundaries and from effective submitted severity at canonical journey boundaries, with a critical-alert floor;
+- `No immediate control was possible` is accepted as explicit truth, while low/medium behavior remains valid;
+- the workspace create-incident and sensor panes expose an editable prefill and remove the former empty-payload handover shortcut;
+- alternate attach paths enforce the same invariant, submitted incidents permit only missing-field repair without overwriting existing controls, and reviewed/closed link-only retries remain immutable;
+- the migration backfill, index, rollback, and reapply pass in an isolated database test;
+- the authoritative affected backend matrix passes 161 tests with 1,404 assertions;
+- frontend verification passes 2 files with 11 tests; TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, client and SSR production builds, and diff integrity are clean;
+- independent review iterated through effective severity, alternate attach paths, submitted repair, missing-source copy, and the critical-alert floor; final re-review returned no findings.
 
 ## Task 13: Present linked Control Room evidence in Incident and H&S
 

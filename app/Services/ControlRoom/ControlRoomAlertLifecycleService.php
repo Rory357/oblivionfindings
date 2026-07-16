@@ -5,6 +5,7 @@ namespace App\Services\ControlRoom;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
@@ -566,25 +567,52 @@ class ControlRoomAlertLifecycleService
         User $actor,
         string $content,
         string $transition,
-    ): ControlRoomAlert {
+        string $type = OperatorNote::TYPE_NOTE,
+        string $purpose = OperatorNote::PURPOSE_GENERAL,
+    ): OperatorNote {
         $content = trim($content);
         if ($content === '') {
-            return $alert;
+            throw new InvalidArgumentException('Operator note content is required.');
+        }
+        if (! in_array($type, OperatorNote::TYPES, true)) {
+            throw new InvalidArgumentException("Unsupported operator note type '{$type}'.");
+        }
+        if (! in_array($purpose, OperatorNote::PURPOSES, true)) {
+            throw new InvalidArgumentException("Unsupported operator note purpose '{$purpose}'.");
         }
 
-        return DB::transaction(function () use ($alert, $actor, $content, $transition): ControlRoomAlert {
+        return DB::transaction(function () use ($alert, $actor, $content, $transition, $type, $purpose): OperatorNote {
             $locked = $this->lockAlert($alert);
+            $at = now();
+            $note = OperatorNote::query()->create([
+                'alert_id' => $locked->id,
+                'user_id' => $actor->id,
+                'type' => $type,
+                'purpose' => $purpose,
+                'content' => $content,
+            ]);
             $locked->forceFill([
-                'context' => $this->appendActivity($locked->context ?? [], $actor, $content, $transition, now()),
+                'context' => $this->appendActivity(
+                    $locked->context ?? [],
+                    $actor,
+                    $content,
+                    $transition,
+                    $at,
+                    $purpose,
+                    $note->id,
+                ),
             ])->save();
 
             AuditLogger::logOrFail('controlRoom.alert.addNote', $locked, [
                 'actor_id' => $actor->id,
                 'alert_id' => $locked->id,
+                'note_id' => $note->id,
+                'note_type' => $type,
+                'note_purpose' => $purpose,
                 'transition' => $transition,
             ]);
 
-            return $locked->refresh();
+            return $note->refresh();
         }, self::TRANSACTION_ATTEMPTS);
     }
 
@@ -953,9 +981,11 @@ class ControlRoomAlertLifecycleService
         string $content,
         string $transition,
         \DateTimeInterface $at,
+        ?string $purpose = null,
+        ?int $operatorNoteId = null,
     ): array {
         $activity = $context['activity_log'] ?? [];
-        $activity[] = [
+        $entry = [
             'type' => 'lifecycle_note',
             'transition' => $transition,
             'content' => $content,
@@ -963,6 +993,13 @@ class ControlRoomAlertLifecycleService
             'user_name' => $actor->name,
             'created_at' => $at->format(DATE_ATOM),
         ];
+        if ($purpose !== null) {
+            $entry['purpose'] = $purpose;
+        }
+        if ($operatorNoteId !== null) {
+            $entry['operator_note_id'] = $operatorNoteId;
+        }
+        $activity[] = $entry;
         $context['activity_log'] = $activity;
 
         return $context;

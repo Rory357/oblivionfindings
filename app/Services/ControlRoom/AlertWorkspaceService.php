@@ -4,6 +4,7 @@ namespace App\Services\ControlRoom;
 
 use App\Models\AuditLog;
 use App\Models\ControlRoom\ConfigOption;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
@@ -99,6 +100,13 @@ class AlertWorkspaceService
         $safeContext = $this->provenance->sanitiseContextForRead($alert);
 
         $linkedIncident = $alert->clientIncident;
+        $immediateControls = OperatorNote::query()
+            ->where('alert_id', $alert->id)
+            ->where('purpose', OperatorNote::PURPOSE_IMMEDIATE_CONTROLS)
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
         $capabilities = $this->access->capabilitiesForScopedAlert($user);
 
@@ -326,6 +334,14 @@ class AlertWorkspaceService
             'config_options' => [
                 'categories' => ConfigOption::forGroup('category'),
                 'resolution_codes' => ConfigOption::forGroup('resolution_code'),
+            ],
+            'incident_defaults' => [
+                'immediate_action_taken' => $immediateControls?->content ?? '',
+                'source_note' => $immediateControls ? [
+                    'id' => $immediateControls->id,
+                    'user_name' => $immediateControls->user?->name,
+                    'created_at' => optional($immediateControls->created_at)->toISOString(),
+                ] : null,
             ],
             'linked_incident' => $linkedIncident ? [
                 'id' => $linkedIncident->id,

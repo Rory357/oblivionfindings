@@ -198,6 +198,170 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame('context', $journey->alert->fresh()->context['original']);
     }
 
+    public function test_serious_alert_submission_requires_immediate_action_at_the_domain_boundary(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->high()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'immediate_action_taken' => '   ',
+            ]),
+            $actor,
+        );
+    }
+
+    public function test_serious_alert_submission_accepts_explicit_no_control_truth(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->critical()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $journey = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'immediate_action_taken' => 'No immediate control was possible',
+            ]),
+            $actor,
+        );
+
+        $this->assertSame(
+            'No immediate control was possible',
+            $journey->incident->fresh()->immediate_action_taken,
+        );
+    }
+
+    public function test_low_and_medium_alert_submissions_allow_no_immediate_action(): void
+    {
+        foreach (['low', 'medium'] as $severity) {
+            $actor = User::factory()->create();
+            $site = Site::factory()->create();
+            $client = Client::factory()->create(['site_id' => $site->id]);
+            $alert = ControlRoomAlert::factory()->create([
+                'severity' => $severity,
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+            ]);
+
+            $journey = app(IncidentJourneyService::class)->submitFromAlert(
+                $alert,
+                $this->incidentInput($client, $site, [
+                    'severity' => $severity,
+                    'immediate_action_taken' => null,
+                ]),
+                $actor,
+            );
+
+            $this->assertNull(
+                $journey->incident->fresh()->immediate_action_taken,
+            );
+        }
+    }
+
+    public function test_task12_review_effective_high_incident_severity_is_enforced_at_the_domain_boundary(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->create([
+            'severity' => 'low',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'severity' => 'high',
+                'immediate_action_taken' => null,
+            ]),
+            $actor,
+        );
+    }
+
+    public function test_task12_review_attach_rejects_a_submitted_serious_incident_without_immediate_action(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->high()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'reported_by' => $actor->id,
+            'severity' => 'high',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'immediate_action_taken' => null,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->attachAlertToIncident(
+            $incident,
+            $alert,
+            $actor,
+        );
+    }
+
+    public function test_task12_review_critical_alert_floor_applies_to_a_submitted_medium_incident_repair(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->critical()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'reported_by' => $actor->id,
+            'severity' => 'medium',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'control_room_alert_id' => $alert->id,
+            'immediate_action_taken' => null,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            [],
+            $actor,
+        );
+    }
+
     public function test_reviewed_and_closed_incident_retries_are_link_only_and_preserve_the_record(): void
     {
         foreach (['reviewed', 'closed'] as $status) {
@@ -1728,6 +1892,7 @@ class IncidentJourneyServiceTest extends TestCase
         $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
             'severity' => 'high',
+            'immediate_action_taken' => 'Immediate controls recorded before the lock-order assertion.',
         ]);
         $alert = ControlRoomAlert::factory()->open()->create([
             'client_id' => $client->id,

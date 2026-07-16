@@ -1240,6 +1240,14 @@ class ControlRoomAlertControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/confirm", [
+                'immediate_action_taken' => 'Resident checked and the area made safe.',
+            ])
             ->assertRedirect();
 
         $incident = ClientIncident::where('source', 'sensor')->latest('id')->first();
@@ -1247,6 +1255,10 @@ class ControlRoomAlertControllerTest extends TestCase
         $this->assertSame('fall', $incident->type);
         $this->assertSame($client->id, $incident->client_id);
         $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame(
+            'Resident checked and the area made safe.',
+            $incident->immediate_action_taken,
+        );
         $this->assertFalse($incident->interactive);
         $this->assertSame('fall_detected', $incident->metadata['sensor_evidence']['signal_type'] ?? null);
 
@@ -1301,7 +1313,9 @@ class ControlRoomAlertControllerTest extends TestCase
         $alert = $this->alertFactory()->resolved()->create(['source' => 'sensor']);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->post("/control-room/alerts/{$alert->id}/confirm", [
+                'immediate_action_taken' => 'Resident checked before the alert was resolved.',
+            ])
             ->assertSessionHasErrors('alert');
 
         $this->assertSame(0, ClientIncident::where('source', 'sensor')->count());
@@ -1330,7 +1344,9 @@ class ControlRoomAlertControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$confirmAlert->id}/confirm")
+            ->post("/control-room/alerts/{$confirmAlert->id}/confirm", [
+                'immediate_action_taken' => 'No immediate control was possible',
+            ])
             ->assertRedirect()
             ->assertSessionHasErrors('alert');
         $this->actingAs($this->admin)
