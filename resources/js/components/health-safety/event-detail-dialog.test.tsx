@@ -209,6 +209,88 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
             incident: 'submitted',
             health_safety: 'open',
         },
+        linked_operational_evidence: {
+            label: 'Linked Control Room evidence',
+            read_only: true,
+            source: {
+                id: 11,
+                reference: 'ALT-2026-0011',
+                alert_type: 'incident',
+                severity: 'high',
+                status: 'resolved',
+                href: '/control-room/alerts/11',
+                site: { id: 3, name: 'Kauri House' },
+                client: null,
+                triggered_at: '2026-07-14T01:30:00Z',
+                created_at: '2026-07-14T01:30:00Z',
+                updated_at: '2026-07-14T02:00:00Z',
+            },
+            notes: [
+                {
+                    id: 71,
+                    type: 'action',
+                    purpose: 'immediate_controls',
+                    purpose_label: 'Immediate controls',
+                    content: 'Loading bay isolated and first aid provided.',
+                    author: { id: 9, name: 'Tama Lewis' },
+                    created_at: '2026-07-14T01:40:00Z',
+                },
+            ],
+            tasks: [
+                {
+                    id: 101,
+                    title: 'Preserve loading bay CCTV',
+                    description: null,
+                    status: 'in_progress',
+                    priority: 'high',
+                    owner: { id: 9, name: 'Tama Lewis' },
+                    due_at: '2026-07-14T05:00:00Z',
+                    overdue: false,
+                    transfer: {
+                        state: 'open',
+                        corrective_action_reference: null,
+                        transferred_at: null,
+                    },
+                },
+            ],
+            evidence_packs: [
+                {
+                    id: 81,
+                    title: 'Alert evidence pack',
+                    status: 'complete',
+                    item_count: 1,
+                    items: [
+                        {
+                            id: 82,
+                            type: 'document',
+                            title: 'CCTV preservation note',
+                            description:
+                                'Footage retained by the duty manager.',
+                            mime_type: 'text/plain',
+                            file_size: 120,
+                            captured_at: '2026-07-14T01:45:00Z',
+                            captured_by: { id: 9, name: 'Tama Lewis' },
+                            download_url: '/evidence/82',
+                        },
+                    ],
+                },
+            ],
+            communications: [
+                {
+                    id: 91,
+                    channel: 'phone',
+                    direction: 'outbound',
+                    purpose: 'Duty manager escalation',
+                    subject: null,
+                    content: 'Duty manager briefed on immediate controls.',
+                    status: 'sent',
+                    sent_at: '2026-07-14T01:55:00Z',
+                    delivered_at: null,
+                    created_at: '2026-07-14T01:54:00Z',
+                },
+            ],
+        },
+        incident_followups: [],
         handover_summary: {
             incident_reference: 'INC-2026-0042',
             alert_reference: 'ALT-2026-0011',
@@ -336,8 +418,14 @@ describe('EventDetailDialog control-room handover', () => {
             'Preserve loading bay CCTV',
             'Review incident record',
         ]) {
-            expect(screen.getByText(text)).toBeInTheDocument();
+            expect(screen.getAllByText(text).length).toBeGreaterThan(0);
         }
+        expect(
+            screen.getByText('Official incident attachments'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Linked Control Room evidence'),
+        ).toBeInTheDocument();
     });
 
     it('offers one acceptance action only when permitted and posts the owner and notes', () => {

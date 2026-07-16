@@ -8,6 +8,7 @@ use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\EvidenceItem;
+use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
@@ -24,8 +25,10 @@ use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use App\Support\HealthSafety\HsCorrectiveActionPresenter;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -42,6 +45,8 @@ class HsEventController extends Controller
         private readonly HsEventService $events,
         private readonly UserSiteAccessService $siteAccess,
         private readonly HsCorrectiveActionPresenter $correctiveActionPresenter,
+        private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
+        private readonly IncidentJourneyService $journeys,
     ) {}
 
     /**
@@ -627,10 +632,18 @@ class HsEventController extends Controller
         $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id);
         $sourceIncident = $hsEvent->source_type === ClientIncident::class
             ? ClientIncident::query()
-                ->with(['reporter:id,name', 'attachments.uploader:id,name'])
+                ->with([
+                    'reporter:id,name',
+                    'attachments.uploader:id,name',
+                    'followups.assignedTo:id,name',
+                ])
                 ->find($hsEvent->source_id)
             : $hsEvent->clientIncident()
-                ->with(['reporter:id,name', 'attachments.uploader:id,name'])
+                ->with([
+                    'reporter:id,name',
+                    'attachments.uploader:id,name',
+                    'followups.assignedTo:id,name',
+                ])
                 ->first();
         if ($source !== null && $sourceIncident !== null) {
             if ($sourceIncident->reference_number) {
@@ -643,7 +656,12 @@ class HsEventController extends Controller
                 $source['url'] = null;
             }
         }
-        $alert = $hsEvent->controlRoomAlert;
+        $alert = $this->linkedControlRoomAlert($hsEvent, $sourceIncident);
+        $alert?->loadMissing([
+            'playbookRun.playbook:id,name',
+            'tasks.assignedTo:id,name',
+            'tasks.transferredCorrectiveAction:id,source_control_room_task_id',
+        ]);
         $handoverAttachments = $sourceIncident?->attachments->map(fn (ClientIncidentAttachment $attachment) => [
             'id' => $attachment->id,
             'name' => $attachment->original_name,
@@ -653,35 +671,20 @@ class HsEventController extends Controller
             'created_at' => $attachment->created_at?->toIso8601String(),
             'download_url' => "/health-safety/events/{$hsEvent->id}/incident-attachments/{$attachment->id}/download",
         ])->values() ?? collect();
-        $controlRoomEvidence = $alert?->evidencePacks->map(fn ($pack) => [
-            'id' => $pack->id,
-            'title' => $pack->title,
-            'status' => $pack->status,
-            'items' => $pack->evidenceItems->map(fn ($item) => [
-                'id' => $item->id,
-                'title' => $item->title,
-                'description' => $item->description,
-                'download_url' => $item->storage_path
-                    ? "/health-safety/events/{$hsEvent->id}/control-room-evidence/{$item->id}/download"
-                    : null,
-            ])->values(),
-        ])->values() ?? collect();
-        $communications = $alert?->communications->map(fn ($communication) => [
-            'id' => $communication->id,
-            'channel' => $communication->channel,
-            'purpose' => $communication->purpose,
-            'content' => $communication->content,
-            'status' => $communication->status,
-            'sent_at' => $communication->sent_at?->toIso8601String(),
-        ])->values() ?? collect();
-        $operationalTasks = $alert?->tasks->map(fn ($task) => [
-            'id' => $task->id,
-            'title' => $task->title,
-            'status' => $task->status,
-            'priority' => $task->priority,
-            'assignee' => $task->assignedTo?->name,
-            'due_at' => $task->due_at?->toIso8601String(),
-        ])->values() ?? collect();
+        $linkedOperationalEvidence = $alert
+            ? $this->linkedEvidence->present(
+                $alert,
+                $currentUser,
+                fn (EvidenceItem $item): string => "/health-safety/events/{$hsEvent->id}/control-room-evidence/{$item->id}/download",
+            )
+            : null;
+        $incidentFollowups = $sourceIncident?->followups->map(fn ($followup): array => [
+            'id' => $followup->id,
+            'notes' => $followup->notes,
+            'assigned_to' => $followup->assignedTo?->name,
+            'due_at' => $followup->due_at?->toIso8601String(),
+            'completed_at' => $followup->completed_at?->toIso8601String(),
+        ])->values()->all() ?? [];
         $unresolvedControlRoomTasks = $canManage && $alert
             ? $alert->tasks
                 ->reject(fn (AlertTask $task): bool => in_array($task->status, AlertTask::TERMINAL_STATUSES, true)
@@ -772,15 +775,15 @@ class HsEventController extends Controller
                 'can_acknowledge' => $canAcknowledgeWorksafe,
             ],
             'investigation_required' => (bool) $hsEvent->investigation_required,
-            'control_room_alert' => $hsEvent->controlRoomAlert ? [
-                'id' => $hsEvent->controlRoomAlert->id,
-                'reference_number' => $hsEvent->controlRoomAlert->reference_number,
-                'severity' => $hsEvent->controlRoomAlert->severity,
-                'status' => $hsEvent->controlRoomAlert->status,
-                'url' => $currentUser->canDo('controlRoom.viewAny')
-                    ? "/control-room/alerts/{$hsEvent->controlRoomAlert->id}"
-                    : null,
+            'control_room_alert' => $alert ? [
+                'id' => $alert->id,
+                'reference_number' => $alert->reference_number,
+                'severity' => $alert->severity,
+                'status' => $alert->status,
+                'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
+            'linked_operational_evidence' => $linkedOperationalEvidence,
+            'incident_followups' => $incidentFollowups,
             'closed_at' => $hsEvent->closed_at?->toIso8601String(),
             'closure_summary' => $hsEvent->closure_summary,
             'created_by_name' => $hsEvent->creator?->name,
@@ -816,14 +819,14 @@ class HsEventController extends Controller
                 'source_label' => $source['label'] ?? null,
                 'site_name' => $hsEvent->site?->name,
                 'attachments' => $handoverAttachments,
-                'control_room_evidence' => $controlRoomEvidence,
+                'control_room_evidence' => data_get($linkedOperationalEvidence, 'evidence_packs', []),
                 'playbook' => $alert?->playbookRun ? [
                     'name' => $alert->playbookRun->playbook?->name,
                     'status' => $alert->playbookRun->status,
                     'outcome' => data_get($alert->playbookRun->context, 'outcome'),
                 ] : null,
-                'communications' => $communications,
-                'operational_tasks' => $operationalTasks,
+                'communications' => data_get($linkedOperationalEvidence, 'communications', []),
+                'operational_tasks' => data_get($linkedOperationalEvidence, 'tasks', []),
                 'next_action' => $nextAction,
             ],
             'investigations' => $investigations,
@@ -902,9 +905,13 @@ class HsEventController extends Controller
         EvidenceItem $item,
     ): StreamedResponse {
         $event = $this->resolveAccessibleEvent($request, $hsEvent);
-        $belongsToJourney = $event->control_room_alert_id !== null
+        $sourceIncident = $event->source_type === ClientIncident::class
+            ? ClientIncident::query()->find($event->source_id)
+            : $event->clientIncident()->first();
+        $alert = $this->linkedControlRoomAlert($event, $sourceIncident);
+        $belongsToJourney = $alert !== null
             && $item->evidencePack()
-                ->where('alert_id', $event->control_room_alert_id)
+                ->where('alert_id', $alert->id)
                 ->exists();
 
         abort_unless($belongsToJourney && filled($item->storage_path), 404);
@@ -1166,6 +1173,17 @@ class HsEventController extends Controller
         );
 
         return $query->findOrFail($eventId);
+    }
+
+    private function linkedControlRoomAlert(
+        HsEvent $event,
+        ?ClientIncident $incident,
+    ): ?ControlRoomAlert {
+        if ($incident !== null) {
+            return $this->journeys->journeyForIncident($incident)->alert;
+        }
+
+        return $event->controlRoomAlert()->first();
     }
 
     private function handoverOwnerQuery(HsEvent $event, User $viewer): Builder

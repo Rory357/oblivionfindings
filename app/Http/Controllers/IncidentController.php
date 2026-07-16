@@ -7,6 +7,7 @@ use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
@@ -24,6 +25,7 @@ use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +37,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class IncidentController extends Controller
 {
     use ServesPrivateAttachments;
+
+    public function __construct(
+        private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
+        private readonly IncidentJourneyService $journeys,
+    ) {}
 
     /**
      * Unified Incidents register (redesign): hs-hero-kit hero with incident stat
@@ -384,22 +391,6 @@ class IncidentController extends Controller
         return $query->exists();
     }
 
-    private function canOpenControlRoomAlert(User $user, ControlRoomAlert $alert): bool
-    {
-        if (! $user->canDo('controlRoom.viewAny')) {
-            return false;
-        }
-
-        $query = ControlRoomAlert::query()->whereKey($alert->id);
-        app(UserSiteAccessService::class)->applyAlertScope(
-            $query,
-            $user,
-            ['reports.viewAny'],
-        );
-
-        return $query->exists();
-    }
-
     /**
      * The full, read-only detail payload behind the IncidentDetailDialog — shared
      * by the modal-over-list (index `?incident=`) and the `/incidents/{id}`
@@ -464,8 +455,6 @@ class IncidentController extends Controller
 
         $inv = $hsEvent?->latestInvestigation;
         $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
-        $canOpenControlRoomAlert = $incident->controlRoomAlert
-            && $this->canOpenControlRoomAlert($user, $incident->controlRoomAlert);
         $canRaiseCorrectiveAction = $user->canDo('incidents.viewAny')
             || $user->canDo('compliance.view')
             || $user->canDo('hazards.view');
@@ -490,6 +479,16 @@ class IncidentController extends Controller
                 ->values()
                 ->all();
         }
+        $linkedControlRoomAlert = $this->journeys
+            ->journeyForIncident($incident)
+            ->alert;
+        $linkedOperationalEvidence = $linkedControlRoomAlert
+            ? $this->linkedEvidence->present(
+                $linkedControlRoomAlert,
+                $user,
+                fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
+            )
+            : null;
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
@@ -533,7 +532,7 @@ class IncidentController extends Controller
             'closed_notes' => $incident->closed_notes,
             'reopened_at' => $incident->reopened_at,
             'reopened_reason' => $incident->reopened_reason,
-            'control_room_alert_id' => $incident->control_room_alert_id,
+            'control_room_alert_id' => $linkedControlRoomAlert?->id,
             'client' => $incident->client ? [
                 'id' => $incident->client->id,
                 'first_name' => $incident->client->first_name,
@@ -573,17 +572,16 @@ class IncidentController extends Controller
                 'reported_at' => $medicationError->reported_at,
                 'url' => '/emar/errors',
             ] : null,
-            'control_room_alert' => $incident->controlRoomAlert ? [
-                'id' => $incident->controlRoomAlert->id,
-                'status' => $incident->controlRoomAlert->status,
-                'severity' => $incident->controlRoomAlert->severity,
-                'alert_type' => $incident->controlRoomAlert->alert_type,
-                'triggered_at' => $incident->controlRoomAlert->triggered_at,
-                'resolved_at' => $incident->controlRoomAlert->resolved_at,
-                'url' => $canOpenControlRoomAlert
-                    ? "/control-room/alerts/{$incident->controlRoomAlert->id}"
-                    : null,
+            'control_room_alert' => $linkedControlRoomAlert ? [
+                'id' => $linkedControlRoomAlert->id,
+                'status' => $linkedControlRoomAlert->status,
+                'severity' => $linkedControlRoomAlert->severity,
+                'alert_type' => $linkedControlRoomAlert->alert_type,
+                'triggered_at' => $linkedControlRoomAlert->triggered_at,
+                'resolved_at' => $linkedControlRoomAlert->resolved_at,
+                'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
+            'linked_operational_evidence' => $linkedOperationalEvidence,
             'hs_event' => $hsEvent ? [
                 'id' => $hsEvent->id,
                 'reference_number' => $hsEvent->reference_number,
@@ -1841,6 +1839,28 @@ class IncidentController extends Controller
             $attachment->path,
             $attachment->original_name,
             $attachment->mime,
+        );
+    }
+
+    public function downloadControlRoomEvidence(
+        Request $request,
+        ClientIncident $incident,
+        EvidenceItem $item,
+    ): StreamedResponse {
+        $this->authorize('view', $incident);
+        $alert = $this->journeys->journeyForIncident($incident)->alert;
+        $belongsToJourney = $alert !== null
+            && $item->evidencePack()
+                ->where('alert_id', $alert->id)
+                ->exists();
+
+        abort_unless($belongsToJourney && filled($item->storage_path), 404);
+
+        return $this->streamPrivateAttachment(
+            'local',
+            $item->storage_path,
+            data_get($item->metadata, 'original_name') ?: basename($item->storage_path),
+            $item->mime_type,
         );
     }
 }

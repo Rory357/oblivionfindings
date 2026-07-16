@@ -6,9 +6,14 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\User;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 
 class IncidentJourneyPresenter
 {
+    public function __construct(
+        private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
+    ) {}
+
     /** @return array<string, mixed> */
     public function present(IncidentJourney $journey, User $viewer): array
     {
@@ -46,9 +51,16 @@ class IncidentJourneyPresenter
 
         $site = $incident->site ?? $hsEvent?->site ?? $incident->shift?->site ?? $incident->client?->site;
         $canViewPerson = $this->canViewPerson($viewer);
-        $canOpenAlert = $alert !== null && $this->canOpenAlert($viewer);
         $canOpenIncident = $this->canOpenIncident($viewer);
         $canOpenHs = $hsEvent !== null && $viewer->canDo('hazards.view');
+        $linkedOperationalEvidence = $alert
+            ? $this->linkedEvidence->present(
+                $alert,
+                $viewer,
+                fn ($item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
+            )
+            : null;
+        $canOpenAlert = data_get($linkedOperationalEvidence, 'source.href') !== null;
 
         return [
             'references' => [
@@ -93,6 +105,7 @@ class IncidentJourneyPresenter
                 ])->values()->all(),
                 'href' => $canOpenIncident ? '/incidents?incident='.$incident->id : null,
             ],
+            'linked_operational_evidence' => $linkedOperationalEvidence,
             'control_room' => $this->presentAlert($alert, $canOpenAlert),
             'health_safety' => $this->presentHealthSafety($hsEvent, $canOpenHs),
             'lifecycle' => [
@@ -260,13 +273,6 @@ class IncidentJourneyPresenter
         return ['label' => 'No action available', 'href' => null, 'stage' => 'complete'];
     }
 
-    private function canOpenAlert(User $viewer): bool
-    {
-        return $viewer->canDo('controlRoom.viewAny')
-            || $viewer->canDo('controlRoom.alerts.view')
-            || $viewer->canDo('controlRoom.alerts.manage');
-    }
-
     private function canOpenIncident(User $viewer): bool
     {
         return $viewer->canDo('incidents.viewAny') || $viewer->canDo('incidents.viewAssigned');
@@ -275,7 +281,9 @@ class IncidentJourneyPresenter
     private function canViewPerson(User $viewer): bool
     {
         return $this->canOpenIncident($viewer)
-            || $this->canOpenAlert($viewer)
+            || $viewer->canDo('controlRoom.viewAny')
+            || $viewer->canDo('controlRoom.alerts.view')
+            || $viewer->canDo('controlRoom.alerts.manage')
             || $viewer->canDo('hazards.view');
     }
 }

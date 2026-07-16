@@ -1512,9 +1512,11 @@ Task 12 final verification:
 - Modify: `app/Http/Controllers/HealthSafety/HsEventController.php`
 - Modify: `app/Services/ControlRoom/AlertWorkspaceService.php`
 - Create: `app/Support/Incidents/LinkedOperationalEvidencePresenter.php`
+- Modify: `routes/incidents.php`
 - Modify: `tests/Feature/Incidents/IncidentJourneyPresenterTest.php`
-- Modify: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
+- Verify: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
 - Create: `tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php`
+- Modify: `tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php`
 - Modify: `resources/js/components/incidents/incident-detail-dialog.tsx`
 - Modify: `resources/js/components/incidents/incident-detail-dialog.test.tsx`
 - Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
@@ -1522,8 +1524,9 @@ Task 12 final verification:
 - Create: `resources/js/components/incidents/linked-operational-evidence.tsx`
 - Create: `resources/js/components/incidents/linked-operational-evidence.test.tsx`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
+- Modify: `docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md`
 
-- [ ] **Step 1: Write failing cross-module payload tests**
+- [x] **Step 1: Write failing cross-module payload tests**
 
 Prove Incident and H&S receive the same read-only linked data:
 
@@ -1535,14 +1538,14 @@ Prove Incident and H&S receive the same read-only linked data:
 - authenticated download URLs;
 - labels distinguishing linked operational evidence from official incident attachments/follow-ups.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```powershell
-php artisan test tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php
+php artisan test tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php
 npx vitest run resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/incidents/linked-operational-evidence.test.tsx
 ```
 
-- [ ] **Step 3: Build one authorized presenter**
+- [x] **Step 3: Build one authorized presenter**
 
 ```php
 return [
@@ -1563,7 +1566,7 @@ return [
 
 Do not copy files or note bodies into incident tables.
 
-- [ ] **Step 4: Render a shared read-only evidence section**
+- [x] **Step 4: Render a shared read-only evidence section**
 
 Use headings:
 
@@ -1577,19 +1580,32 @@ Transferred tasks display:
 
 Open tasks display owner/due state.
 
-- [ ] **Step 5: Re-run tests**
+- [x] **Step 5: Re-run tests**
 
 ```powershell
-php artisan test tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php
+php artisan test tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php
 npx vitest run resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/incidents/linked-operational-evidence.test.tsx
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
-git add app/Services/Incidents/IncidentJourneyPresenter.php app/Http/Controllers/IncidentController.php app/Http/Controllers/HealthSafety/HsEventController.php app/Services/ControlRoom/AlertWorkspaceService.php app/Support/Incidents/LinkedOperationalEvidencePresenter.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php resources/js/components/incidents/incident-detail-dialog.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/incidents/linked-operational-evidence.tsx resources/js/components/incidents/linked-operational-evidence.test.tsx docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add app/Services/Incidents/IncidentJourneyPresenter.php app/Http/Controllers/IncidentController.php app/Http/Controllers/HealthSafety/HsEventController.php app/Services/ControlRoom/AlertWorkspaceService.php app/Support/Incidents/LinkedOperationalEvidencePresenter.php routes/incidents.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/HealthSafety/HsLinkedOperationalEvidenceTest.php tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php resources/js/components/incidents/incident-detail-dialog.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/components/incidents/linked-operational-evidence.tsx resources/js/components/incidents/linked-operational-evidence.test.tsx docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "feat(incidents): preserve linked operational evidence"
 ```
+
+Task 13 final verification:
+
+- the cross-module payload, exact parent-scoped download, context-only legacy journey, latest-communication window, and shared rendering regressions were observed red before implementation;
+- one canonical `LinkedOperationalEvidencePresenter` supplies Incident, H&S, and Control Room workspace payloads without copying files or note bodies into incident tables;
+- direct incident/H&S links and supported context-only legacy alerts use the same canonical journey resolution for detail and download paths;
+- linked evidence remains visible through the authorized parent record, while the Control Room jump-back link is exposed only through exact-alert read permission and never through list-only permission;
+- source context, typed operator notes, tasks and transfer state, evidence packs/items, authenticated downloads, and the latest 20 communications are presented consistently, with those communications restored to chronological display order;
+- the shared UI renders `Linked Control Room evidence`, `Official incident attachments`, and `Incident follow-ups`; transferred tasks use `Transferred to CA-...`, open tasks show owner/due state, and communication direction remains visible;
+- the authoritative backend matrix passes 55 tests with 864 assertions in 196.60s; the frontend matrix passes 3 files with 30 tests;
+- TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, and diff integrity are clean;
+- the production client build passes with 4,967 modules in 3m 13s and SSR passes with 1,619 modules in 40.41s;
+- independent review found and closed three issues: latest-20 selection, canonical legacy journey resolution, and communication direction. Final re-review returned no findings.
 
 ## Task 14: Unify closure gates and truthful cross-module language
 

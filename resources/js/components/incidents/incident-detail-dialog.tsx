@@ -38,6 +38,10 @@ import {
     X,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent } from 'react';
+import {
+    LinkedOperationalEvidence,
+    type LinkedOperationalEvidenceData,
+} from './linked-operational-evidence';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors IncidentController::buildIncidentDetail()           */
@@ -115,6 +119,7 @@ export type IncidentDetail = {
         resolved_at: string | null;
         url: string | null;
     } | null;
+    linked_operational_evidence: LinkedOperationalEvidenceData | null;
     hs_event: {
         id: number;
         reference_number: string;
@@ -305,13 +310,13 @@ export function IncidentDetailDialog({
         },
         {
             key: 'photos',
-            label: 'Photos & documents',
+            label: 'Official incident attachments',
             blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
             icon: Paperclip,
         },
         {
             key: 'followups',
-            label: 'Follow-ups',
+            label: 'Incident follow-ups',
             blurb: openFollowups > 0 ? `${openFollowups} open` : 'all complete',
             icon: ListTodo,
         },
@@ -1696,99 +1701,103 @@ export function LinkedSection({
     clientName: string;
 }) {
     return (
-        <div className="flex flex-col gap-2">
-            {d.control_room_alert ? (
-                <LinkedRow
-                    icon={RadioTower}
-                    title="Control Room alert"
-                    sub={`${titleCase(d.control_room_alert.alert_type)} · ${titleCase(d.control_room_alert.status)}${d.control_room_alert.triggered_at ? ` · ${formatDateTime(d.control_room_alert.triggered_at)}` : ''}`}
-                    href={d.control_room_alert.url}
-                />
-            ) : null}
-            {d.hs_event ? (
-                <LinkedRow
-                    icon={ShieldAlert}
-                    title="Health & Safety event"
-                    sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
-                    href={d.hs_event.url}
-                />
-            ) : null}
-            {(d.safeguarding_concerns ?? []).map((c) =>
-                c.can_view ? (
-                    <LinkedRow
-                        key={c.id}
-                        icon={ShieldAlert}
-                        title="Safeguarding concern"
-                        sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
-                        href={`/safeguarding/${c.id}`}
-                    />
-                ) : (
-                    <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
-                    >
-                        <ShieldAlert className="h-4 w-4 shrink-0" />
-                        <span className="text-sm">
-                            Safeguarding concern raised · restricted
-                            (need-to-know)
-                        </span>
-                    </div>
-                ),
-            )}
-            {d.fleet_incident ? (
-                <LinkedRow
-                    icon={Truck}
-                    title="Fleet incident"
-                    sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
-                    href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
-                />
-            ) : null}
-            {d.medication_error ? (
-                <LinkedRow
-                    icon={Pill}
-                    title="Medication error report"
-                    sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
-                    href={d.medication_error.url}
-                />
-            ) : null}
-            {(d.restraint_events ?? []).map((r) => (
-                <LinkedRow
-                    key={`re-${r.id}`}
-                    icon={Hand}
-                    title="Restraint event"
-                    sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
-                    href={`/health-safety/restraints?event=${r.id}`}
-                />
-            ))}
-            {(d.first_aid_records ?? []).map((r) => (
-                <LinkedRow
-                    key={`fa-${r.id}`}
-                    icon={HeartPulse}
-                    title="First-aid treatment"
-                    sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
-                    href={`/health-safety/first-aid?record=${r.id}`}
-                />
-            ))}
-            {d.client ? (
-                <LinkedRow
-                    icon={User}
-                    title="Client record"
-                    sub={clientName}
-                    href={`/operations/clients/${d.client.id}/care`}
-                />
-            ) : null}
-            {!d.control_room_alert &&
-            !d.hs_event &&
-            !d.client &&
-            !d.fleet_incident &&
-            !d.medication_error &&
-            !(d.safeguarding_concerns ?? []).length &&
-            !(d.restraint_events ?? []).length &&
-            !(d.first_aid_records ?? []).length ? (
-                <p className="text-sm text-muted-foreground">
-                    No linked records.
-                </p>
-            ) : null}
+        <div className="flex flex-col gap-4">
+            <LinkedOperationalEvidence
+                evidence={d.linked_operational_evidence}
+            />
+            <section aria-labelledby="other-linked-records-heading">
+                <h2
+                    id="other-linked-records-heading"
+                    className="mb-2 text-sm font-bold text-foreground"
+                >
+                    Other linked records
+                </h2>
+                <div className="flex flex-col gap-2">
+                    {d.hs_event ? (
+                        <LinkedRow
+                            icon={ShieldAlert}
+                            title="Health & Safety event"
+                            sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
+                            href={d.hs_event.url}
+                        />
+                    ) : null}
+                    {(d.safeguarding_concerns ?? []).map((c) =>
+                        c.can_view ? (
+                            <LinkedRow
+                                key={c.id}
+                                icon={ShieldAlert}
+                                title="Safeguarding concern"
+                                sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
+                                href={`/safeguarding/${c.id}`}
+                            />
+                        ) : (
+                            <div
+                                key={c.id}
+                                className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
+                            >
+                                <ShieldAlert className="h-4 w-4 shrink-0" />
+                                <span className="text-sm">
+                                    Safeguarding concern raised · restricted
+                                    (need-to-know)
+                                </span>
+                            </div>
+                        ),
+                    )}
+                    {d.fleet_incident ? (
+                        <LinkedRow
+                            icon={Truck}
+                            title="Fleet incident"
+                            sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
+                            href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
+                        />
+                    ) : null}
+                    {d.medication_error ? (
+                        <LinkedRow
+                            icon={Pill}
+                            title="Medication error report"
+                            sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
+                            href={d.medication_error.url}
+                        />
+                    ) : null}
+                    {(d.restraint_events ?? []).map((r) => (
+                        <LinkedRow
+                            key={`re-${r.id}`}
+                            icon={Hand}
+                            title="Restraint event"
+                            sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
+                            href={`/health-safety/restraints?event=${r.id}`}
+                        />
+                    ))}
+                    {(d.first_aid_records ?? []).map((r) => (
+                        <LinkedRow
+                            key={`fa-${r.id}`}
+                            icon={HeartPulse}
+                            title="First-aid treatment"
+                            sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
+                            href={`/health-safety/first-aid?record=${r.id}`}
+                        />
+                    ))}
+                    {d.client ? (
+                        <LinkedRow
+                            icon={User}
+                            title="Client record"
+                            sub={clientName}
+                            href={`/operations/clients/${d.client.id}/care`}
+                        />
+                    ) : null}
+                    {!d.hs_event &&
+                    !d.client &&
+                    !d.fleet_incident &&
+                    !d.medication_error &&
+                    !(d.safeguarding_concerns ?? []).length &&
+                    !(d.restraint_events ?? []).length &&
+                    !(d.first_aid_records ?? []).length ? (
+                        <p className="text-sm text-muted-foreground">
+                            No other linked records.
+                        </p>
+                    ) : null}
+                </div>
+            </section>
         </div>
     );
 }

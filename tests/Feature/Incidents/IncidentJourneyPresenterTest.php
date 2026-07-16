@@ -7,10 +7,13 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\Communication;
+use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoomAlert;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\Permission;
 use App\Models\Site;
@@ -90,18 +93,55 @@ class IncidentJourneyPresenterTest extends TestCase
             'total_steps' => 4,
         ]);
         $alert->update(['playbook_run_id' => $run->id]);
-        AlertTask::query()->create([
+        $operationalTask = AlertTask::query()->create([
             'alert_id' => $alert->id,
             'title' => 'Contact the on-call nurse',
             'status' => AlertTask::STATUS_IN_PROGRESS,
             'priority' => 'high',
+            'assigned_to_user_id' => $owner->id,
+            'due_at' => '2026-07-15 09:30:00',
         ]);
-        EvidencePack::query()->create([
+        $transferredTask = AlertTask::query()->create([
+            'alert_id' => $alert->id,
+            'title' => 'Preserve the fall-scene evidence',
+            'status' => AlertTask::STATUS_TRANSFERRED,
+            'priority' => 'critical',
+        ]);
+        $correctiveAction = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $hsEvent->id,
+            'source_control_room_task_id' => $transferredTask->id,
+            'reference_number' => 'CA-2026-0120',
+            'title' => 'Retain and review the fall-scene evidence',
+            'assigned_to_user_id' => $owner->id,
+        ]);
+        $transferredTask->update([
+            'transferred_to_hs_corrective_action_id' => $correctiveAction->id,
+            'transferred_at' => '2026-07-15 09:00:00',
+            'transferred_by_user_id' => $viewer->id,
+        ]);
+        OperatorNote::query()->create([
+            'alert_id' => $alert->id,
+            'type' => OperatorNote::TYPE_ACTION,
+            'purpose' => OperatorNote::PURPOSE_IMMEDIATE_CONTROLS,
+            'content' => 'Room isolated and nurse called.',
+            'user_id' => $viewer->id,
+        ]);
+        $pack = EvidencePack::query()->create([
             'alert_id' => $alert->id,
             'title' => 'Room and response evidence',
             'status' => 'collecting',
             'items' => [],
-            'item_count' => 2,
+            'item_count' => 1,
+        ]);
+        EvidenceItem::query()->create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'document',
+            'title' => 'Room preservation record',
+            'description' => 'Duty manager confirmed the room stayed isolated.',
+            'storage_path' => 'control-room/room-preservation.txt',
+            'mime_type' => 'text/plain',
+            'captured_at' => '2026-07-15 09:05:00',
+            'captured_by_user_id' => $viewer->id,
         ]);
         Communication::query()->create([
             'alert_id' => $alert->id,
@@ -130,6 +170,22 @@ class IncidentJourneyPresenterTest extends TestCase
         $this->assertSame('Contact the on-call nurse', $payload['control_room']['tasks'][0]['title']);
         $this->assertSame('Room and response evidence', $payload['control_room']['evidence'][0]['title']);
         $this->assertSame('Nurse notified', $payload['control_room']['communications'][0]['subject']);
+        $this->assertSame('Linked Control Room evidence', $payload['linked_operational_evidence']['label']);
+        $this->assertTrue($payload['linked_operational_evidence']['read_only']);
+        $this->assertSame('CR-2026-1204', $payload['linked_operational_evidence']['source']['reference']);
+        $this->assertSame('Rimu House', $payload['linked_operational_evidence']['source']['site']['name']);
+        $this->assertSame('Wiremu Tane', $payload['linked_operational_evidence']['source']['client']['name']);
+        $this->assertSame('immediate_controls', $payload['linked_operational_evidence']['notes'][0]['purpose']);
+        $this->assertSame('Immediate controls', $payload['linked_operational_evidence']['notes'][0]['purpose_label']);
+        $this->assertSame($operationalTask->id, $payload['linked_operational_evidence']['tasks'][0]['id']);
+        $this->assertSame('open', $payload['linked_operational_evidence']['tasks'][0]['transfer']['state']);
+        $this->assertSame('transferred', $payload['linked_operational_evidence']['tasks'][1]['transfer']['state']);
+        $this->assertSame('CA-2026-0120', $payload['linked_operational_evidence']['tasks'][1]['transfer']['corrective_action_reference']);
+        $this->assertSame(
+            "/incidents/{$incident->id}/control-room-evidence/".$payload['linked_operational_evidence']['evidence_packs'][0]['items'][0]['id'].'/download',
+            $payload['linked_operational_evidence']['evidence_packs'][0]['items'][0]['download_url'],
+        );
+        $this->assertSame('Nurse notified', $payload['linked_operational_evidence']['communications'][0]['subject']);
         $this->assertSame('awaiting_acceptance', $payload['health_safety']['handover']['status']);
         $this->assertSame('H&S Lead', $payload['health_safety']['handover']['owner']['name']);
         $this->assertTrue($payload['health_safety']['worksafe']['notifiable']);

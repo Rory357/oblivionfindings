@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Support\Collection;
 
 /**
@@ -26,6 +27,7 @@ class AlertWorkspaceService
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
+        private LinkedOperationalEvidencePresenter $linkedEvidence,
     ) {}
 
     /**
@@ -109,6 +111,11 @@ class AlertWorkspaceService
             ->first();
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
         $capabilities = $this->access->capabilitiesForScopedAlert($user);
+        $linkedOperationalEvidence = $this->linkedEvidence->present(
+            $alert,
+            $user,
+            fn ($item): string => "/control-room/evidence/items/{$item->id}/download",
+        );
 
         return [
             'alert' => [
@@ -354,6 +361,7 @@ class AlertWorkspaceService
                     : null,
             ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
+            'linked_operational_evidence' => $linkedOperationalEvidence,
         ];
     }
 

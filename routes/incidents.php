@@ -1,18 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\IncidentFollowupController;
-use App\Http\Controllers\ShiftIncidentController;
-use App\Http\Controllers\IncidentTemplateController;
 use App\Http\Controllers\IncidentReportController;
+use App\Http\Controllers\IncidentTemplateController;
+use App\Http\Controllers\ShiftIncidentController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Incident Management Routes
  *
  * Handles incident reporting, follow-ups, templates, and reporting.
  */
-
 Route::middleware(['auth', 'verified'])->group(function () {
     // Incident creation (must come before /incidents/{incident})
     Route::middleware('permission:incidents.create')->group(function () {
@@ -51,6 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
             ->whereNumber(['incident', 'attachment'])
             ->name('incidents.attachments.download');
+        Route::get('/incidents/{incident}/control-room-evidence/{item}/download', [IncidentController::class, 'downloadControlRoomEvidence'])
+            ->whereNumber(['incident', 'item'])
+            ->name('incidents.control-room-evidence.download');
     });
 
     // Incident updates

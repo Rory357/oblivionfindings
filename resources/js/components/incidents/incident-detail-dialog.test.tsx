@@ -39,12 +39,28 @@ vi.mock('@/components/wizard/shell', async () => {
             children,
             footerStart,
             footerEnd,
+            steps,
+            onStepClick,
         }: {
             children?: ReactNode;
             footerStart?: ReactNode;
             footerEnd?: ReactNode;
+            steps: Array<{ key: string; label: string; blurb: string }>;
+            onStepClick: (index: number) => void;
         }) => (
             <div>
+                <nav>
+                    {steps.map((step, index) => (
+                        // eslint-disable-next-line no-restricted-syntax -- lightweight WizardShell test double navigation control
+                        <button
+                            key={step.key}
+                            type="button"
+                            onClick={() => onStepClick(index)}
+                        >
+                            {step.label} {step.blurb}
+                        </button>
+                    ))}
+                </nav>
                 <main>{children}</main>
                 <footer>
                     {footerStart}
@@ -104,6 +120,27 @@ function incidentDetail(): IncidentDetail {
             triggered_at: '2026-07-14T01:30:00Z',
             resolved_at: '2026-07-14T02:00:00Z',
             url: '/control-room/alerts/11',
+        },
+        linked_operational_evidence: {
+            label: 'Linked Control Room evidence',
+            read_only: true,
+            source: {
+                id: 11,
+                reference: 'CR-2026-0011',
+                alert_type: 'incident',
+                severity: 'high',
+                status: 'resolved',
+                href: '/control-room/alerts/11',
+                site: { id: 3, name: 'Kauri House' },
+                client: null,
+                triggered_at: '2026-07-14T01:30:00Z',
+                created_at: '2026-07-14T01:30:00Z',
+                updated_at: '2026-07-14T02:00:00Z',
+            },
+            notes: [],
+            tasks: [],
+            evidence_packs: [],
+            communications: [],
         },
         hs_event: {
             id: 17,
@@ -195,6 +232,9 @@ describe('IncidentDetailDialog H&S handover', () => {
     it('keeps restricted H&S and Control Room records visible without dead-end links', () => {
         const detail = incidentDetail();
         Object.assign(detail.control_room_alert ?? {}, { url: null });
+        if (detail.linked_operational_evidence) {
+            detail.linked_operational_evidence.source.href = null;
+        }
         Object.assign(detail.hs_event ?? {}, {
             url: null,
             corrective_actions_url: null,
@@ -219,6 +259,26 @@ describe('IncidentDetailDialog H&S handover', () => {
         expect(
             screen.queryByRole('link', { name: /Health & Safety event/i }),
         ).not.toBeInTheDocument();
+    });
+
+    it('labels linked operational evidence separately from official attachments and incident follow-ups', () => {
+        const detail = incidentDetail();
+        render(
+            <IncidentDetailDialog detail={detail} open onClose={() => {}} />,
+        );
+
+        expect(
+            screen.getByRole('button', {
+                name: /Official incident attachments/,
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /Incident follow-ups/ }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Linked records/ }));
+        expect(
+            screen.getByText('Linked Control Room evidence'),
+        ).toBeInTheDocument();
     });
 
     it('offers only eligible H&S owners when raising a corrective action', () => {
