@@ -10,7 +10,6 @@ use App\Models\ClientIncidentAttachment;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
-use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
@@ -22,6 +21,7 @@ use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentJourney;
+use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
@@ -41,6 +41,7 @@ class IncidentController extends Controller
     public function __construct(
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
+        private readonly IncidentJourneyPresenter $journeyPresenter,
     ) {}
 
     /**
@@ -489,6 +490,20 @@ class IncidentController extends Controller
                 fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
             )
             : null;
+        $closeGate = $this->journeys->closeGate($incident);
+        $closeGatePayload = $closeGate->toArray();
+        if (! $request->user()?->canDo('hazards.view')) {
+            $closeGatePayload['requirements'] = collect($closeGatePayload['requirements'])
+                ->map(function (array $requirement): array {
+                    if (str_starts_with($requirement['href'], '/health-safety/')) {
+                        $requirement['href'] = null;
+                    }
+
+                    return $requirement;
+                })
+                ->values()
+                ->all();
+        }
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
@@ -582,6 +597,12 @@ class IncidentController extends Controller
                 'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
+            'close_gate' => $closeGatePayload,
+            'journey_state' => $this->journeyPresenter->journeyState(
+                $incident,
+                $linkedControlRoomAlert,
+                $hsEvent,
+            ),
             'hs_event' => $hsEvent ? [
                 'id' => $hsEvent->id,
                 'reference_number' => $hsEvent->reference_number,
@@ -1526,19 +1547,11 @@ class IncidentController extends Controller
             // operation wins is visible to the other before it can continue.
             abort_unless($lockedIncident->status === 'reviewed', 403);
 
-            if (in_array($lockedIncident->severity, ['high', 'critical'], true)
-                && $lockedIncident->investigation_status !== 'completed'
-                && ! $this->hasCompletedHsInvestigation($lockedIncident)) {
+            $gate = $this->journeys->closeGate($lockedIncident);
+            if (! $gate->allowed) {
                 return [
                     $lockedIncident,
-                    'High-severity incidents require a completed investigation before closure. Open the Investigation section to start one.',
-                ];
-            }
-
-            if ($lockedIncident->followups()->whereNull('completed_at')->exists()) {
-                return [
-                    $lockedIncident,
-                    'There are open follow-ups. Please complete them before closing the incident.',
+                    implode(' ', $gate->blockers()),
                 ];
             }
 
@@ -1582,7 +1595,7 @@ class IncidentController extends Controller
             ]
         );
 
-        return back()->with('success', 'Incident closed.');
+        return back()->with('success', 'Incident closed. Linked journey closure can now continue.');
     }
 
     public function reopen(Request $request, ClientIncident $incident)
@@ -1717,20 +1730,6 @@ class IncidentController extends Controller
         );
 
         return back()->with('success', 'Incident reopened.');
-    }
-
-    /**
-     * Whether the incident's governance HsEvent carries a completed investigation.
-     * Used by the high-severity close guardrail alongside the mirrored
-     * `investigation_status` column.
-     */
-    private function hasCompletedHsInvestigation(ClientIncident $incident): bool
-    {
-        return HsEvent::query()
-            ->where('source_type', ClientIncident::class)
-            ->where('source_id', $incident->id)
-            ->whereHas('investigations', fn ($q) => $q->where('status', HsInvestigation::STATUS_COMPLETED))
-            ->exists();
     }
 
     /**

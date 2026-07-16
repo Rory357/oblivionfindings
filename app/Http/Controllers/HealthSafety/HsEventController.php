@@ -25,6 +25,7 @@ use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use App\Support\HealthSafety\HsCorrectiveActionPresenter;
@@ -47,6 +48,7 @@ class HsEventController extends Controller
         private readonly HsCorrectiveActionPresenter $correctiveActionPresenter,
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
+        private readonly IncidentJourneyPresenter $journeyPresenter,
     ) {}
 
     /**
@@ -784,6 +786,11 @@ class HsEventController extends Controller
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'incident_followups' => $incidentFollowups,
+            'journey_state' => $this->journeyPresenter->journeyState(
+                $sourceIncident,
+                $alert,
+                $hsEvent,
+            ),
             'closed_at' => $hsEvent->closed_at?->toIso8601String(),
             'closure_summary' => $hsEvent->closure_summary,
             'created_by_name' => $hsEvent->creator?->name,
@@ -833,7 +840,7 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions,
             'risk_assessments' => $riskAssessments,
             'attachments' => $handoverAttachments,
-            'close_gate' => $closureGate,
+            'close_gate' => $closureGate->toArray(),
             'assignable_staff' => $assignableStaff,
             'action_handover' => [
                 'eligible_owners' => $assignableStaff,

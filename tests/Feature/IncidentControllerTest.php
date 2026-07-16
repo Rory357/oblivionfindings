@@ -468,6 +468,15 @@ class IncidentControllerTest extends TestCase
                 ->has('detail.followups', 1)
                 ->has('detail.attachments')
                 ->has('detail.can')
+                ->where('detail.close_gate.allowed', false)
+                ->where('detail.close_gate.requirements.0.key', 'incident_review')
+                ->where('detail.close_gate.requirements.1.key', 'incident_followups')
+                ->where('detail.close_gate.requirements.1.complete', false)
+                ->where(
+                    'detail.close_gate.requirements.1.href',
+                    "/incidents/{$incident->id}",
+                )
+                ->has('detail.journey_state')
             );
     }
 
@@ -481,6 +490,23 @@ class IncidentControllerTest extends TestCase
             ->get("/incidents?incident={$incident->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('detail', null));
+    }
+
+    public function test_detail_does_not_link_health_safety_gates_without_health_safety_access(): void
+    {
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->get("/incidents?incident={$incident->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.id', $incident->id)
+                ->where('detail.close_gate.requirements.2.href', null)
+                ->where('detail.close_gate.requirements.3.href', null)
+            );
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2274,6 +2300,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create();
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [
@@ -2296,6 +2323,7 @@ class IncidentControllerTest extends TestCase
 
         $alert = ControlRoomAlert::factory()->open()->create();
         $incident = ClientIncident::factory()->reviewed()->create(['control_room_alert_id' => $alert->id]);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [
@@ -2303,6 +2331,7 @@ class IncidentControllerTest extends TestCase
             ])
             ->assertRedirect();
 
+        $this->assertSame('closed', $incident->fresh()->status);
         // Incident review and operational response are independently truthful.
         // An operator must use the gated Control Room lifecycle to resolve it.
         $alert->refresh();
@@ -2386,6 +2415,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Attempted close'])
@@ -2395,7 +2425,7 @@ class IncidentControllerTest extends TestCase
         $this->assertSame('reviewed', $incident->fresh()->status);
     }
 
-    public function test_completing_the_hs_investigation_unlocks_high_severity_close(): void
+    public function test_completing_the_hs_investigation_and_closing_governance_unlocks_high_severity_close(): void
     {
         $this->mockNotificationService();
 
@@ -2423,6 +2453,7 @@ class IncidentControllerTest extends TestCase
 
         // The lifecycle sync mirrors completion onto the incident column.
         $this->assertSame('completed', $incident->fresh()->investigation_status);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Investigated and resolved'])
@@ -2432,7 +2463,7 @@ class IncidentControllerTest extends TestCase
         $this->assertSame('closed', $incident->fresh()->status);
     }
 
-    public function test_pre_sync_completed_hs_investigation_also_unlocks_close(): void
+    public function test_pre_sync_completed_hs_investigation_and_closed_governance_unlock_close(): void
     {
         // Simulates rows written before the status sync existed: the H&S
         // investigation is completed but the incident column was never mirrored.
@@ -2455,6 +2486,7 @@ class IncidentControllerTest extends TestCase
         ]);
 
         $this->assertNull($incident->fresh()->investigation_status);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Historic record closed'])
@@ -2510,6 +2542,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create();
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         IncidentFollowup::factory()->create([
             'client_incident_id' => $incident->id,
@@ -2532,6 +2565,7 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->reviewed()->create();
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         IncidentFollowup::factory()->create([
             'client_incident_id' => $incident->id,
@@ -2555,6 +2589,7 @@ class IncidentControllerTest extends TestCase
         $followupFirst = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
         ]);
+        $this->markLinkedHealthSafetyGovernanceClosed($followupFirst);
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$followupFirst->id}/followups", [
                 'notes' => 'Created before the close attempt.',
@@ -2574,6 +2609,7 @@ class IncidentControllerTest extends TestCase
         $closeFirst = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
         ]);
+        $this->markLinkedHealthSafetyGovernanceClosed($closeFirst);
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$closeFirst->id}/close", [
                 'closed_outcome' => 'Closed before any follow-up',
@@ -2618,6 +2654,7 @@ class IncidentControllerTest extends TestCase
         $closeIncident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
         ]);
+        $this->markLinkedHealthSafetyGovernanceClosed($closeIncident);
         $closeQueries = $this->captureIncidentBoundaryQueries(fn () => $this->actingAs($this->coordinator)
             ->post("/incidents/{$closeIncident->id}/close", [
                 'closed_outcome' => 'Lock-order close.',
@@ -2773,6 +2810,7 @@ class IncidentControllerTest extends TestCase
             ->assertRedirect();
         $incident->refresh();
         $this->assertEquals('reviewed', $incident->status);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         // 4. Close
         $this->actingAs($this->coordinator)
@@ -3439,6 +3477,7 @@ class IncidentControllerTest extends TestCase
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
 
         $incident = ClientIncident::factory()->reviewed()->create();
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [
@@ -3564,6 +3603,27 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($auditor)
             ->get('/incidents')
             ->assertOk();
+    }
+
+    private function markLinkedHealthSafetyGovernanceClosed(ClientIncident $incident): void
+    {
+        $incident->refresh();
+        $event = $incident->hsEvent()->first()
+            ?? HsEvent::query()
+                ->where('source_type', ClientIncident::class)
+                ->where('source_id', $incident->id)
+                ->first();
+
+        if ($event === null) {
+            return;
+        }
+
+        $event->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $this->coordinator->id,
+            'closure_summary' => 'Governance closed for the incident closure fixture.',
+        ])->saveQuietly();
     }
 
     /** @return list<array{query: string, bindings: array<mixed>, time: float}> */

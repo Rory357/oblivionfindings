@@ -41,43 +41,45 @@ class HsInvestigationService
      */
     public function create(HsEvent $hsEvent, array $data = []): HsInvestigation
     {
-        // Guard: event must be open
-        if (! $hsEvent->isOpen()) {
-            throw new \InvalidArgumentException(
-                "Cannot create investigation for closed HsEvent [{$hsEvent->reference_number}]."
-            );
-        }
-
-        // Guard: no active investigation already exists
-        $existingActive = HsInvestigation::where('hs_event_id', $hsEvent->id)
-            ->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED])
-            ->exists();
-
-        if ($existingActive) {
-            throw new \InvalidArgumentException(
-                "HsEvent [{$hsEvent->reference_number}] already has an active investigation."
-            );
-        }
-
         return DB::transaction(function () use ($hsEvent, $data) {
+            $lockedEvent = HsEvent::query()
+                ->whereKey($hsEvent->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (! $lockedEvent->isOpen()) {
+                throw new \InvalidArgumentException(
+                    "Cannot create investigation for closed HsEvent [{$lockedEvent->reference_number}]."
+                );
+            }
+
+            $existingActive = HsInvestigation::query()
+                ->where('hs_event_id', $lockedEvent->id)
+                ->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED])
+                ->exists();
+            if ($existingActive) {
+                throw new \InvalidArgumentException(
+                    "HsEvent [{$lockedEvent->reference_number}] already has an active investigation."
+                );
+            }
+
             $investigation = HsInvestigation::create([
-                'hs_event_id' => $hsEvent->id,
-                'organization_id' => $hsEvent->organization_id,
+                'hs_event_id' => $lockedEvent->id,
+                'organization_id' => $lockedEvent->organization_id,
                 'reference_number' => HsInvestigation::generateReferenceNumber(),
-                'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($hsEvent),
+                'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($lockedEvent),
                 'status' => HsInvestigation::STATUS_DRAFT,
                 'methodology' => $data['methodology'] ?? null,
                 'lead_investigator_id' => $data['lead_investigator_id'] ?? null,
                 'team_member_ids' => $data['team_member_ids'] ?? null,
-                'target_completion_date' => $data['target_completion_date'] ?? $this->suggestTargetDate($hsEvent),
+                'target_completion_date' => $data['target_completion_date'] ?? $this->suggestTargetDate($lockedEvent),
                 'created_by' => $data['created_by'] ?? auth()->id(),
             ]);
 
             Log::info('HsInvestigationService: investigation created', [
                 'investigation_id' => $investigation->id,
                 'reference' => $investigation->reference_number,
-                'hs_event_id' => $hsEvent->id,
-                'hs_event_reference' => $hsEvent->reference_number,
+                'hs_event_id' => $lockedEvent->id,
+                'hs_event_reference' => $lockedEvent->reference_number,
                 'type' => $investigation->investigation_type,
             ]);
 

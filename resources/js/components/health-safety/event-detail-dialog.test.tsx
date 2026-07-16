@@ -161,24 +161,41 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
         risk_assessments: [],
         attachments: [],
         close_gate: {
-            acceptance_ok: false,
-            worksafe_ok: true,
-            investigation_ok: false,
-            recommendations_ok: false,
-            actions_ok: true,
-            blockers: [
-                'Accept the H&S handover before closing this event.',
-                'Complete the required investigation before closing this event.',
-            ],
+            allowed: false,
             requirements: [
+                {
+                    key: 'hs_acceptance',
+                    complete: false,
+                    label: 'Accept the H&S handover before closing this event.',
+                    href: '/health-safety/events/17?action=accept-handover',
+                },
                 {
                     key: 'worksafe_decision',
                     complete: true,
                     label: 'WorkSafe decision recorded — not notifiable',
                     href: '/health-safety/events/17?action=worksafe-decision',
                 },
+                {
+                    key: 'hs_investigation',
+                    complete: false,
+                    label: 'Complete the required investigation before closing this event.',
+                    href: '/health-safety/events/17?action=investigation',
+                },
+                {
+                    key: 'recommendation_dispositions',
+                    complete: true,
+                    label: 'Every investigation recommendation has a recorded outcome',
+                    href: '/health-safety/events/17?section=investigation',
+                },
+                {
+                    key: 'corrective_actions',
+                    complete: true,
+                    label: 'All corrective actions verified or closed',
+                    href: '/health-safety/corrective-actions?event=17',
+                },
             ],
         },
+        journey_state: 'H&S acceptance pending',
         assignable_staff: [
             { id: 8, name: 'Moana Rangi' },
             { id: 9, name: 'Tama Lewis' },
@@ -384,6 +401,17 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('EventDetailDialog control-room handover', () => {
+    it('opens the acceptance pane from the server requirement deep link', () => {
+        renderDialog(eventDetail(), 'accept_handover');
+
+        expect(
+            screen.getByRole('heading', { name: 'Accept H&S handover' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Accept handover' }),
+        ).toBeInTheDocument();
+    });
+
     it('shows awaiting ownership and all three lifecycle states in the overview', () => {
         renderDialog();
 
@@ -491,10 +519,13 @@ describe('EventDetailDialog closure governance', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
 
         expect(
-            screen.getByText(
-                'Accept the H&S handover before closing this event.',
-            ),
-        ).toBeInTheDocument();
+            screen.getByRole('link', {
+                name: 'Accept the H&S handover before closing this event.',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17?action=accept-handover',
+        );
         expect(
             screen.getByText(
                 'Complete the required investigation before closing this event.',
@@ -572,19 +603,12 @@ describe('EventDetailDialog WorkSafe governance', () => {
                     can_acknowledge: false,
                 },
                 close_gate: {
-                    acceptance_ok: true,
-                    worksafe_ok: false,
-                    investigation_ok: false,
-                    recommendations_ok: false,
-                    actions_ok: true,
-                    blockers: [
-                        'Record the WorkSafe notifiability decision before closing this event.',
-                    ],
+                    allowed: false,
                     requirements: [
                         {
                             key: 'worksafe_decision',
                             complete: false,
-                            label: 'Record the WorkSafe notifiability decision',
+                            label: 'Record the WorkSafe notifiability decision before closing this event.',
                             href: '/health-safety/events/17?action=worksafe-decision',
                         },
                     ],
@@ -767,19 +791,12 @@ describe('EventDetailDialog WorkSafe governance', () => {
                     decided_by: null,
                 },
                 close_gate: {
-                    acceptance_ok: true,
-                    worksafe_ok: false,
-                    investigation_ok: true,
-                    recommendations_ok: true,
-                    actions_ok: true,
-                    blockers: [
-                        'Record the WorkSafe notifiability decision before closing this event.',
-                    ],
+                    allowed: false,
                     requirements: [
                         {
                             key: 'worksafe_decision',
                             complete: false,
-                            label: 'Record the WorkSafe notifiability decision',
+                            label: 'Record the WorkSafe notifiability decision before closing this event.',
                             href: '/health-safety/events/17?action=worksafe-decision',
                         },
                     ],
@@ -791,7 +808,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
 
         expect(
             screen.getByRole('link', {
-                name: 'Record the WorkSafe notifiability decision',
+                name: 'Record the WorkSafe notifiability decision before closing this event.',
             }),
         ).toHaveAttribute(
             'href',
@@ -809,19 +826,12 @@ describe('EventDetailDialog WorkSafe governance', () => {
                 can_notify: true,
             },
             close_gate: {
-                acceptance_ok: true,
-                worksafe_ok: false,
-                investigation_ok: true,
-                recommendations_ok: true,
-                actions_ok: true,
-                blockers: [
-                    'Record the WorkSafe notification before closing this event.',
-                ],
+                allowed: false,
                 requirements: [
                     {
                         key: 'worksafe_decision',
                         complete: false,
-                        label: 'Record the WorkSafe notification',
+                        label: 'Record the WorkSafe notification before closing this event.',
                         href: '/health-safety/events/17?action=worksafe-notify',
                     },
                 ],
@@ -832,7 +842,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
         expect(
             screen.getByRole('link', {
-                name: 'Record the WorkSafe notification',
+                name: 'Record the WorkSafe notification before closing this event.',
             }),
         ).toHaveAttribute(
             'href',

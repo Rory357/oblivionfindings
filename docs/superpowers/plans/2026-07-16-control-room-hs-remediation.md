@@ -1614,6 +1614,7 @@ Task 13 final verification:
 - Create: `app/Support/Journeys/JourneyGate.php`
 - Modify: `app/Services/ControlRoom/ControlRoomAlertLifecycleService.php`
 - Modify: `app/Services/HealthSafety/HsEventService.php`
+- Modify: `app/Services/HealthSafety/HsInvestigationService.php`
 - Modify: `app/Services/Incidents/IncidentJourneyService.php`
 - Modify: `app/Services/Incidents/IncidentJourneyPresenter.php`
 - Modify: `app/Services/ControlRoom/AlertWorkspaceService.php`
@@ -1628,12 +1629,18 @@ Task 13 final verification:
 - Modify: `resources/js/components/incidents/incident-detail-dialog.test.tsx`
 - Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
 - Modify: `resources/js/components/health-safety/event-detail-dialog.test.tsx`
+- Modify: `resources/js/pages/health-safety/events/show.tsx`
+- Create: `resources/js/pages/health-safety/events/show.test.tsx`
 - Modify: `tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php`
 - Modify: `tests/Feature/HealthSafety/HsEventClosureTest.php`
+- Modify: `tests/Feature/HealthSafety/HsEventRegisterTest.php`
+- Modify: `tests/Feature/HealthSafety/HsInvestigationTest.php`
+- Modify: `tests/Feature/IncidentControllerTest.php`
+- Modify: `tests/Feature/Incidents/IncidentJourneyPresenterTest.php`
 - Modify: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing gate-matrix tests**
+- [x] **Step 1: Write failing gate-matrix tests**
 
 Cover:
 
@@ -1643,17 +1650,19 @@ Cover:
 - alert close requires linked incident and H&S closed;
 - incident close requires review, follow-ups, investigation, and H&S closure when applicable;
 - H&S close requires acceptance, explicit WorkSafe truth, investigation, dispositions, verified/closed actions, and summary;
+- incident/H&S direct-link ownership conflicts and duplicate or foreign standalone H&S rows fail closed;
+- investigation creation serializes with event closure by locking and rechecking the event first;
 - every blocker has `key`, `complete`, `label`, and `href`;
 - each UI renders the server gate without reconstructing it.
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 ```powershell
-php artisan test tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php
-npx vitest run resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx
+php artisan test tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php
+npx vitest run resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/events/show.test.tsx
 ```
 
-- [ ] **Step 3: Implement a typed gate value**
+- [x] **Step 3: Implement a typed gate value**
 
 ```php
 final readonly class JourneyGate
@@ -1675,7 +1684,7 @@ final readonly class JourneyGate
 
 Each service owns its domain requirements but returns this shape.
 
-- [ ] **Step 4: Separate resolve and close semantics**
+- [x] **Step 4: Separate resolve and close semantics**
 
 Visible states:
 
@@ -1696,7 +1705,7 @@ Close dialog copy:
 
 `Close is available only when the incident and H&S governance are closed.`
 
-- [ ] **Step 5: Render shared direct-action blockers**
+- [x] **Step 5: Render shared direct-action blockers**
 
 ```tsx
 <JourneyGateList gate={detail.resolve_gate} />
@@ -1705,19 +1714,31 @@ Close dialog copy:
 
 Remove UI language saying an open task will remain while still enabling Resolve.
 
-- [ ] **Step 6: Re-run focused tests**
+- [x] **Step 6: Re-run focused tests**
 
 ```powershell
-php artisan test tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php
-npx vitest run resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx
+php artisan test tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php
+npx vitest run resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/events/show.test.tsx
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
-git add app/Support/Journeys/JourneyGate.php app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Services/HealthSafety/HsEventService.php app/Services/Incidents/IncidentJourneyService.php app/Services/Incidents/IncidentJourneyPresenter.php app/Services/ControlRoom/AlertWorkspaceService.php app/Http/Controllers/ControlRoom/ControlRoomAlertController.php app/Http/Controllers/IncidentController.php app/Http/Controllers/HealthSafety/HsEventController.php resources/js/components/incidents/journey-gate-list.tsx resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add app/Support/Journeys/JourneyGate.php app/Services/ControlRoom/ControlRoomAlertLifecycleService.php app/Services/HealthSafety/HsEventService.php app/Services/HealthSafety/HsInvestigationService.php app/Services/Incidents/IncidentJourneyService.php app/Services/Incidents/IncidentJourneyPresenter.php app/Services/ControlRoom/AlertWorkspaceService.php app/Http/Controllers/ControlRoom/ControlRoomAlertController.php app/Http/Controllers/IncidentController.php app/Http/Controllers/HealthSafety/HsEventController.php resources/js/components/incidents/journey-gate-list.tsx resources/js/components/incidents/journey-gate-list.test.tsx resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.test.tsx resources/js/components/incidents/incident-detail-dialog.tsx resources/js/components/incidents/incident-detail-dialog.test.tsx resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/events/show.tsx resources/js/pages/health-safety/events/show.test.tsx tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php tests/Feature/HealthSafety/HsEventClosureTest.php tests/Feature/HealthSafety/HsEventRegisterTest.php tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/IncidentControllerTest.php tests/Feature/Incidents/IncidentJourneyPresenterTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "feat(journeys): unify closure gate truth"
 ```
+
+Task 14 final verification:
+
+- the original gate matrix was observed red with 5 backend failures and 70 passes, while the shared frontend gate component, server-owned payloads, exact state labels, direct actions, and truthful resolve/close copy were absent;
+- one `JourneyGate` value now supplies typed requirements from Control Room, Incident, and H&S domain services; each UI renders that server truth through one shared `JourneyGateList`;
+- Resolve ends only the live operational response, while Close enforces final incident and H&S governance truth; exact cross-module journey states are presented consistently;
+- server mutation boundaries enforce the same requirements as the UI, lock operational work, serialize investigation creation with event closure, validate direct ownership tuples, and reject duplicate or foreign standalone H&S rows;
+- role-aware serialization removes inaccessible incident/H&S links while retaining plain required-action guidance;
+- the final expanded backend matrix passes 112 tests with 829 assertions in 187.83s; the changed H&S register payload passes 1 test with 81 assertions, and the restricted Incident detail payload passes 1 test with 15 assertions;
+- the frontend matrix passes 5 files with 51 tests; TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, and diff integrity are clean;
+- the exact final production client build passes with 4,968 modules in 3m 01s and SSR passes with 1,620 modules in 40.34s;
+- iterative independent review closed poisoned H&S reads, the investigation-create/event-close race, permission-blind links, standalone final-state labels, conflicting alert links, and duplicate/foreign standalone H&S closure. Final re-review returned no findings.
 
 ## Task 15: Bound shift handover to changed and decision-relevant work
 

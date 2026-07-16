@@ -4,6 +4,7 @@ namespace App\Services\Incidents;
 
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\User;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
@@ -108,6 +109,7 @@ class IncidentJourneyPresenter
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'control_room' => $this->presentAlert($alert, $canOpenAlert),
             'health_safety' => $this->presentHealthSafety($hsEvent, $canOpenHs),
+            'journey_state' => $this->journeyState($incident, $alert, $hsEvent),
             'lifecycle' => [
                 $this->stage('control_room', 'Control Room', $alert?->reference_number, $this->alertState($alert), $canOpenAlert ? '/control-room/alerts/'.$alert->id : null),
                 $this->stage('incident', 'Incident report', $incident->reference_number, $this->incidentState($incident), $canOpenIncident ? '/incidents?incident='.$incident->id : null),
@@ -115,6 +117,74 @@ class IncidentJourneyPresenter
             ],
             'next_action' => $this->nextAction($incident, $alert, $hsEvent, $viewer),
         ];
+    }
+
+    public function journeyState(
+        ?ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        ?HsEvent $hsEvent,
+    ): string {
+        $incidentClosed = $incident === null || $incident->status === 'closed';
+        $healthSafetyClosed = $hsEvent === null || $hsEvent->status === HsEvent::STATUS_CLOSED;
+        $operationalClosed = $alert === null || in_array($alert->status, [
+            ControlRoomAlert::STATUS_CLOSED,
+            ControlRoomAlert::STATUS_DISMISSED,
+        ], true);
+        $operationalResponseEnded = $alert !== null
+            && in_array($alert->status, [
+                ControlRoomAlert::STATUS_RESOLVED,
+                ControlRoomAlert::STATUS_CLOSED,
+                ControlRoomAlert::STATUS_DISMISSED,
+            ], true);
+
+        if ($incidentClosed && $healthSafetyClosed && $operationalClosed) {
+            return 'Journey closed';
+        }
+
+        if ($alert?->isActionable()) {
+            return 'Operational response active';
+        }
+
+        if ($operationalResponseEnded
+            && ! in_array($incident?->status, ['reviewed', 'closed'], true)
+        ) {
+            return 'Operationally resolved';
+        }
+
+        if ($hsEvent !== null
+            && in_array($hsEvent->handover_status, [
+                HsEvent::HANDOVER_NOT_READY,
+                HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ], true)
+        ) {
+            return 'H&S acceptance pending';
+        }
+
+        if ($hsEvent?->status === HsEvent::STATUS_CLOSED) {
+            return 'Governance closed';
+        }
+
+        if ($hsEvent !== null
+            && $hsEvent->correctiveActions()
+                ->where('status', HsCorrectiveAction::STATUS_COMPLETED)
+                ->exists()
+        ) {
+            return 'Awaiting independent verification';
+        }
+
+        if ($hsEvent?->isOpen()) {
+            return 'H&S governance active';
+        }
+
+        if (in_array($incident?->status, ['reviewed', 'closed'], true)) {
+            return 'Incident review complete';
+        }
+
+        if ($operationalResponseEnded) {
+            return 'Operationally resolved';
+        }
+
+        return 'Operational response active';
     }
 
     /** @return array<string, mixed>|null */

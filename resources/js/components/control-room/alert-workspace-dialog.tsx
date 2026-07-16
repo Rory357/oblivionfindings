@@ -1,4 +1,8 @@
 import { LinkedJourney } from '@/components/control-room/alert-workspace/linked-journey';
+import {
+    JourneyGateList,
+    type JourneyGateData,
+} from '@/components/incidents/journey-gate-list';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -298,6 +302,9 @@ export type AlertWorkspaceDetail = {
         investigation: { reference_number: string; status: string } | null;
         href: string | null;
     } | null;
+    resolve_gate: JourneyGateData;
+    close_gate: JourneyGateData;
+    journey_state: string;
 };
 
 type SectionKey =
@@ -348,6 +355,10 @@ const SEV_TONE: Record<string, string> = {
     high: 'critical',
     critical: 'critical',
 };
+
+function isOperationalTaskOpen(status: string): boolean {
+    return !['completed', 'cancelled', 'transferred'].includes(status);
+}
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
     open: { label: 'Open', tone: 'critical' },
@@ -565,8 +576,8 @@ export function AlertWorkspaceDialog({
     const alertRef = a.reference_number ?? `Alert ${a.id}`;
     const isSensor = a.source === 'sensor';
     const isActionable = OPEN_STATES.includes(a.status);
-    const openTasks = d.tasks.filter(
-        (t) => t.status !== 'completed' && t.status !== 'cancelled',
+    const openTasks = d.tasks.filter((t) =>
+        isOperationalTaskOpen(t.status),
     ).length;
     const statusMeta = STATUS_META[a.status] ?? {
         label: titleCase(a.status),
@@ -750,7 +761,7 @@ export function AlertWorkspaceDialog({
                 />
                 {SEV_LABEL[a.severity] ?? titleCase(a.severity)}
             </span>
-            <span className="text-muted-foreground">{statusMeta.label}</span>
+            <span className="text-muted-foreground">{d.journey_state}</span>
             {a.escalation_level > 0 ? (
                 <span className="font-medium text-status-warning">
                     L{a.escalation_level}
@@ -1116,7 +1127,7 @@ function StartTriagePane({
     );
 }
 
-function ResolvePane({
+export function ResolvePane({
     d,
     onDone,
 }: {
@@ -1131,6 +1142,7 @@ function ResolvePane({
         },
     );
     const codes = d.config_options.resolution_codes ?? [];
+    const gate = d.resolve_gate;
 
     const submit = () => {
         // resolution_code travels via the meta endpoint pattern; resolve stores the notes.
@@ -1157,9 +1169,10 @@ function ResolvePane({
             <StepHead
                 icon={CheckCircle2}
                 title="Resolve alert"
-                blurb="Record what happened and how it was resolved — this stops the resolution SLA clock."
+                blurb="Resolve ends the live operational response. It does not close the linked incident or H&S governance."
             />
             <PaneError message={serverError(form.errors)} />
+            <JourneyGateList gate={gate} />
             {step === 0 ? (
                 <>
                     <ContextCard d={d} />
@@ -1195,7 +1208,9 @@ function ResolvePane({
                     <PaneNav
                         onCancel={onDone}
                         onNext={() => setStep(1)}
-                        nextDisabled={!form.data.resolution_notes.trim()}
+                        nextDisabled={
+                            !form.data.resolution_notes.trim() || !gate.allowed
+                        }
                         step={0}
                         stepCount={2}
                     />
@@ -1226,22 +1241,12 @@ function ResolvePane({
                             }
                         />
                     </ReviewCard>
-                    {d.tasks.some(
-                        (t) =>
-                            t.status !== 'completed' &&
-                            t.status !== 'cancelled',
-                    ) ? (
-                        <InfoCard icon={ListTodo} tone="warn">
-                            This alert still has open tasks — they stay open
-                            after resolving. Check the Tasks section if they
-                            should be completed first.
-                        </InfoCard>
-                    ) : null}
                     <PaneNav
                         onCancel={onDone}
                         onBack={() => setStep(0)}
                         onSubmit={submit}
                         submitLabel="Resolve alert"
+                        submitDisabled={!gate.allowed}
                         processing={form.processing}
                         step={1}
                         stepCount={2}
@@ -1252,7 +1257,7 @@ function ResolvePane({
     );
 }
 
-function ClosePane({
+export function ClosePane({
     d,
     onDone,
 }: {
@@ -1271,9 +1276,10 @@ function ClosePane({
             <StepHead
                 icon={CheckCircle2}
                 title="Close alert"
-                blurb="Final state — a closed alert can't be reopened. Make sure evidence and follow-up tasks are wrapped up first."
+                blurb="Close is available only when the incident and H&S governance are closed."
             />
             <PaneError message={serverError(form.errors)} />
+            <JourneyGateList gate={d.close_gate} />
             <ReviewCard icon={CheckCircle2} title="Resolution on record" span>
                 <ReviewRow
                     label="Resolved"
@@ -1299,6 +1305,7 @@ function ClosePane({
                 onCancel={onDone}
                 onSubmit={submit}
                 submitLabel="Close alert"
+                submitDisabled={!d.close_gate.allowed}
                 processing={form.processing}
             />
         </div>
@@ -3510,7 +3517,7 @@ function TaskRow({
 }) {
     const [editing, setEditing] = useState(false);
     const [addingSub, setAddingSub] = useState(false);
-    const live = t.status !== 'completed' && t.status !== 'cancelled';
+    const live = isOperationalTaskOpen(t.status);
 
     return (
         <div className="rounded-lg border border-border p-3">

@@ -7,6 +7,7 @@ use App\Models\HsInvestigation;
 use App\Models\User;
 use App\Services\HealthSafety\HsInvestigationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class HsInvestigationTest extends TestCase
@@ -59,6 +60,30 @@ class HsInvestigationTest extends TestCase
         $this->expectExceptionMessage('already has an active investigation');
 
         $this->service->create($event);
+    }
+
+    public function test_create_locks_and_rechecks_the_parent_before_querying_or_inserting_work(): void
+    {
+        $event = HsEvent::factory()->high()->create();
+        DB::connection()->enableQueryLog();
+
+        $this->service->create($event);
+
+        $queries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->map(fn (string $query): string => strtolower(str_replace(['`', '"'], '', $query)))
+            ->values();
+        DB::connection()->disableQueryLog();
+        $eventLock = $queries->search(fn (string $query): bool => str_contains($query, 'from hs_events')
+            && str_contains($query, 'for update'));
+        $activeCheck = $queries->search(fn (string $query): bool => str_contains($query, 'from hs_investigations'));
+        $insert = $queries->search(fn (string $query): bool => str_starts_with($query, 'insert into hs_investigations'));
+
+        $this->assertNotFalse($eventLock);
+        $this->assertNotFalse($activeCheck);
+        $this->assertNotFalse($insert);
+        $this->assertLessThan($activeCheck, $eventLock);
+        $this->assertLessThan($insert, $eventLock);
     }
 
     public function test_worksafe_event_gets_worksafe_directed_type(): void
@@ -394,6 +419,6 @@ class HsInvestigationTest extends TestCase
         $ref2 = HsInvestigation::generateReferenceNumber();
 
         $this->assertNotEquals($ref1, $ref2);
-        $this->assertStringStartsWith('INV-' . now()->year . '-', $ref2);
+        $this->assertStringStartsWith('INV-'.now()->year.'-', $ref2);
     }
 }

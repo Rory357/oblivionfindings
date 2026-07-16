@@ -142,6 +142,18 @@ function incidentDetail(): IncidentDetail {
             evidence_packs: [],
             communications: [],
         },
+        close_gate: {
+            allowed: false,
+            requirements: [
+                {
+                    key: 'health_safety_governance',
+                    complete: false,
+                    label: 'Close linked H&S governance HS-2026-0017',
+                    href: '/health-safety/events/17',
+                },
+            ],
+        },
+        journey_state: 'H&S governance active',
         hs_event: {
             id: 17,
             reference_number: 'HS-2026-0017',
@@ -206,6 +218,27 @@ describe('IncidentDetailDialog H&S handover', () => {
         expect(
             screen.getByText('Accepted for formal investigation.'),
         ).toBeInTheDocument();
+    });
+
+    it('renders the server-owned incident close gate and disables closure while H&S is open', () => {
+        const detail = incidentDetail();
+        detail.status = 'reviewed';
+        detail.can.close = true;
+
+        render(
+            <IncidentDetailDialog detail={detail} open onClose={() => {}} />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(
+            screen.getByRole('link', {
+                name: 'Close linked H&S governance HS-2026-0017',
+            }),
+        ).toHaveAttribute('href', '/health-safety/events/17');
+        expect(screen.getByText('H&S governance active')).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Close incident' }),
+        ).toBeDisabled();
     });
 
     it('names the unassigned ownership state while H&S acceptance is pending', () => {

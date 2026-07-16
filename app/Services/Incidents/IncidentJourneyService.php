@@ -6,11 +6,13 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\References\ReferenceNumberGenerator;
+use App\Support\Journeys\JourneyGate;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -275,6 +277,110 @@ class IncidentJourneyService
         $alert = $this->readAlertForIncident($incident, $hsEvent);
 
         return new IncidentJourney($incident, $alert, $hsEvent);
+    }
+
+    public function incidentForAlert(ControlRoomAlert $alert): ?ClientIncident
+    {
+        $direct = ClientIncident::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->orderBy('id')
+            ->limit(2)
+            ->get();
+
+        if ($direct->count() > 1) {
+            throw new \DomainException('Incident journey conflict: the alert is directly linked to multiple incidents.');
+        }
+
+        if ($direct->isNotEmpty()) {
+            $incident = $direct->first();
+            $this->assertAlertMatchesIncident($incident, $alert);
+
+            return $incident;
+        }
+
+        $legacyIncidentId = data_get($alert->context, 'incident_id');
+        if (! is_numeric($legacyIncidentId)) {
+            return null;
+        }
+
+        $legacy = ClientIncident::query()->find((int) $legacyIncidentId);
+        if ($legacy?->control_room_alert_id !== null
+            && (int) $legacy->control_room_alert_id !== (int) $alert->id
+        ) {
+            throw new \DomainException('Incident journey conflict: the legacy incident already has a different direct alert.');
+        }
+
+        if ($legacy !== null) {
+            $this->assertAlertMatchesIncident($legacy, $alert);
+        }
+
+        return $legacy;
+    }
+
+    public function closeGate(ClientIncident $incident): JourneyGate
+    {
+        $incident = ClientIncident::query()->findOrFail($incident->getKey());
+        $hsEvent = $this->readHsEventForIncident($incident);
+        $reviewComplete = in_array($incident->status, ['reviewed', 'closed'], true)
+            && $incident->reviewed_at !== null
+            && $incident->reviewed_by !== null;
+        $followupsComplete = ! $incident->followups()
+            ->whereNull('completed_at')
+            ->exists();
+        $investigationRequired = in_array(
+            HsEventService::normaliseSeverity((string) $incident->severity),
+            [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL],
+            true,
+        );
+        $investigationComplete = ! $investigationRequired
+            || $incident->investigation_status === 'completed'
+            || $hsEvent?->hasCompletedInvestigation() === true;
+        $hasActiveHsInvestigation = $hsEvent?->investigations()
+            ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
+            ->exists() === true;
+        $healthSafetyComplete = $hsEvent === null
+            || $hsEvent->status === HsEvent::STATUS_CLOSED;
+
+        return JourneyGate::fromRequirements([
+            [
+                'key' => 'incident_review',
+                'complete' => $reviewComplete,
+                'label' => $reviewComplete
+                    ? 'Incident review complete'
+                    : 'Complete manager review before closing this incident.',
+                'href' => "/incidents/{$incident->id}",
+            ],
+            [
+                'key' => 'incident_followups',
+                'complete' => $followupsComplete,
+                'label' => $followupsComplete
+                    ? 'Incident follow-ups complete'
+                    : 'Complete all incident follow-ups before closing this incident.',
+                'href' => "/incidents/{$incident->id}",
+            ],
+            [
+                'key' => 'incident_investigation',
+                'complete' => $investigationComplete,
+                'label' => $investigationComplete
+                    ? 'Required incident investigation complete'
+                    : 'Complete the required incident investigation before closing this incident.',
+                'href' => $hsEvent
+                    ? ($hasActiveHsInvestigation
+                        ? "/health-safety/events/{$hsEvent->id}?section=investigation"
+                        : "/health-safety/events/{$hsEvent->id}?action=investigation")
+                    : "/incidents/{$incident->id}",
+            ],
+            [
+                'key' => 'health_safety_governance',
+                'complete' => $healthSafetyComplete,
+                'label' => $healthSafetyComplete
+                    ? ($hsEvent ? 'Linked H&S governance closed' : 'No linked H&S governance requires closure')
+                    : 'Close linked H&S governance '.($hsEvent->reference_number ?: "HS-{$hsEvent->id}").' before closing this incident.',
+                'href' => $hsEvent
+                    ? "/health-safety/events/{$hsEvent->id}"
+                    : "/incidents/{$incident->id}",
+            ],
+        ]);
     }
 
     private function lockIncident(ClientIncident $incident): ClientIncident
@@ -1086,13 +1192,66 @@ class IncidentJourneyService
         if ($incident->hs_event_id !== null) {
             $direct = HsEvent::query()->find($incident->hs_event_id);
             if ($direct !== null) {
+                $this->assertHsEventMatchesIncidentForRead($incident, $direct);
+
                 return $direct;
             }
         }
 
-        return HsEvent::query()
+        $fallback = HsEvent::query()
             ->where('idempotency_key', $this->hsIdempotencyKey($incident))
             ->first();
+        if ($fallback !== null) {
+            $this->assertHsEventMatchesIncidentForRead($incident, $fallback);
+        }
+
+        return $fallback;
+    }
+
+    private function assertHsEventMatchesIncidentForRead(
+        ClientIncident $incident,
+        HsEvent $event,
+    ): void {
+        $sourceType = ltrim((string) $event->source_type, '\\');
+        if ($sourceType !== ClientIncident::class
+            || (int) $event->source_id !== (int) $incident->id
+        ) {
+            throw new \DomainException(
+                'Incident journey conflict: the direct H&S event does not match the canonical incident tuple.',
+            );
+        }
+
+        if ($incident->control_room_alert_id !== null
+            && $event->control_room_alert_id !== null
+            && (int) $incident->control_room_alert_id !== (int) $event->control_room_alert_id
+        ) {
+            throw new \DomainException(
+                'Incident journey conflict: the H&S event has a different direct alert.',
+            );
+        }
+
+        foreach (['client_id', 'site_id'] as $column) {
+            if ($incident->{$column} !== null
+                && $event->{$column} !== null
+                && (int) $incident->{$column} !== (int) $event->{$column}
+            ) {
+                throw new \DomainException(
+                    "Incident journey conflict: the direct H&S event {$column} does not match the incident.",
+                );
+            }
+        }
+
+        $incidentOrganizationId = $incident->client_id === null
+            ? null
+            : $incident->client()->value('organization_id');
+        if ($incidentOrganizationId !== null
+            && $event->organization_id !== null
+            && (int) $incidentOrganizationId !== (int) $event->organization_id
+        ) {
+            throw new \DomainException(
+                'Incident journey conflict: the direct H&S event organization does not match the incident.',
+            );
+        }
     }
 
     private function readAlertForIncident(ClientIncident $incident, ?HsEvent $hsEvent): ?ControlRoomAlert

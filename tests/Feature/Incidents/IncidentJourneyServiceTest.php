@@ -20,6 +20,8 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
+use App\Models\IncidentFollowup;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
@@ -34,6 +36,7 @@ use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Support\Journeys\JourneyGate;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -66,6 +69,136 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertTrue($journey->incident->is($incident));
         $this->assertNull($journey->alert);
         $this->assertNull($journey->hsEvent);
+    }
+
+    public function test_alert_read_resolution_rejects_a_foreign_client_claim(): void
+    {
+        $alertClient = Client::factory()->create();
+        $incidentClient = Client::factory()->create();
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $incidentClient->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->create([
+            'client_id' => $alertClient->id,
+            'context' => ['incident_id' => $incident->id],
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('alert client does not match');
+
+        app(IncidentJourneyService::class)->incidentForAlert($alert);
+    }
+
+    public function test_incident_close_gate_rejects_a_poisoned_direct_hs_link(): void
+    {
+        $incident = $this->incidentWithoutEvents([
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => User::factory()->create()->id,
+        ]);
+        $foreignEvent = HsEvent::factory()->closed()->create();
+        $incident->updateQuietly(['hs_event_id' => $foreignEvent->id]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('canonical incident tuple');
+
+        app(IncidentJourneyService::class)->closeGate($incident);
+    }
+
+    public function test_incident_close_gate_rejects_a_direct_hs_link_to_a_different_alert(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incidentAlert = ControlRoomAlert::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $foreignAlert = ControlRoomAlert::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => $actor->id,
+            'control_room_alert_id' => $incidentAlert->id,
+        ]);
+        $event = HsEvent::factory()
+            ->forClientIncident($incident)
+            ->closed()
+            ->create([
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'control_room_alert_id' => $foreignAlert->id,
+            ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('different direct alert');
+
+        app(IncidentJourneyService::class)->closeGate($incident);
+    }
+
+    public function test_incident_close_gate_requires_review_followups_investigation_and_linked_hs_closure(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => $actor->id,
+            'severity' => 'high',
+            'investigation_status' => 'in_progress',
+        ]);
+        $followup = IncidentFollowup::factory()->create([
+            'client_incident_id' => $incident->id,
+            'completed_at' => null,
+        ]);
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
+            'status' => HsEvent::STATUS_OPEN,
+            'investigation_required' => true,
+        ]);
+        $investigation = HsInvestigation::factory()->create([
+            'hs_event_id' => $event->id,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+        $service = app(IncidentJourneyService::class);
+
+        $blocked = $service->closeGate($incident);
+
+        $this->assertInstanceOf(JourneyGate::class, $blocked);
+        $this->assertFalse($blocked->allowed);
+        $this->assertTrue(collect($blocked->requirements)->firstWhere('key', 'incident_review')['complete']);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'incident_followups')['complete']);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'incident_investigation')['complete']);
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            collect($blocked->requirements)->firstWhere('key', 'incident_investigation')['href'],
+        );
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'health_safety_governance')['complete']);
+        foreach ($blocked->requirements as $requirement) {
+            $this->assertSame(['key', 'complete', 'label', 'href'], array_keys($requirement));
+        }
+
+        $followup->update(['completed_at' => now()]);
+        $investigation->forceFill([
+            'status' => HsInvestigation::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+        $event->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $actor->id,
+            'closure_summary' => 'Governance work is complete.',
+        ])->saveQuietly();
+
+        $ready = $service->closeGate($incident->fresh());
+        $this->assertTrue($ready->allowed);
+        $this->assertTrue(collect($ready->requirements)->every('complete'));
     }
 
     public function test_existing_triaging_alert_submits_one_linked_journey_and_retries_without_disturbing_operations(): void

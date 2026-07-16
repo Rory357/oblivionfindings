@@ -690,7 +690,10 @@ class ControlRoomAlertController extends Controller
             return back()->withErrors(['alert' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Alert resolved.');
+        return back()->with(
+            'success',
+            'Operational response resolved. Linked incident and H&S governance remain open until their own closure gates are complete.',
+        );
     }
 
     /**
@@ -715,7 +718,7 @@ class ControlRoomAlertController extends Controller
             return back()->withErrors(['alert' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Alert closed.');
+        return back()->with('success', 'Journey closed.');
     }
 
     /**

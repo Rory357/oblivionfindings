@@ -137,11 +137,14 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.worksafe.can_decide', true)
                 ->where('detail.worksafe.can_notify', false)
                 ->where('detail.worksafe.can_acknowledge', false)
-                ->where('detail.close_gate.worksafe_ok', false)
+                ->where('detail.close_gate.allowed', false)
+                ->where('detail.close_gate.requirements.1.key', 'worksafe_decision')
+                ->where('detail.close_gate.requirements.1.complete', false)
                 ->where(
-                    'detail.close_gate.requirements.0.href',
+                    'detail.close_gate.requirements.1.href',
                     "/health-safety/events/{$undecided->id}?action=worksafe-decision",
                 )
+                ->where('detail.journey_state', 'H&S governance active')
             );
 
         $notNotifiable = HsEvent::factory()->worksafeNotNotifiable($actor)->create([

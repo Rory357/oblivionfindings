@@ -11,10 +11,13 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Support\Journeys\JourneyGate;
 use Database\Factories\ControlRoomAlertFactory;
 use Database\Factories\HsEventFactory;
 use Database\Seeders\RbacSeeder;
@@ -140,6 +143,185 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             ->assertSessionHasErrors('alert');
 
         $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->fresh()->status);
+    }
+
+    public function test_resolve_gate_is_typed_links_to_operational_work_and_does_not_require_hs_closure(): void
+    {
+        $alert = $this->alertFactory()->triaging()->create();
+        $this->hsEventFactory($alert)->handoverAccepted($this->admin, $this->admin)->create([
+            'control_room_alert_id' => $alert->id,
+            'status' => HsEvent::STATUS_OPEN,
+        ]);
+        $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS, [
+            'title' => 'Confirm the temporary control remains effective',
+        ]);
+        $lifecycle = app(ControlRoomAlertLifecycleService::class);
+
+        $blocked = $lifecycle->resolveGate($alert);
+
+        $this->assertInstanceOf(JourneyGate::class, $blocked);
+        $this->assertFalse($blocked->allowed);
+        $requirement = collect($blocked->requirements)->firstWhere('key', 'operational_tasks');
+        $this->assertNotNull($requirement);
+        $this->assertFalse($requirement['complete']);
+        $this->assertStringContainsString($task->title, $requirement['label']);
+        $this->assertSame("/control-room/alerts/{$alert->id}", $requirement['href']);
+        $this->assertNotContains('health_safety_closed', array_column($blocked->requirements, 'key'));
+        foreach ($blocked->requirements as $item) {
+            $this->assertSame(['key', 'complete', 'label', 'href'], array_keys($item));
+        }
+
+        $lifecycle->transferTaskToHealthSafety($task, $this->admin);
+        $ready = $lifecycle->resolveGate($alert->fresh());
+
+        $this->assertTrue($ready->allowed);
+        $this->assertTrue(collect($ready->requirements)->firstWhere('key', 'operational_tasks')['complete']);
+        $this->assertTrue($alert->hsEvent()->firstOrFail()->isOpen());
+
+        $workspace = app(AlertWorkspaceService::class)->build($this->admin, $alert->id);
+        $this->assertTrue(data_get($workspace, 'resolve_gate.allowed'));
+        $this->assertFalse(data_get($workspace, 'close_gate.allowed'));
+        $this->assertSame('Operational response active', data_get($workspace, 'journey_state'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Resolution notes are required.');
+        $lifecycle->resolve($alert->fresh(), $this->admin, '', 'transferred_to_hs');
+    }
+
+    public function test_alert_close_gate_requires_the_linked_incident_and_hs_governance_to_be_closed(): void
+    {
+        $alert = $this->alertFactory()->resolved()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'status' => 'reviewed',
+            'submitted_at' => now()->subDay(),
+            'reviewed_at' => now()->subHour(),
+            'reviewed_by' => $this->admin->id,
+            'control_room_alert_id' => $alert->id,
+        ]));
+        $event = $this->hsEventFactory($alert)->forClientIncident($incident)->create([
+            'control_room_alert_id' => $alert->id,
+            'status' => HsEvent::STATUS_OPEN,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+        $lifecycle = app(ControlRoomAlertLifecycleService::class);
+
+        $blocked = $lifecycle->closeGate($alert);
+
+        $this->assertFalse($blocked->allowed);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'incident_closed')['complete']);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'health_safety_closed')['complete']);
+        $this->assertSame(
+            "/incidents/{$incident->id}",
+            collect($blocked->requirements)->firstWhere('key', 'incident_closed')['href'],
+        );
+        $this->assertSame(
+            "/health-safety/events/{$event->id}",
+            collect($blocked->requirements)->firstWhere('key', 'health_safety_closed')['href'],
+        );
+
+        $restricted = User::factory()->create([
+            'organization_id' => 1,
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+        $restricted->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $restrictedPermissions = Permission::query()
+            ->whereIn('key', ['hazards.view', 'incidents.viewAny', 'incidents.viewAssigned'])
+            ->pluck('id');
+        $restricted->permissionOverrides()->sync(
+            $restrictedPermissions->mapWithKeys(
+                fn ($permissionId) => [$permissionId => ['allowed' => false]],
+            ),
+        );
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => 1,
+            'user_id' => $restricted->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+        $workspace = app(AlertWorkspaceService::class)->build($restricted, $alert->id);
+        $this->assertNull(
+            collect(data_get($workspace, 'close_gate.requirements'))
+                ->firstWhere('key', 'incident_closed')['href'],
+        );
+        $this->assertNull(
+            collect(data_get($workspace, 'close_gate.requirements'))
+                ->firstWhere('key', 'health_safety_closed')['href'],
+        );
+
+        try {
+            $lifecycle->close($alert, $this->admin);
+            $this->fail('The linked journey should block alert closure.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('linked incident', strtolower($exception->getMessage()));
+        }
+
+        $event->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $this->admin->id,
+            'closure_summary' => 'Governance work is complete.',
+        ])->saveQuietly();
+        $incident->forceFill([
+            'status' => 'closed',
+            'closed_at' => now(),
+            'closed_by' => $this->admin->id,
+            'closed_outcome' => 'Journey complete',
+        ])->saveQuietly();
+
+        $this->assertTrue($lifecycle->closeGate($alert->fresh())->allowed);
+        $closed = $lifecycle->close($alert->fresh(), $this->admin);
+        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $closed->status);
+    }
+
+    public function test_standalone_alert_close_rejects_multiple_direct_hs_events(): void
+    {
+        $alert = $this->alertFactory()->resolved()->create();
+        $this->hsEventFactory($alert)->closed()->create([
+            'control_room_alert_id' => $alert->id,
+        ]);
+        $this->hsEventFactory($alert)->create([
+            'control_room_alert_id' => $alert->id,
+            'status' => HsEvent::STATUS_OPEN,
+        ]);
+        $lifecycle = app(ControlRoomAlertLifecycleService::class);
+
+        try {
+            $lifecycle->close($alert, $this->admin);
+            $this->fail('Multiple direct H&S events must never satisfy standalone alert closure.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('one canonical H&S event', $exception->getMessage());
+        }
+
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
+    }
+
+    public function test_standalone_alert_close_rejects_a_foreign_hs_ownership_tuple(): void
+    {
+        $alert = $this->alertFactory()->resolved()->create();
+        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $foreignClient = Client::factory()->create([
+            'organization_id' => 2,
+            'site_id' => $foreignSite->id,
+        ]);
+        HsEvent::factory()->closed()->create([
+            'organization_id' => 2,
+            'site_id' => $foreignSite->id,
+            'client_id' => $foreignClient->id,
+            'control_room_alert_id' => $alert->id,
+        ]);
+        $lifecycle = app(ControlRoomAlertLifecycleService::class);
+
+        try {
+            $lifecycle->close($alert, $this->admin);
+            $this->fail('A foreign H&S event must never satisfy standalone alert closure.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('provenance conflict', $exception->getMessage());
+        }
+
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
     }
 
     public function test_incomplete_transferred_tuple_blocks_resolution(): void

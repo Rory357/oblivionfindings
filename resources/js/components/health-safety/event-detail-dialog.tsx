@@ -22,6 +22,10 @@ import {
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import {
+    JourneyGateList,
+    type JourneyGateData,
+} from '@/components/incidents/journey-gate-list';
+import {
     LinkedOperationalEvidence,
     type LinkedOperationalEvidenceData,
 } from '@/components/incidents/linked-operational-evidence';
@@ -354,20 +358,8 @@ export type EventDetail = {
         due_at: string | null;
         completed_at: string | null;
     }>;
-    close_gate: {
-        acceptance_ok: boolean;
-        worksafe_ok: boolean;
-        investigation_ok: boolean;
-        recommendations_ok: boolean;
-        actions_ok: boolean;
-        blockers: string[];
-        requirements: Array<{
-            key: string;
-            complete: boolean;
-            label: string;
-            href: string;
-        }>;
-    };
+    close_gate: JourneyGateData;
+    journey_state: string;
     assignable_staff: Array<{ id: number; name: string }>;
     action_handover: CorrectiveActionHandover;
     can: {
@@ -390,6 +382,7 @@ export type EventSectionKey =
  *  opened from inside the Investigation / Corrective-actions sections. */
 export type EventActionKey =
     | 'close'
+    | 'accept_handover'
     | 'worksafe_decision'
     | 'worksafe_notify'
     | 'worksafe_acknowledge'
@@ -598,6 +591,10 @@ function paneFromAction(
     switch (action) {
         case 'close':
             return { kind: 'close' };
+        case 'accept_handover':
+            return detail.handover.can_accept
+                ? { kind: 'accept_handover' }
+                : null;
         case 'worksafe_decision':
             return detail.worksafe.can_decide
                 ? { kind: 'worksafe_decision' }
@@ -707,6 +704,7 @@ export function EventDetailDialog({
         detail.worksafe.can_decide,
         detail.worksafe.can_notify,
         detail.worksafe.can_acknowledge,
+        detail.handover.can_accept,
     ]);
 
     const cat =
@@ -794,7 +792,7 @@ export function EventDetailDialog({
             <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${stage.chip}`}
             >
-                <stage.icon className="h-3 w-3" /> {stage.label}
+                <stage.icon className="h-3 w-3" /> {d.journey_state}
             </span>
             <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${worksafeChipClass(d.worksafe)}`}
@@ -807,7 +805,9 @@ export function EventDetailDialog({
     );
 
     const canAct = d.can.manage && d.status !== 'closed';
-    const blockers = d.close_gate?.blockers ?? [];
+    const blockers = d.close_gate.requirements.filter(
+        (requirement) => !requirement.complete,
+    );
 
     // Options bar — suppressed while a pane owns the body + its own buttons. Write
     // actions appear only when they can run (no stubs). Investigation / corrective-
@@ -867,7 +867,7 @@ export function EventDetailDialog({
                     onClick={() => setPane({ kind: 'close' })}
                     title={
                         blockers.length
-                            ? `Closure blocked: ${blockers.join(' ')}`
+                            ? `Closure blocked: ${blockers.map((requirement) => requirement.label).join(' ')}`
                             : undefined
                     }
                     className={
@@ -950,10 +950,7 @@ export function EventDetailDialog({
 
 function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
     const gate = d.close_gate;
-    const blocked = (gate?.blockers.length ?? 0) > 0;
-    const worksafeRequirement = gate?.requirements.find(
-        (requirement) => requirement.key === 'worksafe_decision',
-    );
+    const blocked = !gate.allowed;
     const form = useForm<{ closure_summary: string; override_reason: string }>({
         closure_summary: '',
         override_reason: '',
@@ -1003,42 +1000,11 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </InfoCard>
             ) : null}
 
-            {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">
-                <GateRow
-                    ok={gate?.acceptance_ok ?? true}
-                    label="H&S handover accepted where required"
-                />
-                <GateRow
-                    ok={gate?.worksafe_ok ?? true}
-                    label={
-                        worksafeRequirement?.label ??
-                        'WorkSafe decision and notification complete'
-                    }
-                    href={worksafeRequirement?.href}
-                />
-                <GateRow
-                    ok={gate?.investigation_ok ?? true}
-                    label="Required investigation complete"
-                />
-                <GateRow
-                    ok={gate?.recommendations_ok ?? true}
-                    label="Every recommendation has a recorded outcome"
-                />
-                <GateRow
-                    ok={gate?.actions_ok ?? true}
-                    label="All corrective actions verified or closed"
-                />
-            </div>
+            <JourneyGateList gate={gate} />
 
             {blocked ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
                     <p className="font-semibold">Closure is blocked</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-4">
-                        {gate.blockers.map((blocker) => (
-                            <li key={blocker}>{blocker}</li>
-                        ))}
-                    </ul>
                     <p className="mt-2">
                         {d.can.override_closure
                             ? 'You have the separate override permission. Record the formal reason below; the actor, reason and blockers will be audited.'
@@ -1089,44 +1055,6 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </Button>
             </div>
         </form>
-    );
-}
-
-function GateRow({
-    ok,
-    label,
-    href,
-}: {
-    ok: boolean;
-    label: string;
-    href?: string;
-}) {
-    const content = (
-        <div className="flex items-center gap-2 text-sm">
-            {ok ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
-            ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
-            )}
-            <span className={ok ? 'text-foreground' : 'text-status-critical'}>
-                <span className="font-semibold">
-                    {ok ? 'Complete' : 'Blocked'}:
-                </span>{' '}
-                {label}
-            </span>
-        </div>
-    );
-
-    return href ? (
-        <Link
-            href={href}
-            aria-label={label}
-            className="rounded-md transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-            {content}
-        </Link>
-    ) : (
-        content
     );
 }
 

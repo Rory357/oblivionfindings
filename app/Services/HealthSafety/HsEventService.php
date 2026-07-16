@@ -11,6 +11,7 @@ use App\Models\HsRecommendationDisposition;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
+use App\Support\Journeys\JourneyGate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -316,23 +317,11 @@ class HsEventService
      */
     public function closeBlockers(HsEvent $event): array
     {
-        return $this->closureGate($event)['blockers'];
+        return $this->closureGate($event)->blockers();
     }
 
-    /**
-     * @return array{
-     *     acceptance_ok: bool,
-     *     worksafe_ok: bool,
-     *     investigation_ok: bool,
-     *     recommendations_ok: bool,
-     *     actions_ok: bool,
-     *     blockers: list<string>,
-     *     requirements: list<array{key: string, complete: bool, label: string, href: string}>
-     * }
-     */
-    public function closureGate(HsEvent $event): array
+    public function closureGate(HsEvent $event): JourneyGate
     {
-        $blockers = [];
         $requirements = [];
         $sourceType = ltrim((string) $event->source_type, '\\');
         $handoverRequiresAcceptance = $sourceType === ClientIncident::class
@@ -343,9 +332,14 @@ class HsEventService
         $acceptanceOk = ! $handoverRequiresAcceptance
             || $event->handover_status === HsEvent::HANDOVER_ACCEPTED;
 
-        if (! $acceptanceOk) {
-            $blockers[] = 'Accept the H&S handover before closing this event.';
-        }
+        $requirements[] = [
+            'key' => 'hs_acceptance',
+            'complete' => $acceptanceOk,
+            'label' => $acceptanceOk
+                ? 'H&S handover accepted where required'
+                : 'Accept the H&S handover before closing this event.',
+            'href' => "/health-safety/events/{$event->id}?action=accept-handover",
+        ];
 
         $worksafeOk = $event->worksafe_notifiable === false
             ? $event->worksafe_decided_at !== null
@@ -356,17 +350,17 @@ class HsEventService
                     HsEvent::WORKSAFE_ACKNOWLEDGED,
                 ], true));
 
-        if (! $worksafeOk) {
-            $blockers[] = $event->worksafe_notifiable === null
+        $worksafeLabel = $worksafeOk
+            ? $this->worksafeRequirementLabel($event)
+            : ($event->worksafe_notifiable === null
                 ? 'Record the WorkSafe notifiability decision before closing this event.'
                 : ($event->worksafe_notifiable === true
                     ? 'Record the WorkSafe notification before closing this event.'
-                    : 'Complete the WorkSafe notifiability decision record before closing this event.');
-        }
+                    : 'Complete the WorkSafe notifiability decision record before closing this event.'));
         $requirements[] = [
             'key' => 'worksafe_decision',
             'complete' => $worksafeOk,
-            'label' => $this->worksafeRequirementLabel($event),
+            'label' => $worksafeLabel,
             'href' => $this->worksafeRequirementHref($event),
         ];
 
@@ -375,14 +369,23 @@ class HsEventService
             ->exists();
         $investigationOk = ! $hasActiveInvestigation
             && (! $event->investigation_required || $event->hasCompletedInvestigation());
+        $investigationHref = $hasActiveInvestigation
+            ? "/health-safety/events/{$event->id}?section=investigation"
+            : "/health-safety/events/{$event->id}?action=investigation";
 
-        if (! $investigationOk) {
-            $blockers[] = $hasActiveInvestigation
+        $requirements[] = [
+            'key' => 'hs_investigation',
+            'complete' => $investigationOk,
+            'label' => $investigationOk
+                ? 'Required H&S investigation complete'
+                : ($hasActiveInvestigation
                 ? 'Complete the active H&S investigation before closing this event.'
-                : 'Complete the required H&S investigation before closing this event.';
-        }
+                    : 'Complete the required H&S investigation before closing this event.'),
+            'href' => $investigationHref,
+        ];
 
         $recommendationsOk = true;
+        $recommendationBlockers = [];
         $completedInvestigations = $event->investigations()
             ->where('status', HsInvestigation::STATUS_COMPLETED)
             ->get();
@@ -397,8 +400,16 @@ class HsEventService
             $numbers = collect($missing)
                 ->map(static fn (int $index): string => (string) ($index + 1))
                 ->implode(', ');
-            $blockers[] = "Decide the outcome of recommendation {$numbers} on investigation {$investigation->reference_number}.";
+            $recommendationBlockers[] = "Decide the outcome of recommendation {$numbers} on investigation {$investigation->reference_number}.";
         }
+        $requirements[] = [
+            'key' => 'recommendation_dispositions',
+            'complete' => $recommendationsOk,
+            'label' => $recommendationsOk
+                ? 'Every investigation recommendation has a recorded outcome'
+                : implode(' ', $recommendationBlockers),
+            'href' => "/health-safety/events/{$event->id}?section=investigation",
+        ];
 
         $unresolvedActionDisposition = HsRecommendationDisposition::query()
             ->whereHas('investigation', fn ($query) => $query->where('hs_event_id', $event->id))
@@ -415,19 +426,16 @@ class HsEventService
             ->exists();
         $actionsOk = ! $event->hasOpenCorrectiveActions() && ! $unresolvedActionDisposition;
 
-        if (! $actionsOk) {
-            $blockers[] = 'All corrective actions must be verified or closed before this event can be closed.';
-        }
-
-        return [
-            'acceptance_ok' => $acceptanceOk,
-            'worksafe_ok' => $worksafeOk,
-            'investigation_ok' => $investigationOk,
-            'recommendations_ok' => $recommendationsOk,
-            'actions_ok' => $actionsOk,
-            'blockers' => $blockers,
-            'requirements' => $requirements,
+        $requirements[] = [
+            'key' => 'corrective_actions',
+            'complete' => $actionsOk,
+            'label' => $actionsOk
+                ? 'All corrective actions verified or closed'
+                : 'All corrective actions must be verified or closed before this event can be closed.',
+            'href' => "/health-safety/corrective-actions?event={$event->id}",
         ];
+
+        return JourneyGate::fromRequirements($requirements);
     }
 
     /**

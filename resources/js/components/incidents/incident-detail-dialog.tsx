@@ -38,6 +38,7 @@ import {
     X,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent } from 'react';
+import { JourneyGateList, type JourneyGateData } from './journey-gate-list';
 import {
     LinkedOperationalEvidence,
     type LinkedOperationalEvidenceData,
@@ -120,6 +121,8 @@ export type IncidentDetail = {
         url: string | null;
     } | null;
     linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    close_gate: JourneyGateData;
+    journey_state: string;
     hs_event: {
         id: number;
         reference_number: string;
@@ -401,9 +404,7 @@ export function IncidentDetailDialog({
                 />
                 {SEV_LABEL[d.severity] ?? d.severity}
             </span>
-            <span className="text-muted-foreground">
-                {STATUS_LABEL[d.status] ?? d.status}
-            </span>
+            <span className="text-muted-foreground">{d.journey_state}</span>
         </div>
     );
 
@@ -486,7 +487,7 @@ const ACTION_META: Record<
     },
     close: {
         title: 'Close incident',
-        blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.',
+        blurb: 'Close is available only after review, follow-ups, required investigation, and linked H&S governance are complete.',
         icon: CheckCircle2,
         cta: 'Close incident',
     },
@@ -612,6 +613,7 @@ function ActionPane({
 
             {action === 'close' ? (
                 <>
+                    <JourneyGateList gate={d.close_gate} />
                     <Field
                         label="Outcome"
                         required
@@ -658,7 +660,15 @@ function ActionPane({
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        (action === 'close' &&
+                            (!d.close_gate.allowed ||
+                                !form.data.closed_outcome.trim()))
+                    }
+                >
                     {meta.cta}
                 </Button>
             </div>

@@ -5,28 +5,51 @@ import {
     EventDetailDialog,
     type EventActionKey,
     type EventDetail,
+    type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 
-function actionFromUrl(url: string): EventActionKey | null {
+export function actionFromUrl(url: string): EventActionKey | null {
     const query = url.split('?')[1]?.split('#')[0] ?? '';
     const action = new URLSearchParams(query).get('action');
 
     return (
         (
             {
+                'accept-handover': 'accept_handover',
                 'worksafe-decision': 'worksafe_decision',
                 'worksafe-notify': 'worksafe_notify',
                 'worksafe-acknowledge': 'worksafe_acknowledge',
+                investigation: 'investigation',
             } as const
         )[action ?? ''] ?? null
     );
 }
 
+export function sectionFromUrl(url: string): EventSectionKey | null {
+    const query = url.split('?')[1]?.split('#')[0] ?? '';
+    const section = new URLSearchParams(query).get('section');
+    const sections: EventSectionKey[] = [
+        'overview',
+        'handover',
+        'investigation',
+        'actions',
+        'risk',
+        'timeline',
+        'evidence',
+    ];
+
+    return sections.includes(section as EventSectionKey)
+        ? (section as EventSectionKey)
+        : null;
+}
+
 export default function HsEventShow({ detail }: { detail: EventDetail }) {
-    const initialAction = actionFromUrl(usePage().url);
+    const pageUrl = usePage().url;
+    const initialAction = actionFromUrl(pageUrl);
+    const initialSection = sectionFromUrl(pageUrl) ?? 'overview';
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Health & Safety', href: '/health-safety' },
         { title: 'Events', href: '/health-safety/events' },
@@ -42,6 +65,7 @@ export default function HsEventShow({ detail }: { detail: EventDetail }) {
             <EventDetailDialog
                 detail={detail}
                 open
+                initialSection={initialSection}
                 initialAction={initialAction}
                 onClose={() => router.visit('/health-safety/events')}
             />

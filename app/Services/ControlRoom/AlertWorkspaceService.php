@@ -10,6 +10,8 @@ use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
+use App\Services\Incidents\IncidentJourneyPresenter;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Support\Collection;
@@ -28,6 +30,9 @@ class AlertWorkspaceService
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
         private LinkedOperationalEvidencePresenter $linkedEvidence,
+        private ControlRoomAlertLifecycleService $lifecycle,
+        private IncidentJourneyService $journeys,
+        private IncidentJourneyPresenter $journeyPresenter,
     ) {}
 
     /**
@@ -101,7 +106,10 @@ class AlertWorkspaceService
         $unsafeDeviceReference = $alert->device_id !== null && $safeDevice === null;
         $safeContext = $this->provenance->sanitiseContextForRead($alert);
 
-        $linkedIncident = $alert->clientIncident;
+        $linkedIncident = $this->journeys->incidentForAlert($alert);
+        $linkedHsEvent = $linkedIncident
+            ? $this->journeys->journeyForIncident($linkedIncident)->hsEvent
+            : $alert->hsEvent()->first();
         $immediateControls = OperatorNote::query()
             ->where('alert_id', $alert->id)
             ->where('purpose', OperatorNote::PURPOSE_IMMEDIATE_CONTROLS)
@@ -110,6 +118,27 @@ class AlertWorkspaceService
             ->orderByDesc('id')
             ->first();
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+        $canOpenIncident = $linkedIncident !== null
+            && $canViewIncident
+            && $user->can('view', $linkedIncident);
+        $canOpenHs = $linkedHsEvent !== null && $user->canDo('hazards.view');
+        $resolveGate = $this->lifecycle->resolveGate($alert)->toArray();
+        $closeGate = $this->lifecycle->closeGate($alert)->toArray();
+        $closeGate['requirements'] = collect($closeGate['requirements'])
+            ->map(function (array $requirement) use ($canOpenIncident, $canOpenHs): array {
+                $canOpen = match ($requirement['key']) {
+                    'incident_closed' => $canOpenIncident,
+                    'health_safety_closed' => $canOpenHs,
+                    default => true,
+                };
+                if (! $canOpen) {
+                    $requirement['href'] = null;
+                }
+
+                return $requirement;
+            })
+            ->values()
+            ->all();
         $capabilities = $this->access->capabilitiesForScopedAlert($user);
         $linkedOperationalEvidence = $this->linkedEvidence->present(
             $alert,
@@ -362,6 +391,13 @@ class AlertWorkspaceService
             ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
             'linked_operational_evidence' => $linkedOperationalEvidence,
+            'resolve_gate' => $resolveGate,
+            'close_gate' => $closeGate,
+            'journey_state' => $this->journeyPresenter->journeyState(
+                $linkedIncident,
+                $alert,
+                $linkedHsEvent,
+            ),
         ];
     }
 

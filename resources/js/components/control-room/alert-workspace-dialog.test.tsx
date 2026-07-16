@@ -92,8 +92,10 @@ vi.mock('@inertiajs/react', async () => {
 
 import {
     AddNoteForm,
+    ClosePane,
     CreateIncidentPane,
     LinkedSection,
+    ResolvePane,
     SensorConfirmPane,
     WatchToggle,
     type AlertWorkspaceDetail,
@@ -201,6 +203,97 @@ describe('Control Room workspace permissions', () => {
         expect(
             screen.queryByRole('button', { name: /Watch this alert/ }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('Control Room journey gates', () => {
+    function gateDetail(): AlertWorkspaceDetail {
+        return {
+            alert: {
+                id: 41,
+                reference_number: 'CR-2026-0041',
+                source: 'manual',
+                alert_type: 'incident.fall',
+                severity: 'high',
+                status: 'triaging',
+                context: {},
+                notes: 'Resident found beside the bed.',
+                resolution_code: null,
+                triggered_at: '2026-07-16T05:30:00Z',
+            },
+            client: { id: 7, name: 'Aroha Rangi' },
+            tasks: [
+                {
+                    id: 81,
+                    title: 'Confirm the temporary control remains effective',
+                    status: 'in_progress',
+                },
+            ],
+            config_options: { resolution_codes: [] },
+            resolve_gate: {
+                allowed: false,
+                requirements: [
+                    {
+                        key: 'operational_tasks',
+                        complete: false,
+                        label: 'Complete, cancel with a reason, or transfer Confirm the temporary control remains effective',
+                        href: '/control-room/alerts/41',
+                    },
+                ],
+            },
+            close_gate: {
+                allowed: false,
+                requirements: [
+                    {
+                        key: 'incident_closed',
+                        complete: false,
+                        label: 'Close linked incident INC-2026-0042',
+                        href: '/incidents/42',
+                    },
+                ],
+            },
+            journey_state: 'Operational response active',
+        } as unknown as AlertWorkspaceDetail;
+    }
+
+    it('blocks resolve on the server gate and removes the false open-task promise', () => {
+        render(<ResolvePane d={gateDetail()} onDone={vi.fn()} />);
+
+        expect(
+            screen.getByText(
+                'Resolve ends the live operational response. It does not close the linked incident or H&S governance.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', {
+                name: /Complete, cancel with a reason, or transfer/,
+            }),
+        ).toHaveAttribute('href', '/control-room/alerts/41');
+        expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+        expect(
+            screen.queryByText(/they stay open after resolving/i),
+        ).not.toBeInTheDocument();
+    });
+
+    it('blocks final alert closure until the linked journey gate is complete', () => {
+        const d = gateDetail();
+        d.alert.status = 'resolved';
+
+        render(<ClosePane d={d} onDone={vi.fn()} />);
+
+        expect(
+            screen.getByText(
+                'Close is available only when the incident and H&S governance are closed.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', {
+                name: 'Close linked incident INC-2026-0042',
+            }),
+        ).toHaveAttribute('href', '/incidents/42');
+        expect(
+            screen.getByRole('button', { name: 'Close alert' }),
+        ).toBeDisabled();
     });
 });
 

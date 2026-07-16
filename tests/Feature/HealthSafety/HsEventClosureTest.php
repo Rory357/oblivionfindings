@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\HsInvestigationService;
+use App\Support\Journeys\JourneyGate;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -115,10 +116,9 @@ class HsEventClosureTest extends TestCase
         ];
 
         foreach ($events as $label => [$event, $expected, $blocker, $action]) {
-            $gate = $service->closureGate($event);
+            $gate = $service->closureGate($event)->toArray();
             $requirement = collect($gate['requirements'])->firstWhere('key', 'worksafe_decision');
 
-            $this->assertSame($expected, $gate['worksafe_ok'], $label);
             $this->assertNotNull($requirement, $label);
             $this->assertSame($expected, $requirement['complete'], $label);
             $this->assertSame(
@@ -128,9 +128,55 @@ class HsEventClosureTest extends TestCase
             );
 
             if ($blocker !== null) {
-                $this->assertContains($blocker, $gate['blockers'], $label);
+                $this->assertContains(
+                    $blocker,
+                    collect($gate['requirements'])
+                        ->where('complete', false)
+                        ->pluck('label')
+                        ->all(),
+                    $label,
+                );
             }
         }
+    }
+
+    public function test_hs_closure_gate_uses_the_shared_typed_requirement_contract(): void
+    {
+        $event = HsEvent::factory()->high()->worksafeUndecided()->create([
+            'source_type' => ClientIncident::class,
+            'source_id' => 991_014,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                991_014,
+                HsEvent::CATEGORY_INCIDENT,
+            ),
+            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+        ]);
+        HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
+            'status' => HsCorrectiveAction::STATUS_COMPLETED,
+        ]);
+
+        $gate = app(HsEventService::class)->closureGate($event);
+
+        $this->assertInstanceOf(JourneyGate::class, $gate);
+        $this->assertFalse($gate->allowed);
+        $this->assertSame([
+            'hs_acceptance',
+            'worksafe_decision',
+            'hs_investigation',
+            'recommendation_dispositions',
+            'corrective_actions',
+        ], array_column($gate->requirements, 'key'));
+        foreach ($gate->requirements as $requirement) {
+            $this->assertSame(['key', 'complete', 'label', 'href'], array_keys($requirement));
+            $this->assertNotSame('', trim($requirement['label']));
+            $this->assertNotSame('', trim($requirement['href']));
+        }
+        $this->assertSame(
+            $gate->allowed,
+            $gate->toArray()['allowed'],
+        );
     }
 
     public function test_close_blocked_when_required_investigation_incomplete(): void
@@ -189,6 +235,13 @@ class HsEventClosureTest extends TestCase
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
         ]);
         HsInvestigation::factory()->completed()->create(['hs_event_id' => $event->id]);
+        $requirement = collect(app(HsEventService::class)->closureGate($event)->requirements)
+            ->firstWhere('key', 'recommendation_dispositions');
+
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            $requirement['href'],
+        );
 
         $this->assertFalse($event->fresh()->allCorrectiveActionsResolved());
 
@@ -289,6 +342,13 @@ class HsEventClosureTest extends TestCase
         }
 
         HsInvestigation::factory()->create(['hs_event_id' => $event->id]);
+        $requirement = collect(app(HsEventService::class)->closureGate($event)->requirements)
+            ->firstWhere('key', 'hs_investigation');
+
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            $requirement['href'],
+        );
 
         $this->actingAs($actor)
             ->post("/health-safety/events/{$event->id}/close", [
