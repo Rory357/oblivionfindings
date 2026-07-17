@@ -23,6 +23,10 @@
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+# Login shells may use umask 0077. Deployment artifacts must remain readable by
+# PHP-FPM and nginx after Composer and Vite recreate their cache/build files.
+umask 002
+
 SKIP_QUECLINK=0
 INSTALL_NOMINATIM=0
 SKIP_NOMINATIM=0
