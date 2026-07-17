@@ -2325,7 +2325,7 @@ Task 19 completed:
 - Modify only files required to fix failures found by the commands below.
 - Update: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Run the full relevant backend suites**
+- [x] **Step 1: Run the full relevant backend suites**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature/HealthSafety tests/Feature/Tasks
@@ -2333,7 +2333,13 @@ php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature
 
 Expected: zero failures. Record exact test and assertion counts.
 
-- [ ] **Step 2: Run all changed frontend tests**
+Result: the final full rerun passed 1,293 tests and 10,036 assertions in
+1,775.50 seconds. The first run found one stale workflow request fixture using
+the retired verification field; the fixture now submits the current
+`evidence_reviewed` and `effective` contract, its focused regression passed,
+the complete workflow file passed, and the full matrix was rerun from scratch.
+
+- [x] **Step 2: Run all changed frontend tests**
 
 ```powershell
 npx vitest run resources/js/components/control-room resources/js/components/incidents resources/js/components/health-safety resources/js/pages/control-room/shifts resources/js/pages/health-safety resources/js/pages/tasks resources/js/components/wizard/primitives.test.tsx resources/js/lib/datetime.test.ts resources/js/lib/journey-labels.test.ts
@@ -2341,41 +2347,105 @@ npx vitest run resources/js/components/control-room resources/js/components/inci
 
 Expected: zero failures and zero React controlled/uncontrolled warnings.
 
-- [ ] **Step 3: Generate routes and run static checks**
+Result: 23 files and 122 tests passed in 48.39 seconds with no React
+controlled/uncontrolled warning.
+
+- [x] **Step 3: Generate routes and run static checks**
 
 ```powershell
-php artisan wayfinder:generate
+[xml]$phpunitConfig = Get-Content phpunit.xml
+$appKeyNode = @($phpunitConfig.phpunit.php.env) |
+    Where-Object { $_.name -eq 'APP_KEY' } |
+    Select-Object -First 1
+if ($null -eq $appKeyNode) { throw 'APP_KEY is missing from phpunit.xml.' }
+$env:APP_KEY = [string]$appKeyNode.value
+try {
+    php artisan wayfinder:generate
+    if ($LASTEXITCODE -ne 0) { throw 'Wayfinder generation failed.' }
+} finally {
+    Remove-Item Env:APP_KEY -ErrorAction SilentlyContinue
+}
 npm run types
 npx eslint resources/js/components/control-room resources/js/components/incidents resources/js/components/health-safety resources/js/pages/control-room/shifts resources/js/pages/health-safety resources/js/pages/tasks resources/js/components/wizard/primitives.tsx resources/js/lib/datetime.ts resources/js/lib/journey-labels.ts
-vendor\bin\pint --test app/Http/Controllers/ControlRoom app/Http/Controllers/HealthSafety app/Http/Requests/HealthSafety app/Models/ControlRoom app/Models/HsCorrectiveAction.php app/Models/HsEvent.php app/Services/ControlRoom app/Services/HealthSafety app/Services/Incidents app/Services/Tasks app/Support database/migrations database/seeders tests/Feature/ControlRoom tests/Feature/HealthSafety tests/Feature/Incidents tests/Feature/Tasks
+$changedPhp = @(git diff --name-only origin/main...HEAD -- '*.php')
+if ($changedPhp.Count -eq 0) { throw 'No changed PHP files found for the Pint gate.' }
+vendor\bin\pint --test @changedPhp
 git diff --check
 ```
 
 Expected: every command exits 0.
 
-- [ ] **Step 4: Run both production builds**
+Result: Wayfinder generation, TypeScript, targeted ESLint, Pint over all 133
+changed PHP files, and diff integrity pass. The original directory-wide Pint
+command reached untouched legacy files and reported pre-existing baseline
+formatting debt; the release gate now checks the complete branch diff and
+avoids an unrelated mass rewrite.
+
+- [x] **Step 4: Run both production builds**
 
 ```powershell
-npm run build
-npx vite build --ssr
+[xml]$phpunitConfig = Get-Content phpunit.xml
+$appKeyNode = @($phpunitConfig.phpunit.php.env) |
+    Where-Object { $_.name -eq 'APP_KEY' } |
+    Select-Object -First 1
+if ($null -eq $appKeyNode) { throw 'APP_KEY is missing from phpunit.xml.' }
+$env:APP_KEY = [string]$appKeyNode.value
+try {
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw 'Client build failed.' }
+    npx vite build --ssr
+    if ($LASTEXITCODE -ne 0) { throw 'SSR build failed.' }
+} finally {
+    Remove-Item Env:APP_KEY -ErrorAction SilentlyContinue
+}
 ```
 
 Expected: client and SSR builds exit 0.
 
-- [ ] **Step 5: Run production-built browser suites**
+Result: the production client built 4,970 modules in 3m 52s and the SSR bundle
+built 1,622 modules in 1m 04s.
+
+- [x] **Step 5: Run production-built browser suites**
 
 ```powershell
-npx playwright test tests/e2e/control-room-incident-hs-golden-journey.spec.ts tests/e2e/control-room-incident-hs-alternate-branches.spec.ts --project=chromium-desktop
+[xml]$phpunitConfig = Get-Content phpunit.xml
+$managedEnvironment = @()
+foreach ($node in @($phpunitConfig.phpunit.php.env)) {
+    $name = [string]$node.name
+    Set-Item -Path "Env:$name" -Value ([string]$node.value)
+    $managedEnvironment += $name
+}
+$env:SESSION_DRIVER = 'database'
+if ('SESSION_DRIVER' -notin $managedEnvironment) {
+    $managedEnvironment += 'SESSION_DRIVER'
+}
+try {
+    npx playwright test tests/e2e/control-room-incident-hs-golden-journey.spec.ts tests/e2e/control-room-incident-hs-alternate-branches.spec.ts --project=chromium-desktop
+    if ($LASTEXITCODE -ne 0) { throw 'Production-built browser gate failed.' }
+} finally {
+    foreach ($name in $managedEnvironment) {
+        Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
+    }
+}
 ```
 
 Expected: all scenarios pass.
 
-- [ ] **Step 6: Self-review against all 19 findings**
+Result: both production-built specifications passed in 2.8 minutes with the
+dedicated PHPUnit database environment and a database-backed browser session.
+
+- [x] **Step 6: Self-review against all 19 findings**
 
 Run:
 
 ```powershell
-rg -n "D-(0[1-9]|1[0-9])" docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+$findingRows = @(
+    rg -n '^\| D-(0[1-9]|1[0-9]) \|' docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+)
+if ($findingRows.Count -ne 19) {
+    throw "Expected 19 canonical finding rows; found $($findingRows.Count)."
+}
+$findingRows
 $draftTerms = @(
     ('T' + 'BD'),
     ('TO' + 'DO'),
@@ -2400,7 +2470,7 @@ Expected:
 - every ledger row has concrete code and automated evidence;
 - no finding status remains Open, Partial, or Not tested before live verification begins.
 
-- [ ] **Step 7: Request code review and fix every actionable issue**
+- [x] **Step 7: Request code review and fix every actionable issue**
 
 Use `superpowers:requesting-code-review`. Review must cover:
 
@@ -2416,7 +2486,16 @@ Use `superpowers:requesting-code-review`. Review must cover:
 
 Re-run the affected focused tests after each fix and the complete gate after all review fixes.
 
-- [ ] **Step 8: Commit release-gate fixes and ledger evidence**
+Result: final branch review is clean. The review covered explicit WorkSafe
+migration truth, named cross-site bypass permissions, exact site/parent record
+scope, private attachment streaming and cleanup, row locks and retry
+idempotency, owner/completer/verifier separation, shared presenters and journey
+gates, controlled Select behavior, keyboard focus restoration, date-only
+formatting, and every Task 21 live-evidence obligation. Thread policy did not
+permit spawning a separate reviewer, so the requesting-code-review checklist
+was applied as a complete local diff review. No actionable issue remained.
+
+- [x] **Step 8: Commit release-gate fixes and ledger evidence**
 
 ```powershell
 git add -A

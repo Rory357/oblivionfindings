@@ -131,14 +131,16 @@ class HsEventWorkflowTest extends TestCase
         // Same person cannot verify their own completion.
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify", [
-                'effectiveness_confirmed' => true,
+                'evidence_reviewed' => true,
+                'effective' => true,
             ])->assertSessionHas('error');
         $this->assertEquals(HsCorrectiveAction::STATUS_COMPLETED, $action->fresh()->status);
 
         // A different manager can.
         $this->actingAs($verifier)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify", [
-                'effectiveness_confirmed' => true,
+                'evidence_reviewed' => true,
+                'effective' => true,
             ])->assertSessionHas('success');
         $this->assertEquals(HsCorrectiveAction::STATUS_VERIFIED, $action->fresh()->status);
 
