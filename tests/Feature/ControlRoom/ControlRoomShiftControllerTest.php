@@ -99,7 +99,9 @@ class ControlRoomShiftControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/shifts/handover')
                 ->where('openAlertsCount', 1)
-                ->where('criticalAlertsCount', 1)
+                ->has('requiredAlerts', 1)
+                ->where('requiredAlerts.0.severity', 'critical')
+                ->where('carryForward.total', 0)
                 ->has('staff', 2)
             );
     }

@@ -10,6 +10,7 @@ use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\PlaybookStep;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
@@ -1521,6 +1522,54 @@ class ControlRoomAlertControllerTest extends TestCase
                 ->has('alerts.data', 1)
                 ->where('alerts.data.0.id', $snoozed->id)
             );
+    }
+
+    public function test_review_gap_carry_forward_drilldown_contains_only_the_exact_unchanged_population_including_snoozed(): void
+    {
+        $shift = Shift::query()->create([
+            'name' => 'Outgoing shift',
+            'starts_at' => now()->subHours(8),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->admin->id,
+            'team_members' => [$this->admin->id],
+        ]);
+        $unchanged = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'medium',
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+        $unchangedSnoozed = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'low',
+            'snoozed_until' => now()->addHour(),
+            'snoozed_by_user_id' => $this->admin->id,
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+        $required = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'critical',
+            'created_at' => now()->subHour(),
+            'updated_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts?lens=active&handover=carry-forward')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where(
+                    'alerts.data',
+                    fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all()
+                        === collect([$unchanged->id, $unchangedSnoozed->id])->sort()->values()->all(),
+                )
+                ->where('filters.lens', 'active')
+            );
+
+        $this->assertNotSame($required->id, $unchanged->id);
+        $this->assertSame($shift->id, Shift::getCurrent()?->id);
     }
 
     public function test_expired_snooze_returns_to_the_default_worklist(): void

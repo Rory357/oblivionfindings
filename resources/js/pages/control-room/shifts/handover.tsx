@@ -60,6 +60,7 @@ interface AlertSummary {
     next_action: { label: string; href: string };
     href: string;
     tasks: AlertTask[];
+    handover_reasons: Array<{ key: string; label: string }>;
 }
 
 interface HandoverDraft {
@@ -69,6 +70,18 @@ interface HandoverDraft {
     incoming_team_members?: number[];
     reviewed_alert_ids?: number[];
     priority_alert_ids?: number[];
+    carry_forward_acknowledged?: boolean;
+    carry_forward_signature?: string | null;
+}
+
+interface CarryForwardSummary {
+    total: number;
+    by_severity: Record<string, number>;
+    by_queue: Array<{ id: number | null; name: string; total: number }>;
+    oldest_created_at: string | null;
+    breached_count: number;
+    href: string;
+    signature: string;
 }
 
 interface HandoverSnapshot {
@@ -81,9 +94,16 @@ interface HandoverSnapshot {
         lead: StaffMember;
         team_members: StaffMember[];
     };
+    criteria_at?: string;
+    criteria?: Array<{ key: string; label: string }>;
+    required_alert_ids?: number[];
     reviewed_alert_ids?: number[];
     priority_alert_ids?: number[];
     alerts?: AlertSummary[];
+    carry_forward?: CarryForwardSummary;
+    carry_forward_acknowledged?: boolean;
+    pinned_notes?: OperatorNote[];
+    followup_notes?: OperatorNote[];
 }
 
 interface ShiftData {
@@ -123,17 +143,18 @@ interface OperatorNote {
 interface Props {
     shift: ShiftData;
     openAlertsCount: number;
-    criticalAlertsCount: number;
-    highAlertsCount: number;
-    criticalAlerts: AlertSummary[];
-    highAlerts: AlertSummary[];
+    requiredAlerts: AlertSummary[];
+    handoverCriteriaAt: string;
+    handoverCriteria: Array<{ key: string; label: string }>;
+    carryForward: CarryForwardSummary;
     pinnedNotes: OperatorNote[];
     followupNotes: OperatorNote[];
     staff: StaffMember[];
     eligibleLeads: StaffMember[];
+    snapshotIssue: string | null;
 }
 
-const STEPS = ['Urgent work', 'Context', 'Incoming team', 'Final review'];
+const STEPS = ['Required work', 'Context', 'Incoming team', 'Final review'];
 
 function formatDuration(minutes: number | null): string {
     if (minutes === null) return 'Not available';
@@ -145,6 +166,10 @@ function formatDuration(minutes: number | null): string {
 
 function alertReference(alert: AlertSummary): string {
     return alert.reference_number ?? `Alert ${alert.id}`;
+}
+
+function severityLabel(severity: string): string {
+    return severity.charAt(0).toUpperCase() + severity.slice(1);
 }
 
 function StepIndicator({ current }: { current: number }) {
@@ -178,6 +203,97 @@ function StepIndicator({ current }: { current: number }) {
     );
 }
 
+function CarryForwardPanel({
+    summary,
+    acknowledged,
+    editable,
+    onAcknowledgedChange,
+    prepared = false,
+}: {
+    summary: CarryForwardSummary;
+    acknowledged: boolean;
+    editable: boolean;
+    onAcknowledgedChange?: (checked: boolean) => void;
+    prepared?: boolean;
+}) {
+    const copy =
+        summary.total === 0
+            ? 'No unchanged active alerts need to carry forward.'
+            : prepared
+              ? `${summary.total} unchanged active alerts carried forward as an acknowledged summary.`
+              : `${summary.total} unchanged active alerts will carry forward as a summary. You do not need to open each one.`;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Unchanged active work</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="font-medium">{copy}</p>
+                {summary.total > 0 && (
+                    <>
+                        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
+                            {['critical', 'high', 'medium', 'low'].map(
+                                (severity) => (
+                                    <div
+                                        key={severity}
+                                        className="rounded-lg border p-3"
+                                    >
+                                        <p className="text-muted-foreground">
+                                            {severityLabel(severity)}
+                                        </p>
+                                        <p className="text-lg font-semibold">
+                                            {summary.by_severity[severity] ?? 0}
+                                        </p>
+                                    </div>
+                                ),
+                            )}
+                            <div className="rounded-lg border p-3">
+                                <p className="text-muted-foreground">
+                                    SLA breached
+                                </p>
+                                <p className="text-lg font-semibold">
+                                    {summary.breached_count}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                            <span>
+                                Oldest active alert:{' '}
+                                {summary.oldest_created_at
+                                    ? formatDateTime(summary.oldest_created_at)
+                                    : 'Not available'}
+                            </span>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={summary.href}>
+                                    Open carry-forward list
+                                </Link>
+                            </Button>
+                        </div>
+                    </>
+                )}
+                {editable && summary.total > 0 && (
+                    <label className="flex items-start gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg/30 p-4 text-sm">
+                        <Checkbox
+                            aria-label={`Acknowledge ${summary.total} unchanged active alerts`}
+                            checked={acknowledged}
+                            onCheckedChange={(value) =>
+                                onAcknowledgedChange?.(value === true)
+                            }
+                        />
+                        <span>
+                            <strong>Acknowledge carry-forward summary.</strong>{' '}
+                            I have reviewed these counts and understand the
+                            unchanged active alerts will remain available in the
+                            Control Room.
+                        </span>
+                    </label>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function AlertReviewRow({
     alert,
     reviewed,
@@ -206,9 +322,7 @@ function AlertReviewRow({
                                     : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                             }
                         >
-                            {alert.severity === 'critical'
-                                ? 'Critical'
-                                : 'High'}
+                            {severityLabel(alert.severity)}
                         </Badge>
                         <Link
                             href={alert.href}
@@ -222,6 +336,18 @@ function AlertReviewRow({
                     <p className="mt-2 font-medium text-foreground">
                         {alert.summary}
                     </p>
+                    {alert.handover_reasons.length > 0 && (
+                        <div
+                            className="mt-2 flex flex-wrap gap-2"
+                            aria-label={`Why ${alertReference(alert)} requires review`}
+                        >
+                            {alert.handover_reasons.map((reason) => (
+                                <Badge key={reason.key} variant="secondary">
+                                    {reason.label}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
                     <p className="mt-1 text-sm text-muted-foreground">
                         {[
                             alert.person?.name,
@@ -296,18 +422,20 @@ export default function ShiftHandover(props: Props) {
     const {
         shift,
         openAlertsCount,
-        criticalAlertsCount,
-        highAlertsCount,
-        criticalAlerts,
-        highAlerts,
+        requiredAlerts,
+        handoverCriteriaAt,
+        carryForward,
         pinnedNotes,
         followupNotes,
         staff,
         eligibleLeads,
+        snapshotIssue,
     } = props;
-    const urgentAlerts = useMemo(
-        () => [...criticalAlerts, ...highAlerts],
-        [criticalAlerts, highAlerts],
+    const requiredCriticalCount = useMemo(
+        () =>
+            requiredAlerts.filter((alert) => alert.severity === 'critical')
+                .length,
+        [requiredAlerts],
     );
     const [currentStep, setCurrentStep] = useState(0);
     const [handoverNotes, setHandoverNotes] = useState(
@@ -329,6 +457,12 @@ export default function ShiftHandover(props: Props) {
     );
     const [priorityAlertIds, setPriorityAlertIds] = useState<number[]>(
         shift.draft.priority_alert_ids ?? [],
+    );
+    const [carryForwardAcknowledged, setCarryForwardAcknowledged] = useState(
+        Boolean(
+            shift.draft.carry_forward_acknowledged &&
+            shift.draft.carry_forward_signature === carryForward.signature,
+        ),
     );
     const [version, setVersion] = useState(shift.handover_version);
     const versionRef = useRef(shift.handover_version);
@@ -360,6 +494,10 @@ export default function ShiftHandover(props: Props) {
                     incoming_team_members: incomingTeamMembers,
                     reviewed_alert_ids: reviewedAlertIds,
                     priority_alert_ids: priorityAlertIds,
+                    carry_forward_acknowledged: carryForwardAcknowledged,
+                    carry_forward_signature: carryForwardAcknowledged
+                        ? carryForward.signature
+                        : null,
                     expected_version: versionRef.current,
                 },
                 {
@@ -392,6 +530,8 @@ export default function ShiftHandover(props: Props) {
         return () => window.clearTimeout(timer);
     }, [
         handoverNotes,
+        carryForward.signature,
+        carryForwardAcknowledged,
         incomingLeadUserId,
         incomingShiftName,
         incomingTeamMembers,
@@ -431,12 +571,13 @@ export default function ShiftHandover(props: Props) {
         );
     };
 
-    const allUrgentReviewed = urgentAlerts.every((alert) =>
+    const allRequiredReviewed = requiredAlerts.every((alert) =>
         reviewedAlertIds.includes(alert.id),
     );
     const readyToPrepare =
         Boolean(incomingLeadUserId) &&
-        allUrgentReviewed &&
+        allRequiredReviewed &&
+        (carryForward.total === 0 || carryForwardAcknowledged) &&
         saveState === 'saved';
 
     const prepare = () => {
@@ -486,10 +627,55 @@ export default function ShiftHandover(props: Props) {
         );
     };
 
+    if (snapshotIssue) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Control Room', href: '/control-room' },
+                    { title: 'Shifts', href: '/control-room/shifts' },
+                    { title: 'Unusable handover', href: '#' },
+                ]}
+            >
+                <Head title={`Unusable handover - ${shift.name}`} />
+                <PageShell>
+                    <PageHero
+                        variant="compact"
+                        title="Prepared handover cannot be used"
+                        description="The saved snapshot did not pass the handover integrity checks."
+                        backHref="/control-room/shifts"
+                        backLabel="Back to Control Room shifts"
+                    />
+                    <Card className="border-status-critical/30 bg-status-critical-bg/30">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-status-critical">
+                                <AlertTriangle className="h-5 w-5" />
+                                Acceptance is blocked
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <p>{snapshotIssue}</p>
+                            <p>
+                                The outgoing shift remains active. No incoming
+                                shift has been started and no ownership has
+                                changed.
+                            </p>
+                            <p className="text-muted-foreground">
+                                Ask a Control Room administrator to inspect and
+                                replace this handover before the shift can be
+                                transferred.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
+
     if (shift.handover_status === 'prepared' && shift.handover_snapshot) {
         const snapshot = shift.handover_snapshot;
         const alerts = snapshot.alerts ?? [];
         const priorities = new Set(snapshot.priority_alert_ids ?? []);
+        const snapshotCarryForward = snapshot.carry_forward ?? carryForward;
 
         return (
             <AppLayout
@@ -562,7 +748,7 @@ export default function ShiftHandover(props: Props) {
                         </CardContent>
                     </Card>
 
-                    <div className="mb-6 grid grid-cols-3 gap-4">
+                    <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-sm text-muted-foreground">
@@ -576,7 +762,7 @@ export default function ShiftHandover(props: Props) {
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-sm text-muted-foreground">
-                                    Urgent alerts reviewed
+                                    Required alerts reviewed
                                 </p>
                                 <p className="font-semibold">{alerts.length}</p>
                             </CardContent>
@@ -584,10 +770,10 @@ export default function ShiftHandover(props: Props) {
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-sm text-muted-foreground">
-                                    Carry-forward priorities
+                                    Unchanged carried forward
                                 </p>
                                 <p className="font-semibold">
-                                    {priorities.size}
+                                    {snapshotCarryForward.total}
                                 </p>
                             </CardContent>
                         </Card>
@@ -605,6 +791,59 @@ export default function ShiftHandover(props: Props) {
                         </CardContent>
                     </Card>
 
+                    {((snapshot.pinned_notes?.length ?? 0) > 0 ||
+                        (snapshot.followup_notes?.length ?? 0) > 0) && (
+                        <div className="mb-6 grid grid-cols-2 gap-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Pinned notes</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    {(snapshot.pinned_notes ?? []).map(
+                                        (note) => (
+                                            <p key={note.id}>{note.content}</p>
+                                        ),
+                                    )}
+                                    {(snapshot.pinned_notes?.length ?? 0) ===
+                                        0 && (
+                                        <p className="text-muted-foreground">
+                                            None
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Follow-up notes</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    {(snapshot.followup_notes ?? []).map(
+                                        (note) => (
+                                            <p key={note.id}>{note.content}</p>
+                                        ),
+                                    )}
+                                    {(snapshot.followup_notes?.length ?? 0) ===
+                                        0 && (
+                                        <p className="text-muted-foreground">
+                                            None
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
+                    <div className="mb-6">
+                        <CarryForwardPanel
+                            summary={snapshotCarryForward}
+                            acknowledged={
+                                snapshot.carry_forward_acknowledged === true
+                            }
+                            editable={false}
+                            prepared
+                        />
+                    </div>
+
                     <section aria-labelledby="snapshot-alerts-title">
                         <div className="mb-3 flex items-center justify-between">
                             <div>
@@ -612,11 +851,13 @@ export default function ShiftHandover(props: Props) {
                                     id="snapshot-alerts-title"
                                     className="text-lg font-semibold"
                                 >
-                                    Frozen urgent-work snapshot
+                                    Frozen required-work snapshot
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    Open a row to continue in the canonical
-                                    alert workspace.
+                                    Scope checked{' '}
+                                    {formatDateTime(snapshot.criteria_at)}. Open
+                                    a row to continue in the canonical alert
+                                    workspace.
                                 </p>
                             </div>
                             <Button asChild variant="outline">
@@ -636,8 +877,9 @@ export default function ShiftHandover(props: Props) {
                             {alerts.length === 0 && (
                                 <Card>
                                     <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                        No critical or high alerts were open
-                                        when this handover was prepared.
+                                        No alerts matched the individual-review
+                                        criteria when this handover was
+                                        prepared.
                                     </CardContent>
                                 </Card>
                             )}
@@ -661,7 +903,7 @@ export default function ShiftHandover(props: Props) {
                 <PageHero
                     variant="compact"
                     title="Prepare shift handover"
-                    description="Review live urgent work, name the incoming lead, and save a clear handover. The outgoing shift remains active until acceptance."
+                    description="Review work that changed or needs a decision, acknowledge the unchanged carry-forward summary, and name the incoming lead. The outgoing shift remains active until acceptance."
                     backHref="/control-room/shifts"
                     backLabel="Back to Control Room shifts"
                 />
@@ -688,7 +930,8 @@ export default function ShiftHandover(props: Props) {
                         <span>
                             {shift.name} ·{' '}
                             {formatDuration(shift.duration_minutes)} ·{' '}
-                            {openAlertsCount} active alerts
+                            {openAlertsCount} active alerts · scope checked{' '}
+                            {formatDateTime(handoverCriteriaAt)}
                         </span>
                     </div>
                     <div
@@ -717,27 +960,31 @@ export default function ShiftHandover(props: Props) {
                     <div className="space-y-5">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle
+                                    role="heading"
+                                    aria-level={2}
+                                    className="flex items-center gap-2"
+                                >
                                     <AlertTriangle className="h-5 w-5" />
-                                    Review every critical and high alert
+                                    Review changed and decision-relevant work
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="mb-4 grid grid-cols-3 gap-4 text-sm">
                                     <div>
                                         <span className="text-muted-foreground">
-                                            Critical
+                                            Required
                                         </span>
                                         <p className="text-xl font-semibold">
-                                            {criticalAlertsCount}
+                                            {requiredAlerts.length}
                                         </p>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground">
-                                            High
+                                            Critical required
                                         </span>
                                         <p className="text-xl font-semibold">
-                                            {highAlertsCount}
+                                            {requiredCriticalCount}
                                         </p>
                                     </div>
                                     <div>
@@ -747,18 +994,18 @@ export default function ShiftHandover(props: Props) {
                                         <p className="text-xl font-semibold">
                                             {
                                                 reviewedAlertIds.filter((id) =>
-                                                    urgentAlerts.some(
+                                                    requiredAlerts.some(
                                                         (alert) =>
                                                             alert.id === id,
                                                     ),
                                                 ).length
                                             }
-                                            /{urgentAlerts.length}
+                                            /{requiredAlerts.length}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    {urgentAlerts.map((alert) => (
+                                    {requiredAlerts.map((alert) => (
                                         <AlertReviewRow
                                             key={alert.id}
                                             alert={alert}
@@ -777,15 +1024,21 @@ export default function ShiftHandover(props: Props) {
                                             }
                                         />
                                     ))}
-                                    {urgentAlerts.length === 0 && (
+                                    {requiredAlerts.length === 0 && (
                                         <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-5 text-sm text-status-success">
-                                            No critical or high alerts are
-                                            waiting for handover.
+                                            No alerts currently match the
+                                            individual-review criteria.
                                         </div>
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
+                        <CarryForwardPanel
+                            summary={carryForward}
+                            acknowledged={carryForwardAcknowledged}
+                            editable={shift.can_prepare}
+                            onAcknowledgedChange={setCarryForwardAcknowledged}
+                        />
                         <div className="flex justify-end">
                             <Button onClick={() => setCurrentStep(1)}>
                                 Continue to context
@@ -1002,7 +1255,7 @@ export default function ShiftHandover(props: Props) {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-5">
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     <div className="rounded-lg border p-4">
                                         <p className="text-sm text-muted-foreground">
                                             Incoming lead
@@ -1017,11 +1270,23 @@ export default function ShiftHandover(props: Props) {
                                     </div>
                                     <div className="rounded-lg border p-4">
                                         <p className="text-sm text-muted-foreground">
-                                            Urgent work reviewed
+                                            Required work reviewed
                                         </p>
                                         <p className="font-semibold">
                                             {reviewedAlertIds.length}/
-                                            {urgentAlerts.length}
+                                            {requiredAlerts.length}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border p-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            Unchanged carry-forward
+                                        </p>
+                                        <p className="font-semibold">
+                                            {carryForward.total === 0
+                                                ? 'None'
+                                                : carryForwardAcknowledged
+                                                  ? `${carryForward.total} acknowledged`
+                                                  : 'Not acknowledged'}
                                         </p>
                                     </div>
                                     <div className="rounded-lg border p-4">
@@ -1054,12 +1319,20 @@ export default function ShiftHandover(props: Props) {
                                         </li>
                                     </ol>
                                 </div>
-                                {!allUrgentReviewed && (
+                                {!allRequiredReviewed && (
                                     <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
-                                        Return to Urgent work and review every
-                                        critical and high alert.
+                                        Return to Required work and review every
+                                        changed or decision-relevant alert.
                                     </div>
                                 )}
+                                {carryForward.total > 0 &&
+                                    !carryForwardAcknowledged && (
+                                        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
+                                            Return to Required work and
+                                            acknowledge the unchanged active
+                                            alert summary.
+                                        </div>
+                                    )}
                             </CardContent>
                         </Card>
                         <div className="flex justify-between">

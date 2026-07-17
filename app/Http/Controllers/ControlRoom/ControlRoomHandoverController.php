@@ -5,12 +5,12 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
-use App\Models\ControlRoomAlert;
 use App\Models\User;
-use App\Services\ControlRoom\AlertWorklistPresenter;
-use App\Services\ControlRoom\AlertWorklistQuery;
+use App\Services\ControlRoom\ControlRoomHandoverScopeService;
+use App\Services\ControlRoom\ControlRoomPreparedHandoverSnapshotService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ControlRoomHandoverController extends Controller
@@ -18,8 +18,8 @@ class ControlRoomHandoverController extends Controller
     public function show(
         Request $request,
         Shift $shift,
-        AlertWorklistQuery $worklist,
-        AlertWorklistPresenter $presenter,
+        ControlRoomHandoverScopeService $handoverScope,
+        ControlRoomPreparedHandoverSnapshotService $preparedSnapshots,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
@@ -28,7 +28,18 @@ class ControlRoomHandoverController extends Controller
         $siteAccess = app(UserSiteAccessService::class);
         $shiftLead = $shift->shiftLead;
         $teamMembers = $shift->getTeamMemberUsers();
-        $draft = data_get($shift->handover_snapshot, 'draft', []);
+        $snapshot = $shift->handover_snapshot;
+        $snapshotIssue = null;
+        if ($shift->handover_status === Shift::HANDOVER_PREPARED) {
+            abort_unless($this->canViewPreparedSnapshot($shift, $user), 403);
+            try {
+                $snapshot = $preparedSnapshots->validated($shift);
+            } catch (ValidationException $exception) {
+                $snapshot = null;
+                $snapshotIssue = (string) collect($exception->errors())->flatten()->first();
+            }
+        }
+        $draft = data_get($snapshot, 'draft', []);
 
         $shiftData = [
             'id' => $shift->id,
@@ -52,7 +63,7 @@ class ControlRoomHandoverController extends Controller
             'handover_status' => $shift->handover_status,
             'handover_version' => $shift->handover_version,
             'handover_prepared_at' => $shift->handover_prepared_at?->toISOString(),
-            'handover_snapshot' => $shift->handover_snapshot,
+            'handover_snapshot' => $snapshot,
             'draft' => is_array($draft) ? $draft : [],
             'incoming_lead' => $shift->handedOverTo ? [
                 'id' => $shift->handedOverTo->id,
@@ -61,33 +72,35 @@ class ControlRoomHandoverController extends Controller
             'can_prepare' => $shift->handover_status === Shift::HANDOVER_NONE
                 && (int) $shift->shift_lead_user_id === $user->id,
             'can_accept' => $shift->handover_status === Shift::HANDOVER_PREPARED
-                && (int) $shift->handed_over_to_user_id === $user->id,
+                && (int) $shift->handed_over_to_user_id === $user->id
+                && $snapshotIssue === null,
         ];
 
-        $activeAlerts = $worklist->forUser($user, ['lens' => 'active']);
-        $openAlertsCount = (clone $activeAlerts)->count();
-        $urgentAlerts = (clone $activeAlerts)
-            ->whereIn('control_room_alerts.severity', ['critical', 'high'])
-            ->with(['tasks' => fn ($query) => $query
-                ->whereNotIn('status', ['completed', 'cancelled', 'transferred'])
-                ->orderBy('due_at')
-                ->orderBy('id')])
-            ->get()
-            ->map(function (ControlRoomAlert $alert) use ($presenter, $user): array {
-                $row = $presenter->present($alert, $user);
-                $row['tasks'] = $alert->tasks->map(fn ($task) => [
-                    'id' => $task->id,
-                    'title' => $task->title,
-                    'status' => $task->status,
-                    'due_at' => $task->due_at?->toISOString(),
-                ])->values()->all();
+        $hasPreparedScope = $shift->handover_status === Shift::HANDOVER_PREPARED
+            && $snapshotIssue === null
+            && is_array($snapshot)
+            && is_array(data_get($snapshot, 'alerts'))
+            && is_array(data_get($snapshot, 'carry_forward'));
+        $scope = match (true) {
+            $hasPreparedScope => [
+                'criteria_at' => data_get($snapshot, 'criteria_at'),
+                'criteria' => data_get($snapshot, 'criteria', []),
+                'required_alerts' => data_get($snapshot, 'alerts', []),
+                'carry_forward' => data_get($snapshot, 'carry_forward'),
+            ],
+            $snapshotIssue !== null => $this->emptyScope($shift),
+            default => $handoverScope->build($shift, $user),
+        };
+        $requiredAlerts = collect($scope['required_alerts']);
+        $carryForward = $scope['carry_forward'];
+        $openAlertsCount = $requiredAlerts->count() + (int) $carryForward['total'];
 
-                return $row;
-            })
-            ->values();
-
-        $pinnedNotes = $this->notes($shift, fn ($query) => $query->where('is_pinned', true));
-        $followupNotes = $this->notes($shift, fn ($query) => $query->where('requires_followup', true)->orderBy('followup_at'));
+        $pinnedNotes = $snapshotIssue === null
+            ? $this->notes($shift, fn ($query) => $query->where('is_pinned', true))
+            : [];
+        $followupNotes = $snapshotIssue === null
+            ? $this->notes($shift, fn ($query) => $query->where('requires_followup', true)->orderBy('followup_at'))
+            : [];
 
         $staff = User::staff()
             ->tap(fn ($query) => $siteAccess->applyStaffScope($query, $user, $this->alertBypassPermissions()))
@@ -104,10 +117,10 @@ class ControlRoomHandoverController extends Controller
         return Inertia::render('control-room/shifts/handover', [
             'shift' => $shiftData,
             'openAlertsCount' => $openAlertsCount,
-            'criticalAlertsCount' => $urgentAlerts->where('severity', 'critical')->count(),
-            'highAlertsCount' => $urgentAlerts->where('severity', 'high')->count(),
-            'criticalAlerts' => $urgentAlerts->where('severity', 'critical')->values()->all(),
-            'highAlerts' => $urgentAlerts->where('severity', 'high')->values()->all(),
+            'requiredAlerts' => $requiredAlerts->values()->all(),
+            'handoverCriteriaAt' => $scope['criteria_at'],
+            'handoverCriteria' => $scope['criteria'],
+            'carryForward' => $carryForward,
             'pinnedNotes' => $pinnedNotes,
             'followupNotes' => $followupNotes,
             'staff' => $staff->map(fn (User $candidate) => [
@@ -115,6 +128,7 @@ class ControlRoomHandoverController extends Controller
                 'name' => $candidate->name,
             ])->values()->all(),
             'eligibleLeads' => $eligibleLeads,
+            'snapshotIssue' => $snapshotIssue,
         ]);
     }
 
@@ -144,5 +158,47 @@ class ControlRoomHandoverController extends Controller
     protected function alertBypassPermissions(): array
     {
         return ['reports.viewAny'];
+    }
+
+    private function canViewPreparedSnapshot(Shift $shift, User $user): bool
+    {
+        if ($user->canDo('reports.viewAny')) {
+            return true;
+        }
+
+        $participantIds = collect([
+            ...$shift->memberUserIds(),
+            $shift->handed_over_to_user_id,
+        ])
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->unique();
+
+        return $participantIds->contains($user->id);
+    }
+
+    /** @return array<string, mixed> */
+    private function emptyScope(Shift $shift): array
+    {
+        return [
+            'criteria_at' => $shift->handover_prepared_at?->toIso8601String()
+                ?? now()->toIso8601String(),
+            'criteria' => [],
+            'required_alerts' => [],
+            'carry_forward' => [
+                'total' => 0,
+                'by_severity' => [
+                    'critical' => 0,
+                    'high' => 0,
+                    'medium' => 0,
+                    'low' => 0,
+                ],
+                'by_queue' => [],
+                'oldest_created_at' => null,
+                'breached_count' => 0,
+                'href' => '/control-room/alerts?lens=active&handover=carry-forward',
+                'signature' => hash('sha256', '[]'),
+            ],
+        ];
     }
 }

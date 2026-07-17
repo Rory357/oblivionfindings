@@ -1745,16 +1745,28 @@ Task 14 final verification:
 **Files:**
 
 - Create: `app/Services/ControlRoom/ControlRoomHandoverScopeService.php`
+- Create: `app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php`
 - Modify: `app/Services/ControlRoom/ControlRoomShiftHandoverService.php`
+- Modify: `app/Services/ControlRoom/ControlRoomAlertProvenanceService.php`
+- Modify: `app/Services/ControlRoom/AlertWorklistQuery.php`
+- Modify: `app/Services/ControlRoom/AlertWorklistPresenter.php`
+- Modify: `app/Services/Incidents/IncidentJourneyService.php`
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php`
+- Modify: `app/Http/Controllers/ControlRoom/ControlRoomAlertController.php`
+- Modify: `app/Http/Controllers/ControlRoom/ControlRoomShiftController.php`
 - Modify: `app/Models/ControlRoom/Shift.php`
+- Modify: `app/Models/ControlRoomAlert.php`
 - Create: `tests/Feature/ControlRoom/ControlRoomShiftHandoverScopeTest.php`
 - Modify: `tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomHandoverControllerTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomAlertControllerTest.php`
+- Modify: `tests/Feature/ControlRoom/ControlRoomShiftControllerTest.php`
+- Modify: `tests/Unit/ControlRoom/AlertWorklistPresenterTest.php`
 - Modify: `resources/js/pages/control-room/shifts/handover.tsx`
 - Create: `resources/js/pages/control-room/shifts/handover.test.tsx`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing scope tests**
+- [x] **Step 1: Write failing scope tests**
 
 An alert requires individual review when it was:
 
@@ -1770,14 +1782,14 @@ Untouched pre-existing active alerts must be counted in carry-forward, not indiv
 
 Prove no critical alert matching the scope is hidden by pagination or a cap.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom/ControlRoomShiftHandoverScopeTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php
 npx vitest run resources/js/pages/control-room/shifts/handover.test.tsx
 ```
 
-- [ ] **Step 3: Implement the scope service**
+- [x] **Step 3: Implement the scope service**
 
 Public contract:
 
@@ -1805,11 +1817,11 @@ public function build(Shift $shift, User $viewer): array
 ]
 ```
 
-- [ ] **Step 4: Replace `urgentAlertsFor()`**
+- [x] **Step 4: Replace `urgentAlertsFor()`**
 
 `ControlRoomShiftHandoverService::prepare()` must compare reviewed IDs only with `required_alerts`. Store the exact criteria timestamp, criteria labels, required snapshots, and carry-forward summary in the immutable snapshot.
 
-- [ ] **Step 5: Rebuild the handover page sections**
+- [x] **Step 5: Rebuild the handover page sections**
 
 Render:
 
@@ -1823,19 +1835,29 @@ Required copy:
 
 `118 unchanged active alerts will carry forward as a summary. You do not need to open each one.`
 
-- [ ] **Step 6: Re-run tests**
+- [x] **Step 6: Re-run tests**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom/ControlRoomShiftHandoverScopeTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php
 npx vitest run resources/js/pages/control-room/shifts/handover.test.tsx
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add app/Services/ControlRoom/ControlRoomHandoverScopeService.php app/Services/ControlRoom/ControlRoomShiftHandoverService.php app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php app/Models/ControlRoom/Shift.php tests/Feature/ControlRoom/ControlRoomShiftHandoverScopeTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php resources/js/pages/control-room/shifts/handover.tsx resources/js/pages/control-room/shifts/handover.test.tsx docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
 git commit -m "feat(control-room): bound shift handover scope"
 ```
+
+Completed evidence:
+
+- scope selection is canonical and uncapped across the seven approved criteria, including current snoozed work, current shift-member ownership/watch state, SLA risk, due-before-next-shift tasks, governance changes, and outgoing-lead pins;
+- unchanged active work is frozen as an exact carry-forward ID set plus severity, queue, age, breach, signature, and exact-link summary, while incoming-lead visibility is checked both at preparation and acceptance;
+- prepared snapshots are immutable and fail closed: actor/team authorization comes from persisted shift state, the criteria taxonomy and row shapes are validated server-side, and access drift or malformed snapshots cannot switch shifts;
+- canonical Incident/H&S governance is resolved in bounded batches, alert-management capability is precomputed, and the 40-alert full-scope query-budget regression passes without per-row governance, SLA, or RBAC growth;
+- the definitive backend matrix passes 110 tests with 718 assertions; the isolated full SLA query-budget proof passes 1 test with 4 assertions;
+- the handover frontend passes 1 file with 3 tests; TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, diff integrity, and final independent review are clean;
+- the production client build passes with 4,968 modules in 2m 56s and SSR passes with 1,620 modules in 39.79s.
 
 ## Task 16: Add stale-shift override, permission ownership, and clean live fixtures
 

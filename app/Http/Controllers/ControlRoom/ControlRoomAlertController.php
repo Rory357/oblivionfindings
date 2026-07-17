@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\OperatorNote;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -22,6 +23,7 @@ use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
+use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
@@ -46,6 +48,7 @@ class ControlRoomAlertController extends Controller
         Request $request,
         AlertWorklistQuery $worklists,
         AlertWorklistPresenter $presenter,
+        ControlRoomHandoverScopeService $handoverScope,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
@@ -59,8 +62,9 @@ class ControlRoomAlertController extends Controller
             default => 'active',
         };
         $assignedTo = (string) $request->input('assigned_to', '');
-        $query = $worklists->forUser($user, array_filter([
-            'lens' => $lens,
+        $carryForwardDrilldown = $request->input('handover') === 'carry-forward';
+        $worklistFilters = array_filter([
+            'lens' => $carryForwardDrilldown ? 'all_active' : $lens,
             'severity' => $request->input('severity'),
             'source' => $request->input('source'),
             'queue_id' => $request->input('queue_id'),
@@ -70,7 +74,11 @@ class ControlRoomAlertController extends Controller
             'q' => $request->input('search'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
-        ], fn ($value) => filled($value)));
+        ], fn ($value) => filled($value));
+        if ($carryForwardDrilldown) {
+            $worklistFilters['ids'] = $this->carryForwardAlertIds($user, $handoverScope);
+        }
+        $query = $worklists->forUser($user, $worklistFilters);
 
         if ($status !== '' && $status !== 'all') {
             $query->where('control_room_alerts.status', $status);
@@ -101,8 +109,9 @@ class ControlRoomAlertController extends Controller
         }
 
         $paginated = $query->paginate(30)->withQueryString();
-        $alerts = $paginated->through(function (ControlRoomAlert $alert) use ($presenter, $user): array {
-            $row = $presenter->present($alert, $user);
+        $canManageAlerts = $user->canDo('controlRoom.alerts.manage');
+        $alerts = $paginated->through(function (ControlRoomAlert $alert) use ($presenter, $user, $canManageAlerts): array {
+            $row = $presenter->present($alert, $user, $canManageAlerts);
 
             return array_merge($row, [
                 'alert_type' => $alert->alert_type,
@@ -199,6 +208,29 @@ class ControlRoomAlertController extends Controller
                 ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
                 : null,
         ]);
+    }
+
+    /** @return list<int> */
+    private function carryForwardAlertIds(
+        User $user,
+        ControlRoomHandoverScopeService $handoverScope,
+    ): array {
+        $shift = Shift::getCurrent();
+        if ($shift === null) {
+            return [];
+        }
+
+        $snapshotIds = data_get($shift->handover_snapshot, 'carry_forward_alert_ids');
+        if ($shift->handover_status === Shift::HANDOVER_PREPARED && is_array($snapshotIds)) {
+            return collect($snapshotIds)
+                ->filter(fn ($id): bool => is_numeric($id))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $handoverScope->build($shift, $user)['carry_forward_alert_ids'];
     }
 
     public function createIncident(

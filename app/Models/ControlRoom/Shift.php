@@ -4,6 +4,7 @@ namespace App\Models\ControlRoom;
 
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,6 +18,8 @@ class Shift extends Model
     public const HANDOVER_PREPARED = 'prepared';
 
     public const HANDOVER_ACCEPTED = 'accepted';
+
+    public const EXPECTED_DURATION_HOURS = 8;
 
     protected $table = 'control_room_shifts';
 
@@ -142,5 +145,24 @@ class Shift extends Model
         }
 
         return User::whereIn('id', $this->team_members)->get();
+    }
+
+    /** @return list<int> */
+    public function memberUserIds(): array
+    {
+        return collect([
+            $this->shift_lead_user_id,
+            ...($this->team_members ?? []),
+        ])
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function expectedNextShiftAt(?CarbonInterface $from = null): CarbonInterface
+    {
+        return ($from ?? now())->copy()->addHours(self::EXPECTED_DURATION_HOURS);
     }
 }

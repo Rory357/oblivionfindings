@@ -414,15 +414,39 @@ class ControlRoomAlertProvenanceService
     ): void {
         $alertSiteId = $this->authoritativeSiteId($alert);
         $alertClientId = $this->authoritativeClientId($alert);
+        $loadedSite = $alert->relationLoaded('site') && (int) $alert->site?->id === $alertSiteId
+            ? $alert->site
+            : null;
+        $loadedClientSite = $alert->relationLoaded('client')
+            && (int) $alert->client?->site_id === $alertSiteId
+            && $alert->client?->relationLoaded('site')
+            ? $alert->client?->site
+            : null;
         $siteTenantId = $alertSiteId === null
             ? null
-            : Site::query()->whereKey($alertSiteId)->value('tenant_id');
+            : ($loadedSite?->tenant_id
+                ?? $loadedClientSite?->tenant_id
+                ?? Site::query()->whereKey($alertSiteId)->value('tenant_id'));
 
         $clientMismatch = $alertClientId === null
             ? $event->client_id !== null
             : (int) $event->client_id !== $alertClientId;
         $assetMismatch = $event->asset_id !== null
             && ($alert->asset_id === null || (int) $event->asset_id !== (int) $alert->asset_id);
+
+        $assetMatches = $alert->asset_id === null
+            || ($alert->relationLoaded('asset')
+                ? $alert->asset !== null && $this->assetMatchesAlert($alert, $alert->asset)
+                : $this->assetMatchesAlert($alert));
+        $fleetSignalMatches = $alert->fleet_signal_id === null
+            || ($alert->relationLoaded('fleetSignal')
+                ? $alert->fleetSignal !== null
+                    && $this->fleetSignalMatchesAlert($alert, $alert->fleetSignal)
+                : $this->fleetSignalMatchesAlert($alert));
+        $deviceMatches = $alert->device_id === null
+            || ($alert->relationLoaded('device')
+                ? $alert->device !== null && $this->deviceMatchesAlert($alert, $alert->device)
+                : $this->deviceMatchesAlert($alert));
 
         if ($alertSiteId === null
             || (int) $event->site_id !== $alertSiteId
@@ -432,9 +456,9 @@ class ControlRoomAlertProvenanceService
             || $clientMismatch
             || $assetMismatch
             || ! $this->clientMatchesAlert($alert)
-            || ! $this->assetMatchesAlert($alert)
-            || ! $this->fleetSignalMatchesAlert($alert)
-            || ! $this->deviceMatchesAlert($alert)
+            || ! $assetMatches
+            || ! $fleetSignalMatches
+            || ! $deviceMatches
         ) {
             throw new DomainException(
                 'H&S handover provenance conflict: the alert and H&S event do not share one client, site, and tenant ownership tuple.',

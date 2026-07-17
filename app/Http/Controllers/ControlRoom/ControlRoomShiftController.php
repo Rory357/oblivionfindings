@@ -210,6 +210,8 @@ class ControlRoomShiftController extends Controller
             'reviewed_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
             'priority_alert_ids' => ['nullable', 'array'],
             'priority_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'carry_forward_acknowledged' => ['nullable', 'boolean'],
+            'carry_forward_signature' => ['nullable', 'string', 'size:64', 'regex:/^[a-f0-9]+$/'],
             'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 

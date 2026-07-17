@@ -14,8 +14,11 @@ class AlertWorklistPresenter
     ) {}
 
     /** @return array<string, mixed> */
-    public function present(ControlRoomAlert $alert, User $viewer): array
-    {
+    public function present(
+        ControlRoomAlert $alert,
+        User $viewer,
+        ?bool $canManageAlerts = null,
+    ): array {
         $alert->loadMissing([
             'site:id,name',
             'client:id,first_name,last_name,site_id,organization_id',
@@ -70,7 +73,7 @@ class AlertWorklistPresenter
                 'health_safety_reference' => $alert->hsEvent?->reference_number ?: null,
                 'handover_status' => $alert->hsEvent?->handover_status,
             ],
-            'next_action' => $viewer->canDo('controlRoom.alerts.manage')
+            'next_action' => ($canManageAlerts ?? $viewer->canDo('controlRoom.alerts.manage'))
                 ? ['label' => 'Continue response', 'href' => '/control-room/alerts/'.$alert->id]
                 : ['label' => 'View alert', 'href' => '/control-room/alerts/'.$alert->id],
             'href' => '/control-room/alerts/'.$alert->id,
