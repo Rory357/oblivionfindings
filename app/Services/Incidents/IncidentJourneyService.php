@@ -919,11 +919,11 @@ class IncidentJourneyService
                 'severity' => $this->hsSeverity($incident),
                 'occurred_at' => $incident->occurred_at,
                 'reported_at' => $incident->submitted_at ?? $incident->created_at,
+                'organization_id' => $this->incidentOrganizationId($incident),
                 'site_id' => $this->incidentSiteId($incident),
                 'client_id' => $incident->client_id,
                 'staff_id' => $incident->reported_by,
                 'shift_id' => $incident->shift_id,
-                'worksafe_notifiable' => (bool) $incident->is_notifiable,
                 'created_by' => $actor?->id ?? $incident->reported_by,
                 'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
                 // Ownership starts only when an authorised H&S user accepts the handover.
@@ -1300,7 +1300,7 @@ class IncidentJourneyService
     ): array {
         if (! $mayAdoptIncidentWorksafe) {
             return [
-                'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
+                'worksafe_notifiable' => $hsEvent->worksafe_notifiable,
                 'worksafe_status' => $hsEvent->worksafe_status,
                 'worksafe_reference' => $hsEvent->worksafe_reference,
                 'worksafe_notified_at' => $hsEvent->worksafe_notified_at,
@@ -1310,7 +1310,13 @@ class IncidentJourneyService
             ];
         }
 
-        $notifiable = (bool) $hsEvent->worksafe_notifiable || (bool) $incident->is_notifiable;
+        $notifiable = $hsEvent->worksafe_notifiable;
+        if ($incident->is_notifiable === true) {
+            // A positive legacy source classification must never be lost while
+            // the direct H&S link is first adopted. The legacy false default is
+            // not an explicit decision and must leave a new event undecided.
+            $notifiable = true;
+        }
         $incidentStatus = $incident->is_notifiable
             ? ($incident->worksafe_notification_status ?: HsEvent::WORKSAFE_PENDING)
             : null;
@@ -1501,6 +1507,15 @@ class IncidentJourneyService
         $clientSiteId = Client::query()->whereKey($incident->client_id)->value('site_id');
 
         return $clientSiteId === null ? null : (int) $clientSiteId;
+    }
+
+    private function incidentOrganizationId(ClientIncident $incident): ?int
+    {
+        $organizationId = Client::query()
+            ->whereKey($incident->client_id)
+            ->value('organization_id');
+
+        return is_numeric($organizationId) ? (int) $organizationId : null;
     }
 
     private function readHsEventForIncident(

@@ -206,7 +206,10 @@ class IncidentJourneyServiceTest extends TestCase
         $actor = User::factory()->create();
         $otherReporter = User::factory()->create();
         $site = Site::factory()->create();
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'organization_id' => $site->tenant_id,
+        ]);
         $occurredAt = now()->subMinutes(20);
         $originalContext = [
             'signal_id' => 812,
@@ -284,7 +287,10 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
         $this->assertSame($site->id, $hsEvent->site_id);
         $this->assertSame($client->id, $hsEvent->client_id);
+        $this->assertSame($site->tenant_id, $hsEvent->organization_id);
         $this->assertSame($actor->id, $hsEvent->staff_id);
+        $this->assertNull($hsEvent->worksafe_notifiable);
+        $this->assertNull($hsEvent->worksafe_decided_at);
         $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $hsEvent->handover_status);
 
         $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->status);

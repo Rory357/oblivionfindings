@@ -29,6 +29,8 @@ final class IncidentHandoverE2ESeeder extends Seeder
 
     public const INCOMING_EMAIL = 'incident-e2e-incoming@demo.test';
 
+    public const ACTION_OWNER_EMAIL = 'incident-e2e-action-owner@demo.test';
+
     public const SHIFT_NAME = '[INCIDENT-HANDOVER-E2E] Fresh Control Room shift';
 
     public const REQUIRED_ALERT_REFERENCES = [
@@ -46,6 +48,12 @@ final class IncidentHandoverE2ESeeder extends Seeder
         $worker = $this->staff('incident-e2e-worker@demo.test', 'Playwright Support Worker', 'support_worker', $site);
         $reviewer = $this->staff('incident-e2e-reviewer@demo.test', 'Playwright Incident Reviewer', 'provider_manager', $site);
         $owner = $this->staff('incident-e2e-owner@demo.test', 'Playwright H&S Owner', 'coordinator', $site);
+        $actionOwner = $this->staff(
+            self::ACTION_OWNER_EMAIL,
+            'Playwright Corrective Action Owner / Site Manager',
+            'team_lead',
+            $site,
+        );
         $verifier = $this->staff('incident-e2e-verifier@demo.test', 'Playwright H&S Verifier', 'coordinator', $site);
 
         $this->grant($operator, [
@@ -60,6 +68,7 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'incidents.viewAny',
             'incidents.update',
             'incidents.approve',
+            'incidents.reopen',
             'incidents.followups.manage',
             'hazards.view',
             'hazards.manage',
@@ -80,7 +89,9 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'incidents.create',
             'incidents.submit',
             'incidents.viewAssigned',
+            'hazards.view',
         ]);
+        $this->deny($worker, ['hazards.manage']);
         $this->grant($reviewer, [
             'incidents.viewAny',
             'incidents.update',
@@ -90,6 +101,7 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'hazards.manage',
         ]);
         $this->grant($owner, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
+        $this->grant($actionOwner, ['hazards.view', 'hazards.manage']);
         $this->grant($verifier, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
 
         $this->assertNoUnrelatedActiveShift();
@@ -119,6 +131,7 @@ final class IncidentHandoverE2ESeeder extends Seeder
                 'worker' => $this->userManifest($worker),
                 'reviewer' => $this->userManifest($reviewer),
                 'owner' => $this->userManifest($owner),
+                'action_owner' => $this->userManifest($actionOwner),
                 'verifier' => $this->userManifest($verifier),
             ],
         ];

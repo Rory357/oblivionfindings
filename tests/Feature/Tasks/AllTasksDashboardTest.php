@@ -112,6 +112,19 @@ it('excludes closed items by default and includes them with done=1', function ()
         ->assertInertia(fn ($page) => $page->where('items', $inList));
 });
 
+it('treats an explicit done bucket as a history request', function () {
+    $user = makeTasksUser(['incidents.viewAny']);
+    $closed = makeTasksIncident($user, ['status' => 'closed']);
+
+    $this->actingAs($user)
+        ->get('/tasks?bucket=done&q='.urlencode($closed->reference_number))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.include_done', true)
+            ->where('items', fn ($items) => collect($items)
+                ->contains(fn ($item) => $item['id'] === 'incident-'.$closed->id)));
+});
+
 it('task7_final_gap uses the actionable allowlist for control room work items', function () {
     $user = makeTasksUser(['controlRoom.viewAny']);
     $site = Site::factory()->create(['tenant_id' => $user->organization_id]);

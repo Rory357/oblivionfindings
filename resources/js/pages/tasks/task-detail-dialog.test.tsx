@@ -110,7 +110,10 @@ describe('TaskDetailDialog permission recovery and focus', () => {
         });
 
         fireEvent.click(rowButton);
-        await screen.findByText('Resident safety response');
+        const dialogHeading = await screen.findByRole('heading', {
+            name: 'Resident safety response',
+        });
+        await waitFor(() => expect(dialogHeading).toHaveFocus());
         fireEvent.keyDown(document, { key: 'Escape' });
 
         await waitFor(() => expect(rowButton).toHaveFocus());

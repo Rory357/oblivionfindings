@@ -2229,9 +2229,15 @@ Task 18 completed:
 - Create: `tests/Feature/Incidents/IncidentHandoverE2ESeederTest.php`
 - Create: `tests/e2e/control-room-incident-hs-helpers.ts`
 - Modify: `tests/e2e/incident-handover-helpers.ts`
+- Modify: `app/Services/Incidents/IncidentJourneyService.php`
+- Modify: `app/Http/Controllers/AllTasksController.php`
+- Modify: `resources/js/pages/tasks/task-detail-dialog.tsx`
+- Modify: `resources/js/pages/tasks/task-detail-dialog.test.tsx`
+- Modify: `tests/Feature/Incidents/IncidentJourneyServiceTest.php`
+- Modify: `tests/Feature/Tasks/AllTasksDashboardTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write the failing seeder contract test**
+- [x] **Step 1: Write the failing seeder contract test**
 
 Assert the seeder creates/reuses:
 
@@ -2246,7 +2252,7 @@ Assert the seeder creates/reuses:
 - one fresh active shift with a bounded required-alert set;
 - no duplicate tagged fixture after a second run.
 
-- [ ] **Step 2: Write the golden browser scenario**
+- [x] **Step 2: Write the golden browser scenario**
 
 The automated relay must log in as seven distinct users and perform:
 
@@ -2260,7 +2266,7 @@ The automated relay must log in as seven distinct users and perform:
 
 The scenario then closes action, H&S, incident, and alert in the correct order and asserts Universal Tasks active/history reconciliation.
 
-- [ ] **Step 3: Write alternate branches A–F**
+- [x] **Step 3: Write alternate branches A–F**
 
 Create separate tagged records and prove:
 
@@ -2271,7 +2277,7 @@ Create separate tagged records and prove:
 - E: Control Room task transfers one-for-one to H&S corrective action;
 - F: each closure gate blocks, links to the unmet item, preserves entered text, and succeeds after the prerequisite is completed.
 
-- [ ] **Step 4: Add console, failed-request, and focus assertions**
+- [x] **Step 4: Add console, failed-request, and focus assertions**
 
 Fail the suite on:
 
@@ -2283,7 +2289,7 @@ Fail the suite on:
 - missing direct route;
 - duplicate active responsibility.
 
-- [ ] **Step 5: Run the seeder and browser tests against a production build**
+- [x] **Step 5: Run the seeder and browser tests against a production build**
 
 ```powershell
 php artisan test tests/Feature/Incidents/IncidentHandoverE2ESeederTest.php
@@ -2295,12 +2301,22 @@ npx playwright test tests/e2e/control-room-incident-hs-golden-journey.spec.ts te
 
 Expected: both browser files pass with no console or failed-request exceptions.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
-git add tests/e2e/control-room-incident-hs-golden-journey.spec.ts tests/e2e/control-room-incident-hs-alternate-branches.spec.ts tests/e2e/control-room-incident-hs-helpers.ts tests/e2e/incident-handover-helpers.ts database/seeders/IncidentHandoverE2ESeeder.php tests/Feature/Incidents/IncidentHandoverE2ESeederTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add app/Http/Controllers/AllTasksController.php app/Services/Incidents/IncidentJourneyService.php database/seeders/IncidentHandoverE2ESeeder.php resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/task-detail-dialog.test.tsx tests/Feature/Incidents/IncidentHandoverE2ESeederTest.php tests/Feature/Incidents/IncidentJourneyServiceTest.php tests/Feature/Tasks/AllTasksDashboardTest.php tests/e2e/control-room-incident-hs-golden-journey.spec.ts tests/e2e/control-room-incident-hs-alternate-branches.spec.ts tests/e2e/control-room-incident-hs-helpers.ts tests/e2e/incident-handover-helpers.ts docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "test(journeys): cover seven-role closure relay"
 ```
+
+Task 19 completed:
+
+- the deterministic seeder creates seven distinct scoped personas, one site/client, one fresh active shift, exactly two required fixture alerts, and stable second-run identities without touching unrelated active shifts;
+- the golden production-browser relay covers the operator, reviewer, H&S owner, dedicated action owner/site manager, independent verifier, incoming operator, and novice worker through one CR/INC/HS/INV/CA chain, an evidence return/resubmission loop, bounded handover, ordered closure, Universal Tasks reconciliation, read-only controls, and exact focus restoration;
+- alternate branches A–F cover routine closure, sensor false-positive suppression, reopen-for-incident continuity, snooze/unsnooze/escalation with unchanged applicable SLA truth, one-for-one task transfer with exact retry, and H&S/Incident/Control Room gate links plus typed-value preservation and ordered recovery;
+- the browser relay exposed and closed four product defects: missing H&S `organization_id` provenance, an implicit false WorkSafe decision, `bucket=done` failing to request terminal provider data, and initial focus landing on nested term help so one Escape did not close the task drawer;
+- the final strengthened paired production-asset browser run passes 2 tests in 2.7 minutes with strict console, page-error, failed-request, response-status, focus, and duplicate-responsibility guards;
+- the combined backend regression passes 60 tests with 670 assertions in 184.44 seconds, and the complete task-detail frontend file passes 5 tests;
+- the production client builds 4,970 modules in 3m 04s, SSR builds 1,622 modules in 42.55s, and TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, Playwright discovery, seeder execution, and diff integrity are clean.
 
 ## Task 20: Run the complete local release gate and remediate every failure
 

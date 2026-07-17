@@ -48,10 +48,15 @@ class AllTasksController extends Controller
             $usingDefaultView = true;
         }
 
+        $bucketFilter = $this->csv($params['bucket'] ?? null);
+        $includeDone = filter_var(
+            $params['done'] ?? false,
+            FILTER_VALIDATE_BOOL,
+        ) || in_array(TaskItem::BUCKET_DONE, $bucketFilter ?? [], true);
         $filters = [
             'sources' => $this->csv($params['sources'] ?? null),
             'severity' => $this->csv($params['severity'] ?? null),
-            'bucket' => $this->csv($params['bucket'] ?? null),
+            'bucket' => $bucketFilter,
             'assigned' => in_array($params['assigned'] ?? null, ['me', 'unassigned'], true)
                 ? $params['assigned']
                 : null,
@@ -59,7 +64,7 @@ class AllTasksController extends Controller
             'due' => ($params['due'] ?? null) === 'week' ? 'week' : null,
             'q' => ($q = trim((string) ($params['q'] ?? ''))) === '' ? null : $q,
             'following' => filter_var($params['following'] ?? false, FILTER_VALIDATE_BOOL),
-            'include_done' => filter_var($params['done'] ?? false, FILTER_VALIDATE_BOOL),
+            'include_done' => $includeDone,
         ];
         $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
             $request->getRequestUri(),

@@ -336,6 +336,7 @@ export function TaskDetailDialog({
     const [splitBusy, setSplitBusy] = useState(false);
     // Guards against a slow response landing after the user opened another row.
     const seq = useRef(0);
+    const titleRef = useRef<HTMLHeadingElement>(null);
 
     const fetchDetail = useCallback(
         async (target: TaskItem) => {
@@ -447,6 +448,10 @@ export function TaskDetailDialog({
             <DialogContent
                 data-test="tasks-detail-dialog"
                 className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    titleRef.current?.focus();
+                }}
                 onCloseAutoFocus={(event) => {
                     event.preventDefault();
                     requestAnimationFrame(() => triggerRef.current?.focus());
@@ -475,7 +480,11 @@ export function TaskDetailDialog({
                                     label="Explain task status terms"
                                 />
                             </div>
-                            <DialogTitle className="text-base leading-snug">
+                            <DialogTitle
+                                ref={titleRef}
+                                tabIndex={-1}
+                                className="text-base leading-snug outline-none"
+                            >
                                 {display.title}
                             </DialogTitle>
                             <DialogDescription>

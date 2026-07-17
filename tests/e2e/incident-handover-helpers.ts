@@ -3,19 +3,32 @@ import { expect, type APIResponse, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { loginAs, runArtisan, runLaravelJson } from './helpers';
+import { runArtisan, runLaravelJson } from './helpers';
 
-type FixtureUser = { id: number; email: string; name: string };
+export type FixtureUser = { id: number; email: string; name: string };
 
 export interface IncidentHandoverManifest {
+    marker: string;
     site: { id: number; name: string };
     client: { id: number; name: string };
+    shift: {
+        id: number;
+        name: string;
+        starts_at: string;
+        required_alert_count: number;
+    };
+    records: {
+        required_alert_ids: number[];
+        required_alert_references: string[];
+    };
     users: {
         operator: FixtureUser;
         worker: FixtureUser;
         reviewer: FixtureUser;
         owner: FixtureUser;
+        action_owner: FixtureUser;
         verifier: FixtureUser;
+        incoming: FixtureUser;
     };
 }
 
@@ -94,7 +107,26 @@ export function seedIncidentHandoverFixtures(): IncidentHandoverManifest {
 
 export async function loginAsFixture(page: Page, user: FixtureUser) {
     await page.context().clearCookies();
-    await loginAs(page, user.email, 'password');
+    const loginPage = await page.request.get('/login');
+    expect(loginPage.status(), 'fixture login page should load').toBeLessThan(
+        400,
+    );
+    const cookies = await page.context().cookies();
+    const xsrf = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
+    const response = await page.request.post('/login', {
+        form: {
+            email: user.email,
+            password: 'password',
+        },
+        headers: {
+            Accept: 'text/html',
+            'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf.value) : '',
+        },
+        maxRedirects: 0,
+    });
+
+    expect(response.status(), 'fixture login should redirect').toBe(302);
+    expect(response.headers().location ?? '').not.toMatch(/\/login(?:$|\?)/);
 }
 
 export async function postLaravel(
@@ -105,6 +137,31 @@ export async function postLaravel(
     const cookies = await page.context().cookies();
     const xsrf = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
     const response = await page.request.post(path, {
+        data,
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf.value) : '',
+        },
+        maxRedirects: 0,
+    });
+
+    expect(
+        response.status(),
+        `${path} should succeed; received ${response.status()}: ${await response.text()}`,
+    ).toBeLessThan(400);
+
+    return response;
+}
+
+export async function patchLaravel(
+    page: Page,
+    path: string,
+    data: Record<string, unknown> = {},
+): Promise<APIResponse> {
+    const cookies = await page.context().cookies();
+    const xsrf = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
+    const response = await page.request.patch(path, {
         data,
         headers: {
             Accept: 'application/json',
