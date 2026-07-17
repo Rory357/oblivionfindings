@@ -196,6 +196,7 @@ class RbacSeeder extends Seeder
             ['key' => 'controlRoom.alerts.assign', 'description' => 'Assign alerts to staff', 'group' => 'control_room', 'module' => 'System'],
             ['key' => 'controlRoom.alerts.escalate', 'description' => 'Escalate alerts', 'group' => 'control_room', 'module' => 'System'],
             ['key' => 'controlRoom.alerts.create', 'description' => 'Create alerts manually or via API', 'group' => 'control_room', 'module' => 'System'],
+            ['key' => 'controlRoom.handovers.override', 'description' => 'Prepare a stale Control Room shift handover when the outgoing lead is unavailable', 'group' => 'control_room', 'module' => 'System'],
             ['key' => 'controlRoom.reports.view', 'description' => 'View Control Room reports', 'group' => 'control_room', 'module' => 'System'],
 
             // Calendar
@@ -575,7 +576,8 @@ class RbacSeeder extends Seeder
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
             'controlRoom.viewAny', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
-            'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.reports.view',
+            'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.handovers.override',
+            'controlRoom.reports.view',
             'calendar.viewAny', 'compliance.view', 'timeline.viewAny', 'timeline.create', 'timeline.pin',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.delete', 'progress_notes.review',
             'summaries.viewAny', 'summaries.generate', 'unifi.manage',
@@ -667,7 +669,8 @@ class RbacSeeder extends Seeder
             'fleet.bookings.approve', 'fleet.incidents.manage', 'fleet.maintenance.manage',
             'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
             'controlRoom.viewAny', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
-            'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.reports.view',
+            'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.handovers.override',
+            'controlRoom.reports.view',
             'assets.viewAny', 'assets.create', 'assets.update',
             'assets.inspections.record', 'assets.maintenance.record', 'assets.documents.manage',
             'assets.qr.download', 'assets.ownership.manage', 'assets.assignments.manage',

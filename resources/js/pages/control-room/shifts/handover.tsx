@@ -87,6 +87,11 @@ interface CarryForwardSummary {
 interface HandoverSnapshot {
     prepared_by?: StaffMember;
     prepared_at?: string;
+    override?: {
+        actor: StaffMember;
+        reason: string;
+        at: string;
+    } | null;
     handover_notes?: string;
     incoming_shift?: {
         id?: number;
@@ -125,6 +130,9 @@ interface ShiftData {
     handover_snapshot: HandoverSnapshot | null;
     draft: HandoverDraft;
     incoming_lead: StaffMember | null;
+    is_stale: boolean;
+    stale_after_hours: number;
+    can_override: boolean;
     can_prepare: boolean;
     can_accept: boolean;
 }
@@ -464,6 +472,7 @@ export default function ShiftHandover(props: Props) {
             shift.draft.carry_forward_signature === carryForward.signature,
         ),
     );
+    const [overrideReason, setOverrideReason] = useState('');
     const [version, setVersion] = useState(shift.handover_version);
     const versionRef = useRef(shift.handover_version);
     const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving'>(
@@ -498,6 +507,7 @@ export default function ShiftHandover(props: Props) {
                     carry_forward_signature: carryForwardAcknowledged
                         ? carryForward.signature
                         : null,
+                    override_reason: shift.can_override ? overrideReason : null,
                     expected_version: versionRef.current,
                 },
                 {
@@ -518,6 +528,7 @@ export default function ShiftHandover(props: Props) {
                         setConflictMessage(
                             String(
                                 errors.handover_version ??
+                                    errors.override_reason ??
                                     errors.handover ??
                                     'The draft could not be saved. Review the fields and try again.',
                             ),
@@ -535,8 +546,10 @@ export default function ShiftHandover(props: Props) {
         incomingLeadUserId,
         incomingShiftName,
         incomingTeamMembers,
+        overrideReason,
         priorityAlertIds,
         reviewedAlertIds,
+        shift.can_override,
         shift.can_prepare,
         shift.handover_status,
         shift.id,
@@ -578,6 +591,7 @@ export default function ShiftHandover(props: Props) {
         Boolean(incomingLeadUserId) &&
         allRequiredReviewed &&
         (carryForward.total === 0 || carryForwardAcknowledged) &&
+        (!shift.can_override || overrideReason.trim().length >= 10) &&
         saveState === 'saved';
 
     const prepare = () => {
@@ -588,6 +602,9 @@ export default function ShiftHandover(props: Props) {
             {
                 incoming_lead_user_id: Number(incomingLeadUserId),
                 reviewed_alert_ids: reviewedAlertIds,
+                override_reason: shift.can_override
+                    ? overrideReason.trim()
+                    : null,
                 expected_version: version,
             },
             {
@@ -596,6 +613,7 @@ export default function ShiftHandover(props: Props) {
                     setConflictMessage(
                         String(
                             errors.handover_version ??
+                                errors.override_reason ??
                                 errors.reviewed_alert_ids ??
                                 errors.handover ??
                                 'The handover could not be prepared.',
@@ -726,6 +744,23 @@ export default function ShiftHandover(props: Props) {
                                     </strong>
                                     .
                                 </p>
+                                {snapshot.override && (
+                                    <Card className="mt-3 border-status-warning/30 bg-background/70">
+                                        <CardContent className="p-3 text-sm">
+                                            <p className="font-medium">
+                                                Audited stale-shift override
+                                            </p>
+                                            <p className="mt-1 text-muted-foreground">
+                                                {snapshot.override.actor.name}{' '}
+                                                on{' '}
+                                                {formatDateTime(
+                                                    snapshot.override.at,
+                                                )}
+                                                : {snapshot.override.reason}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
                             </div>
                             {shift.can_accept ? (
                                 <Button
@@ -908,6 +943,49 @@ export default function ShiftHandover(props: Props) {
                     backLabel="Back to Control Room shifts"
                 />
 
+                {shift.is_stale && (
+                    <div className="mb-5 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                            <div className="space-y-3">
+                                <p>
+                                    This shift is stale. The named outgoing lead
+                                    has not completed handover. An authorised
+                                    manager may prepare it with an audited
+                                    reason; the incoming lead must still accept
+                                    it.
+                                </p>
+                                {shift.can_override && (
+                                    <div>
+                                        <Label htmlFor="override-reason">
+                                            Audited override reason
+                                        </Label>
+                                        <Textarea
+                                            id="override-reason"
+                                            className="mt-2 bg-background"
+                                            rows={3}
+                                            required
+                                            minLength={10}
+                                            maxLength={2000}
+                                            value={overrideReason}
+                                            onChange={(event) =>
+                                                setOverrideReason(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="Explain why the named outgoing lead is unavailable."
+                                        />
+                                        <p className="mt-2 text-muted-foreground">
+                                            At least 10 characters. Your name,
+                                            reason, and preparation time are
+                                            frozen in the handover audit.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {!shift.can_prepare && (
                     <div className="mb-5 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm">
                         Only the outgoing shift lead,{' '}
@@ -1331,6 +1409,13 @@ export default function ShiftHandover(props: Props) {
                                             Return to Required work and
                                             acknowledge the unchanged active
                                             alert summary.
+                                        </div>
+                                    )}
+                                {shift.can_override &&
+                                    overrideReason.trim().length < 10 && (
+                                        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
+                                            Record an audited override reason of
+                                            at least 10 characters.
                                         </div>
                                     )}
                             </CardContent>

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\MedicationError;
@@ -13,20 +14,35 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 
 final class IncidentHandoverE2ESeeder extends Seeder
 {
+    public const MARKER = 'INCIDENT-HANDOVER-E2E-2026-07-16';
+
     public const SITE_ID = 9401;
 
     public const CLIENT_ID = 9401;
+
+    public const OPERATOR_EMAIL = 'incident-e2e-operator@demo.test';
+
+    public const INCOMING_EMAIL = 'incident-e2e-incoming@demo.test';
+
+    public const SHIFT_NAME = '[INCIDENT-HANDOVER-E2E] Fresh Control Room shift';
+
+    public const REQUIRED_ALERT_REFERENCES = [
+        'CR-E2E-HANDOVER-01',
+        'CR-E2E-HANDOVER-02',
+    ];
 
     public function run(): void
     {
         $site = $this->site();
         $client = $this->client($site);
 
-        $operator = $this->staff('incident-e2e-operator@demo.test', 'Playwright Control Room Operator', 'coordinator', $site);
+        $operator = $this->staff(self::OPERATOR_EMAIL, 'Playwright Control Room Operator', 'coordinator', $site);
+        $incoming = $this->staff(self::INCOMING_EMAIL, 'Playwright Incoming Control Room Operator', 'coordinator', $site);
         $worker = $this->staff('incident-e2e-worker@demo.test', 'Playwright Support Worker', 'support_worker', $site);
         $reviewer = $this->staff('incident-e2e-reviewer@demo.test', 'Playwright Incident Reviewer', 'provider_manager', $site);
         $owner = $this->staff('incident-e2e-owner@demo.test', 'Playwright H&S Owner', 'coordinator', $site);
@@ -49,8 +65,16 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'hazards.manage',
             'medications.view',
             'medications.administer.record',
-            'reports.viewAny',
         ]);
+        $this->deny($operator, ['reports.viewAny']);
+        $this->grant($incoming, [
+            'controlRoom.viewAny',
+            'controlRoom.alerts.view',
+            'controlRoom.alerts.manage',
+            'controlRoom.alerts.assign',
+            'controlRoom.alerts.escalate',
+        ]);
+        $this->deny($incoming, ['reports.viewAny']);
         $this->grant($worker, [
             'clients.viewAssigned',
             'incidents.create',
@@ -68,14 +92,30 @@ final class IncidentHandoverE2ESeeder extends Seeder
         $this->grant($owner, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
         $this->grant($verifier, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
 
+        $this->assertNoUnrelatedActiveShift();
         $client->supportWorkers()->syncWithoutDetaching([$worker->id]);
         $this->clearPriorJourneys($client);
+        $this->retirePriorFixtureShifts();
+        $shift = $this->freshShift($operator, $incoming);
+        $requiredAlerts = $this->requiredAlerts($site, $client, $operator);
 
         $manifest = [
+            'marker' => self::MARKER,
             'site' => ['id' => $site->id, 'name' => $site->name],
             'client' => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)],
+            'shift' => [
+                'id' => $shift->id,
+                'name' => $shift->name,
+                'starts_at' => $shift->starts_at->toIso8601String(),
+                'required_alert_count' => $requiredAlerts->count(),
+            ],
+            'records' => [
+                'required_alert_ids' => $requiredAlerts->pluck('id')->all(),
+                'required_alert_references' => $requiredAlerts->pluck('reference_number')->all(),
+            ],
             'users' => [
                 'operator' => $this->userManifest($operator),
+                'incoming' => $this->userManifest($incoming),
                 'worker' => $this->userManifest($worker),
                 'reviewer' => $this->userManifest($reviewer),
                 'owner' => $this->userManifest($owner),
@@ -176,6 +216,93 @@ final class IncidentHandoverE2ESeeder extends Seeder
         $user->permissionOverrides()->syncWithoutDetaching(
             $permissions->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])->all(),
         );
+    }
+
+    /** @param list<string> $permissionKeys */
+    private function deny(User $user, array $permissionKeys): void
+    {
+        $permissions = Permission::query()->whereIn('key', $permissionKeys)->pluck('id');
+        $user->permissionOverrides()->syncWithoutDetaching(
+            $permissions->mapWithKeys(fn (int $id) => [$id => ['allowed' => false]])->all(),
+        );
+    }
+
+    private function retirePriorFixtureShifts(): void
+    {
+        Shift::query()
+            ->where('name', self::SHIFT_NAME)
+            ->where('status', 'active')
+            ->get()
+            ->each(fn (Shift $shift) => $shift->forceFill([
+                'status' => 'completed',
+                'ends_at' => now(),
+            ])->save());
+    }
+
+    private function assertNoUnrelatedActiveShift(): void
+    {
+        $blockingIds = Shift::query()
+            ->active()
+            ->where(fn ($query) => $query
+                ->whereNull('name')
+                ->orWhere('name', '!=', self::SHIFT_NAME))
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        if ($blockingIds !== []) {
+            throw new \RuntimeException(
+                'Refusing to replace an unrelated active Control Room shift. '
+                .'Complete it through its real handover first. Blocking shift IDs: '
+                .implode(', ', $blockingIds),
+            );
+        }
+    }
+
+    private function freshShift(User $operator, User $incoming): Shift
+    {
+        return Shift::query()->create([
+            'name' => self::SHIFT_NAME,
+            'starts_at' => now()->subMinute(),
+            'status' => 'active',
+            'shift_lead_user_id' => $operator->id,
+            'team_members' => [$operator->id, $incoming->id],
+            'open_alerts_at_start' => 0,
+        ]);
+    }
+
+    /** @return Collection<int, ControlRoomAlert> */
+    private function requiredAlerts(
+        Site $site,
+        Client $client,
+        User $operator,
+    ): Collection {
+        return collect([
+            [
+                'reference_number' => self::REQUIRED_ALERT_REFERENCES[0],
+                'alert_type' => 'E2E welfare escalation',
+                'severity' => 'high',
+                'notes' => 'Deterministic serious alert for the seven-persona closure relay.',
+            ],
+            [
+                'reference_number' => self::REQUIRED_ALERT_REFERENCES[1],
+                'alert_type' => 'E2E follow-up decision',
+                'severity' => 'medium',
+                'notes' => 'Deterministic decision-relevant handover alert.',
+            ],
+        ])->map(fn (array $attributes): ControlRoomAlert => ControlRoomAlert::query()->create([
+            ...$attributes,
+            'source' => 'manual',
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+            'triggered_at' => now(),
+            'created_by_user_id' => $operator->id,
+            'context' => [
+                'fixture_marker' => self::MARKER,
+                'site_id' => $site->id,
+            ],
+        ]));
     }
 
     private function clearPriorJourneys(Client $client): void

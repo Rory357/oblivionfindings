@@ -165,4 +165,19 @@ class Shift extends Model
     {
         return ($from ?? now())->copy()->addHours(self::EXPECTED_DURATION_HOURS);
     }
+
+    public function handoverStaleAfterHours(): int
+    {
+        return max(1, (int) config('control-room.handover_stale_after_hours', 16));
+    }
+
+    public function handoverStaleAt(): CarbonInterface
+    {
+        return $this->starts_at->copy()->addHours($this->handoverStaleAfterHours());
+    }
+
+    public function isHandoverStale(?CarbonInterface $at = null): bool
+    {
+        return ($at ?? now())->greaterThanOrEqualTo($this->handoverStaleAt());
+    }
 }

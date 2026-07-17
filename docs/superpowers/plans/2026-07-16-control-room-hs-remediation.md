@@ -1867,7 +1867,9 @@ Completed evidence:
 - Modify: `database/seeders/RbacSeeder.php`
 - Modify: `database/seeders/IncidentHandoverE2ESeeder.php`
 - Modify: `database/seeders/DuskDatabaseSeeder.php`
+- Modify: `app/Models/ControlRoom/Shift.php`
 - Modify: `app/Services/ControlRoom/ControlRoomShiftHandoverService.php`
+- Modify: `app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php`
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php`
 - Modify: `app/Http/Controllers/ControlRoom/ControlRoomShiftController.php`
 - Modify: `resources/js/pages/control-room/shifts/handover.tsx`
@@ -1876,7 +1878,7 @@ Completed evidence:
 - Modify: `tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing stale-shift tests**
+- [x] **Step 1: Write failing stale-shift tests**
 
 Prove:
 
@@ -1889,14 +1891,14 @@ Prove:
 - override never bypasses selected incoming acceptance;
 - fresh fixture shift has a bounded required set and no inherited global backlog.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```powershell
 php artisan test tests/Feature/ControlRoom/ControlRoomStaleShiftHandoverTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php
 npx vitest run resources/js/pages/control-room/shifts/handover.test.tsx
 ```
 
-- [ ] **Step 3: Add configuration and permission**
+- [x] **Step 3: Add configuration and permission**
 
 ```php
 // config/control-room.php
@@ -1916,7 +1918,7 @@ Seeder row:
 
 Grant only to Admin, Provider Manager, and the appropriate Control Room coordinator role. Add it to Dusk fixture permission setup.
 
-- [ ] **Step 4: Extend the prepare contract**
+- [x] **Step 4: Extend the prepare contract**
 
 ```php
 public function prepare(
@@ -1935,13 +1937,13 @@ If the actor is not outgoing lead:
 - actor must hold the override permission;
 - reason must contain at least 10 characters.
 
-- [ ] **Step 5: Add stale banner and override form**
+- [x] **Step 5: Add stale banner and override form**
 
 Required copy:
 
 `This shift is stale. The named outgoing lead has not completed handover. An authorised manager may prepare it with an audited reason; the incoming lead must still accept it.`
 
-- [ ] **Step 6: Make the E2E seeder idempotently create a fresh bounded shift**
+- [x] **Step 6: Make the E2E seeder idempotently create a fresh bounded shift**
 
 The seeder must:
 
@@ -1952,7 +1954,7 @@ The seeder must:
 - create or reuse the tagged incoming operator;
 - print the fixture marker, users, site, client, shift, and record IDs.
 
-- [ ] **Step 7: Re-run tests and permission seeding**
+- [x] **Step 7: Re-run tests and permission seeding**
 
 ```powershell
 php artisan db:seed --class=RbacSeeder
@@ -1960,12 +1962,22 @@ php artisan test tests/Feature/ControlRoom/ControlRoomStaleShiftHandoverTest.php
 npx vitest run resources/js/pages/control-room/shifts/handover.test.tsx
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add config/control-room.php database/seeders/RbacSeeder.php database/seeders/IncidentHandoverE2ESeeder.php database/seeders/DuskDatabaseSeeder.php app/Services/ControlRoom/ControlRoomShiftHandoverService.php app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php app/Http/Controllers/ControlRoom/ControlRoomShiftController.php resources/js/pages/control-room/shifts/handover.tsx resources/js/pages/control-room/shifts/handover.test.tsx tests/Feature/ControlRoom/ControlRoomStaleShiftHandoverTest.php tests/Feature/ControlRoom/ControlRoomShiftHandoverAcceptanceTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
 git commit -m "feat(control-room): add audited stale handover recovery"
 ```
+
+Completed evidence:
+
+- the configurable stale threshold is enforced under the locked shift; the outgoing lead retains normal ownership, while only Admin, Provider Manager, and Coordinator receive the dedicated override permission;
+- a non-lead override requires a 10–2,000 character reason for both draft recovery and preparation, preserves the full required-alert/carry-forward gates, and never permits the override actor to accept for the selected incoming lead;
+- actor, reason, and time are frozen in both snapshot and audit; prepared-page access is derived from persisted shift/audit state, and acceptance rejects structurally valid snapshot tampering that does not match the committed audit row;
+- the stale banner and form use the approved copy, expose the audited boundary before editing, and show the override provenance to the incoming lead;
+- the E2E seeder retires only its own prior tagged active shift, creates one site-bounded two-alert required set and tagged incoming operator, leaves unrelated records untouched, prints the complete manifest, and fails closed rather than mutating an unrelated active shift;
+- `RbacSeeder` completes successfully; the authoritative backend pair passes 19 tests with 238 assertions, and the handover frontend passes 1 file with 4 tests;
+- TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, diff integrity, client build (4,968 modules in 2m 56s), and SSR build (1,620 modules in 39.08s) are clean.
 
 ## Task 17: Repair shared Select behavior and date-only rendering
 

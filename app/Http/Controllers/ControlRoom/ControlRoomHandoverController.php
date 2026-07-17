@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\User;
@@ -40,6 +41,11 @@ class ControlRoomHandoverController extends Controller
             }
         }
         $draft = data_get($snapshot, 'draft', []);
+        $isStale = $shift->isHandoverStale();
+        $canOverride = $shift->handover_status === Shift::HANDOVER_NONE
+            && $isStale
+            && (int) $shift->shift_lead_user_id !== $user->id
+            && $user->canDo('controlRoom.handovers.override');
 
         $shiftData = [
             'id' => $shift->id,
@@ -69,8 +75,14 @@ class ControlRoomHandoverController extends Controller
                 'id' => $shift->handedOverTo->id,
                 'name' => $shift->handedOverTo->name,
             ] : null,
+            'is_stale' => $isStale,
+            'stale_after_hours' => $shift->handoverStaleAfterHours(),
+            'can_override' => $canOverride,
             'can_prepare' => $shift->handover_status === Shift::HANDOVER_NONE
-                && (int) $shift->shift_lead_user_id === $user->id,
+                && (
+                    (int) $shift->shift_lead_user_id === $user->id
+                    || $canOverride
+                ),
             'can_accept' => $shift->handover_status === Shift::HANDOVER_PREPARED
                 && (int) $shift->handed_over_to_user_id === $user->id
                 && $snapshotIssue === null,
@@ -174,7 +186,16 @@ class ControlRoomHandoverController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->unique();
 
-        return $participantIds->contains($user->id);
+        if ($participantIds->contains($user->id)) {
+            return true;
+        }
+
+        return AuditLog::query()
+            ->where('action', 'controlRoom.shift.handoverPrepared')
+            ->where('auditable_type', $shift->getMorphClass())
+            ->where('auditable_id', $shift->id)
+            ->where('user_id', $user->id)
+            ->exists();
     }
 
     /** @return array<string, mixed> */

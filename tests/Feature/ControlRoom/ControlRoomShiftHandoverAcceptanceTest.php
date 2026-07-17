@@ -151,6 +151,7 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         $this->assertEqualsCanonicalizing([$critical->id, $high->id], data_get($snapshot, 'required_alert_ids'));
         $this->assertNotNull(data_get($snapshot, 'criteria_at'));
         $this->assertCount(7, data_get($snapshot, 'criteria'));
+        $this->assertNull(data_get($snapshot, 'override'));
         $this->assertSame(1, data_get($snapshot, 'carry_forward.total'));
         $this->assertTrue(data_get($snapshot, 'carry_forward_acknowledged'));
         $this->assertSame($this->outgoingLead->id, data_get($snapshot, 'carry_forward_acknowledged_by.id'));

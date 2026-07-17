@@ -78,6 +78,9 @@ const baseProps = {
         handover_snapshot: null,
         draft: {},
         incoming_lead: null,
+        is_stale: false,
+        stale_after_hours: 16,
+        can_override: false,
         can_prepare: true,
         can_accept: false,
     },
@@ -196,5 +199,31 @@ describe('bounded Control Room shift handover', () => {
                 name: 'Accept and start my shift',
             }),
         ).not.toBeInTheDocument();
+    });
+
+    it('shows the audited stale-shift recovery boundary and requires an override reason', () => {
+        render(
+            <ShiftHandover
+                {...baseProps}
+                shift={{
+                    ...baseProps.shift,
+                    is_stale: true,
+                    stale_after_hours: 16,
+                    can_override: true,
+                    can_prepare: true,
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByText(
+                'This shift is stale. The named outgoing lead has not completed handover. An authorised manager may prepare it with an audited reason; the incoming lead must still accept it.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('textbox', {
+                name: 'Audited override reason',
+            }),
+        ).toBeRequired();
     });
 });

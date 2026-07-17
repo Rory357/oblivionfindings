@@ -2,6 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Models\AuditLog;
 use App\Models\ControlRoom\Shift;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -25,16 +26,33 @@ final class ControlRoomPreparedHandoverSnapshotService
         }
 
         $preparedBy = $this->person($snapshot['prepared_by'] ?? null);
+        $preparedAt = $this->timestamp($snapshot['prepared_at'] ?? null);
+        $override = $this->override(
+            $snapshot['override'] ?? null,
+            $preparedBy,
+            $preparedAt,
+        );
+        if ($override !== null && ! $this->hasMatchingOverrideAudit(
+            $shift,
+            $preparedBy['id'],
+            $override,
+        )) {
+            $this->invalid();
+        }
         $incoming = $this->requiredArray($snapshot['incoming_shift'] ?? null);
         $incomingLead = $this->person($incoming['lead'] ?? null);
-        if ($preparedBy['id'] !== (int) $shift->shift_lead_user_id
-            || $incomingLead['id'] !== (int) $shift->handed_over_to_user_id
+        if ($incomingLead['id'] !== (int) $shift->handed_over_to_user_id) {
+            $this->invalid();
+        }
+        if (($override === null && $preparedBy['id'] !== (int) $shift->shift_lead_user_id)
+            || ($override !== null && $preparedBy['id'] === (int) $shift->shift_lead_user_id)
         ) {
             $this->invalid();
         }
 
         $incomingTeam = $this->people($incoming['team_members'] ?? null);
         $participantIds = collect([
+            $preparedBy['id'],
             $incomingLead['id'],
             ...collect($incomingTeam)->pluck('id')->all(),
         ])->unique()->values()->all();
@@ -71,14 +89,15 @@ final class ControlRoomPreparedHandoverSnapshotService
         $carryAcknowledged = ($snapshot['carry_forward_acknowledged'] ?? null) === true;
         $carryAcknowledgedBy = $this->person($snapshot['carry_forward_acknowledged_by'] ?? null);
         if (($carryForward['total'] > 0 && ! $carryAcknowledged)
-            || $carryAcknowledgedBy['id'] !== (int) $shift->shift_lead_user_id
+            || $carryAcknowledgedBy['id'] !== $preparedBy['id']
         ) {
             $this->invalid();
         }
 
         return [
             'prepared_by' => $preparedBy,
-            'prepared_at' => $this->timestamp($snapshot['prepared_at'] ?? null),
+            'prepared_at' => $preparedAt,
+            'override' => $override,
             'criteria_at' => $this->timestamp($snapshot['criteria_at'] ?? null),
             'next_expected_shift_at' => $this->timestamp($snapshot['next_expected_shift_at'] ?? null),
             'criteria' => $criteria,
@@ -101,6 +120,61 @@ final class ControlRoomPreparedHandoverSnapshotService
             ),
             'pinned_notes' => $this->notes($snapshot['pinned_notes'] ?? null),
             'followup_notes' => $this->notes($snapshot['followup_notes'] ?? null),
+        ];
+    }
+
+    /**
+     * @param  array{actor: array{id: int, name: string}, reason: string, at: string}  $override
+     */
+    private function hasMatchingOverrideAudit(
+        Shift $shift,
+        int $actorId,
+        array $override,
+    ): bool {
+        return AuditLog::query()
+            ->where('action', 'controlRoom.shift.handoverPrepared')
+            ->where('auditable_type', $shift->getMorphClass())
+            ->where('auditable_id', $shift->id)
+            ->where('user_id', $actorId)
+            ->get(['meta'])
+            ->contains(fn (AuditLog $audit): bool => (
+                (int) data_get($audit->meta, 'override.actor_id') === $actorId
+                && data_get($audit->meta, 'override.reason') === $override['reason']
+                && data_get($audit->meta, 'override.at') === $override['at']
+            ));
+    }
+
+    /**
+     * @param  array{id: int, name: string}  $preparedBy
+     * @return array{actor: array{id: int, name: string}, reason: string, at: string}|null
+     */
+    private function override(
+        mixed $value,
+        array $preparedBy,
+        string $preparedAt,
+    ): ?array {
+        if ($value === null) {
+            return null;
+        }
+
+        $override = $this->requiredArray($value);
+        $actor = $this->person($override['actor'] ?? null);
+        $reason = $this->string($override['reason'] ?? null);
+        $at = $this->timestamp($override['at'] ?? null);
+        if ($actor['id'] !== $preparedBy['id']
+            || $actor['name'] !== $preparedBy['name']
+            || $reason !== trim($reason)
+            || mb_strlen($reason) < 10
+            || mb_strlen($reason) > 2000
+            || ! Carbon::parse($at)->equalTo(Carbon::parse($preparedAt))
+        ) {
+            $this->invalid();
+        }
+
+        return [
+            'actor' => $actor,
+            'reason' => $reason,
+            'at' => $at,
         ];
     }
 

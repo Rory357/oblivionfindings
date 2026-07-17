@@ -26,11 +26,18 @@ class ControlRoomShiftHandoverService
         array $draft,
         User $actor,
         int $expectedVersion,
+        ?string $overrideReason = null,
     ): Shift {
-        return DB::transaction(function () use ($outgoing, $draft, $actor, $expectedVersion): Shift {
+        return DB::transaction(function () use (
+            $outgoing,
+            $draft,
+            $actor,
+            $expectedVersion,
+            $overrideReason,
+        ): Shift {
             $locked = $this->lockShift($outgoing);
+            $this->authorizePreparationActor($locked, $actor, $overrideReason);
             $this->assertVersion($locked, $expectedVersion);
-            $this->assertOutgoingLead($locked, $actor);
             $this->assertEditable($locked);
             $normalisedDraft = $this->normaliseDraft($draft);
             $this->assertDraftAlertsVisible($normalisedDraft, $actor);
@@ -55,11 +62,23 @@ class ControlRoomShiftHandoverService
         array $reviewedAlertIds,
         User $actor,
         int $expectedVersion,
+        ?string $overrideReason = null,
     ): Shift {
-        return DB::transaction(function () use ($outgoing, $incomingLead, $reviewedAlertIds, $actor, $expectedVersion): Shift {
+        return DB::transaction(function () use (
+            $outgoing,
+            $incomingLead,
+            $reviewedAlertIds,
+            $actor,
+            $expectedVersion,
+            $overrideReason,
+        ): Shift {
             $locked = $this->lockShift($outgoing);
+            $normalisedOverrideReason = $this->authorizePreparationActor(
+                $locked,
+                $actor,
+                $overrideReason,
+            );
             $this->assertVersion($locked, $expectedVersion);
-            $this->assertOutgoingLead($locked, $actor);
             $this->assertEditable($locked);
 
             if (! $incomingLead->canDo('controlRoom.alerts.manage')) {
@@ -150,6 +169,13 @@ class ControlRoomShiftHandoverService
                 'draft' => $draft,
                 'prepared_by' => ['id' => $actor->id, 'name' => $actor->name],
                 'prepared_at' => $preparedAt->toIso8601String(),
+                'override' => $normalisedOverrideReason === null
+                    ? null
+                    : [
+                        'actor' => ['id' => $actor->id, 'name' => $actor->name],
+                        'reason' => $normalisedOverrideReason,
+                        'at' => $preparedAt->toIso8601String(),
+                    ],
                 'criteria_at' => $scope['criteria_at'],
                 'next_expected_shift_at' => $scope['next_expected_shift_at'],
                 'criteria' => $scope['criteria'],
@@ -203,6 +229,13 @@ class ControlRoomShiftHandoverService
                 'carry_forward_total' => $carryForwardTotal,
                 'criteria_at' => $scope['criteria_at'],
                 'handover_version' => $locked->handover_version,
+                'override' => $normalisedOverrideReason === null
+                    ? null
+                    : [
+                        'actor_id' => $actor->id,
+                        'reason' => $normalisedOverrideReason,
+                        'at' => $preparedAt->toIso8601String(),
+                    ],
             ]);
 
             return $locked->fresh();
@@ -318,11 +351,29 @@ class ControlRoomShiftHandoverService
         }
     }
 
-    private function assertOutgoingLead(Shift $shift, User $actor): void
-    {
-        if ((int) $shift->shift_lead_user_id !== $actor->id) {
+    private function authorizePreparationActor(
+        Shift $shift,
+        User $actor,
+        ?string $overrideReason,
+    ): ?string {
+        if ((int) $shift->shift_lead_user_id === $actor->id) {
+            return null;
+        }
+
+        if (! $shift->isHandoverStale()
+            || ! $actor->canDo('controlRoom.handovers.override')
+        ) {
             throw new AuthorizationException('Only the outgoing shift lead can prepare this handover.');
         }
+
+        $reason = trim((string) $overrideReason);
+        if (mb_strlen($reason) < 10 || mb_strlen($reason) > 2000) {
+            throw ValidationException::withMessages([
+                'override_reason' => 'Explain why the unavailable outgoing lead cannot complete this handover (10 to 2,000 characters).',
+            ]);
+        }
+
+        return $reason;
     }
 
     private function assertEditable(Shift $shift): void
