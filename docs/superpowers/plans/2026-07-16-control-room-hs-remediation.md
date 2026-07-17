@@ -2333,11 +2333,18 @@ php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature
 
 Expected: zero failures. Record exact test and assertion counts.
 
-Result: the final full rerun passed 1,293 tests and 10,036 assertions in
-1,775.50 seconds. The first run found one stale workflow request fixture using
-the retired verification field; the fixture now submits the current
-`evidence_reviewed` and `effective` contract, its focused regression passed,
-the complete workflow file passed, and the full matrix was rerun from scratch.
+Result: the final post-review rerun passed 1,303 tests and 10,111 assertions in
+1,870.73 seconds. The first Task 20 run found one stale workflow request fixture
+using the retired verification field; that fixture now submits the current
+`evidence_reviewed` and `effective` contract. Live pre-seeding inspection then
+exposed 80 legacy H&S rows without organization provenance, including one
+unscoped safeguarding source tuple. A conservative migration and ten-test,
+75-assertion regression now repair only provable tenant/site ownership, reject
+every conflicting H&S, Incident, signal, asset, fleet, device, client, site,
+and context claimant, retain ambiguous rows as null, and prove a fresh install
+does not create a foreign key to a nonexistent `organizations` table. The full
+matrix was rerun from scratch after the fresh-install defect and all independent
+review findings were reproduced and fixed.
 
 - [x] **Step 2: Run all changed frontend tests**
 
@@ -2347,7 +2354,7 @@ npx vitest run resources/js/components/control-room resources/js/components/inci
 
 Expected: zero failures and zero React controlled/uncontrolled warnings.
 
-Result: 23 files and 122 tests passed in 48.39 seconds with no React
+Result: 23 files and 122 tests passed in 10.17 seconds with no React
 controlled/uncontrolled warning.
 
 - [x] **Step 3: Generate routes and run static checks**
@@ -2367,7 +2374,10 @@ try {
 }
 npm run types
 npx eslint resources/js/components/control-room resources/js/components/incidents resources/js/components/health-safety resources/js/pages/control-room/shifts resources/js/pages/health-safety resources/js/pages/tasks resources/js/components/wizard/primitives.tsx resources/js/lib/datetime.ts resources/js/lib/journey-labels.ts
-$changedPhp = @(git diff --name-only origin/main...HEAD -- '*.php')
+$changedPhp = @(
+    git diff --name-only origin/main -- '*.php'
+    git ls-files --others --exclude-standard -- '*.php'
+) | Sort-Object -Unique
 if ($changedPhp.Count -eq 0) { throw 'No changed PHP files found for the Pint gate.' }
 vendor\bin\pint --test @changedPhp
 git diff --check
@@ -2375,11 +2385,12 @@ git diff --check
 
 Expected: every command exits 0.
 
-Result: Wayfinder generation, TypeScript, targeted ESLint, Pint over all 133
-changed PHP files, and diff integrity pass. The original directory-wide Pint
-command reached untouched legacy files and reported pre-existing baseline
-formatting debt; the release gate now checks the complete branch diff and
-avoids an unrelated mass rewrite.
+Result: Wayfinder generation, TypeScript, targeted ESLint, Pint over the two
+unpublished PHP files, and diff integrity pass. The command includes both the
+tracked diff and untracked PHP files, so a final migration cannot escape the
+release gate merely because the preceding checkpoints already reached
+`origin/main`. The original directory-wide Pint command reached untouched
+legacy files and reported pre-existing baseline formatting debt.
 
 - [x] **Step 4: Run both production builds**
 
@@ -2402,8 +2413,8 @@ try {
 
 Expected: client and SSR builds exit 0.
 
-Result: the production client built 4,970 modules in 3m 52s and the SSR bundle
-built 1,622 modules in 1m 04s.
+Result: the production client built 4,970 modules in 2m 43s and the SSR bundle
+built 1,622 modules in 37.66 seconds.
 
 - [x] **Step 5: Run production-built browser suites**
 
@@ -2431,7 +2442,7 @@ try {
 
 Expected: all scenarios pass.
 
-Result: both production-built specifications passed in 2.8 minutes with the
+Result: both production-built specifications passed in 2.6 minutes with the
 dedicated PHPUnit database environment and a database-backed browser session.
 
 - [x] **Step 6: Self-review against all 19 findings**
@@ -2491,9 +2502,13 @@ migration truth, named cross-site bypass permissions, exact site/parent record
 scope, private attachment streaming and cleanup, row locks and retry
 idempotency, owner/completer/verifier separation, shared presenters and journey
 gates, controlled Select behavior, keyboard focus restoration, date-only
-formatting, and every Task 21 live-evidence obligation. Thread policy did not
-permit spawning a separate reviewer, so the requesting-code-review checklist
-was applied as a complete local diff review. No actionable issue remained.
+formatting, and every Task 21 live-evidence obligation. A fresh independent
+review of the live-discovered organization-provenance migration found and
+closed fail-closed claimant gaps across HR profile tenants, shared alerts,
+same-source H&S rows, direct and legacy Incident links, Control Room signals,
+nested asset/fleet/device fields, and context ownership. The final reviewer
+verdict is `Ready to merge: Yes`; every Critical, Important, and Minor finding
+is closed.
 
 - [x] **Step 8: Commit release-gate fixes and ledger evidence**
 
