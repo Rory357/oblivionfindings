@@ -282,4 +282,62 @@ describe('TaskDetailDialog permission recovery and focus', () => {
             expect.any(Object),
         );
     });
+
+    it('renders human activity labels and concise definitions instead of machine action names', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () =>
+                    detail({
+                        timeline: [
+                            {
+                                id: 1,
+                                action: 'healthSafety.correctiveAction.returnedForRework',
+                                user: 'Independent Verifier',
+                                at: '2026-07-16T08:00:00+12:00',
+                            },
+                            {
+                                id: 2,
+                                action: 'controlRoom.shift.handoverPrepared',
+                                user: 'Outgoing Lead',
+                                at: '2026-07-16T09:00:00+12:00',
+                            },
+                            {
+                                id: 3,
+                                action: 'App\\Models\\Unknown.update',
+                                user: 'System',
+                                at: '2026-07-16T10:00:00+12:00',
+                            },
+                        ],
+                    }),
+            }),
+        );
+        render(<Harness returnTo="/tasks?bucket=in_progress" />);
+        fireEvent.click(
+            screen.getByRole('button', { name: /Open CR-2026-2135/ }),
+        );
+
+        expect(
+            await screen.findByText('Action returned for rework'),
+        ).toBeVisible();
+        expect(screen.getByText('Shift handover prepared')).toBeVisible();
+        expect(screen.getByText('Activity recorded')).toBeVisible();
+        expect(
+            screen.queryByText(
+                'healthSafety.correctiveAction.returnedForRework',
+            ),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('App\\Models\\Unknown.update'),
+        ).not.toBeInTheDocument();
+
+        const help = screen.getByRole('button', {
+            name: 'Explain task status terms',
+        });
+        expect(help).toHaveClass('focus-visible:ring-2');
+        fireEvent.click(help);
+        expect(await screen.findByText('Potential harm.')).toBeVisible();
+        expect(screen.getByText('The current lifecycle state.')).toBeVisible();
+    });
 });

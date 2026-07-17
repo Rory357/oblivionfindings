@@ -29,6 +29,7 @@ import {
     LinkedOperationalEvidence,
     type LinkedOperationalEvidenceData,
 } from '@/components/incidents/linked-operational-evidence';
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -3397,9 +3398,15 @@ function OverviewSection({
         <div className="flex flex-col gap-4">
             {/* eslint-disable-next-line no-restricted-syntax -- custom governance layout surface */}
             <div className="rounded-xl border border-border bg-card/70 p-4">
-                <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                    Governance stage
-                </p>
+                <div className="mb-2 flex items-center gap-1">
+                    <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        Governance stage
+                    </p>
+                    <JourneyTermHelp
+                        terms={['governance_stage', 'status']}
+                        label="Explain governance stage"
+                    />
+                </div>
                 <StageTracker status={d.status} />
             </div>
 

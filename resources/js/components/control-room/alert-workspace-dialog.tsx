@@ -3,6 +3,7 @@ import {
     JourneyGateList,
     type JourneyGateData,
 } from '@/components/incidents/journey-gate-list';
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
 } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
+import { journeyActivityLabel } from '@/lib/journey-labels';
 import {
     DndContext,
     KeyboardSensor,
@@ -2376,6 +2378,12 @@ function OverviewSection({
     const fleet = (a.fleet_context ?? null) as Record<string, any> | null;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex justify-end sm:col-span-2">
+                <JourneyTermHelp
+                    terms={['status', 'severity', 'priority', 'escalation']}
+                    label="Explain alert status terms"
+                />
+            </div>
             <div className="sm:col-span-2">
                 <StatusFlow a={a} />
             </div>
@@ -2674,9 +2682,12 @@ function SlaTimelineSection({ d }: { d: AlertWorkspaceDetail }) {
         <div className="flex flex-col gap-5">
             {d.sla ? (
                 <div>
-                    <p className="mb-2 text-sm font-semibold text-foreground">
-                        SLA deadlines
-                    </p>
+                    <div className="mb-2 flex items-center gap-1">
+                        <p className="text-sm font-semibold text-foreground">
+                            SLA deadlines
+                        </p>
+                        <JourneyTermHelp terms={['sla']} label="Explain SLA" />
+                    </div>
                     <div className="grid gap-2 sm:grid-cols-3">
                         <SlaCountdownRow
                             label="Acknowledge"
@@ -2753,11 +2764,7 @@ function SlaTimelineSection({ d }: { d: AlertWorkspaceDetail }) {
                                 className="flex items-baseline justify-between gap-3 rounded-md border border-border/60 px-2.5 py-1.5 text-xs"
                             >
                                 <span className="min-w-0 truncate text-foreground">
-                                    {titleCase(
-                                        log.action
-                                            .replace('controlRoom.', '')
-                                            .replace('alert.', ''),
-                                    )}
+                                    {journeyActivityLabel(log.action)}
                                     {log.user ? (
                                         <span className="text-muted-foreground">
                                             {' '}

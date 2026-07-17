@@ -91,7 +91,28 @@ export type ExpiringRow = {
     site: string | null;
 };
 
+export type AcceptanceRow = {
+    id: number;
+    event_reference: string;
+    title: string;
+    severity: string;
+    reported_at: string | null;
+    site: string | null;
+    client: string | null;
+    owner: string | null;
+    action_url: string;
+};
+
+export type AttentionWorklist = {
+    key: 'awaiting_hs_acceptance';
+    label: string;
+    help: string;
+    count: number;
+    items: AcceptanceRow[];
+};
+
 export type WorklistsPayload = {
+    attention: AttentionWorklist[];
     overdue_corrective_actions: CorrectiveActionRow[];
     open_investigations: InvestigationRow[];
     notifiable_events: NotifiableRow[];
@@ -99,6 +120,7 @@ export type WorklistsPayload = {
 };
 
 export type WorklistKey =
+    | 'acceptance'
     | 'corrective_actions'
     | 'investigations'
     | 'notifiable'
@@ -189,6 +211,8 @@ type NormRow = {
     tag: string;
     tagTone: PillTone;
     meta: string;
+    actionUrl?: string;
+    actionLabel?: string;
 };
 
 /* ------------------------------------------------------------------ */
@@ -249,6 +273,54 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
                 },
                 { label: 'Owner', value: r.owner },
                 { label: 'Linked event', value: r.event_reference },
+            ],
+        },
+    }));
+}
+
+function acceptanceRows(rows: AcceptanceRow[]): NormRow[] {
+    return rows.map((row) => ({
+        key: `accept-${row.id}`,
+        pill: {
+            label: 'Accept now',
+            tone: ['critical', 'high'].includes(row.severity)
+                ? 'critical'
+                : 'warning',
+            icon: ShieldAlert,
+        },
+        title: row.title,
+        sub: [row.event_reference, row.client, row.site]
+            .filter(Boolean)
+            .join(' · '),
+        owner: row.owner,
+        due: null,
+        clientId: null,
+        staffId: null,
+        registerUrl: row.action_url,
+        registerLabel: 'Accept H&S handover',
+        tag: 'H&S',
+        tagTone: 'warning',
+        meta: row.event_reference,
+        actionUrl: row.action_url,
+        actionLabel: `Accept H&S handover for ${row.event_reference}`,
+        detail: {
+            title: 'Awaiting H&S acceptance',
+            description:
+                'A named H&S owner must accept governance responsibility.',
+            railIcon: ShieldAlert,
+            railTitle: row.title,
+            railSub: row.event_reference,
+            cardTitle: 'H&S handover',
+            cardIcon: ShieldAlert,
+            registerUrl: row.action_url,
+            registerLabel: 'Accept H&S handover',
+            rows: [
+                { label: 'Reference', value: row.event_reference },
+                { label: 'Title', value: row.title },
+                { label: 'Severity', value: titleCase(row.severity) },
+                { label: 'Client', value: row.client },
+                { label: 'Site', value: row.site },
+                { label: 'Proposed owner', value: row.owner },
             ],
         },
     }));
@@ -439,6 +511,8 @@ type CardConfig = {
     registerLabel: string;
     rows: NormRow[];
     emptyText: string;
+    count?: number;
+    countLabel?: string;
 };
 
 export function HsWorklists({
@@ -464,9 +538,16 @@ export function HsWorklists({
         e.preventDefault();
         const items: ShiftCtxItem[] = [
             {
-                icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View detail',
-                onClick: () => setDetail(row.detail),
+                icon: row.actionUrl ? (
+                    <ExternalLink className="h-3.5 w-3.5" />
+                ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                ),
+                label: row.actionUrl ? 'Open action' : 'View detail',
+                onClick: () =>
+                    row.actionUrl
+                        ? router.visit(row.actionUrl)
+                        : setDetail(row.detail),
             },
         ];
         if (row.clientId) {
@@ -506,6 +587,21 @@ export function HsWorklists({
     };
 
     const allConfigs: Record<WorklistKey, CardConfig> = {
+        acceptance: {
+            key: 'acceptance',
+            icon: ShieldAlert,
+            iconTone: 'warning',
+            title: worklists.attention[0]?.label ?? 'Awaiting H&S acceptance',
+            subtitle:
+                worklists.attention[0]?.help ??
+                'A named H&S owner must accept governance responsibility.',
+            registerUrl: null,
+            registerLabel: 'Open action',
+            rows: acceptanceRows(worklists.attention[0]?.items ?? []),
+            emptyText: 'No H&S handovers are awaiting acceptance.',
+            count: worklists.attention[0]?.count ?? 0,
+            countLabel: `${worklists.attention[0]?.count ?? 0} H&S handover${(worklists.attention[0]?.count ?? 0) === 1 ? '' : 's'} awaiting acceptance`,
+        },
         corrective_actions: {
             key: 'corrective_actions',
             icon: Clock,
@@ -578,9 +674,19 @@ export function HsWorklists({
                                     <cfg.icon className="h-4 w-4" />
                                 </span>
                                 <div>
-                                    <CardTitle className="text-sm leading-tight font-bold">
-                                        {cfg.title}
-                                    </CardTitle>
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle className="text-sm leading-tight font-bold">
+                                            {cfg.title}
+                                        </CardTitle>
+                                        {cfg.count !== undefined ? (
+                                            <span
+                                                aria-label={cfg.countLabel}
+                                                className="inline-flex min-w-5 items-center justify-center rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning"
+                                            >
+                                                {cfg.count}
+                                            </span>
+                                        ) : null}
+                                    </div>
                                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                                         {cfg.subtitle}
                                     </p>
@@ -603,52 +709,14 @@ export function HsWorklists({
                                 </p>
                             ) : (
                                 cfg.rows.map((row) => (
-                                    // eslint-disable-next-line no-restricted-syntax -- worklist row is a custom full-width selector card, not a shadcn Button.
-                                    <button
+                                    <WorklistRow
                                         key={row.key}
-                                        type="button"
-                                        onClick={() => setDetail(row.detail)}
-                                        onContextMenu={(e) => openCtx(e, row)}
-                                        className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-border hover:bg-muted/50"
-                                    >
-                                        <span
-                                            className={cn(
-                                                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                                                PILL_CLASS[row.pill.tone],
-                                            )}
-                                        >
-                                            {row.pill.icon ? (
-                                                <row.pill.icon className="h-3 w-3" />
-                                            ) : null}
-                                            {row.pill.label}
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-[13px] font-medium text-foreground">
-                                                {row.title}
-                                            </span>
-                                            <span className="block truncate text-[11px] text-muted-foreground">
-                                                {row.sub}
-                                            </span>
-                                        </span>
-                                        <span className="flex shrink-0 items-center gap-2">
-                                            {row.owner ? (
-                                                <span
-                                                    title={row.owner}
-                                                    className={cn(
-                                                        'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
-                                                        avatarTone(row.owner),
-                                                    )}
-                                                >
-                                                    {initials(row.owner)}
-                                                </span>
-                                            ) : null}
-                                            {row.due ? (
-                                                <span className="w-12 text-right text-[11px] text-muted-foreground tabular-nums">
-                                                    {row.due}
-                                                </span>
-                                            ) : null}
-                                        </span>
-                                    </button>
+                                        row={row}
+                                        onOpen={() => setDetail(row.detail)}
+                                        onContextMenu={(event) =>
+                                            openCtx(event, row)
+                                        }
+                                    />
                                 ))
                             )}
                         </CardContent>
@@ -666,6 +734,83 @@ export function HsWorklists({
                 />
             ) : null}
         </>
+    );
+}
+
+function WorklistRow({
+    row,
+    onOpen,
+    onContextMenu,
+}: {
+    row: NormRow;
+    onOpen: () => void;
+    onContextMenu: (event: React.MouseEvent) => void;
+}) {
+    const content = (
+        <>
+            <span
+                className={cn(
+                    'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    PILL_CLASS[row.pill.tone],
+                )}
+            >
+                {row.pill.icon ? <row.pill.icon className="h-3 w-3" /> : null}
+                {row.pill.label}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-foreground">
+                    {row.title}
+                </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                    {row.sub}
+                </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+                {row.owner ? (
+                    <span
+                        title={row.owner}
+                        className={cn(
+                            'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
+                            avatarTone(row.owner),
+                        )}
+                    >
+                        {initials(row.owner)}
+                    </span>
+                ) : null}
+                {row.due ? (
+                    <span className="w-12 text-right text-[11px] text-muted-foreground tabular-nums">
+                        {row.due}
+                    </span>
+                ) : null}
+            </span>
+        </>
+    );
+    const className =
+        'flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+
+    if (row.actionUrl) {
+        return (
+            <Link
+                href={row.actionUrl}
+                aria-label={row.actionLabel}
+                onContextMenu={onContextMenu}
+                className={className}
+            >
+                {content}
+            </Link>
+        );
+    }
+
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- worklist row is a custom full-width selector card, not a shadcn Button.
+        <button
+            type="button"
+            onClick={onOpen}
+            onContextMenu={onContextMenu}
+            className={className}
+        >
+            {content}
+        </button>
     );
 }
 

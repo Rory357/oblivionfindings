@@ -7,5 +7,6 @@ it('uses the same plain-language desk and queue vocabulary in the Control Room s
         ->toContain("title: 'Desk'")
         ->toContain("title: 'My queue'")
         ->toContain("title: 'Shifts'")
+        ->toContain('filterVisibleSidebarGroups')
         ->not->toContain("title: 'Command Centre'");
 });

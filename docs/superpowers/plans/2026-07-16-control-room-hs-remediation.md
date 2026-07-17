@@ -2106,6 +2106,7 @@ Task 17 completed:
 - Create: `resources/js/pages/health-safety/dashboard.test.tsx`
 - Modify: `resources/js/components/app-sidebar.tsx`
 - Create: `resources/js/components/app-sidebar-role-filter.test.tsx`
+- Create: `resources/js/components/journey-term-help.tsx`
 - Modify: `resources/js/pages/tasks/task-detail-dialog.tsx`
 - Modify: `resources/js/pages/tasks/task-detail-dialog.test.tsx`
 - Create: `resources/js/lib/journey-labels.ts`
@@ -2113,11 +2114,13 @@ Task 17 completed:
 - Modify: `resources/js/components/health-safety/event-detail-dialog.tsx`
 - Modify: `resources/js/components/control-room/alert-workspace-dialog.tsx`
 - Modify: `resources/js/components/incidents/incident-detail-dialog.tsx`
+- Modify: `app/Services/Incidents/IncidentJourneyService.php`
+- Modify: `app/Http/Controllers/IncidentController.php`
 - Modify: `tests/Feature/HealthSafety/HsDashboardWorklistTest.php`
 - Modify: `tests/Feature/Navigation/ControlRoomNavigationTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing H&S acceptance worklist tests**
+- [x] **Step 1: Write failing H&S acceptance worklist tests**
 
 Prove:
 
@@ -2127,7 +2130,7 @@ Prove:
 - accepted/closed events leave the list;
 - the manual fixture event is findable without a register filter.
 
-- [ ] **Step 2: Write failing navigation and terminology tests**
+- [x] **Step 2: Write failing navigation and terminology tests**
 
 Prove:
 
@@ -2138,14 +2141,14 @@ Prove:
 - status/severity/priority/escalation/SLA help text is available;
 - machine audit action strings are never rendered to users.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsDashboardWorklistTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php
 npx vitest run resources/js/pages/health-safety/dashboard.test.tsx resources/js/components/app-sidebar-role-filter.test.tsx resources/js/pages/tasks/task-detail-dialog.test.tsx resources/js/lib/journey-labels.test.ts
 ```
 
-- [ ] **Step 4: Add the H&S acceptance worklist**
+- [x] **Step 4: Add the H&S acceptance worklist**
 
 Server row:
 
@@ -2159,7 +2162,7 @@ Server row:
 ]
 ```
 
-- [ ] **Step 5: Centralize human labels**
+- [x] **Step 5: Centralize human labels**
 
 ```ts
 export const JOURNEY_ACTIVITY_LABELS: Record<string, string> = {
@@ -2174,7 +2177,7 @@ export const JOURNEY_ACTIVITY_LABELS: Record<string, string> = {
 
 Unknown actions fall back to `Activity recorded`, not machine class/action names.
 
-- [ ] **Step 6: Filter sidebar groups after permission filtering**
+- [x] **Step 6: Filter sidebar groups after permission filtering**
 
 ```tsx
 const visibleGroups = groups
@@ -2182,7 +2185,7 @@ const visibleGroups = groups
     .filter((group) => group.items.length > 0);
 ```
 
-- [ ] **Step 7: Add concise inline definitions**
+- [x] **Step 7: Add concise inline definitions**
 
 Use one reusable help popover for:
 
@@ -2192,19 +2195,29 @@ Use one reusable help popover for:
 - SLA = required response time;
 - governance stage = accountable review state.
 
-- [ ] **Step 8: Re-run tests**
+- [x] **Step 8: Re-run tests**
 
 ```powershell
 php artisan test tests/Feature/HealthSafety/HsDashboardWorklistTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php
 npx vitest run resources/js/pages/health-safety/dashboard.test.tsx resources/js/components/app-sidebar-role-filter.test.tsx resources/js/pages/tasks/task-detail-dialog.test.tsx resources/js/lib/journey-labels.test.ts
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
-git add app/Services/HealthSafety/HsDashboardService.php app/Http/Controllers/HealthSafety/HealthSafetyDashboardController.php resources/js/pages/health-safety/dashboard.tsx resources/js/pages/health-safety/components/worklists.tsx resources/js/pages/health-safety/dashboard.test.tsx resources/js/components/app-sidebar.tsx resources/js/components/app-sidebar-role-filter.test.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/task-detail-dialog.test.tsx resources/js/lib/journey-labels.ts resources/js/lib/journey-labels.test.ts resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/incidents/incident-detail-dialog.tsx tests/Feature/HealthSafety/HsDashboardWorklistTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
+git add app/Services/HealthSafety/HsDashboardService.php app/Http/Controllers/HealthSafety/HealthSafetyDashboardController.php app/Services/Incidents/IncidentJourneyService.php app/Http/Controllers/IncidentController.php resources/js/pages/health-safety/dashboard.tsx resources/js/pages/health-safety/components/worklists.tsx resources/js/pages/health-safety/dashboard.test.tsx resources/js/components/app-sidebar.tsx resources/js/components/app-sidebar-role-filter.test.tsx resources/js/components/journey-term-help.tsx resources/js/pages/tasks/task-detail-dialog.tsx resources/js/pages/tasks/task-detail-dialog.test.tsx resources/js/lib/journey-labels.ts resources/js/lib/journey-labels.test.ts resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/incidents/incident-detail-dialog.tsx tests/Feature/HealthSafety/HsDashboardWorklistTest.php tests/Feature/Navigation/ControlRoomNavigationTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md docs/superpowers/plans/2026-07-16-control-room-hs-remediation.md
 git commit -m "feat(journeys): finish worklist and recovery UX"
 ```
+
+Task 18 completed:
+
+- H&S dashboard attention work starts with a viewer- and site-scoped `Awaiting H&S acceptance` list whose total is independent of its row limit, whose rows deep-link to the exact acceptance action, and whose accepted/closed events leave the list;
+- the sidebar removes empty post-permission groups in desktop, mobile, and search views while expanded and collapsed user menus remain operable;
+- task Back/Close/Escape recovery preserves the originating query and focus, and direct worklist actions plus shared help controls have visible keyboard focus rings;
+- journey audit actions use one human-label map with an `Activity recorded` fallback, while one reusable help popover explains status, severity, priority, escalation, SLA, and governance stage in plain language;
+- incident detail presentation honors an explicit historical H&S foreign key without weakening the strict canonical ownership checks used by the close mutation;
+- the final backend set passes 51 tests with 541 assertions, the historical direct-link regression passes 1 test with 23 assertions, and the expanded frontend set passes 7 files with 58 tests;
+- TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, diff integrity, client build (4,970 modules in 2m 52s), and SSR build (1,622 modules in 39.42s) are clean.
 
 ## Task 19: Add deterministic end-to-end browser coverage for the complete journey
 

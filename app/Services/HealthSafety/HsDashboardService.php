@@ -209,6 +209,56 @@ class HsDashboardService
     /* ------------------------------------------------------------------ */
 
     /**
+     * Priority H&S attention queues, ordered by the action a governance owner
+     * must take next. Rows deep-link to the exact action rather than relying on
+     * a register filter or prior knowledge of the H&S reference.
+     */
+    public function attentionWorklists(
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+        int $limit = 10,
+    ): array {
+        $awaitingAcceptance = $this->hsEventQuery($siteId, $viewer)
+            ->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)
+            ->where('status', '!=', HsEvent::STATUS_CLOSED)
+            ->with([
+                'client:id,first_name,last_name',
+                'clientIncident:id,hs_event_id,title,description,type',
+                'owner:id,name',
+                'site:id,name',
+            ])
+            ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+            ->orderBy('reported_at');
+        $awaitingAcceptanceCount = (clone $awaitingAcceptance)->count();
+        $awaitingAcceptance = $awaitingAcceptance
+            ->limit($limit)
+            ->get();
+
+        return [[
+            'key' => 'awaiting_hs_acceptance',
+            'label' => 'Awaiting H&S acceptance',
+            'help' => 'A named H&S owner must accept governance responsibility.',
+            'count' => $awaitingAcceptanceCount,
+            'items' => $awaitingAcceptance
+                ->map(fn (HsEvent $event) => [
+                    'id' => $event->id,
+                    'event_reference' => $event->reference_number,
+                    'title' => $event->clientIncident?->title
+                        ?: $event->clientIncident?->description
+                        ?: ucfirst(str_replace('_', ' ', $event->event_category)).' event',
+                    'severity' => $event->severity,
+                    'reported_at' => $event->reported_at?->toIso8601String(),
+                    'site' => $event->site?->name,
+                    'client' => $event->client?->full_name,
+                    'owner' => $event->owner?->name,
+                    'action_url' => "/health-safety/events/{$event->id}?action=accept-handover",
+                ])
+                ->values()
+                ->all(),
+        ]];
+    }
+
+    /**
      * Overdue corrective actions as worklist rows. Each row carries the linked
      * client/staff ids (from the parent HsEvent) for the context-menu jumps.
      * Site-scoped via the parent event.

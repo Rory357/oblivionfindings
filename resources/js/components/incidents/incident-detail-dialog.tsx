@@ -1,3 +1,4 @@
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -888,6 +889,12 @@ function OverviewSection({
         worksafe.status === 'notified' || worksafe.status === 'acknowledged';
     return (
         <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex justify-end sm:col-span-2">
+                <JourneyTermHelp
+                    terms={['status', 'severity', 'priority']}
+                    label="Explain incident status terms"
+                />
+            </div>
             {escalation ? (
                 <div className="sm:col-span-2">
                     <InfoCard icon={ShieldAlert} tone="warn">

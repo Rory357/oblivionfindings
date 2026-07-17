@@ -241,6 +241,7 @@ class HealthSafetyDashboardController extends Controller
             'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteScope),
             'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteScope),
             'worklists' => [
+                'attention' => $this->dashboardService->attentionWorklists($siteScope, $user),
                 'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteScope),
                 'open_investigations' => $this->dashboardService->openInvestigations($siteScope),
                 'notifiable_events' => $this->dashboardService->notifiableEvents($siteScope, 10, $user),

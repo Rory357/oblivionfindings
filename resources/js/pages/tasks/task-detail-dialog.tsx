@@ -4,6 +4,7 @@
  * used to live on the row itself. Uses the shared Dialog chrome so it matches
  * every other modal in the app. Assignment / watch / split mirror the queue's
  * write actions. */
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
+import { journeyActivityLabel } from '@/lib/journey-labels';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -468,6 +470,10 @@ export function TaskDetailDialog({
                                 <StatusBadge variant="neutral" size="sm">
                                     {taskStateLabel(display)}
                                 </StatusBadge>
+                                <JourneyTermHelp
+                                    terms={['severity', 'status']}
+                                    label="Explain task status terms"
+                                />
                             </div>
                             <DialogTitle className="text-base leading-snug">
                                 {display.title}
@@ -623,7 +629,9 @@ export function TaskDetailDialog({
                                                 />
                                                 <div className="min-w-0 text-sm">
                                                     <div className="font-medium">
-                                                        {humanise(entry.action)}
+                                                        {journeyActivityLabel(
+                                                            entry.action,
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground">
                                                         {entry.user ?? 'System'}

@@ -490,7 +490,7 @@ class IncidentController extends Controller
                 fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
             )
             : null;
-        $closeGate = $this->journeys->closeGate($incident);
+        $closeGate = $this->journeys->closeGateForDisplay($incident);
         $closeGatePayload = $closeGate->toArray();
         if (! $request->user()?->canDo('hazards.view')) {
             $closeGatePayload['requirements'] = collect($closeGatePayload['requirements'])
