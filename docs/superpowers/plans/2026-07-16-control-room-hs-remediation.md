@@ -2333,8 +2333,8 @@ php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature
 
 Expected: zero failures. Record exact test and assertion counts.
 
-Result: the final post-review rerun passed 1,308 tests and 10,135 assertions in
-1,863.15 seconds. The first Task 20 run found one stale workflow request fixture
+Result: the final post-review rerun passed 1,314 tests and 10,150 assertions in
+1,907.19 seconds. The first Task 20 run found one stale workflow request fixture
 using the retired verification field; that fixture now submits the current
 `evidence_reviewed` and `effective` contract. Live pre-seeding inspection then
 exposed 80 legacy H&S rows without organization provenance, including one
@@ -2349,8 +2349,15 @@ safeguarding concerns. A second additive migration records that independently
 proven tenant without rewriting any historical site, client, subject, or
 source identity. Its five-test, 24-assertion regression rejects cross-tenant
 and missing-subject tuples and retains provenance on rollback. The full matrix
-was rerun from scratch after both migrations and all independent review
-findings were reproduced and fixed.
+was rerun from scratch after both migrations. The first deployed handover-scope
+build then exposed a separate runtime guard that still treated a client's
+current site as historical alert truth. The repaired guard accepts only an
+exact direct alert/event client plus exact historical alert/event site when the
+event, historical site, and client's current organization share one tenant. It
+continues to reject context-only client claims, stale loaded client snapshots,
+and every cross-tenant tuple, permits an exact clientless pair, and batches
+fresh organization reads for uncapped handover scope. All independent review
+findings were reproduced and fixed before the definitive rerun.
 
 - [x] **Step 2: Run all changed frontend tests**
 
@@ -2360,7 +2367,7 @@ npx vitest run resources/js/components/control-room resources/js/components/inci
 
 Expected: zero failures and zero React controlled/uncontrolled warnings.
 
-Result: 23 files and 122 tests passed in 10.00 seconds with no React
+Result: 23 files and 122 tests passed in 42.87 seconds with no React
 controlled/uncontrolled warning.
 
 - [x] **Step 3: Generate routes and run static checks**
@@ -2391,8 +2398,8 @@ git diff --check
 
 Expected: every command exits 0.
 
-Result: Wayfinder generation, TypeScript, targeted ESLint, Pint over the two
-unpublished PHP files, and diff integrity pass. The command includes both the
+Result: Wayfinder generation, TypeScript, targeted ESLint, PHP syntax, Pint over
+the three unpublished PHP files, and diff integrity pass. The command includes both the
 tracked diff and untracked PHP files, so a final migration cannot escape the
 release gate merely because the preceding checkpoints already reached
 `origin/main`. The original directory-wide Pint command reached untouched
@@ -2419,8 +2426,8 @@ try {
 
 Expected: client and SSR builds exit 0.
 
-Result: the production client built 4,970 modules in 2m 46s and the SSR bundle
-built 1,622 modules in 37.74 seconds.
+Result: the production client built 4,970 modules in 3m 09s and the SSR bundle
+built 1,622 modules in 43.12 seconds.
 
 - [x] **Step 5: Run production-built browser suites**
 
@@ -2448,7 +2455,7 @@ try {
 
 Expected: all scenarios pass.
 
-Result: both production-built specifications passed in 2.5 minutes with the
+Result: both production-built specifications passed in 2.7 minutes with the
 dedicated PHPUnit database environment and a database-backed browser session.
 
 - [x] **Step 6: Self-review against all 19 findings**
@@ -2516,7 +2523,14 @@ nested asset/fleet/device fields, and context ownership. The final reviewer
 verdict is `Ready to merge: Yes`; every Critical, Important, and Minor finding
 is closed. A separate review of the same-tenant historical-site follow-up
 closed its Client-subject scoping, missing-subject, and rollback-retention
-coverage gaps. Its final verdict is also `Ready to merge: Yes`.
+coverage gaps. Its final verdict is also `Ready to merge: Yes`. The final
+historical handover runtime review then found and closed stale loaded-client,
+context-only client-identity, exact clientless-pair, and per-alert query issues.
+Red runs proved the stale/context failures and a 43-query 40-client backlog;
+the final batch performs the fresh organization check within the fixed query
+budget. The post-review focused matrix passed 64 tests with 801 assertions in
+201.70 seconds, and the final verdict remained `Ready to merge: Yes` with no
+Critical, Important, or Minor finding.
 
 - [x] **Step 8: Commit release-gate fixes and ledger evidence**
 

@@ -436,6 +436,17 @@ class IncidentJourneyService
                 ->whereIn('id', $legacyIncidentIds)
                 ->get()
                 ->keyBy(fn (ClientIncident $incident): int => (int) $incident->id);
+        $directClientIds = $alerts
+            ->pluck('client_id')
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+        $currentClientOrganizationIds = $directClientIds->isEmpty()
+            ? collect()
+            : Client::query()
+                ->whereIn('id', $directClientIds)
+                ->pluck('organization_id', 'id');
 
         $records = $alerts->map(function (ControlRoomAlert $alert) use (
             $directEvents,
@@ -539,6 +550,7 @@ class IncidentJourneyService
                 ->groupBy(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'));
 
         $resolved = $records->map(function (array $record) use (
+            $currentClientOrganizationIds,
             $journeyEventsById,
             $journeyEventsByKey,
             $legacyJourneyAlerts,
@@ -584,10 +596,18 @@ class IncidentJourneyService
             }
 
             if ($directEvent !== null) {
-                $this->alertProvenance->assertHealthSafetyEventTuple($alert, $directEvent);
+                $this->alertProvenance->assertHealthSafetyEventTuple(
+                    $alert,
+                    $directEvent,
+                    $currentClientOrganizationIds,
+                );
             }
             if ($journeyEvent !== null) {
-                $this->alertProvenance->assertHealthSafetyEventTuple($alert, $journeyEvent);
+                $this->alertProvenance->assertHealthSafetyEventTuple(
+                    $alert,
+                    $journeyEvent,
+                    $currentClientOrganizationIds,
+                );
             }
             if ($directEvent !== null
                 && $journeyEvent !== null

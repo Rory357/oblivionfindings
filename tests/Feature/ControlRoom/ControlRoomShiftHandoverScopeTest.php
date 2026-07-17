@@ -19,6 +19,7 @@ use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
@@ -375,6 +376,142 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $this->assertNull($event->fresh()->control_room_alert_id);
     }
 
+    public function test_review_gap_scope_preserves_a_same_tenant_historical_site_after_the_client_moves(): void
+    {
+        $shift = $this->activeShift();
+        $currentSite = Site::factory()->create(['tenant_id' => 1]);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $currentSite->id,
+        ]);
+        $alert = $this->preExistingAlert('medium', [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $event = $this->eventFor($alert, [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'organization_id' => 1,
+            'accepted_at' => now()->subHour(),
+            'accepted_by_user_id' => $this->viewer->id,
+        ]);
+
+        $required = collect(
+            app(ControlRoomHandoverScopeService::class)
+                ->build($shift, $this->viewer)['required_alerts'],
+        );
+        $snapshot = $required->firstWhere('id', $alert->id);
+
+        $this->assertNotNull($snapshot);
+        $this->assertReason($required, $alert, 'governance_state_changed');
+        $this->assertSame(
+            $event->reference_number,
+            data_get($snapshot, 'journey.health_safety_reference'),
+        );
+        $this->assertSame($this->site->id, $event->fresh()->site_id);
+        $this->assertSame($currentSite->id, $client->fresh()->site_id);
+    }
+
+    public function test_historical_health_safety_tuple_fails_closed_when_the_client_belongs_to_another_tenant(): void
+    {
+        $foreignCurrentSite = Site::factory()->create(['tenant_id' => 2]);
+        $client = Client::factory()->create([
+            'organization_id' => 2,
+            'site_id' => $foreignCurrentSite->id,
+        ]);
+        $alert = $this->preExistingAlert('medium', [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $event = $this->eventFor($alert, [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'organization_id' => 1,
+            'accepted_at' => now()->subHour(),
+            'accepted_by_user_id' => $this->viewer->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('provenance conflict');
+
+        app(ControlRoomAlertProvenanceService::class)
+            ->assertHealthSafetyEventTuple($alert, $event);
+    }
+
+    public function test_historical_health_safety_tuple_rechecks_current_client_organization_instead_of_a_loaded_snapshot(): void
+    {
+        $currentSite = Site::factory()->create(['tenant_id' => 1]);
+        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $currentSite->id,
+        ]);
+        $alert = $this->preExistingAlert('medium', [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $event = $this->eventFor($alert, [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'organization_id' => 1,
+        ]);
+        $alert->load('client');
+        $client->update([
+            'organization_id' => 2,
+            'site_id' => $foreignSite->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('provenance conflict');
+
+        app(ControlRoomAlertProvenanceService::class)
+            ->assertHealthSafetyEventTuple($alert, $event);
+    }
+
+    public function test_historical_site_exception_rejects_context_only_client_identity(): void
+    {
+        $currentSite = Site::factory()->create(['tenant_id' => 1]);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $currentSite->id,
+        ]);
+        $alert = $this->preExistingAlert('medium', [
+            'client_id' => null,
+            'site_id' => $this->site->id,
+            'context' => ['client_id' => $client->id],
+        ]);
+        $event = $this->eventFor($alert, [
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'organization_id' => 1,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('provenance conflict');
+
+        app(ControlRoomAlertProvenanceService::class)
+            ->assertHealthSafetyEventTuple($alert, $event);
+    }
+
+    public function test_historical_health_safety_tuple_allows_an_exact_clientless_pair(): void
+    {
+        $alert = $this->preExistingAlert('medium', [
+            'client_id' => null,
+            'site_id' => $this->site->id,
+            'context' => [],
+        ]);
+        $event = $this->eventFor($alert, [
+            'client_id' => null,
+            'site_id' => $this->site->id,
+            'organization_id' => 1,
+        ]);
+
+        app(ControlRoomAlertProvenanceService::class)
+            ->assertHealthSafetyEventTuple($alert, $event);
+
+        $this->assertNull($event->client_id);
+    }
+
     public function test_review_gap_scope_fails_closed_when_multiple_health_safety_events_claim_one_alert(): void
     {
         $shift = $this->activeShift();
@@ -445,6 +582,48 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
             8,
             $queryCount,
             "Canonical batch resolution issued {$queryCount} queries for 40 alerts.",
+        );
+    }
+
+    public function test_review_gap_batches_current_client_organization_checks_for_an_uncapped_backlog(): void
+    {
+        $alerts = collect();
+        foreach (range(1, 40) as $index) {
+            $client = Client::factory()->create([
+                'organization_id' => 1,
+                'site_id' => $this->site->id,
+            ]);
+            $alert = $this->preExistingAlert('medium', [
+                'client_id' => $client->id,
+            ]);
+            $this->eventFor($alert, [
+                'client_id' => $client->id,
+                'accepted_at' => now()->subHour(),
+                'accepted_by_user_id' => $this->viewer->id,
+            ]);
+            $alerts->push($alert);
+        }
+        $loadedAlerts = ControlRoomAlert::query()
+            ->whereIn('id', $alerts->pluck('id'))
+            ->with([
+                'site:id,name,tenant_id',
+                'client:id,site_id,organization_id',
+                'client.site:id,tenant_id',
+            ])
+            ->get();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $records = app(IncidentJourneyService::class)
+            ->governanceRecordsForAlerts($loadedAlerts);
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertCount(40, $records);
+        $this->assertLessThanOrEqual(
+            9,
+            $queryCount,
+            "Client-bearing canonical batch resolution issued {$queryCount} queries for 40 alerts.",
         );
     }
 

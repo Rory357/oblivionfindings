@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use DomainException;
+use Illuminate\Support\Collection;
 
 /**
  * Resolves and validates the ownership tuple behind a Control Room alert.
@@ -411,6 +412,7 @@ class ControlRoomAlertProvenanceService
     public function assertHealthSafetyEventTuple(
         ControlRoomAlert $alert,
         HsEvent $event,
+        ?Collection $currentClientOrganizationIds = null,
     ): void {
         $alertSiteId = $this->authoritativeSiteId($alert);
         $alertClientId = $this->authoritativeClientId($alert);
@@ -455,7 +457,11 @@ class ControlRoomAlertProvenanceService
             || (int) $event->organization_id !== (int) $siteTenantId
             || $clientMismatch
             || $assetMismatch
-            || ! $this->clientMatchesAlert($alert)
+            || ! $this->clientOrganizationMatchesTenant(
+                $alert,
+                (int) $siteTenantId,
+                $currentClientOrganizationIds,
+            )
             || ! $assetMatches
             || ! $fleetSignalMatches
             || ! $deviceMatches
@@ -464,6 +470,28 @@ class ControlRoomAlertProvenanceService
                 'H&S handover provenance conflict: the alert and H&S event do not share one client, site, and tenant ownership tuple.',
             );
         }
+    }
+
+    private function clientOrganizationMatchesTenant(
+        ControlRoomAlert $alert,
+        int $siteTenantId,
+        ?Collection $currentClientOrganizationIds,
+    ): bool {
+        $clientId = $this->authoritativeClientId($alert);
+        if ($clientId === null) {
+            return true;
+        }
+
+        if (! is_numeric($alert->client_id) || (int) $alert->client_id !== $clientId) {
+            return $this->clientMatchesAlert($alert);
+        }
+
+        $organizationId = $currentClientOrganizationIds === null
+            ? Client::query()->whereKey($clientId)->value('organization_id')
+            : $currentClientOrganizationIds->get($clientId);
+
+        return is_numeric($organizationId)
+            && (int) $organizationId === $siteTenantId;
     }
 
     private function clientMatchesTuple(Client $client, ?int $siteId): bool
