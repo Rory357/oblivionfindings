@@ -9,7 +9,9 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ControlRoomShiftControllerTest extends TestCase
@@ -62,6 +64,40 @@ class ControlRoomShiftControllerTest extends TestCase
                 ->where('criticalAlertsCount', 1)
                 ->has('staff', 2)
             );
+    }
+
+    public function test_shift_index_avoids_a_mixed_status_recent_shift_sort_query(): void
+    {
+        Shift::query()->create([
+            'name' => 'Completed Shift',
+            'starts_at' => now()->subHours(2),
+            'ends_at' => now()->subHour(),
+            'status' => 'completed',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+
+        $shiftQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$shiftQueries): void {
+            if (str_contains(strtolower($query->sql), 'control_room_shifts')) {
+                $shiftQueries[] = str_replace('`', '"', strtolower($query->sql));
+            }
+        });
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room/shifts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('recentShifts.0.name', 'Completed Shift')
+            );
+
+        $this->assertFalse(
+            collect($shiftQueries)->contains(
+                fn (string $sql): bool => str_contains($sql, 'status" in')
+                    && str_contains($sql, 'order by "starts_at" desc'),
+            ),
+            'Recent shifts must not use the mixed-status filesort query that exhausted MySQL sort memory after handover acceptance.',
+        );
     }
 
     public function test_shift_store_rejects_out_of_scope_staff_selection(): void

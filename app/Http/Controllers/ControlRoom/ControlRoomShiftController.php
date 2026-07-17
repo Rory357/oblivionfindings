@@ -94,7 +94,7 @@ class ControlRoomShiftController extends Controller
         }
 
         // Recent completed shifts
-        $recentShifts = Shift::whereIn('status', ['completed', 'handover'])
+        $recentShifts = Shift::where('status', 'completed')
             ->with('shiftLead:id,name')
             ->orderByDesc('starts_at')
             ->limit(10)
