@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     fmt,
@@ -265,15 +266,6 @@ const TABLE_TITLE: Record<string, string> = {
 
 const TRACEABILITY_REPORT =
     '/health-safety/reports/corrective-action-traceability';
-
-function fmtDate(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-}
 
 /* date helpers (browser-local) */
 const todayStr = () => {
@@ -980,7 +972,7 @@ function ActionTable({
                                         )}
                                     >
                                         <Clock className="h-3.5 w-3.5" />
-                                        {fmtDate(action.due_date)}
+                                        {formatDateOnly(action.due_date)}
                                     </div>
                                     <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
                                         {action.is_overdue

@@ -1998,7 +1998,7 @@ Completed evidence:
 - Modify: `tests/Feature/HealthSafety/HsCorrectiveActionTest.php`
 - Modify: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 
-- [ ] **Step 1: Write failing controlled Select tests**
+- [x] **Step 1: Write failing controlled Select tests**
 
 Prove:
 
@@ -2019,7 +2019,7 @@ expect(error).not.toHaveBeenCalledWith(
 );
 ```
 
-- [ ] **Step 2: Write failing date-only tests**
+- [x] **Step 2: Write failing date-only tests**
 
 ```tsx
 expect(formatDateOnly('2026-07-21', 'Pacific/Auckland')).toBe('21 Jul 2026');
@@ -2028,14 +2028,14 @@ expect(formatDateOnly('2026-07-21', 'America/Los_Angeles')).toBe('21 Jul 2026');
 
 Backend tests must assert stored/presented `target_completion_date` and `due_date` remain exactly `2026-07-21`.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```powershell
 npx vitest run resources/js/components/wizard/primitives.test.tsx resources/js/lib/datetime.test.ts resources/js/components/control-room/select-regressions.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx
 php artisan test tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php
 ```
 
-- [ ] **Step 4: Keep `SelectInput` controlled from first render**
+- [x] **Step 4: Keep `SelectInput` controlled from first render**
 
 Replace:
 
@@ -2051,7 +2051,7 @@ with:
 
 Use a named non-empty sentinel only where a Radix item represents “none”; translate it at the component boundary.
 
-- [ ] **Step 5: Add a date-only formatter that never creates an instant**
+- [x] **Step 5: Add a date-only formatter that never creates an instant**
 
 ```ts
 export function formatDateOnly(
@@ -2073,19 +2073,27 @@ export function formatDateOnly(
 
 Use it for investigation target and corrective-action due dates. Do not use `formatDateTime`, `new Date('YYYY-MM-DD')` in feature components, or `toISOString()` for these fields.
 
-- [ ] **Step 6: Re-run tests**
+- [x] **Step 6: Re-run tests**
 
 ```powershell
 npx vitest run resources/js/components/wizard/primitives.test.tsx resources/js/lib/datetime.test.ts resources/js/components/control-room/select-regressions.test.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx
 php artisan test tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add resources/js/components/wizard/primitives.tsx resources/js/components/wizard/primitives.test.tsx resources/js/lib/datetime.ts resources/js/lib/datetime.test.ts resources/js/components/health-safety/event-detail-dialog.tsx resources/js/components/health-safety/event-detail-dialog.test.tsx resources/js/pages/health-safety/corrective-actions/index.tsx resources/js/pages/health-safety/components/worklists.tsx resources/js/components/control-room/new-alert-wizard.tsx resources/js/components/control-room/alert-workspace-dialog.tsx resources/js/components/control-room/select-regressions.test.tsx tests/Feature/HealthSafety/HsInvestigationTest.php tests/Feature/HealthSafety/HsCorrectiveActionTest.php docs/audits/control-room-hs-remediation-ledger-2026-07-16.md
 git commit -m "fix(ui): stabilize selects and date-only values"
 ```
+
+Task 17 completed:
+
+- the shared Radix Select boundary preserves the empty string as a controlled value from first render, with an explicit regression test preventing uncontrolled-to-controlled warnings;
+- the real Control Room client and task-assignee pickers have mouse, keyboard, exact-ID, reopened-state, and competing-highlight regression coverage;
+- `formatDateOnly` validates and renders calendar dates without ever creating a JavaScript instant, and investigation target plus corrective-action due dates use it across H&S detail, register, and worklist surfaces;
+- backend date persistence/presentation passes 73 tests with 179 assertions; the planned frontend set passes 4 files with 32 tests, and the expanded affected set passes 5 files with 43 tests;
+- TypeScript, targeted ESLint, Prettier, Pint, PHP syntax, diff integrity, client build (4,968 modules in 3m 1s), and SSR build (1,620 modules in 39.90s) are clean.
 
 ## Task 18: Finish H&S worklists, navigation, focus, terminology, and activity copy
 

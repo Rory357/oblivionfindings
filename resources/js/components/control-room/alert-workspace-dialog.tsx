@@ -360,6 +360,28 @@ function isOperationalTaskOpen(status: string): boolean {
     return !['completed', 'cancelled', 'transferred'].includes(status);
 }
 
+export function TaskAssigneeSelect({
+    value,
+    onChange,
+    staff,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    staff: Array<{ id: number; name: string }>;
+}) {
+    return (
+        <SelectInput
+            value={value}
+            onChange={onChange}
+            placeholder="Unassigned"
+            options={staff.map((person) => ({
+                value: String(person.id),
+                label: person.name,
+            }))}
+        />
+    );
+}
+
 const STATUS_META: Record<string, { label: string; tone: string }> = {
     open: { label: 'Open', tone: 'critical' },
     ack: { label: 'Acknowledged', tone: 'warning' },
@@ -3717,14 +3739,10 @@ function EditTaskForm({
                     />
                 </Field>
                 <Field label="Assign to">
-                    <SelectInput
+                    <TaskAssigneeSelect
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
+                        staff={d.staff}
                     />
                 </Field>
                 <Field label="Due">
@@ -3883,14 +3901,10 @@ function AddTaskForm({
                     />
                 </Field>
                 <Field label="Assign to">
-                    <SelectInput
+                    <TaskAssigneeSelect
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
+                        staff={d.staff}
                     />
                 </Field>
                 <Field label="Due">

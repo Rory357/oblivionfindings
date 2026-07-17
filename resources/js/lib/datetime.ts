@@ -27,6 +27,71 @@ const DEFAULT_FALLBACK = '—';
 
 type DateInput = string | number | Date | null | undefined;
 
+/**
+ * "21 Jul 2026" — a calendar date that never becomes a JavaScript instant.
+ *
+ * Database `date` columns arrive as YYYY-MM-DD and must display identically in
+ * every browser timezone. Parsing that shape with `new Date()` silently turns
+ * midnight UTC into a different local day.
+ */
+export function formatDateOnly(
+    value: string | null | undefined,
+    fallback = DEFAULT_FALLBACK,
+): string {
+    if (!value) return fallback;
+
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return fallback;
+
+    const [, year, month, day] = match;
+    const monthNumber = Number(month);
+    const dayNumber = Number(day);
+    const yearNumber = Number(year);
+    const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+    ];
+    const monthLabel = months[monthNumber - 1];
+    const leapYear =
+        yearNumber % 4 === 0 &&
+        (yearNumber % 100 !== 0 || yearNumber % 400 === 0);
+    const daysInMonth = [
+        31,
+        leapYear ? 29 : 28,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ][monthNumber - 1];
+
+    if (
+        !monthLabel ||
+        !daysInMonth ||
+        dayNumber < 1 ||
+        dayNumber > daysInMonth
+    ) {
+        return fallback;
+    }
+
+    return `${dayNumber} ${monthLabel} ${year}`;
+}
+
 function toDate(value: DateInput): Date | null {
     if (value === null || value === undefined || value === '') return null;
     const d = value instanceof Date ? value : new Date(value);
@@ -80,7 +145,10 @@ export function formatDateForFilename(
  * "Fri 17 Apr" — short weekday, day, short month. No year (workers are in
  * the now; year appears only when explicitly needed elsewhere).
  */
-export function formatDate(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+export function formatDate(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
     const d = toDate(value);
     if (!d) return fallback;
     return d
@@ -98,7 +166,10 @@ export function formatDate(value: DateInput, fallback: string = DEFAULT_FALLBACK
  * "8:00 pm" — 12-hour, lowercase am/pm, single space. Consistent across
  * shift times, med times, clock-in/out, handover submitted, etc.
  */
-export function formatTime(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+export function formatTime(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
     const d = toDate(value);
     if (!d) return fallback;
     const raw = d.toLocaleTimeString(WORKER_LOCALE, {
@@ -117,7 +188,10 @@ export function formatTime(value: DateInput, fallback: string = DEFAULT_FALLBACK
 }
 
 /** "Fri 17 Apr, 8:00 pm" — the default frontline timestamp. */
-export function formatDateTime(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+export function formatDateTime(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
     const d = toDate(value);
     if (!d) return fallback;
     return `${formatDate(d)}, ${formatTime(d)}`;
@@ -127,7 +201,10 @@ export function formatDateTime(value: DateInput, fallback: string = DEFAULT_FALL
  * "17 April 2026" — long-form date for records, registers and audit views
  * where the year matters (incident logs, hazard registers, respite stays).
  */
-export function formatDateLong(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+export function formatDateLong(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
     const d = toDate(value);
     if (!d) return fallback;
     return d.toLocaleDateString(WORKER_LOCALE, {
@@ -139,7 +216,10 @@ export function formatDateLong(value: DateInput, fallback: string = DEFAULT_FALL
 }
 
 /** "17 April 2026, 8:00 pm" — long-form timestamp for record views. */
-export function formatDateTimeLong(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+export function formatDateTimeLong(
+    value: DateInput,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
     const d = toDate(value);
     if (!d) return fallback;
     return `${formatDateLong(d)}, ${formatTime(d)}`;
@@ -163,7 +243,8 @@ export function toDatetimeLocal(value: DateInput): string {
         minute: '2-digit',
         hour12: false,
     }).formatToParts(d);
-    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    const get = (type: string) =>
+        parts.find((p) => p.type === type)?.value ?? '';
     const hour = get('hour') === '24' ? '00' : get('hour');
     return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
 }

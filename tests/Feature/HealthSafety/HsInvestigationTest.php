@@ -2,12 +2,17 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsInvestigationService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class HsInvestigationTest extends TestCase
@@ -133,6 +138,48 @@ class HsInvestigationTest extends TestCase
             now()->addDays(14)->toDateString(),
             $highInv->target_completion_date->toDateString()
         );
+    }
+
+    public function test_target_completion_date_is_stored_and_presented_as_the_exact_calendar_date(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $viewer = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
+        $hazardsView = Permission::query()->where('key', 'hazards.view')->firstOrFail();
+        $viewer->permissionOverrides()->sync([
+            $hazardsView->id => ['allowed' => true],
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => 1,
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ]);
+        $event = HsEvent::factory()->high()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
+        $investigation = HsInvestigation::factory()->create([
+            'hs_event_id' => $event->id,
+            'target_completion_date' => '2026-07-21',
+        ]);
+
+        $this->assertDatabaseHas('hs_investigations', [
+            'id' => $investigation->id,
+            'target_completion_date' => '2026-07-21',
+        ]);
+        $this->actingAs($viewer)
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where(
+                    'detail.investigations.0.target_completion_date',
+                    '2026-07-21',
+                )
+            );
     }
 
     // ──────────────────────────────────────────────────────

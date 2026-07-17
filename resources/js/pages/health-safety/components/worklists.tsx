@@ -10,6 +10,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -216,7 +217,7 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
         title: r.title ?? r.reference ?? `Corrective action #${r.id}`,
         sub: [r.reference, titleCase(r.priority)].filter(Boolean).join(' · '),
         owner: r.owner,
-        due: fmtDate(r.due_date),
+        due: formatDateOnly(r.due_date),
         clientId: r.client_id,
         staffId: r.staff_id,
         registerUrl: '/health-safety/corrective-actions',
@@ -241,7 +242,7 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
                 { label: 'Title', value: r.title },
                 { label: 'Priority', value: titleCase(r.priority) },
                 { label: 'Status', value: titleCase(r.status) },
-                { label: 'Due date', value: fmtDate(r.due_date) },
+                { label: 'Due date', value: formatDateOnly(r.due_date) },
                 {
                     label: 'Days overdue',
                     value: r.days_overdue != null ? `${r.days_overdue}` : '—',
@@ -262,7 +263,7 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
         title: `Investigation ${r.reference ?? `#${r.id}`}`,
         sub: titleCase(r.type),
         owner: r.owner,
-        due: fmtDate(r.target_completion_date),
+        due: formatDateOnly(r.target_completion_date),
         clientId: r.client_id,
         staffId: r.staff_id,
         registerUrl: '/health-safety/events',
@@ -288,7 +289,7 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
                 { label: 'Status', value: titleCase(r.status) },
                 {
                     label: 'Target completion',
-                    value: fmtDate(r.target_completion_date),
+                    value: formatDateOnly(r.target_completion_date),
                 },
                 { label: 'Overdue', value: r.is_overdue ? 'Yes' : 'No' },
                 { label: 'Lead investigator', value: r.owner },

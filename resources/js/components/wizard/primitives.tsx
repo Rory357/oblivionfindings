@@ -16,7 +16,14 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Check } from 'lucide-react';
-import { cloneElement, isValidElement, useId, type ComponentType, type ReactElement, type ReactNode } from 'react';
+import {
+    cloneElement,
+    isValidElement,
+    useId,
+    type ComponentType,
+    type ReactElement,
+    type ReactNode,
+} from 'react';
 
 export type IconType = ComponentType<{ className?: string }>;
 
@@ -71,16 +78,23 @@ export function Field({
     // composite controls — Select/TilePicker/fragments — are left untouched and
     // the htmlFor simply doesn't bind, exactly as before).
     const generatedId = useId();
-    const child = isValidElement(children) ? (children as ReactElement<{ id?: string }>) : null;
+    const child = isValidElement(children)
+        ? (children as ReactElement<{ id?: string }>)
+        : null;
     const controlId = child && child.props.id == null ? generatedId : undefined;
     const control = controlId
-        ? cloneElement(child as ReactElement<{ id?: string }>, { id: controlId })
+        ? cloneElement(child as ReactElement<{ id?: string }>, {
+              id: controlId,
+          })
         : children;
 
     return (
         <div className={cn('min-w-0', span && 'sm:col-span-2')}>
             {label ? (
-                <Label htmlFor={controlId} className="mb-1.5 flex items-center gap-1.5">
+                <Label
+                    htmlFor={controlId}
+                    className="mb-1.5 flex items-center gap-1.5"
+                >
                     {label}
                     {required ? (
                         <span className="text-status-critical">*</span>
@@ -106,7 +120,7 @@ export function SubHead({
     children: ReactNode;
 }) {
     return (
-        <div className="col-span-full mt-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <div className="col-span-full mt-1 flex items-center gap-2 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
             <Icon className="h-3.5 w-3.5" />
             {children}
         </div>
@@ -150,7 +164,12 @@ export function InfoCard({
         crit: 'border-status-critical/35 bg-status-critical-bg text-status-critical',
     }[tone];
     return (
-        <div className={cn('col-span-full flex gap-2.5 rounded-lg border p-3', tones)}>
+        <div
+            className={cn(
+                'col-span-full flex gap-2.5 rounded-lg border p-3',
+                tones,
+            )}
+        >
             <Icon className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="text-[13px] leading-relaxed text-foreground">
                 {children}
@@ -179,8 +198,14 @@ export function SelectInput({
     ariaLabel?: string;
 }) {
     return (
+        // Keep the empty string as a real controlled value. Converting it to
+        // undefined makes Radix switch ownership mid-session and can commit a
+        // highlighted option instead of the option the worker clicked.
         <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="w-full" aria-label={ariaLabel ?? placeholder}>
+            <SelectTrigger
+                className="w-full"
+                aria-label={ariaLabel ?? placeholder}
+            >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
@@ -220,7 +245,8 @@ export function Segmented<T extends string>({
                             active
                                 ? 'bg-card text-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground',
-                            o.disabled && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+                            o.disabled &&
+                                'cursor-not-allowed opacity-50 hover:text-muted-foreground',
                         )}
                     >
                         {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
@@ -242,7 +268,9 @@ export function ChipMulti({
     options: string[];
 }) {
     const toggle = (o: string) =>
-        onChange(values.includes(o) ? values.filter((v) => v !== o) : [...values, o]);
+        onChange(
+            values.includes(o) ? values.filter((v) => v !== o) : [...values, o],
+        );
     return (
         <div className="flex flex-wrap gap-1.5">
             {options.map((o) => {
@@ -292,7 +320,9 @@ export function TilePicker({
         <div
             className={cn(
                 'grid gap-2',
-                cols === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2',
+                cols === 3
+                    ? 'grid-cols-2 sm:grid-cols-3'
+                    : 'grid-cols-1 sm:grid-cols-2',
             )}
         >
             {options.map((o) => {
@@ -323,13 +353,16 @@ export function TilePicker({
                                         'h-4 w-4',
                                         active
                                             ? 'text-primary'
-                                            : (o.accent ?? 'text-muted-foreground'),
+                                            : (o.accent ??
+                                                  'text-muted-foreground'),
                                     )}
                                 />
                             </span>
                         ) : null}
                         <span className="min-w-0">
-                            <span className="block text-sm font-semibold">{o.label}</span>
+                            <span className="block text-sm font-semibold">
+                                {o.label}
+                            </span>
                             {o.description ? (
                                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                                     {o.description}
@@ -353,7 +386,10 @@ export function Ring({ pct, size = 56 }: { pct: number; size?: number }) {
     const r = (size - 7) / 2;
     const c = 2 * Math.PI * r;
     return (
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div
+            className="relative shrink-0"
+            style={{ width: size, height: size }}
+        >
             <svg width={size} height={size} className="-rotate-90">
                 <circle
                     cx={size / 2}

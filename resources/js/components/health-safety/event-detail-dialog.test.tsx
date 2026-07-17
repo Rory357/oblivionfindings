@@ -978,6 +978,7 @@ describe('EventDetailDialog recommendation outcomes', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
 
+        expect(screen.getByText(/Due 21 Jul 2026/)).toBeInTheDocument();
         expect(screen.getByText('Accepted risk')).toBeInTheDocument();
         expect(
             screen.getByText('Residual risk is within tolerance.'),
@@ -1121,7 +1122,7 @@ describe('EventDetailDialog corrective-action provenance', () => {
                             id: 8,
                             name: 'Playwright Incident Reviewer',
                         },
-                        due_date: '2026-08-31',
+                        due_date: '2026-07-21',
                         is_overdue: false,
                         completed_at: null,
                         completed_by_user_id: null,
@@ -1168,6 +1169,7 @@ describe('EventDetailDialog corrective-action provenance', () => {
         expect(
             screen.getByText('Playwright Incident Reviewer', { exact: false }),
         ).toBeInTheDocument();
+        expect(screen.getByText(/due 21 Jul 2026/)).toBeInTheDocument();
         expect(
             screen.getByText(
                 'Recommendation: Install a permanent bathroom safety rail.',

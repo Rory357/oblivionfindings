@@ -41,12 +41,19 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_creates_action_from_recommendation(): void
     {
-        ['investigation' => $investigation, 'owner' => $owner, 'actor' => $actor] = $this->recommendationJourney();
+        [
+            'investigation' => $investigation,
+            'owner' => $owner,
+            'actor' => $actor,
+            'event' => $event,
+        ] = $this->recommendationJourney();
 
         $action = $this->service->createFromRecommendation(
             $investigation,
             0,
-            $this->newResponsibilityPayload($owner),
+            $this->newResponsibilityPayload($owner, [
+                'due_date' => '2026-07-21',
+            ]),
             $actor,
         );
 
@@ -56,7 +63,7 @@ class HsCorrectiveActionTest extends TestCase
             'recommendation_index' => 0,
             'status' => HsCorrectiveAction::STATUS_OPEN,
             'assigned_to_user_id' => $owner->id,
-            'due_date' => '2026-08-31',
+            'due_date' => '2026-07-21',
         ]);
         $this->assertDatabaseHas('hs_recommendation_dispositions', [
             'hs_investigation_id' => $investigation->id,
@@ -72,6 +79,17 @@ class HsCorrectiveActionTest extends TestCase
             'This is a new H&S responsibility because no operational task covers the recommendation.',
             $action->description,
         );
+
+        $hazardsView = Permission::query()->where('key', 'hazards.view')->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $hazardsView->id => ['allowed' => true],
+        ]);
+        $this->actingAs($actor)
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.corrective_actions.0.due_date', '2026-07-21')
+            );
     }
 
     public function test_exact_retry_returns_the_same_action_and_transfers_the_same_task_once(): void

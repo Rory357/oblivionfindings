@@ -45,7 +45,7 @@ import {
     WizardShell,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -2833,7 +2833,7 @@ function VerifyActionPane({
                         </dt>
                         <dd>
                             {ca.due_date
-                                ? formatDateTime(ca.due_date)
+                                ? formatDateOnly(ca.due_date)
                                 : 'Not recorded'}
                         </dd>
                     </div>
@@ -4008,7 +4008,7 @@ function InvestigationSection({
                             {inv.target_completion_date ? (
                                 <span>
                                     Due{' '}
-                                    {formatDateTime(inv.target_completion_date)}
+                                    {formatDateOnly(inv.target_completion_date)}
                                 </span>
                             ) : null}
                         </div>
@@ -4299,7 +4299,7 @@ function ActionsSection({
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {a.assigned_to_name ?? 'Unassigned'}
                                         {a.due_date
-                                            ? ` · due ${formatDateTime(a.due_date)}`
+                                            ? ` · due ${formatDateOnly(a.due_date)}`
                                             : ''}
                                         {a.is_overdue &&
                                         a.status !== 'verified' &&

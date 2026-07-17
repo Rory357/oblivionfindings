@@ -2,12 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import {
     formatDateForFilename,
+    formatDateOnly,
     formatMonthYear,
     toDateInput,
     toDatetimeLocal,
 } from './datetime';
 
 describe('NZ date input and filename boundaries', () => {
+    it('formats a date-only value without shifting it through a timezone', () => {
+        expect(formatDateOnly('2026-07-21', 'Pacific/Auckland')).toBe(
+            '21 Jul 2026',
+        );
+        expect(formatDateOnly('2026-07-21', 'America/Los_Angeles')).toBe(
+            '21 Jul 2026',
+        );
+        expect(formatDateOnly('2026-02-31')).toBe('—');
+    });
+
     it('uses the Auckland calendar date for a morning instant that is still the prior UTC day', () => {
         const aucklandMorning = new Date('2026-07-12T20:15:00.000Z');
 
