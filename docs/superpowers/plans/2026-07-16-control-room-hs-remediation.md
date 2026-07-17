@@ -2333,18 +2333,24 @@ php artisan test tests/Feature/ControlRoom tests/Feature/Incidents tests/Feature
 
 Expected: zero failures. Record exact test and assertion counts.
 
-Result: the final post-review rerun passed 1,303 tests and 10,111 assertions in
-1,870.73 seconds. The first Task 20 run found one stale workflow request fixture
+Result: the final post-review rerun passed 1,308 tests and 10,135 assertions in
+1,863.15 seconds. The first Task 20 run found one stale workflow request fixture
 using the retired verification field; that fixture now submits the current
 `evidence_reviewed` and `effective` contract. Live pre-seeding inspection then
 exposed 80 legacy H&S rows without organization provenance, including one
-unscoped safeguarding source tuple. A conservative migration and ten-test,
-75-assertion regression now repair only provable tenant/site ownership, reject
+unscoped safeguarding source tuple. The first conservative migration and
+ten-test, 75-assertion regression repair only canonical ownership and reject
 every conflicting H&S, Incident, signal, asset, fleet, device, client, site,
-and context claimant, retain ambiguous rows as null, and prove a fresh install
-does not create a foreign key to a nonexistent `organizations` table. The full
-matrix was rerun from scratch after the fresh-install defect and all independent
-review findings were reproduced and fixed.
+and context claimant. Its live run repaired 59 rows and deliberately retained
+21 historical-site rows whose clients had since moved. Live reconciliation
+then proved each retained event's historical site tenant and client
+organization still agree, and found four equivalent Client-subject
+safeguarding concerns. A second additive migration records that independently
+proven tenant without rewriting any historical site, client, subject, or
+source identity. Its five-test, 24-assertion regression rejects cross-tenant
+and missing-subject tuples and retains provenance on rollback. The full matrix
+was rerun from scratch after both migrations and all independent review
+findings were reproduced and fixed.
 
 - [x] **Step 2: Run all changed frontend tests**
 
@@ -2354,7 +2360,7 @@ npx vitest run resources/js/components/control-room resources/js/components/inci
 
 Expected: zero failures and zero React controlled/uncontrolled warnings.
 
-Result: 23 files and 122 tests passed in 10.17 seconds with no React
+Result: 23 files and 122 tests passed in 10.00 seconds with no React
 controlled/uncontrolled warning.
 
 - [x] **Step 3: Generate routes and run static checks**
@@ -2413,8 +2419,8 @@ try {
 
 Expected: client and SSR builds exit 0.
 
-Result: the production client built 4,970 modules in 2m 43s and the SSR bundle
-built 1,622 modules in 37.66 seconds.
+Result: the production client built 4,970 modules in 2m 46s and the SSR bundle
+built 1,622 modules in 37.74 seconds.
 
 - [x] **Step 5: Run production-built browser suites**
 
@@ -2442,7 +2448,7 @@ try {
 
 Expected: all scenarios pass.
 
-Result: both production-built specifications passed in 2.6 minutes with the
+Result: both production-built specifications passed in 2.5 minutes with the
 dedicated PHPUnit database environment and a database-backed browser session.
 
 - [x] **Step 6: Self-review against all 19 findings**
@@ -2508,7 +2514,9 @@ closed fail-closed claimant gaps across HR profile tenants, shared alerts,
 same-source H&S rows, direct and legacy Incident links, Control Room signals,
 nested asset/fleet/device fields, and context ownership. The final reviewer
 verdict is `Ready to merge: Yes`; every Critical, Important, and Minor finding
-is closed.
+is closed. A separate review of the same-tenant historical-site follow-up
+closed its Client-subject scoping, missing-subject, and rollback-retention
+coverage gaps. Its final verdict is also `Ready to merge: Yes`.
 
 - [x] **Step 8: Commit release-gate fixes and ledger evidence**
 
