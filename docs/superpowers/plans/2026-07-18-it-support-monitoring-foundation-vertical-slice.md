@@ -71,7 +71,7 @@
 - Create: `database/factories/MonitorObservationFactory.php`
 - Test: `tests/Feature/Monitoring/MonitoringSchemaTest.php`
 
-- [ ] **Step 1: Write the failing schema/model test**
+- [x] **Step 1: Write the failing schema/model test**
 
 ```php
 <?php
@@ -119,7 +119,7 @@ it('stores collector profile monitor and honest current state', function () {
 });
 ```
 
-- [ ] **Step 2: Run the schema/model test and verify RED**
+- [x] **Step 2: Run the schema/model test and verify RED**
 
 Run:
 
@@ -129,7 +129,7 @@ php artisan test tests/Feature/Monitoring/MonitoringSchemaTest.php
 
 Expected: FAIL because monitoring tables, enums, models, and factories do not exist.
 
-- [ ] **Step 3: Add the state and kind enums**
+- [x] **Step 3: Add the state and kind enums**
 
 ```php
 <?php
@@ -173,7 +173,7 @@ enum MonitorKind: string
 }
 ```
 
-- [ ] **Step 4: Add the migration with tenant-scoped indexes and idempotent observations**
+- [x] **Step 4: Add the migration with tenant-scoped indexes and idempotent observations**
 
 The migration must create:
 
@@ -248,11 +248,11 @@ Schema::create('monitor_observations', function (Blueprint $table) {
 });
 ```
 
-- [ ] **Step 5: Implement focused models and factories**
+- [x] **Step 5: Implement focused models and factories**
 
 Each model uses `HasFactory`, explicit fillable/casts, `scopeForTenant`, and only its direct relationships. `Monitor` casts `kind` and `current_state` to the enums. `MonitorObservation` uses immutable evidence semantics: no update helpers are exposed.
 
-- [ ] **Step 6: Run the focused test and verify GREEN**
+- [x] **Step 6: Run the focused test and verify GREEN**
 
 Run:
 
@@ -262,7 +262,7 @@ php artisan test tests/Feature/Monitoring/MonitoringSchemaTest.php
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the monitoring foundation schema**
+- [x] **Step 7: Commit the monitoring foundation schema**
 
 ```powershell
 git add database/migrations/2026_07_18_100001_create_monitoring_foundation_tables.php app/Domain/Monitoring database/factories/Monitoring* tests/Feature/Monitoring/MonitoringSchemaTest.php
