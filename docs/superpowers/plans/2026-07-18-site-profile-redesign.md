@@ -485,21 +485,21 @@ Run: `git add resources/js/pages/sites/tabs/hazards.tsx resources/js/pages/sites
 - Create: `resources/js/test/site-profile-operations-tabs.test.tsx`
 - Modify: `tests/Feature/SiteControllerTest.php`
 
-- [ ] **Step 1: Write failing Operations ownership tests**
+- [x] **Step 1: Write failing Operations ownership tests**
 
 Prove Checklists renders bounded status counts and `/sites/{site}/checklists`, never `ChecklistsWorkspace`; Meal Planner reuses its existing canonical embedded component; Assets/Fleet/Hardware render summaries and filtered owner links; Plan & Rooms remains Site-owned; head office hides Meal Planner.
 
-- [ ] **Step 2: Prove the test fails**
+- [x] **Step 2: Prove the test fails**
 
 Run: `npm test -- resources/js/test/site-profile-operations-tabs.test.tsx`
 
 Expected: FAIL because `show.tsx` imports and renders the full Checklists workspace.
 
-- [ ] **Step 3: Extract Operations components and remove eager registers**
+- [x] **Step 3: Extract Operations components and remove eager registers**
 
 Delete the profile import/host for `ChecklistsWorkspace`. Keep only current/due/overdue counts, recent bounded activity, and the canonical workspace link in `operationsData`. Preserve Meal Planner’s established lazy import and embedded contract rather than copying its forms.
 
-- [ ] **Step 4: Verify Operations and Checklists compatibility**
+- [x] **Step 4: Verify Operations and Checklists compatibility**
 
 Run: `npm test -- resources/js/test/site-profile-operations-tabs.test.tsx resources/js/test/site-profile-shell.test.tsx`
 
@@ -507,7 +507,7 @@ Run: `php artisan test tests/Feature/SiteControllerTest.php --filter="checklist|
 
 Expected: PASS with compact Checklists assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add resources/js/pages/sites/tabs/calendar.tsx resources/js/pages/sites/tabs/checklists.tsx resources/js/pages/sites/tabs/meal-planner.tsx resources/js/pages/sites/tabs/assets.tsx resources/js/pages/sites/tabs/fleet.tsx resources/js/pages/sites/tabs/hardware.tsx resources/js/pages/sites/tabs/plan.tsx resources/js/pages/sites/show.tsx resources/js/test/site-profile-operations-tabs.test.tsx tests/Feature/SiteControllerTest.php && git diff --cached --check && git commit -m "refactor(sites): slim site operations tabs"`
 

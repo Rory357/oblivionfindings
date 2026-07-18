@@ -8,9 +8,13 @@ import {
     CheckCircle2,
     ExternalLink,
 } from 'lucide-react';
-import { SiteProfileEmptyState } from './site-profile-states';
+import {
+    SiteProfileEmptyState,
+    SiteProfileLockedState,
+} from './site-profile-states';
 
 export type SiteProfileSummaryModule = {
+    locked?: boolean;
     items?: Array<Record<string, unknown>>;
     summary?: Record<string, unknown> | null;
     href?: string | null;
@@ -27,6 +31,8 @@ export function SiteProfileModuleSummary({
     data: SiteProfileSummaryModule;
     actionLabel?: string;
 }) {
+    if (data.locked) return <SiteProfileLockedState label={label} />;
+
     const items = data.items ?? [];
 
     return (
@@ -79,6 +85,8 @@ export function SiteProfileModuleSummary({
                                 item.due_date ??
                                 item.review_due_at ??
                                 item.next_due_date ??
+                                item.start_at ??
+                                item.scheduled_date ??
                                 item.scheduled_at ??
                                 item.treatment_date ??
                                 item.expiry_date ??
@@ -136,7 +144,7 @@ export function SiteProfileModuleSummary({
                         })}
                     </CardContent>
                 </Card>
-            ) : (
+            ) : !data.summary ? (
                 <SiteProfileEmptyState
                     title={`No ${label.toLowerCase()} to show`}
                     description={`There are no current ${label.toLowerCase()} records for this Site.`}
@@ -146,7 +154,7 @@ export function SiteProfileModuleSummary({
                             : undefined
                     }
                 />
-            )}
+            ) : null}
         </div>
     );
 }

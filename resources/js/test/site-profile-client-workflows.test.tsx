@@ -43,4 +43,17 @@ describe('site profile client workflow ownership', () => {
         expect(existsSync(legacyDialogs)).toBe(false);
         expect(routes).not.toContain("name('sites.clients.store')");
     });
+
+    it('keeps room placement in one room assignment dialog', () => {
+        const source = readFileSync(
+            resolve(root, 'resources/js/pages/sites/rooms/_dialogs.tsx'),
+            'utf8',
+        );
+
+        expect(source).toContain('export function AssignClientToRoomDialog');
+        expect(source).not.toContain('AssignRoomToClientDialog');
+        expect(source).not.toContain(
+            'assigned_client_id: room.assigned_client',
+        );
+    });
 });

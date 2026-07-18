@@ -407,9 +407,10 @@ class SiteProfileData
                 ])->values()
             : collect();
 
-        $checklists = $user->canDo('checklists.view')
-            ? SiteChecklistRun::query()
-                ->where('site_id', $site->id)
+        $canViewChecklists = $user->canDo('checklists.view');
+        $checklistsQuery = SiteChecklistRun::query()->where('site_id', $site->id);
+        $checklists = $canViewChecklists
+            ? (clone $checklistsQuery)
                 ->with('template:id,name')
                 ->orderByDesc('scheduled_date')
                 ->limit(12)
@@ -424,12 +425,21 @@ class SiteProfileData
                     'href' => route('sites.checklists.showRun', $run),
                 ])->values()
             : collect();
+        $checklistCounts = $canViewChecklists
+            ? (clone $checklistsQuery)
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw("SUM(CASE WHEN status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as open_count")
+                ->selectRaw("SUM(CASE WHEN scheduled_date < ? AND status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as overdue_count", [now()->toDateString()])
+                ->selectRaw('SUM(CASE WHEN items_failed > 0 THEN 1 ELSE 0 END) as failed_count')
+                ->first()
+            : null;
 
-        $assets = $this->canViewAssets($user)
-            ? Asset::query()
-                ->where('site_id', $site->id)
+        $canViewAssets = $this->canViewAssets($user);
+        $assetsQuery = Asset::query()->where('site_id', $site->id);
+        $assets = $canViewAssets
+            ? (clone $assetsQuery)
                 ->orderBy('name')
-                ->limit(100)
+                ->limit(12)
                 ->get(['id', 'name', 'asset_tag', 'category', 'status', 'risk_level', 'location', 'inspection_due_at', 'maintenance_due_at'])
                 ->map(fn (Asset $asset) => [
                     'id' => $asset->id,
@@ -444,11 +454,24 @@ class SiteProfileData
                     'href' => route('fleet-assets.assets.show', $asset),
                 ])->values()
             : collect();
+        $assetCount = $canViewAssets ? (clone $assetsQuery)->count() : 0;
 
         $tenantId = (int) ($site->tenant_id ?? $user->tenant_id ?? $user->organization_id ?? 1);
         $hardwareCount = $user->canDo('securityDevices.devices.view')
             ? $this->devices->forSite($tenantId, $site->id)->count()
             : 0;
+        $fleetCount = $user->canDo('fleet.viewAny')
+            ? Asset::query()
+                ->vehicles()
+                ->where(fn (Builder $query) => $query
+                    ->where('site_id', $site->id)
+                    ->orWhere('home_site_id', $site->id))
+                ->count()
+            : 0;
+        $plan = $this->typePlans->profileSummaryFor(
+            $site,
+            $user->canDo('securityDevices.devices.view') ? $hardwareCount : null,
+        );
 
         return [
             'calendar' => [
@@ -458,14 +481,15 @@ class SiteProfileData
                 'href' => $user->canDo('calendar.view') ? route('sites.calendar.index', $site) : null,
             ],
             'checklists' => [
-                'locked' => ! $user->canDo('checklists.view'),
+                'locked' => ! $canViewChecklists,
                 'items' => $checklists,
-                'summary' => [
-                    'recent' => $checklists->count(),
-                    'open' => $checklists->whereIn('status', ['scheduled', 'in_progress'])->count(),
-                    'failed' => $checklists->where('items_failed', '>', 0)->count(),
-                ],
-                'href' => $user->canDo('checklists.view') ? route('sites.checklists.index', $site) : null,
+                'summary' => $canViewChecklists ? [
+                    'total' => (int) ($checklistCounts?->total ?? 0),
+                    'open' => (int) ($checklistCounts?->open_count ?? 0),
+                    'overdue' => (int) ($checklistCounts?->overdue_count ?? 0),
+                    'failed' => (int) ($checklistCounts?->failed_count ?? 0),
+                ] : null,
+                'href' => $canViewChecklists ? route('sites.checklists.index', $site) : null,
             ],
             'meal_planner' => [
                 'locked' => ! $user->canDo('sites.meals.view') || $site->type === 'head_office',
@@ -474,13 +498,14 @@ class SiteProfileData
                     : null,
             ],
             'assets' => [
-                'locked' => ! $this->canViewAssets($user),
+                'locked' => ! $canViewAssets,
                 'items' => $assets,
-                'summary' => ['total' => $assets->count()],
-                'href' => $this->canViewAssets($user) ? route('fleet-assets.assets.index', ['site_id' => $site->id]) : null,
+                'summary' => $canViewAssets ? ['total' => $assetCount, 'shown' => $assets->count()] : null,
+                'href' => $canViewAssets ? route('fleet-assets.assets.index', ['site_id' => $site->id]) : null,
             ],
             'fleet' => [
                 'locked' => ! $user->canDo('fleet.viewAny'),
+                'summary' => $user->canDo('fleet.viewAny') ? ['vehicles' => $fleetCount] : null,
                 'href' => $user->canDo('fleet.viewAny') ? route('fleet-assets.dashboard', ['site_id' => $site->id]) : null,
             ],
             'hardware' => [
@@ -489,8 +514,10 @@ class SiteProfileData
                 'href' => $user->canDo('securityDevices.devices.view') ? route('sites.hardware.index', $site) : null,
             ],
             'plan' => [
-                'summary' => $this->typePlans->summaryFor($site),
+                'summary' => $plan['summary'],
                 'href' => route('sites.plan.show', $site),
+                'inventory_href' => $plan['inventory_href'],
+                'inventory_label' => $plan['inventory_label'],
             ],
         ];
     }

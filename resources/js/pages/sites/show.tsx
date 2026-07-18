@@ -24,6 +24,9 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SiteProfileAssets } from './tabs/assets';
+import { SiteProfileCalendar } from './tabs/calendar';
+import { SiteProfileChecklists } from './tabs/checklists';
 import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
 import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
 import { SiteProfileDrills } from './tabs/drills';
@@ -32,10 +35,14 @@ import {
     type EmergencyPlanModule,
 } from './tabs/emergency-plan';
 import { SiteProfileFirstAid } from './tabs/first-aid';
+import { SiteProfileFleet } from './tabs/fleet';
+import { SiteProfileHardware } from './tabs/hardware';
 import { SiteProfileHazards } from './tabs/hazards';
 import { SiteProfileInspections } from './tabs/inspections';
+import { SiteProfileMealPlanner } from './tabs/meal-planner';
 import type { SiteProfileSummaryModule } from './tabs/module-summary-panel';
 import { SiteProfileOverview } from './tabs/overview';
+import { SiteProfilePlan, type SitePlanSummaryModule } from './tabs/plan';
 import { SiteProfilePpe } from './tabs/ppe';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
@@ -188,6 +195,16 @@ type SiteSafetyData = {
     emergency_plan: EmergencyPlanModule;
 };
 
+type SiteOperationsData = {
+    calendar: SiteProfileSummaryModule;
+    checklists: SiteProfileSummaryModule;
+    meal_planner: SiteProfileSummaryModule;
+    assets: SiteProfileSummaryModule;
+    fleet: SiteProfileSummaryModule;
+    hardware: SiteProfileSummaryModule;
+    plan: SitePlanSummaryModule;
+};
+
 export type SiteProfileProps = {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
@@ -198,7 +215,7 @@ export type SiteProfileProps = {
     uiPreferences: { pinned_tabs: string[] };
     peopleData?: SitePeopleData;
     safetyData?: SiteSafetyData;
-    operationsData?: OptionalGroupData;
+    operationsData?: SiteOperationsData;
     adminData?: OptionalGroupData;
 };
 
@@ -638,6 +655,31 @@ function SiteProfileContent({
                 return (
                     <SiteProfileEmergencyPlan data={safety.emergency_plan} />
                 );
+        }
+    }
+
+    if (dataGroup === 'operationsData') {
+        const operations = groupData as SiteOperationsData;
+        switch (active.id) {
+            case 'calendar':
+                return <SiteProfileCalendar data={operations.calendar} />;
+            case 'checklists':
+                return <SiteProfileChecklists data={operations.checklists} />;
+            case 'meal_planner':
+                return (
+                    <SiteProfileMealPlanner
+                        site={props.site}
+                        data={operations.meal_planner}
+                    />
+                );
+            case 'assets':
+                return <SiteProfileAssets data={operations.assets} />;
+            case 'fleet':
+                return <SiteProfileFleet data={operations.fleet} />;
+            case 'hardware':
+                return <SiteProfileHardware data={operations.hardware} />;
+            case 'plan':
+                return <SiteProfilePlan data={operations.plan} />;
         }
     }
 

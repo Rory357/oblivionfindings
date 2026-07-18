@@ -359,7 +359,7 @@ class SiteControllerTest extends TestCase
             );
     }
 
-    public function test_site_show_exposes_functional_checklists_workspace_payload(): void
+    public function test_site_show_exposes_compact_checklist_summary_and_canonical_workspace_link(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
         $template = SiteChecklistTemplate::create([
@@ -395,12 +395,20 @@ class SiteControllerTest extends TestCase
             ])
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
-            ->assertJsonPath('props.operationsData.checklists.summary.recent', 1)
+            ->assertJsonPath('props.operationsData.checklists.summary.total', 1)
+            ->assertJsonPath('props.operationsData.checklists.summary.open', 1)
+            ->assertJsonPath('props.operationsData.checklists.summary.overdue', 0)
             ->assertJsonPath('props.operationsData.checklists.items.0.name', 'Profile Summary Checklist')
             ->assertJsonStructure(['props' => ['operationsData' => ['checklists' => ['href']]]])
+            ->assertJsonStructure(['props' => ['operationsData' => ['plan' => ['summary', 'href', 'inventory_href']]]])
             ->assertJsonMissingPath('props.checklistsData')
             ->assertJsonMissingPath('props.runDetail')
-            ->assertJsonMissingPath('props.templateDetail');
+            ->assertJsonMissingPath('props.templateDetail')
+            ->assertJsonMissingPath('props.operationsData.plan.summary.draft')
+            ->assertJsonMissingPath('props.operationsData.plan.summary.published')
+            ->assertJsonPath('props.operationsData.plan.summary.is_published', false)
+            ->assertJsonMissingPath('props.operationsData.plan.summary.taxonomy')
+            ->assertJsonMissingPath('props.operationsData.plan.summary.inventory');
     }
 
     public function test_site_show_exposes_inspections_summary_for_profile_tab(): void
@@ -464,7 +472,7 @@ class SiteControllerTest extends TestCase
     public function test_site_show_includes_linked_assets(): void
     {
         $site = Site::factory()->create();
-        Asset::factory()->count(3)->forSite($site)->create();
+        Asset::factory()->count(15)->forSite($site)->create();
 
         $this->actingAs($this->admin)
             ->get("/sites/{$site->id}", [
@@ -474,7 +482,9 @@ class SiteControllerTest extends TestCase
             ])
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
-            ->assertJsonCount(3, 'props.operationsData.assets.items');
+            ->assertJsonPath('props.operationsData.assets.summary.total', 15)
+            ->assertJsonPath('props.operationsData.assets.summary.shown', 12)
+            ->assertJsonCount(12, 'props.operationsData.assets.items');
     }
 
     public function test_site_show_returns_document_folders(): void

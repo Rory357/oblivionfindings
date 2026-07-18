@@ -263,3 +263,103 @@ test('unlink clears the room assignment without deleting the client', function (
         ->and($client->fresh()->room_id)->toBeNull()
         ->and($room->fresh()->assigned_client_id)->toBeNull();
 });
+
+test('room assignment keeps the room and client placement fields in sync', function () {
+    $client = Client::factory()->create([
+        'organization_id' => 41,
+        'site_id' => $this->site->id,
+        'room_id' => null,
+    ]);
+    $room = SiteHouseRoom::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => 41,
+        'name' => 'Bedroom 3',
+        'is_active' => true,
+        'is_assignable' => true,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post(route('sites.rooms.assign', [$this->site, $room]), [
+            'client_id' => $client->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($room->fresh()->assigned_client_id)->toBe($client->id)
+        ->and($client->fresh()->room_id)->toBe($room->id)
+        ->and($client->fresh()->site_id)->toBe($this->site->id);
+});
+
+test('room reassignment clears both sides of the previous placement', function () {
+    $previous = Client::factory()->create([
+        'organization_id' => 41,
+        'site_id' => $this->site->id,
+    ]);
+    $replacement = Client::factory()->create([
+        'organization_id' => 41,
+        'site_id' => $this->site->id,
+    ]);
+    $room = SiteHouseRoom::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => 41,
+        'name' => 'Bedroom 4',
+        'assigned_client_id' => $previous->id,
+        'assigned_from' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'is_assignable' => true,
+    ]);
+    $previous->update(['room_id' => $room->id]);
+
+    $this->actingAs($this->admin)
+        ->post(route('sites.rooms.assign', [$this->site, $room]), [
+            'client_id' => $replacement->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($previous->fresh()->room_id)->toBeNull()
+        ->and($replacement->fresh()->room_id)->toBe($room->id)
+        ->and($room->fresh()->assigned_client_id)->toBe($replacement->id);
+});
+
+test('room assignment rejects clients outside the site organization and clears client state on unassign', function () {
+    $client = Client::factory()->create([
+        'organization_id' => 41,
+        'site_id' => $this->site->id,
+    ]);
+    $foreignClient = Client::factory()->create([
+        'organization_id' => 99,
+        'site_id' => null,
+    ]);
+    $room = SiteHouseRoom::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => 41,
+        'name' => 'Bedroom 5',
+        'assigned_client_id' => $client->id,
+        'assigned_from' => now()->toDateString(),
+        'is_active' => true,
+        'is_assignable' => true,
+    ]);
+    $client->update(['room_id' => $room->id]);
+
+    $this->actingAs($this->admin)
+        ->from(route('sites.rooms.index', $this->site))
+        ->post(route('sites.rooms.assign', [$this->site, $room]), [
+            'client_id' => $foreignClient->id,
+        ])
+        ->assertRedirect(route('sites.rooms.index', $this->site))
+        ->assertSessionHasErrors('client_id');
+
+    expect($room->fresh()->assigned_client_id)->toBe($client->id)
+        ->and($foreignClient->fresh()->room_id)->toBeNull();
+
+    $this->actingAs($this->admin)
+        ->post(route('sites.rooms.assign', [$this->site, $room]), [
+            'client_id' => null,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($room->fresh()->assigned_client_id)->toBeNull()
+        ->and($client->fresh()->room_id)->toBeNull();
+});
