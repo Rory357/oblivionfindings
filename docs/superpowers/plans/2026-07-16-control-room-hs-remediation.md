@@ -2554,7 +2554,7 @@ git commit -m "docs(journeys): record local remediation proof"
 - Update: `docs/audits/control-room-hs-remediation-ledger-2026-07-16.md`
 - Create live evidence under: `output/manual-audits/control-room-multi-role-remediation-2026-07-16/`
 
-- [ ] **Step 1: Verify the branch is clean and current**
+- [x] **Step 1: Verify the branch is clean and current**
 
 ```powershell
 git status --short --branch
@@ -2565,7 +2565,7 @@ git merge-base --is-ancestor origin/main HEAD
 
 Expected: clean branch and no missing upstream main commits. If main advanced, merge `origin/main`, resolve carefully, and repeat Task 20.
 
-- [ ] **Step 2: Integrate the branch into remote main without touching the dirty canonical checkout**
+- [x] **Step 2: Integrate the branch into remote main without touching the dirty canonical checkout**
 
 Use `superpowers:finishing-a-development-branch`. Keep the isolated remediation branch checked out and push its verified HEAD to main only after confirming `origin/main` is an ancestor:
 
@@ -2578,7 +2578,7 @@ git push origin HEAD:main
 
 Expected: remote main fast-forwards to the fully verified remediation HEAD; record the pushed SHA. Do not switch, reset, or clean `C:\Users\steph\Herd\oblivionfindings`.
 
-- [ ] **Step 3: Take live pre-migration evidence**
+- [x] **Step 3: Take live pre-migration evidence**
 
 On the development server at `/var/www/oblivionfindings`, using the approved SSH credential from the secure session:
 
@@ -2601,7 +2601,7 @@ test -s "$backup_file"
 
 Expected: clean `main`, current pre-deploy SHA, readable WorkSafe counts, migration status captured, and backup file created with non-zero size.
 
-- [ ] **Step 4: Deploy with the repository script**
+- [x] **Step 4: Deploy with the repository script**
 
 ```bash
 cd /var/www/oblivionfindings
@@ -2620,7 +2620,7 @@ Expected:
 - WorkSafe count command has no inconsistent rows;
 - server SHA equals pushed main SHA.
 
-- [ ] **Step 5: Seed a fresh tagged live acceptance fixture**
+- [x] **Step 5: Seed a fresh tagged live acceptance fixture**
 
 ```bash
 cd /var/www/oblivionfindings
@@ -2629,7 +2629,7 @@ php artisan db:seed --class=IncidentHandoverE2ESeeder --force
 
 Record the printed marker, seven account IDs, site/client IDs, fresh active shift ID, and bounded required-alert count.
 
-- [ ] **Step 6: Perform the actual desktop Chrome seven-persona relay**
+- [x] **Step 6: Perform the actual desktop Chrome seven-persona relay**
 
 Use actual Chrome at 1440 × 900. Log out between roles. Use the tagged fixture accounts, not Admin substitution.
 
@@ -2702,7 +2702,7 @@ Tester 7 — Novice Support Worker:
 
 Capture before/after screenshots for every tester and record every reference/actor/time.
 
-- [ ] **Step 7: Exercise alternate branches A–F in actual Chrome**
+- [x] **Step 7: Exercise alternate branches A–F in actual Chrome**
 
 Use separate tagged records:
 
@@ -2715,7 +2715,7 @@ Use separate tagged records:
 
 Every row must be Pass; no row may be inferred from automation.
 
-- [ ] **Step 8: Run live database and log integrity checks**
+- [x] **Step 8: Run live database and log integrity checks**
 
 Read-only evidence must prove:
 
@@ -2731,7 +2731,7 @@ Read-only evidence must prove:
 - Laravel logs since deployment have zero unexplained `ERROR`, `CRITICAL`, `ALERT`, or `EMERGENCY`;
 - browser console and failed-request captures are empty.
 
-- [ ] **Step 9: Update the authoritative audit and completion ledger**
+- [x] **Step 9: Update the authoritative audit and completion ledger**
 
 The final audit must:
 
