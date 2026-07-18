@@ -11,8 +11,13 @@ import { describe, expect, it } from 'vitest';
 
 const allPermissions = Object.fromEntries(
     siteProfileTabs
-        .map((tab) => tab.permission)
-        .filter((permission): permission is string => Boolean(permission))
+        .flatMap((tab) =>
+            Array.isArray(tab.permission)
+                ? tab.permission
+                : tab.permission
+                  ? [tab.permission]
+                  : [],
+        )
         .map((permission) => [permission, true]),
 );
 
@@ -94,6 +99,18 @@ describe('site profile registry', () => {
         expect(financials).toMatchObject({ locked: true, count: undefined });
     });
 
+    it('unlocks tabs when the viewer holds any accepted scoped permission', () => {
+        const clients = visibleSiteProfileTabs('house', {
+            'clients.viewAssigned': true,
+        }).find((tab) => tab.id === 'clients');
+        const assets = visibleSiteProfileTabs('house', {
+            'assets.viewAssigned': true,
+        }).find((tab) => tab.id === 'assets');
+
+        expect(clients?.locked).toBe(false);
+        expect(assets?.locked).toBe(false);
+    });
+
     it('normalizes unknown or type-hidden deep links without looping', () => {
         expect(
             resolveSiteProfileTab('hazards', 'house', allPermissions).id,
@@ -104,6 +121,12 @@ describe('site profile registry', () => {
         ).toBe('overview');
         expect(
             resolveSiteProfileTab('retired-tab', 'house', allPermissions).id,
+        ).toBe('overview');
+        expect(
+            resolveSiteProfileTab('financials', 'house', {
+                ...allPermissions,
+                'finance.dashboard': false,
+            }).id,
         ).toBe('overview');
     });
 

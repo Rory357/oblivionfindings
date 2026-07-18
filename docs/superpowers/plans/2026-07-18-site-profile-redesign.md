@@ -256,7 +256,7 @@ Run: `git add app/Services/Sites/SiteProfileAttentionService.php tests/Feature/S
 - Create: `tests/Feature/Sites/SiteProfilePayloadTest.php`
 - Modify: `tests/Feature/SiteControllerTest.php`
 
-- [ ] **Step 1: Write failing payload-boundary tests**
+- [x] **Step 1: Write failing payload-boundary tests**
 
 Prove `sites.show` still authorizes and renders `sites/show`; the eager response includes `site`, `hero`, `permissions`, `attention`, `overview`, `readiness`, and `uiPreferences`; the eager response excludes `peopleData`, `safetyData`, `operationsData`, `adminData`, credential secrets, full Checklists runs, and full Vendor registers. Add partial Inertia requests for each group using:
 
@@ -269,13 +269,13 @@ Prove `sites.show` still authorizes and renders `sites/show`; the eager response
 ]
 ```
 
-- [ ] **Step 2: Prove the new boundary test fails**
+- [x] **Step 2: Prove the new boundary test fails**
 
 Run: `php artisan test tests/Feature/Sites/SiteProfilePayloadTest.php`
 
 Expected: FAIL because the route still uses `SiteController` and sends eager registers.
 
-- [ ] **Step 3: Implement the focused controller and service**
+- [x] **Step 3: Implement the focused controller and service**
 
 Change only the route target, not its URL/name/middleware. Authorize before calling the data service. Return optional props with closures:
 
@@ -291,17 +291,17 @@ return Inertia::render('sites/show', [
 
 Move read-only page assembly out of `SiteController::show`; leave Site CRUD and mutation methods in place.
 
-- [ ] **Step 4: Add query ceilings**
+- [x] **Step 4: Add query ceilings**
 
 Warm framework and permission caches before counting. Assert fixed ceilings for shell and each optional group with at least three rows per included relation. A ceiling failure must report the observed count.
 
-- [ ] **Step 5: Verify controller compatibility**
+- [x] **Step 5: Verify controller compatibility**
 
 Run: `php artisan test tests/Feature/Sites/SiteProfilePayloadTest.php tests/Feature/SiteControllerTest.php --filter="site show"`
 
 Expected: PASS; update stale assertions that expected full eager Checklists/Vendor payloads to assert their optional summaries instead.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run: `git add app/Http/Controllers/Sites/SiteProfileController.php app/Services/Sites/SiteProfileData.php app/Http/Controllers/SiteController.php routes/assets.php tests/Feature/Sites/SiteProfilePayloadTest.php tests/Feature/SiteControllerTest.php && git diff --cached --check && git commit -m "refactor(sites): defer site profile module payloads"`
 

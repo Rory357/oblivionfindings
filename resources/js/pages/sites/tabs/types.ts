@@ -33,12 +33,12 @@ export type SiteProfileTabDefinition = {
     label: (siteType: string) => string;
     icon: LucideIcon;
     dataGroup?: SiteProfileDataGroup;
-    permission?: string;
+    permission?: string | string[];
     hiddenFor?: string[];
     warningSource?: string;
 };
 
-export type ResolvedSiteProfileTab = SiteProfileTabDefinition & {
+export type ResolvedSiteProfileTab = Omit<SiteProfileTabDefinition, 'label'> & {
     label: string;
     locked: boolean;
     count?: number;

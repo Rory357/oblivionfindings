@@ -1,13 +1,13 @@
 import {
     AlertTriangle,
     Ambulance,
+    BriefcaseMedical,
     CalendarDays,
     Car,
     CheckSquare,
     ClipboardCheck,
     ContactRound,
     FileText,
-    FirstAidKit,
     FolderOpen,
     Gauge,
     HandCoins,
@@ -99,7 +99,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: (siteType) => siteProfileTerminology(siteType).people,
         icon: Users,
         dataGroup: 'peopleData',
-        permission: 'clients.view',
+        permission: ['clients.viewAny', 'clients.viewAssigned'],
         hiddenFor: ['head_office'],
     },
     {
@@ -115,7 +115,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Staff Requirements'),
         icon: UserRoundCog,
         dataGroup: 'peopleData',
-        permission: 'hr.view',
+        permission: 'staff.viewAny',
         warningSource: 'staff_requirements',
     },
     {
@@ -124,7 +124,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Shift Coverage'),
         icon: CalendarDays,
         dataGroup: 'peopleData',
-        permission: 'rostering.view',
+        permission: 'rostering.viewAny',
         hiddenFor: ['head_office'],
         warningSource: 'shift_coverage',
     },
@@ -168,7 +168,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         id: 'first_aid',
         group: 'safety',
         label: literal('First Aid'),
-        icon: FirstAidKit,
+        icon: BriefcaseMedical,
         dataGroup: 'safetyData',
         permission: 'hazards.view',
         warningSource: 'first_aid',
@@ -214,7 +214,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Meal Planner'),
         icon: Utensils,
         dataGroup: 'operationsData',
-        permission: 'catering.view',
+        permission: 'sites.meals.view',
         hiddenFor: ['head_office'],
     },
     {
@@ -223,7 +223,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Assets'),
         icon: ShoppingBasket,
         dataGroup: 'operationsData',
-        permission: 'assets.viewAny',
+        permission: ['assets.viewAny', 'assets.viewAssigned'],
         warningSource: 'assets',
     },
     {
@@ -274,7 +274,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Vendors & Credentials'),
         icon: Store,
         dataGroup: 'adminData',
-        permission: 'finance.ap.view',
+        permission: ['vendors.view', 'credentials.view'],
         warningSource: 'vendors',
     },
     {
@@ -294,9 +294,16 @@ export function visibleSiteProfileTabs(
     return siteProfileTabs
         .filter((tab) => !tab.hiddenFor?.includes(siteType))
         .map((tab) => {
-            const locked = Boolean(
-                tab.permission && permissions[tab.permission] !== true,
-            );
+            const requiredPermissions = Array.isArray(tab.permission)
+                ? tab.permission
+                : tab.permission
+                  ? [tab.permission]
+                  : [];
+            const locked =
+                requiredPermissions.length > 0 &&
+                !requiredPermissions.some(
+                    (permission) => permissions[permission] === true,
+                );
 
             return {
                 ...tab,
@@ -318,7 +325,7 @@ export function resolveSiteProfileTab(
     const visible = visibleSiteProfileTabs(siteType, permissions);
 
     return (
-        visible.find((tab) => tab.id === requestedTab) ??
+        visible.find((tab) => tab.id === requestedTab && !tab.locked) ??
         visible.find((tab) => tab.id === 'overview') ??
         visible[0]
     );
