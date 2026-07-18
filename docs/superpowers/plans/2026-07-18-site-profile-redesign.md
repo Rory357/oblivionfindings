@@ -396,11 +396,11 @@ Run: `git add resources/js/pages/sites/tabs/overview.tsx resources/js/pages/site
 - Create: `tests/Feature/Sites/SiteClientTest.php`
 - Create: `resources/js/test/site-profile-client-workflows.test.tsx`
 
-- [ ] **Step 1: Write failing workflow-ownership tests**
+- [x] **Step 1: Write failing workflow-ownership tests**
 
 Frontend tests prove “Create client” opens `components/clients/add-client-dialog.tsx`, “Link existing client” opens only the focused placement wizard, and no quick-create fields or `sites.clients.store` submission remain. Backend tests prove linking validates tenant-scoped `client_id`, optional `service_context_id`, `room_id`, and `key_worker_id`, rejects occupied/foreign rooms and unauthorized workers, and applies placement atomically.
 
-- [ ] **Step 2: Prove both suites fail**
+- [x] **Step 2: Prove both suites fail**
 
 Run: `npm test -- resources/js/test/site-profile-client-workflows.test.tsx`
 
@@ -408,15 +408,15 @@ Run: `php artisan test tests/Feature/Sites/SiteClientTest.php`
 
 Expected: FAIL because quick-create remains and link accepts only `client_id`.
 
-- [ ] **Step 3: Remove the duplicate quick-create path**
+- [x] **Step 3: Remove the duplicate quick-create path**
 
 Delete `QuickCreateForm`, remove `SiteClientController::store`, and remove `sites.clients.store`. Keep the shared full Add Client dialog as the only new-client workflow, prefilled with Site/service context through its supported props.
 
-- [ ] **Step 4: Implement the placement request and transaction**
+- [x] **Step 4: Implement the placement request and transaction**
 
 Validate every selected record against the same tenant and Site scope before `DB::transaction`. Update the Client Site assignment and authorized placement metadata together. Return focused validation messages to the owning wizard step. Unlink continues through the shared destructive confirmation and explains room/assignment effects.
 
-- [ ] **Step 5: Extract People tabs and verify**
+- [x] **Step 5: Extract People tabs and verify**
 
 Move existing People UI into typed focused components. Head office hides Clients and Shift Coverage through the registry; it does not render empty protected payloads.
 
@@ -426,7 +426,7 @@ Run: `php artisan test tests/Feature/Sites/SiteClientTest.php tests/Feature/Site
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run: `git add resources/js/pages/sites/clients/_dialogs.tsx resources/js/pages/sites/clients/link-client-dialog.tsx resources/js/pages/sites/tabs/clients.tsx resources/js/pages/sites/tabs/contacts.tsx resources/js/pages/sites/tabs/staff-requirements.tsx resources/js/pages/sites/tabs/shift-coverage.tsx app/Http/Controllers/SiteClientController.php app/Http/Requests/Sites/LinkSiteClientRequest.php routes/assets.php tests/Feature/Sites/SiteClientTest.php resources/js/test/site-profile-client-workflows.test.tsx && git diff --cached --check && git commit -m "refactor(sites): unify client placement workflows"`
 
@@ -444,21 +444,21 @@ Run: `git add resources/js/pages/sites/clients/_dialogs.tsx resources/js/pages/s
 - Create: `resources/js/test/site-profile-safety-tabs.test.tsx`
 - Modify: `tests/Feature/Sites/SiteOperationalReadinessTest.php`
 
-- [ ] **Step 1: Write failing canonical-action tests**
+- [x] **Step 1: Write failing canonical-action tests**
 
 Assert each Safety tab renders its permission-shaped summary and canonical create/manage link with `site_id` context. Assert the Site Profile does not host a second H&S create/edit form, and restricted viewers receive no record counts. Preserve existing Site-owned emergency metadata only where the H&S owner has no equivalent.
 
-- [ ] **Step 2: Prove the test fails**
+- [x] **Step 2: Prove the test fails**
 
 Run: `npm test -- resources/js/test/site-profile-safety-tabs.test.tsx`
 
 Expected: FAIL because Safety UI still lives in the monolith and duplicates action hosting.
 
-- [ ] **Step 3: Extract summary components and canonical links**
+- [x] **Step 3: Extract summary components and canonical links**
 
 Use the current H&S route names and shared module dialogs where they already exist. All rows include a plain-language status, due date, and resolution path. The Site Profile may prefill Site context but must not persist H&S records itself.
 
-- [ ] **Step 4: Verify Safety behaviour**
+- [x] **Step 4: Verify Safety behaviour**
 
 Run: `npm test -- resources/js/test/site-profile-safety-tabs.test.tsx resources/js/test/site-profile-overview.test.tsx`
 
@@ -466,7 +466,7 @@ Run: `php artisan test tests/Feature/Sites/SiteOperationalReadinessTest.php test
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add resources/js/pages/sites/tabs/hazards.tsx resources/js/pages/sites/tabs/risk-assessments.tsx resources/js/pages/sites/tabs/inspections.tsx resources/js/pages/sites/tabs/drills.tsx resources/js/pages/sites/tabs/first-aid.tsx resources/js/pages/sites/tabs/ppe.tsx resources/js/pages/sites/tabs/emergency-plan.tsx resources/js/test/site-profile-safety-tabs.test.tsx tests/Feature/Sites/SiteOperationalReadinessTest.php && git diff --cached --check && git commit -m "refactor(sites): route safety work to canonical modules"`
 

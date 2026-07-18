@@ -273,6 +273,7 @@ class SiteProfileData
                 'status' => $assessment->status,
                 'risk_level' => $assessment->risk_level,
                 'review_due_at' => $assessment->review_due_at?->toDateString(),
+                'href' => route('health-safety.risk-assessments.show', $assessment),
             ])->values();
 
         $inspections = SiteInspectionSchedule::query()
@@ -303,6 +304,7 @@ class SiteProfileData
                 'completed_at' => $drill->completed_at?->toISOString(),
                 'status' => $drill->status,
                 'outcome' => $drill->outcome,
+                'href' => route('health-safety.drills.show', $drill),
             ])->values();
 
         $firstAid = FirstAidRecord::query()
@@ -318,6 +320,7 @@ class SiteProfileData
                 'injury' => $record->injury_illness_type,
                 'outcome' => $record->treatment_outcome,
                 'ambulance_called' => (bool) $record->ambulance_called,
+                'href' => route('health-safety.first-aid.show', $record),
             ])->values();
 
         $ppe = PpeInventory::query()
@@ -347,6 +350,7 @@ class SiteProfileData
             'risk_assessments' => [
                 'items' => $riskAssessments,
                 'summary' => ['total' => $riskAssessments->count()],
+                'href' => route('health-safety.risk-assessments.index', ['site_id' => $site->id]),
             ],
             'inspections' => [
                 'items' => $inspections,
@@ -359,14 +363,17 @@ class SiteProfileData
             'drills' => [
                 'items' => $drills,
                 'summary' => ['total' => $drills->count()],
+                'href' => route('health-safety.drills.index', ['site_id' => $site->id]),
             ],
             'first_aid' => [
                 'items' => $firstAid,
                 'summary' => ['recent' => $firstAid->count()],
+                'href' => route('health-safety.first-aid.index', ['site_id' => $site->id]),
             ],
             'ppe' => [
                 'items' => $ppe,
                 'summary' => ['items' => $ppe->count(), 'units' => $ppe->sum('quantity')],
+                'href' => route('health-safety.ppe.index', ['site_id' => $site->id]),
             ],
             'emergency_plan' => [
                 'summary' => [
@@ -760,7 +767,11 @@ class SiteProfileData
             'house', 'residential' => [
                 'label' => 'Bedrooms',
                 'total' => (int) $site->getAttribute('rooms_total'),
-                'occupied' => $site->houseRooms()->active()->whereNotNull('assigned_client_id')->count(),
+                'occupied' => $site->houseRooms()
+                    ->active()
+                    ->where('is_assignable', true)
+                    ->whereNotNull('assigned_client_id')
+                    ->count(),
             ],
             'head_office' => [
                 'label' => 'Resources',
@@ -806,7 +817,7 @@ class SiteProfileData
         $site->loadCount([
             'documents',
             'checklistAssignments',
-            'houseRooms as rooms_total' => fn (Builder $query) => $query->active(),
+            'houseRooms as rooms_total' => fn (Builder $query) => $query->active()->where('is_assignable', true),
             'hoResources as ho_resources_count' => fn (Builder $query) => $query->active(),
             'facilityZones as facility_zones_count' => fn (Builder $query) => $query->active(),
             'hazards as recent_hazards_count' => fn (Builder $query) => $query->where('updated_at', '>=', now()->subDays(90)),

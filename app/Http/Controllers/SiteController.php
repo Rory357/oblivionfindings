@@ -1357,6 +1357,19 @@ class SiteController extends Controller
         ];
     }
 
+    private function savedViewCounts($visibleSites, SiteReadinessService $readinessService): array
+    {
+        return [
+            'at_risk' => $visibleSites->filter(fn (Site $site) => $site->is_high_risk || $site->is_high_needs)->count(),
+            'audit_overdue' => $visibleSites->filter(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) > 0)->count(),
+            'open_hazards' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_hazards_count ?? 0) > 0)->count(),
+            'open_maintenance' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_maintenance_count ?? 0) > 0)->count(),
+            'active_incomplete' => $visibleSites->filter(fn (Site $site) => $readinessService->slim($site)['is_active_but_incomplete'])->count(),
+            'respite' => $visibleSites->filter(fn (Site $site) => (int) ($site->respite_service_contexts_count ?? 0) > 0)->count(),
+            'inactive' => $visibleSites->where('is_active', false)->count(),
+        ];
+    }
+
     /**
      * Categorise a site's geofence state for the index list pill:
      *   'active'    — at least one active site-scoped AssetGeofence.

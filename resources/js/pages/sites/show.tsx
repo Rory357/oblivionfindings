@@ -26,7 +26,17 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
 import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
+import { SiteProfileDrills } from './tabs/drills';
+import {
+    SiteProfileEmergencyPlan,
+    type EmergencyPlanModule,
+} from './tabs/emergency-plan';
+import { SiteProfileFirstAid } from './tabs/first-aid';
+import { SiteProfileHazards } from './tabs/hazards';
+import { SiteProfileInspections } from './tabs/inspections';
+import type { SiteProfileSummaryModule } from './tabs/module-summary-panel';
 import { SiteProfileOverview } from './tabs/overview';
+import { SiteProfilePpe } from './tabs/ppe';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
     dataGroupForTab,
@@ -34,6 +44,7 @@ import {
     siteProfileGroups,
     visibleSiteProfileTabs,
 } from './tabs/registry';
+import { SiteProfileRiskAssessments } from './tabs/risk-assessments';
 import {
     SiteProfileShiftCoverage,
     type SiteShiftCoverageData,
@@ -166,6 +177,17 @@ type SitePeopleData = {
     shift_coverage: SiteShiftCoverageData;
 };
 
+type SiteSafetyData = {
+    locked: boolean;
+    hazards: SiteProfileSummaryModule;
+    risk_assessments: SiteProfileSummaryModule;
+    inspections: SiteProfileSummaryModule;
+    drills: SiteProfileSummaryModule;
+    first_aid: SiteProfileSummaryModule;
+    ppe: SiteProfileSummaryModule;
+    emergency_plan: EmergencyPlanModule;
+};
+
 export type SiteProfileProps = {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
@@ -175,7 +197,7 @@ export type SiteProfileProps = {
     readiness: SiteReadinessData;
     uiPreferences: { pinned_tabs: string[] };
     peopleData?: SitePeopleData;
-    safetyData?: OptionalGroupData;
+    safetyData?: SiteSafetyData;
     operationsData?: OptionalGroupData;
     adminData?: OptionalGroupData;
 };
@@ -587,6 +609,34 @@ function SiteProfileContent({
             case 'shift_coverage':
                 return (
                     <SiteProfileShiftCoverage data={people.shift_coverage} />
+                );
+        }
+    }
+
+    if (dataGroup === 'safetyData') {
+        const safety = groupData as SiteSafetyData;
+        if (safety.locked) return <SiteProfileLockedState label="Safety" />;
+
+        switch (active.id) {
+            case 'hazards':
+                return <SiteProfileHazards data={safety.hazards} />;
+            case 'risk_assessments':
+                return (
+                    <SiteProfileRiskAssessments
+                        data={safety.risk_assessments}
+                    />
+                );
+            case 'inspections':
+                return <SiteProfileInspections data={safety.inspections} />;
+            case 'drills':
+                return <SiteProfileDrills data={safety.drills} />;
+            case 'first_aid':
+                return <SiteProfileFirstAid data={safety.first_aid} />;
+            case 'ppe':
+                return <SiteProfilePpe data={safety.ppe} />;
+            case 'emergency_plan':
+                return (
+                    <SiteProfileEmergencyPlan data={safety.emergency_plan} />
                 );
         }
     }
