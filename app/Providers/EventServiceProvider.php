@@ -8,6 +8,7 @@ use App\Events\RosterPeriodPublished;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
+use App\Listeners\It\CreateOrUpdateMonitoringTicket;
 use App\Listeners\ResolveCoverageAlertForAddedSupply;
 use App\Listeners\Rostering\RecordRosterPeriodPublishedAudit;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -33,6 +34,7 @@ class EventServiceProvider extends ServiceProvider
             NotifyOnFallDetected::class,
             NotifyOnBedExit::class,
             NotifyOnMedicationCabinetOpen::class,
+            CreateOrUpdateMonitoringTicket::class,
         ],
         CoverageSupplyAdded::class => [
             ResolveCoverageAlertForAddedSupply::class,

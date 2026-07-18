@@ -777,7 +777,7 @@ git commit -m "feat(it): add typed monitoring work links"
 - Modify: `app/Providers/EventServiceProvider.php`
 - Test: `tests/Feature/It/ItMonitoringTicketIntegrationTest.php`
 
-- [ ] **Step 1: Write failing failure, deduplication, and recovery tests**
+- [x] **Step 1: Write failing failure, deduplication, and recovery tests**
 
 Define this fixture helper at the top of the test file:
 
@@ -874,7 +874,7 @@ it('does not turn security or healthcare signals into automatic IT incidents wit
 })->with(['security', 'iot_healthcare']);
 ```
 
-- [ ] **Step 2: Run listener tests and verify RED**
+- [x] **Step 2: Run listener tests and verify RED**
 
 Run:
 
@@ -884,7 +884,7 @@ php artisan test tests/Feature/It/ItMonitoringTicketIntegrationTest.php --filter
 
 Expected: FAIL because the listener does not exist.
 
-- [ ] **Step 3: Implement the after-commit listener**
+- [x] **Step 3: Implement the after-commit listener**
 
 The listener implements `ShouldQueueAfterCommit` and uses queue `monitoring`. Its policy is explicit:
 
@@ -907,7 +907,7 @@ Failure handling must:
 
 Recovery handling must find active system incidents linked to the canonical device, set `monitoring_recovered_at/status_reason`, and record one idempotent recovery event. It must not set `resolved_at`, `closed_at`, or a terminal status.
 
-- [ ] **Step 4: Register the listener**
+- [x] **Step 4: Register the listener**
 
 ```php
 DeviceSignalPublished::class => [
@@ -918,7 +918,7 @@ DeviceSignalPublished::class => [
 ],
 ```
 
-- [ ] **Step 5: Run the IT monitoring integration suite**
+- [x] **Step 5: Run the IT monitoring integration suite**
 
 Run:
 
@@ -928,7 +928,7 @@ php artisan test tests/Feature/It/ItMonitoringTicketIntegrationTest.php
 
 Expected: PASS; one outage produces one linked ticket, repeated evidence does not duplicate it, recovery leaves the ticket open, and non-IT domains do not auto-ticket.
 
-- [ ] **Step 6: Run the connected backend slice**
+- [x] **Step 6: Run the connected backend slice**
 
 Run:
 
@@ -938,7 +938,7 @@ php artisan test tests/Feature/Monitoring tests/Feature/SecurityDevices/DeviceEv
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit monitoring-to-ticket orchestration**
+- [x] **Step 7: Commit monitoring-to-ticket orchestration**
 
 ```powershell
 git add app/Listeners/It/CreateOrUpdateMonitoringTicket.php app/Providers/EventServiceProvider.php tests/Feature/It/ItMonitoringTicketIntegrationTest.php
