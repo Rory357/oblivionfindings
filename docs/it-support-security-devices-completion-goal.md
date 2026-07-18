@@ -20,9 +20,9 @@ Security & Devices already provides the canonical `Device`, assignments, topolog
 
 | Stream | State | Acceptance evidence |
 | --- | --- | --- |
-| 1. Platform foundations | Planned | None recorded |
-| 2. Connected monitoring-to-ticket lifecycle | Planned | None recorded |
-| 3. Complete IT & Support | Planned | None recorded |
+| 1. Platform foundations | In progress | Native monitor persistence and idempotent observation ingestion: `496dbce8f`, `334c98ffa` |
+| 2. Connected monitoring-to-ticket lifecycle | In progress | L01-L04 vertical slice: `94a5f5830`, `21d5e0b93` |
+| 3. Complete IT & Support | In progress | Typed monitoring work links and permission-safe ticket context: `2bb1f5fd2`, `0c0a51410` |
 | 4. Complete Security & Devices workspaces | Planned | None recorded |
 | 5. Cross-module projections and privacy | Planned | None recorded |
 | 6. Production hardening and closure | Planned | None recorded |
@@ -44,12 +44,17 @@ Allowed states are `Planned`, `In progress`, `Implemented`, `Acceptance verified
 - [ ] A09 Topology snapshots, evidence/confidence, changes, maps, and root-cause suppression are complete.
 - [ ] A10 Configuration/inventory snapshots, diff, firmware, and capacity history are complete.
 
+Progress notes:
+
+- A04 partial: durable `Monitor` and `MonitorObservation` persistence plus the v1 `ObservationInput` source-key contract are implemented and idempotent. Full version negotiation, event/command replay, and replay operations remain open.
+- A08 partial: typed monitor profiles, failure/recovery confirmation thresholds, and honest stale/unknown transitions are implemented. Coverage analysis, dependencies, maintenance behavior, generalized hysteresis, baselines, and roll-ups remain open.
+
 ### Monitoring-to-work lifecycle
 
-- [ ] L01 Confirmed failure creates or updates one canonical Control Room correlation.
-- [ ] L02 Policy creates one linked IT incident for root-cause technical work.
-- [ ] L03 Repeated observations and downstream symptoms enrich existing work without duplicates.
-- [ ] L04 Confirmed recovery resolves the monitoring finding and marks the IT incident recovered without falsely resolving technician work.
+- [x] L01 Confirmed failure creates or updates one canonical Control Room correlation.
+- [x] L02 Policy creates one linked IT incident for root-cause technical work.
+- [x] L03 Repeated observations and downstream symptoms enrich existing work without duplicates.
+- [x] L04 Confirmed recovery resolves the monitoring finding and marks the IT incident recovered without falsely resolving technician work.
 - [ ] L05 Collector/path/runtime outages create one accurate correlation and stale state rather than device-alert storms.
 - [ ] L06 Retry, ordering, dead-letter, replay, clock drift, gap, and backlog failures are visible and recoverable.
 
@@ -137,3 +142,9 @@ Allowed states are `Planned`, `In progress`, `Implemented`, `Acceptance verified
 
 - 2026-07-18: Isolated worktree baseline passed `npm test`: 89 files, 357 tests.
 - 2026-07-18: Master design committed as `d21565b8f`.
+- 2026-07-18: Native monitoring foundation and lifecycle slice committed as `496dbce8f`, `334c98ffa`, `94a5f5830`, `2bb1f5fd2`, `21d5e0b93`, and `0c0a51410`.
+- 2026-07-18: Focused lifecycle proof passed: observation ingestion 5 tests / 35 assertions; Control Room recovery 3 / 10; canonical DeviceEvent signal pipeline 4 / 19; monitoring-to-ticket integration 9 / 29; IT ticket workspace 10 / 152; linked-context component 1 test.
+- 2026-07-18: Connected backend regression passed `php artisan test tests/Feature/Monitoring tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php tests/Feature/It`: 188 tests, 1,439 assertions.
+- 2026-07-18: Frontend verification passed: Wayfinder generation with no tracked drift; `npm test` 90 files / 358 tests; `npm run types`; client build 4,966 modules; SSR build 1,618 modules.
+- 2026-07-18: `vendor/bin/pint --dirty` and `git diff --check` passed. V01 and V08 remain open because only this vertical slice, not the full master-goal domain and release matrix, has been verified.
+- 2026-07-18: Foundation contract review found the monitor/observation identity, `ObservationInput` idempotency, online recovery routing, typed `ItTicketLink` ownership, single `DeviceSignalPublished` monitoring-to-ticket path, and permission-aware ticket context stable for dependent plans.

@@ -1086,7 +1086,7 @@ git commit -m "feat(it): show monitoring context on tickets"
 - Modify: `docs/it-support-security-devices-completion-goal.md`
 - Modify: `docs/superpowers/plans/2026-07-18-it-support-monitoring-foundation-vertical-slice.md`
 
-- [ ] **Step 1: Run the connected feature suites**
+- [x] **Step 1: Run the connected feature suites**
 
 ```powershell
 php artisan test tests/Feature/Monitoring tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php tests/Feature/It
@@ -1094,7 +1094,7 @@ php artisan test tests/Feature/Monitoring tests/Feature/SecurityDevices/DeviceEv
 
 Expected: all tests pass with zero failures.
 
-- [ ] **Step 2: Regenerate routes and run frontend verification**
+- [x] **Step 2: Regenerate routes and run frontend verification**
 
 ```powershell
 php artisan wayfinder:generate
@@ -1106,7 +1106,7 @@ npx vite build --ssr
 
 Expected: each command exits 0. If `npm run types` reports missing generated routes, rerun Wayfinder once and record the exact remaining error rather than hiding it.
 
-- [ ] **Step 3: Run formatting and diff checks**
+- [x] **Step 3: Run formatting and diff checks**
 
 ```powershell
 vendor/bin/pint --dirty
@@ -1116,7 +1116,7 @@ git status --short
 
 Expected: formatting succeeds, diff check is clean, and status contains only this plan's intended files before the ledger commit.
 
-- [ ] **Step 4: Update exact ledger evidence**
+- [x] **Step 4: Update exact ledger evidence**
 
 Mark only the requirements actually proven by this slice:
 
@@ -1129,18 +1129,18 @@ Mark only the requirements actually proven by this slice:
 
 Add commit IDs and exact test counts to the Evidence log.
 
-- [ ] **Step 5: Mark this plan's completed checkboxes**
+- [x] **Step 5: Mark this plan's completed checkboxes**
 
 Change each executed `- [ ]` in this plan to `- [x]`. Do not mark a step whose command did not produce its expected result.
 
-- [ ] **Step 6: Commit plan and ledger evidence**
+- [x] **Step 6: Commit plan and ledger evidence**
 
 ```powershell
 git add docs/it-support-security-devices-completion-goal.md docs/superpowers/plans/2026-07-18-it-support-monitoring-foundation-vertical-slice.md
 git commit -m "docs(monitoring): record vertical slice evidence"
 ```
 
-- [ ] **Step 7: Review the foundation contract before the next plan**
+- [x] **Step 7: Review the foundation contract before the next plan**
 
 Confirm the next plans can depend on these stable contracts:
 
