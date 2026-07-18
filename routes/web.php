@@ -3,6 +3,7 @@
 use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
@@ -148,6 +149,8 @@ Route::get('/my-roster', [RosterController::class, 'index'])
 // docs/IT_TICKETING_GAP_ANALYSIS.md.
 Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
+    Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
     // Self-service: raising a ticket needs it.request (or it.manage for
     // agents logging on behalf of others) — enforced via ItTicketPolicy.
     Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');

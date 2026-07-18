@@ -89,12 +89,12 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create catalogue factories and seeder fixtures
 - Create `tests/Feature/It/ItServiceCatalogTest.php`
 
-- [ ] Write failing tests for tenant-scoped published catalogue discovery, schema-versioned field validation, restricted/internal fields, requester confirmation, approval flagging, idempotent submission, and canonical ticket creation.
-- [ ] Store a versioned form schema on each item and an immutable field-value snapshot on each submission.
-- [ ] Support service request, security request, and provisioning catalogue outcomes without creating a second ticket store.
-- [ ] Preserve search-first knowledge deflection and add catalogue suggestions to the existing requester payload.
-- [ ] Verify request creation, reference, SLA, timeline, approval, and requester visibility end to end.
-- [ ] Commit as `feat(it): add service catalogue intake`.
+- [x] Write failing tests for tenant-scoped published catalogue discovery, schema-versioned field validation, restricted/internal fields, requester confirmation, approval flagging, idempotent submission, and canonical ticket creation.
+- [x] Store a versioned form schema on each item and an immutable field-value snapshot on each submission.
+- [x] Support service request, security request, and provisioning catalogue outcomes without creating a second ticket store.
+- [x] Preserve search-first knowledge deflection and add catalogue suggestions to the existing requester payload.
+- [x] Verify request creation, reference, SLA, timeline, approval, and requester visibility end to end (focused: 6 tests, 69 assertions; combined regression: 25 tests, 265 assertions; TypeScript and route generation pass).
+- [x] Commit as `feat(it): add service catalogue intake`.
 
 ## Task 4: Add work tasks, dependencies, and fulfilment gates
 

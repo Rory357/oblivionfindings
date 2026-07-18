@@ -15,6 +15,7 @@ use App\Http\Requests\It\BulkProvisioningActionRequest;
 use App\Http\Requests\It\ResolveTicketRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
+use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItSlaPolicy;
@@ -102,6 +103,16 @@ class ItProvisioningController extends Controller
         return Inertia::render('it/index', [
             ...$agentProps,
             'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user->id) : [],
+            'catalogItems' => $canRequest ? ItCatalogItem::query()
+                ->forTenant($tenantId)
+                ->published()
+                ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
+                ->values()
+                ->all() : [],
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
             'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId) : [],
