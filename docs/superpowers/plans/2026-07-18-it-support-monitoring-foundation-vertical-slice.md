@@ -956,7 +956,7 @@ git commit -m "feat(it): create incidents from monitoring findings"
 - Modify: `resources/js/pages/it/tickets/show.tsx`
 - Test: `tests/Feature/It/ItTicketWorkspaceTest.php`
 
-- [ ] **Step 1: Write a failing payload permission test**
+- [x] **Step 1: Write a failing payload permission test**
 
 Create a ticket linked to a same-tenant device and alert, request `GET /it/tickets/{ticket}` as an IT agent, and assert:
 
@@ -971,7 +971,7 @@ Create a ticket linked to a same-tenant device and alert, request `GET /it/ticke
 
 Add a second assertion that a requester can see only context allowed by both the ticket policy and canonical device/alert policy; restricted fields such as raw config, payload, client data, and command capability are absent.
 
-- [ ] **Step 2: Run the workspace test and verify RED**
+- [x] **Step 2: Run the workspace test and verify RED**
 
 Run:
 
@@ -981,7 +981,7 @@ php artisan test tests/Feature/It/ItTicketWorkspaceTest.php --filter="linked con
 
 Expected: FAIL because `linked_context` is absent.
 
-- [ ] **Step 3: Implement the presenter**
+- [x] **Step 3: Implement the presenter**
 
 `ItTicketContextPresenter::present(ItTicket $ticket, User $viewer): array` loads typed links and returns:
 
@@ -1012,7 +1012,7 @@ Expected: FAIL because `linked_context` is absent.
 
 Filter each target with the canonical policy before mapping it. Do not return raw `context`, `config`, credentials, clinical payload, or command data.
 
-- [ ] **Step 4: Add `linked_context` to the ticket payload**
+- [x] **Step 4: Add `linked_context` to the ticket payload**
 
 Inject the presenter into `ItTicketController` and add:
 
@@ -1022,7 +1022,7 @@ Inject the presenter into `ItTicketController` and add:
 
 The JSON drawer and Inertia page continue sharing the same payload.
 
-- [ ] **Step 5: Write the failing React component test**
+- [x] **Step 5: Write the failing React component test**
 
 ```tsx
 it('shows monitoring recovery and canonical deep links without raw payloads', () => {
@@ -1041,7 +1041,7 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
 });
 ```
 
-- [ ] **Step 6: Run the component test and verify RED**
+- [x] **Step 6: Run the component test and verify RED**
 
 Run:
 
@@ -1051,7 +1051,7 @@ npx vitest run resources/js/components/it/__tests__/ticket-linked-context.test.t
 
 Expected: FAIL because the component does not exist.
 
-- [ ] **Step 7: Implement the context component and add it to the ticket rail**
+- [x] **Step 7: Implement the context component and add it to the ticket rail**
 
 Use existing status-pill, card, icon, date/time, focus, and external/deep-link patterns. The component must show:
 
@@ -1061,7 +1061,7 @@ Use existing status-pill, card, icon, date/time, focus, and external/deep-link p
 - clear links to canonical Security & Devices and Control Room records;
 - an empty state only when there are no links.
 
-- [ ] **Step 8: Run focused backend and frontend tests**
+- [x] **Step 8: Run focused backend and frontend tests**
 
 Run:
 
@@ -1072,7 +1072,7 @@ npx vitest run resources/js/components/it/__tests__/ticket-linked-context.test.t
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit ticket context UI**
+- [x] **Step 9: Commit ticket context UI**
 
 ```powershell
 git add app/Domain/It/Presenters/ItTicketContextPresenter.php app/Http/Controllers/It/ItTicketController.php resources/js/components/it/ticket-linked-context.tsx resources/js/components/it/__tests__/ticket-linked-context.test.tsx resources/js/pages/it/tickets/show.tsx tests/Feature/It/ItTicketWorkspaceTest.php

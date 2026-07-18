@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Presenters\ItTicketContextPresenter;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -23,6 +24,7 @@ use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketAssignedNotification;
+use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +40,10 @@ use Inertia\Inertia;
 class ItTicketController extends Controller
 {
     use BuildsItOptions, ResolvesHrTenant, ServesPrivateAttachments, StoresItAttachments;
+
+    public function __construct(
+        private readonly ItTicketContextPresenter $contextPresenter,
+    ) {}
 
     public function show(Request $request, ItTicket $ticket)
     {
@@ -177,6 +183,7 @@ class ItTicketController extends Controller
                 'created_human' => $ticket->created_at?->diffForHumans(short: true),
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
                 'resolved_at' => $ticket->resolved_at?->toIso8601String(),
+                'monitoring_recovered_at' => $ticket->monitoring_recovered_at?->toIso8601String(),
                 'closed_at' => $ticket->closed_at?->toIso8601String(),
                 // §P-S2: the survivor this ticket was folded into, for the banner.
                 'merged_into' => $ticket->mergedInto
@@ -200,6 +207,7 @@ class ItTicketController extends Controller
             ],
             'comments' => $comments,
             'events' => $events,
+            'linked_context' => $this->contextPresenter->present($ticket, $user),
             'assignees' => $canManage ? $this->tenantUserOptions($tenantId) : [],
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
@@ -388,7 +396,7 @@ class ItTicketController extends Controller
         ItTicketEvent::record($ticket, 'reopened', $user->id);
 
         if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
-            $ticket->assignee->notify(new \App\Notifications\It\TicketReopenedNotification($ticket));
+            $ticket->assignee->notify(new TicketReopenedNotification($ticket));
         }
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");

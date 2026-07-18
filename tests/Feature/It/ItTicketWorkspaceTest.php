@@ -1,5 +1,10 @@
 <?php
 
+use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Models\Asset;
+use App\Models\ControlRoom\Device as ControlRoomDevice;
+use App\Models\ControlRoomAlert;
 use App\Models\ItKbArticle;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
@@ -8,6 +13,7 @@ use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Support\Facades\Notification;
 
 function itWorkspaceUser(string $role): User
@@ -22,8 +28,58 @@ function itWorkspaceUser(string $role): User
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->seed(SecurityDevicesPermissionsSeeder::class);
     $this->hr = itWorkspaceUser('hr');
     $this->worker = itWorkspaceUser('support_worker');
+});
+
+test('linked context follows canonical device and alert permissions without leaking raw payloads', function () {
+    $agent = itWorkspaceUser('admin');
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+    $device = Device::factory()->itInfrastructure()->create([
+        'tenant_id' => $ticket->tenant_id,
+        'name' => 'Core switch',
+        'config' => ['snmp_community' => 'private-secret'],
+    ]);
+    $projection = ControlRoomDevice::create([
+        'name' => $device->name,
+        'canonical_device_id' => $device->id,
+        'type' => ControlRoomDevice::TYPE_NETWORK,
+    ]);
+    $alert = ControlRoomAlert::factory()->create([
+        'source' => 'security_devices',
+        'device_id' => $projection->id,
+        'context' => [
+            'signal_payload' => ['credential' => 'never-return-this'],
+            'client_id' => 999,
+        ],
+    ]);
+    $links = app(ItTicketLinkService::class);
+    $links->link($ticket, $device, 'affected_device');
+    $links->link($ticket, $alert, 'source_alert');
+
+    $this->actingAs($agent)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonPath('linked_context.devices.0.id', $device->id)
+        ->assertJsonPath('linked_context.devices.0.name', $device->name)
+        ->assertJsonPath('linked_context.devices.0.health_status', $device->health_status->value)
+        ->assertJsonPath('linked_context.alerts.0.id', $alert->id)
+        ->assertJsonPath('linked_context.alerts.0.status', $alert->status)
+        ->assertJsonPath('linked_context.alerts.0.reference', $alert->reference_number)
+        ->assertJsonMissingPath('linked_context.devices.0.config')
+        ->assertJsonMissingPath('linked_context.devices.0.command_capability')
+        ->assertJsonMissingPath('linked_context.alerts.0.context')
+        ->assertJsonMissingPath('linked_context.alerts.0.payload')
+        ->assertJsonMissingPath('linked_context.alerts.0.client_id');
+
+    $this->actingAs($this->worker)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonPath('linked_context.devices.0.id', $device->id)
+        ->assertJsonCount(0, 'linked_context.alerts')
+        ->assertJsonMissingPath('linked_context.devices.0.config')
+        ->assertJsonMissingPath('linked_context.devices.0.command_capability');
 });
 
 test('the workspace strips internal notes from requester payloads server-side', function () {
@@ -195,7 +251,7 @@ test('the quick-peek JSON branch mirrors the page payload and its stripping', fu
 
 test('the rail can retag category, subcategory and linked asset', function () {
     $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
-    $asset = \App\Models\Asset::factory()->create(['status' => 'active']);
+    $asset = Asset::factory()->create(['status' => 'active']);
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [

@@ -8,6 +8,11 @@ import { CsatRater, CsatStars } from '@/components/it/csat';
 import { MergeTicketDialog, ResolveTicketDialog, type MergeTarget } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import {
+    TicketLinkedContext,
+    type TicketLinkedAlert,
+    type TicketLinkedDevice,
+} from '@/components/it/ticket-linked-context';
+import {
     TicketThread,
     type ThreadAttachment,
     type ThreadComment,
@@ -72,6 +77,7 @@ interface TicketPayload {
     created_human: string | null;
     updated_at: string | null;
     resolved_at: string | null;
+    monitoring_recovered_at: string | null;
     closed_at: string | null;
     merged_into: { id: number; reference: string | null; title: string } | null;
     requires_approval: boolean;
@@ -94,6 +100,10 @@ interface Props {
     assetOptions: { id: number; name: string; tag: string | null }[];
     kbSuggestions: ThreadKbHint[];
     mergeTargets: MergeTarget[];
+    linked_context: {
+        devices: TicketLinkedDevice[];
+        alerts: TicketLinkedAlert[];
+    };
     can: {
         manage: boolean;
         view: boolean;
@@ -146,6 +156,7 @@ export default function ItTicketShow({
     assetOptions,
     kbSuggestions,
     mergeTargets,
+    linked_context,
     can,
 }: Props) {
     const page = usePage<{ auth?: { user?: { id?: number } } }>();
@@ -573,6 +584,12 @@ export default function ItTicketShow({
                                 ) : null}
                             </>
                         )}
+
+                        <TicketLinkedContext
+                            recoveredAt={ticket.monitoring_recovered_at}
+                            devices={linked_context.devices}
+                            alerts={linked_context.alerts}
+                        />
 
                         {ticket.provisioning_request ? (
                             <RailField label="Provisioning request">
