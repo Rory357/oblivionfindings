@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
     Activity,
     AlertTriangle,
+    BookOpenCheck,
     CheckCircle2,
     CircleAlert,
     CircleHelp,
@@ -36,10 +37,23 @@ export interface TicketLinkedAlert {
     href: string;
 }
 
+export interface TicketLinkedProblem {
+    id: number;
+    reference: string;
+    title: string;
+    workflow_state: string;
+    root_cause: string | null;
+    workaround: string | null;
+    known_error_at: string | null;
+    href: string;
+    ticket_href: string;
+}
+
 interface Props {
     recoveredAt: string | null;
     devices: TicketLinkedDevice[];
     alerts: TicketLinkedAlert[];
+    problems?: TicketLinkedProblem[];
 }
 
 interface StatusPresentation {
@@ -90,8 +104,14 @@ function ContextStatus({ value }: { value: string }) {
     );
 }
 
-export function TicketLinkedContext({ recoveredAt, devices, alerts }: Props) {
-    const hasLinks = devices.length > 0 || alerts.length > 0;
+export function TicketLinkedContext({
+    recoveredAt,
+    devices,
+    alerts,
+    problems = [],
+}: Props) {
+    const hasLinks =
+        devices.length > 0 || alerts.length > 0 || problems.length > 0;
 
     return (
         <section
@@ -233,6 +253,59 @@ export function TicketLinkedContext({ recoveredAt, devices, alerts }: Props) {
                                         Triggered{' '}
                                         {formatDateTime(alert.triggered_at)}
                                     </span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+
+            {problems.length > 0 ? (
+                <div className="mt-3">
+                    <h3 className="text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                        Known problems
+                    </h3>
+                    <ul className="mt-1.5 space-y-2">
+                        {problems.map((problem) => (
+                            <li
+                                key={problem.id}
+                                className="overflow-hidden rounded-xl border border-status-warning/30 bg-status-warning-bg"
+                            >
+                                <Link
+                                    href={problem.href}
+                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
+                                >
+                                    <BookOpenCheck
+                                        aria-hidden="true"
+                                        className="mt-0.5 h-4 w-4 flex-none text-status-warning"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span className="font-mono text-[12px] font-bold">
+                                                {problem.reference}
+                                            </span>
+                                            <ExternalLink
+                                                aria-hidden="true"
+                                                className="h-3.5 w-3.5 text-muted-foreground"
+                                            />
+                                        </span>
+                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
+                                            {problem.title}
+                                        </span>
+                                    </span>
+                                </Link>
+                                <div className="space-y-1 border-t border-status-warning/20 px-3 py-2">
+                                    <ContextStatus
+                                        value={problem.workflow_state}
+                                    />
+                                    {problem.workaround ? (
+                                        <p className="text-[11.5px] text-foreground">
+                                            <span className="font-semibold">
+                                                Workaround:
+                                            </span>{' '}
+                                            {problem.workaround}
+                                        </p>
+                                    ) : null}
                                 </div>
                             </li>
                         ))}

@@ -20,6 +20,10 @@ final class ItTicketLinkService
         array $context = [],
         ?int $actorUserId = null,
     ): ItTicketLink {
+        if (! in_array($relationship, ItTicketLink::RELATIONSHIPS, true)) {
+            throw new DomainException('That ticket-link relationship is not supported.');
+        }
+
         $targetTenantId = $this->targetTenantId($target);
 
         if ($targetTenantId === null) {
@@ -39,6 +43,15 @@ final class ItTicketLinkService
             'context' => $context,
             'created_by_user_id' => $actorUserId,
         ]);
+    }
+
+    public function unlink(ItTicket $ticket, Model $target, string $relationship): void
+    {
+        $ticket->links()
+            ->where('relationship', $relationship)
+            ->where('linkable_type', $target->getMorphClass())
+            ->where('linkable_id', $target->getKey())
+            ->delete();
     }
 
     private function targetTenantId(Model $target): ?int

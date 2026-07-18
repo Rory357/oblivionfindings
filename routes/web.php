@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
+use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItReportsController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\It\ItWorkTaskController;
@@ -152,6 +153,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
     Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
     Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
+    Route::get('/it/problems', [ItProblemController::class, 'index'])->middleware('permission:it.view')->name('it.problems.index');
+    Route::get('/it/problems/{problem}', [ItProblemController::class, 'show'])->middleware('permission:it.view')->name('it.problems.show');
     // Self-service: raising a ticket needs it.request (or it.manage for
     // agents logging on behalf of others) — enforced via ItTicketPolicy.
     Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
@@ -190,6 +193,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
+        Route::post('/it/problems', [ItProblemController::class, 'store'])->name('it.problems.store');
+        Route::patch('/it/problems/{problem}', [ItProblemController::class, 'update'])->name('it.problems.update');
+        Route::post('/it/problems/{problem}/transitions', [ItProblemController::class, 'transition'])->name('it.problems.transitions.store');
         // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits
         // above the {provisioning} routes so it is never bound as an id.
         Route::post('/it/provisioning/bulk', [ItProvisioningController::class, 'bulkProvisioning'])->name('it.provisioning.bulk');

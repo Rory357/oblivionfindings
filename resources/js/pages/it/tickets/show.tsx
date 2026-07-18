@@ -11,6 +11,7 @@ import {
     TicketLinkedContext,
     type TicketLinkedAlert,
     type TicketLinkedDevice,
+    type TicketLinkedProblem,
 } from '@/components/it/ticket-linked-context';
 import {
     TicketThread,
@@ -103,6 +104,7 @@ interface Props {
     linked_context: {
         devices: TicketLinkedDevice[];
         alerts: TicketLinkedAlert[];
+        problems: TicketLinkedProblem[];
     };
     can: {
         manage: boolean;
@@ -589,6 +591,7 @@ export default function ItTicketShow({
                             recoveredAt={ticket.monitoring_recovered_at}
                             devices={linked_context.devices}
                             alerts={linked_context.alerts}
+                            problems={linked_context.problems}
                         />
 
                         {ticket.provisioning_request ? (

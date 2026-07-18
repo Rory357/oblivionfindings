@@ -128,11 +128,11 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create `resources/js/pages/it/problems/show.tsx`
 - Create focused component tests
 
-- [ ] Write failing domain tests for investigation, known-error, resolved, and closed states; root cause; workaround; corrective action; incident linking; and permanent-fix change linking.
-- [ ] Reuse ticket conversation, tasks, approvals, attachments, SLA, and timeline.
-- [ ] Add create/list/filter/show/update/transition UI using production-backed records and canonical deep links.
-- [ ] Surface linked problem/known-error context in affected ticket workspaces.
-- [ ] Commit as `feat(it): add problem management`.
+- [x] Write failing domain tests for investigation, known-error, resolved, and closed states; root cause; workaround; corrective action; incident linking; and permanent-fix change linking.
+- [x] Reuse ticket conversation, tasks, approvals, attachments, SLA, and timeline.
+- [x] Add create/list/filter/show/update/transition UI using production-backed records and canonical deep links.
+- [x] Surface linked problem/known-error context in affected ticket workspaces.
+- [x] Commit as `feat(it): add problem management` (focused backend: 5 tests, 70 assertions; integrated ticket/transition/monitoring regression: 37 tests, 343 assertions; frontend: 2 files, 3 tests; TypeScript, Wayfinder, routes, client build 4,968 modules, SSR build 1,620 modules, syntax, formatting, and diff checks pass).
 
 ## Task 6: Implement controlled Changes end to end
 

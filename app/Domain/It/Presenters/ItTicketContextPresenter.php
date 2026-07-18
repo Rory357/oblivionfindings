@@ -13,7 +13,7 @@ use BackedEnum;
 final class ItTicketContextPresenter
 {
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -39,7 +39,44 @@ final class ItTicketContextPresenter
             'devices' => $devices,
             'alerts' => $alerts,
             'tasks' => $this->presentTasks($ticket, $viewer),
+            'problems' => $this->presentProblems($ticket, $viewer),
         ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function presentProblems(ItTicket $ticket, User $viewer): array
+    {
+        if (! $viewer->canDo('it.view')) {
+            return [];
+        }
+
+        return $ticket->links
+            ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'related_problem'
+                && $link->linkable instanceof ItTicket
+                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
+                && $link->linkable->work_type === 'problem')
+            ->map(function (ItTicketLink $link): ?array {
+                $problemTicket = $link->linkable;
+                $problemTicket->loadMissing('problemProfile');
+                if (! $problemTicket->problemProfile) {
+                    return null;
+                }
+
+                return [
+                    'id' => $problemTicket->problemProfile->id,
+                    'reference' => $problemTicket->reference,
+                    'title' => $problemTicket->title,
+                    'workflow_state' => $problemTicket->workflow_state,
+                    'root_cause' => $problemTicket->problemProfile->root_cause,
+                    'workaround' => $problemTicket->problemProfile->workaround,
+                    'known_error_at' => $problemTicket->problemProfile->known_error_at?->toIso8601String(),
+                    'href' => "/it/problems/{$problemTicket->problemProfile->id}",
+                    'ticket_href' => "/it/tickets/{$problemTicket->id}",
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** @return array<int, array<string, mixed>> */

@@ -43,12 +43,25 @@ const alertFixture = {
     href: '/control-room/alerts/20',
 };
 
+const problemFixture = {
+    id: 7,
+    reference: 'IT-000042',
+    title: 'Repeated VPN authentication failures',
+    workflow_state: 'known_error',
+    root_cause: 'A gateway node has an outdated certificate chain.',
+    workaround: 'Reconnect through the secondary gateway.',
+    known_error_at: '2026-07-18T00:59:00Z',
+    href: '/it/problems/7',
+    ticket_href: '/it/tickets/42',
+};
+
 it('shows monitoring recovery and canonical deep links without raw payloads', () => {
     render(
         <TicketLinkedContext
             recoveredAt="2026-07-18T01:00:00Z"
             devices={[deviceFixture]}
             alerts={[alertFixture]}
+            problems={[problemFixture]}
         />,
     );
 
@@ -63,5 +76,12 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
     );
     expect(screen.getByText('Healthy')).toBeInTheDocument();
     expect(screen.getByText('Resolved')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /IT-000042/i })).toHaveAttribute(
+        'href',
+        '/it/problems/7',
+    );
+    expect(
+        screen.getByText(/Reconnect through the secondary gateway/i),
+    ).toBeVisible();
     expect(screen.queryByText(/signal_payload/i)).not.toBeInTheDocument();
 });

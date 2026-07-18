@@ -42,6 +42,7 @@ use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
+use App\Models\ItProblem;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItQueue;
 use App\Models\ItService;
@@ -196,6 +197,7 @@ class AppServiceProvider extends ServiceProvider
             // short keys so DB rows survive class moves.
             'it_ticket' => ItTicket::class,
             'it_provisioning_request' => ItProvisioningRequest::class,
+            'it_problem' => ItProblem::class,
             'it_ticket_comment' => ItTicketComment::class,
             'it_team' => ItTeam::class,
             'it_queue' => ItQueue::class,

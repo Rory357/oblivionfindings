@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\QueryException;
 
@@ -285,6 +286,11 @@ class ItTicket extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ItWorkTask::class, 'ticket_id')->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function problemProfile(): HasOne
+    {
+        return $this->hasOne(ItProblem::class, 'ticket_id');
     }
 
     public function linked(string $relationship): HasMany
