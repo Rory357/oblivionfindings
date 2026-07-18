@@ -22,7 +22,7 @@ Security & Devices already provides the canonical `Device`, assignments, topolog
 | --- | --- | --- |
 | 1. Platform foundations | In progress | Native monitor persistence and idempotent observation ingestion: `496dbce8f`, `334c98ffa` |
 | 2. Connected monitoring-to-ticket lifecycle | In progress | L01-L04 vertical slice: `94a5f5830`, `21d5e0b93` |
-| 3. Complete IT & Support | In progress | Typed monitoring links, governed service-management lifecycles, grouped navigation, catalogue, teams, queues, routing, and service ownership: `2bb1f5fd2`, `0c0a51410`, Tasks 2-8 in the implementation plan |
+| 3. Complete IT & Support | In progress | Typed monitoring links, governed service-management lifecycles, grouped navigation, catalogue, teams, queues, routing, service ownership, and secure service API identities with scoped idempotent intake: `2bb1f5fd2`, `0c0a51410`, Tasks 2-9 in the implementation plan |
 | 4. Complete Security & Devices workspaces | Planned | None recorded |
 | 5. Cross-module projections and privacy | Planned | None recorded |
 | 6. Production hardening and closure | Planned | None recorded |
@@ -65,7 +65,7 @@ Progress notes:
 - [ ] I03 Shared work supports context links, queues/teams, assignee/owner, SLA, conversations, attachments, watchers, tasks, approvals, and timeline.
 - [ ] I04 Help Centre, knowledge deflection, service catalogue, dynamic forms, My requests, and CSAT are end-to-end.
 - [ ] I05 Inbound/outbound email threading, delivery/bounce state, deduplication, spoofing controls, and attachment quarantine are complete.
-- [ ] I06 Secure API for approved systems uses service identities, scoped fields, idempotency, rate limits, and audit.
+- [x] I06 Secure API for approved systems uses service identities, scoped fields, idempotency, rate limits, and audit.
 - [ ] I07 Queue views, saved filters, workload, SLA risk, waiting parties, bulk per-item results, and ticket workspace are complete.
 - [ ] I08 Joiner/mover/leaver provisioning covers accounts, licences, equipment, network, access control, reversals, and HR completion.
 - [ ] I09 Problems, known errors, workarounds, changes, validation/backout, knowledge lifecycle, major incidents, and reports are complete.
@@ -148,3 +148,4 @@ Progress notes:
 - 2026-07-18: Frontend verification passed: Wayfinder generation with no tracked drift; `npm test` 90 files / 358 tests; `npm run types`; client build 4,966 modules; SSR build 1,618 modules.
 - 2026-07-18: `vendor/bin/pint --dirty` and `git diff --check` passed. V01 and V08 remain open because only this vertical slice, not the full master-goal domain and release matrix, has been verified.
 - 2026-07-18: Foundation contract review found the monitor/observation identity, `ObservationInput` idempotency, online recovery routing, typed `ItTicketLink` ownership, single `DeviceSignalPublished` monitoring-to-ticket path, and permission-aware ticket context stable for dependent plans.
+- 2026-07-19: Secure service API Task 9 passed 10 focused tests / 198 assertions and the full IT regression at 229 tests / 2,147 assertions. TypeScript, targeted ESLint, 5 component tests, 2 desktop/mobile browser journeys, 4 versioned API routes plus 2 identity-admin routes, client build at 4,977 modules, SSR build at 1,629 modules, PHP syntax, targeted Pint, and diff checks passed. V01 and V08 remain open because the full master-goal domain and release matrix are not yet complete.

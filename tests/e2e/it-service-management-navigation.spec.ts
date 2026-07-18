@@ -32,6 +32,24 @@ test.describe('IT & Support service management navigation', () => {
         await expect(
             page.getByRole('button', { name: 'New service' }),
         ).toBeVisible();
+        await page.getByRole('tab', { name: 'API identities' }).click();
+        await expect(
+            page.getByRole('heading', { name: 'API identities', level: 2 }),
+        ).toBeVisible();
+        await page.getByRole('button', { name: 'New API identity' }).click();
+        await expect(
+            page.getByRole('dialog').getByRole('heading', {
+                name: 'New API identity',
+            }),
+        ).toBeVisible();
+        await expect(page.getByLabel('Identity name')).toBeVisible();
+        await expect(page.getByLabel('Execution account')).toBeVisible();
+        await expect(
+            page.getByText(
+                'Require a timestamped HMAC signature on every request',
+            ),
+        ).toBeVisible();
+        await page.getByRole('button', { name: 'Cancel' }).click();
 
         if (testInfo.project.name.includes('desktop')) {
             const sidebar = page.locator('aside').filter({

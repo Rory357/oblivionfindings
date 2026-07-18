@@ -207,6 +207,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/queues/{queue}', [ItServiceManagementSetupController::class, 'updateQueue'])->name('it.setup.queues.update');
         Route::post('/it/setup/services', [ItServiceManagementSetupController::class, 'storeService'])->name('it.setup.services.store');
         Route::patch('/it/setup/services/{service}', [ItServiceManagementSetupController::class, 'updateService'])->name('it.setup.services.update');
+        Route::post('/it/setup/api-identities', [ItServiceManagementSetupController::class, 'storeIdentity'])->name('it.setup.api-identities.store');
+        Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
         Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');

@@ -1,3 +1,8 @@
+import {
+    ItApiIdentities,
+    type ItApiIdentity,
+    type OneTimeApiCredential,
+} from '@/components/it/it-api-identities';
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +21,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import {
     Boxes,
+    KeyRound,
     Network,
     Pencil,
     Plus,
@@ -83,6 +89,9 @@ interface Props {
     queues: Queue[];
     services: Service[];
     agents: Agent[];
+    sites: Agent[];
+    apiIdentities: ItApiIdentity[];
+    oneTimeApiCredential: OneTimeApiCredential | null;
     generatedAt?: string;
 }
 
@@ -111,9 +120,14 @@ export default function ItSetupIndex({
     queues,
     services,
     agents,
+    sites,
+    apiIdentities,
+    oneTimeApiCredential,
     generatedAt,
 }: Props) {
-    const [tab, setTab] = useState<'teams' | 'queues' | 'services'>('teams');
+    const [tab, setTab] = useState<'teams' | 'queues' | 'services' | 'api'>(
+        oneTimeApiCredential ? 'api' : 'teams',
+    );
     const [teamOpen, setTeamOpen] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
     const [serviceOpen, setServiceOpen] = useState(false);
@@ -339,6 +353,13 @@ export default function ItSetupIndex({
                         >
                             Services
                         </Tab>
+                        <Tab
+                            active={tab === 'api'}
+                            onClick={() => setTab('api')}
+                            icon={KeyRound}
+                        >
+                            API identities
+                        </Tab>
                     </div>
 
                     {tab === 'teams' ? (
@@ -385,6 +406,14 @@ export default function ItSetupIndex({
                                 />
                             ))}
                         </Register>
+                    ) : null}
+                    {tab === 'api' ? (
+                        <ItApiIdentities
+                            identities={apiIdentities}
+                            oneTimeCredential={oneTimeApiCredential}
+                            agents={agents}
+                            sites={sites}
+                        />
                     ) : null}
                 </main>
             </ItModuleShell>

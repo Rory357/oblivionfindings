@@ -201,11 +201,11 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create versioned API FormRequests, resources, controllers, and routes
 - Create `tests/Feature/It/ItSecureApiTest.php`
 
-- [ ] Write failing tests for opaque hashed credentials, optional request signatures, allowed tenant/site/work type/fields, idempotency-key replay, conflicting replay, rate limit, revoked/expired identity, response field minimization, and audit.
-- [ ] Implement `POST /api/v1/it/work-items`, read status/context, append public evidence/comment, and status callbacks through canonical services.
-- [ ] Never expose raw device config, secrets, clinical readings, restricted tracking/media, internal notes, or command capability through a scope that does not explicitly allow them.
-- [ ] Add admin setup UI showing identity metadata and one-time secret creation without ever re-displaying a reusable secret.
-- [ ] Commit as `feat(it): add secure service API`.
+- [x] Write failing tests for opaque hashed credentials, optional request signatures, allowed tenant/site/work type/fields, idempotency-key replay, conflicting replay, rate limit, revoked/expired identity, response field minimization, and audit.
+- [x] Implement `POST /api/v1/it/work-items`, read status/context, append public evidence/comment, and status callbacks through canonical services.
+- [x] Never expose raw device config, secrets, clinical readings, restricted tracking/media, internal notes, or command capability through a scope that does not explicitly allow them.
+- [x] Add admin setup UI showing identity metadata and one-time secret creation without ever re-displaying a reusable secret.
+- [x] Commit as `feat(it): add secure service API` (focused backend: 10 tests, 198 assertions; integrated IT regression: 229 tests, 2,147 assertions; frontend: 1 file, 5 tests; browser: desktop and mobile, 2 tests; TypeScript, targeted ESLint, Wayfinder, 6 new API/admin routes, client build 4,977 modules, SSR build 1,629 modules, PHP syntax, targeted Pint, and diff checks pass).
 
 ## Task 10: Expand provisioning to joiner, mover, and leaver templates
 

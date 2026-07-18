@@ -49,6 +49,7 @@ use App\Models\ItProblem;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItQueue;
 use App\Models\ItService;
+use App\Models\ItServiceIdentity;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
@@ -208,6 +209,7 @@ class AppServiceProvider extends ServiceProvider
             'it_team' => ItTeam::class,
             'it_queue' => ItQueue::class,
             'it_service' => ItService::class,
+            'it_service_identity' => ItServiceIdentity::class,
             'it_work_task' => ItWorkTask::class,
             'security_device' => Device::class,
             'control_room_alert' => ControlRoomAlert::class,
@@ -346,6 +348,14 @@ class AppServiceProvider extends ServiceProvider
     {
         // Standard API rate limit
         RateLimiter::for('api', function (Request $request) {
+            // Service identities have their configured per-identity limit in
+            // AuthenticateItServiceIdentity. Keep a wider IP ceiling here so
+            // invalid credentials are still throttled without silently
+            // reducing an approved identity's limit.
+            if ($request->is('api/v1/it/*')) {
+                return Limit::perMinute(300)->by('it-service-api:'.$request->ip());
+            }
+
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 

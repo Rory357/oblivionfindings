@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\SaveItQueueRequest;
 use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
+use App\Http\Requests\It\StoreItServiceIdentityRequest;
 use App\Models\ItQueue;
 use App\Models\ItService;
+use App\Models\ItServiceIdentity;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
+use App\Models\Site;
 use App\Models\User;
 use DomainException;
 use Illuminate\Http\Request;
@@ -24,6 +28,7 @@ class ItServiceManagementSetupController extends Controller
 
     public function __construct(
         private readonly ItServiceManagementSetupService $setupService,
+        private readonly ItServiceIdentityCredentialService $identityCredentials,
     ) {}
 
     public function index(Request $request)
@@ -109,14 +114,46 @@ class ItServiceManagementSetupController extends Controller
                 ],
             ])->values();
 
+        $apiIdentities = ItServiceIdentity::query()
+            ->forTenant($tenantId)
+            ->with(['actor:id,name', 'creator:id,name'])
+            ->latest('id')
+            ->get()
+            ->map(fn (ItServiceIdentity $identity) => [
+                'id' => $identity->id,
+                'public_id' => $identity->public_id,
+                'name' => $identity->name,
+                'description' => $identity->description,
+                'actor' => $this->userOption($identity->actor),
+                'creator' => $this->userOption($identity->creator),
+                'abilities' => $identity->abilities ?? [],
+                'allowed_work_types' => $identity->allowed_work_types ?? [],
+                'allowed_site_ids' => $identity->allowed_site_ids ?? [],
+                'allowed_fields' => $identity->allowed_fields ?? ['create' => [], 'read' => []],
+                'require_signature' => $identity->require_signature,
+                'rate_limit_per_minute' => $identity->rate_limit_per_minute,
+                'expires_at' => $identity->expires_at?->toIso8601String(),
+                'revoked_at' => $identity->revoked_at?->toIso8601String(),
+                'last_used_at' => $identity->last_used_at?->toIso8601String(),
+                'created_at' => $identity->created_at?->toIso8601String(),
+                'is_active' => $identity->isActive(),
+            ])->values();
+
         return Inertia::render('it/setup/index', [
             'teams' => $teams,
             'queues' => $queues,
             'services' => $services,
+            'apiIdentities' => $apiIdentities,
+            'oneTimeApiCredential' => $request->session()->get('it_api_credential'),
             'agents' => ItStaffDirectory::agents($tenantId)
                 ->sortBy('name')
                 ->map(fn (User $user) => $this->userOption($user))
                 ->values(),
+            'sites' => Site::query()
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'generatedAt' => now()->toIso8601String(),
         ]);
     }
@@ -167,6 +204,39 @@ class ItServiceManagementSetupController extends Controller
 
         return $this->run($request, fn (int $tenantId) => $this->setupService
             ->updateService($service, $request->user(), $tenantId, $request->validated()), 'Service updated.');
+    }
+
+    public function storeIdentity(StoreItServiceIdentityRequest $request)
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        try {
+            $data = $request->validated();
+            $credential = $this->identityCredentials->create($request->user(), $tenantId, [
+                ...$data,
+                'allowed_fields' => [
+                    'create' => array_values($data['create_fields']),
+                    'read' => array_values($data['read_fields']),
+                ],
+            ]);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('it.setup.index')
+            ->with('success', 'API identity created. Copy its credential now; it will not be shown again.')
+            ->with('it_api_credential', [
+                'identity_id' => $credential['identity']->id,
+                'name' => $credential['identity']->name,
+                'token' => $credential['token'],
+            ]);
+    }
+
+    public function revokeIdentity(Request $request, ItServiceIdentity $identity)
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $this->identityCredentials->revoke($identity, $request->user(), $tenantId);
+
+        return redirect()->route('it.setup.index')->with('success', 'API identity revoked.');
     }
 
     /** @param callable(int): mixed $action */

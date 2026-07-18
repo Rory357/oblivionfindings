@@ -164,6 +164,9 @@ describe('IT & Support grouped navigation', () => {
                     },
                 ]}
                 agents={[]}
+                sites={[]}
+                apiIdentities={[]}
+                oneTimeApiCredential={null}
             />,
         );
 
@@ -179,6 +182,61 @@ describe('IT & Support grouped navigation', () => {
         expect(
             screen.getByRole('button', { name: /New service/i }),
         ).toBeVisible();
+    });
+
+    it('shows scoped API identity metadata and a one-time credential in setup', () => {
+        render(
+            <ItSetupIndex
+                teams={[]}
+                queues={[]}
+                services={[]}
+                agents={[{ id: 8, name: 'Integration agent' }]}
+                sites={[{ id: 3, name: 'Central House' }]}
+                apiIdentities={[
+                    {
+                        id: 12,
+                        public_id: 'abc123publicid',
+                        name: 'Native monitoring',
+                        description: 'Approved event intake.',
+                        actor: { id: 8, name: 'Integration agent' },
+                        creator: { id: 7, name: 'IT manager' },
+                        abilities: ['work:create', 'work:read'],
+                        allowed_work_types: ['incident'],
+                        allowed_site_ids: [3],
+                        allowed_fields: {
+                            create: ['title', 'category'],
+                            read: [],
+                        },
+                        require_signature: true,
+                        rate_limit_per_minute: 60,
+                        expires_at: null,
+                        revoked_at: null,
+                        last_used_at: null,
+                        created_at: '2026-07-19T12:00:00Z',
+                        is_active: true,
+                    },
+                ]}
+                oneTimeApiCredential={{
+                    identity_id: 12,
+                    name: 'Native monitoring',
+                    token: 'ofi_public_secret-shown-once',
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByRole('tab', { name: 'API identities' }),
+        ).toHaveAttribute('aria-selected', 'true');
+
+        expect(
+            screen.getByRole('heading', { name: 'API identities' }),
+        ).toBeVisible();
+        expect(screen.getByText('Native monitoring')).toBeVisible();
+        expect(screen.getByText('Signed')).toBeVisible();
+        expect(screen.getByLabelText('One-time API credential')).toHaveValue(
+            'ofi_public_secret-shown-once',
+        );
+        expect(screen.queryByText('token_hash')).not.toBeInTheDocument();
     });
 
     it('turns the service catalogue into a searchable human workspace', async () => {

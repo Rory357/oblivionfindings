@@ -1,14 +1,17 @@
 <?php
 
 use App\Http\Middleware\AddContentSecurityPolicy;
+use App\Http\Middleware\AuthenticateItServiceIdentity;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnforceTwoFactorPolicy;
 use App\Http\Middleware\EnsureAccountStillApproved;
+use App\Http\Middleware\EnsureItApiAbility;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
+use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -50,6 +53,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureRole::class,
             'permission' => EnsurePermission::class,
             'role_scope' => RoleScope::class,
+            'it.service' => AuthenticateItServiceIdentity::class,
+            'it.ability' => EnsureItApiAbility::class,
+            'it.api.request' => RecordItApiRequest::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
