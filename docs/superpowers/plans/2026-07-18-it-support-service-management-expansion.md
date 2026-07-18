@@ -165,10 +165,10 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create `resources/js/pages/it/major-incidents/show.tsx`
 - Create focused component tests
 
-- [ ] Write failing tests for declaration, commander, impacted service/site links, related incidents, update cadence, audience-safe communications, service restoration, resolution, and post-incident review.
-- [ ] Keep the Control Room correlation canonical and link it; do not create a second operational alert.
-- [ ] Add a live timeline/communications workspace and explicit overdue-update state.
-- [ ] Commit as `feat(it): add major incident management`.
+- [x] Write failing tests for declaration, commander, impacted service/site links, related incidents, update cadence, audience-safe communications, service restoration, resolution, and post-incident review.
+- [x] Keep the Control Room correlation canonical and link it; do not create a second operational alert.
+- [x] Add a live timeline/communications workspace and explicit overdue-update state.
+- [x] Commit as `feat(it): add major incident management` (focused backend: 6 tests, 100 assertions; integrated major-incident/change/problem/ticket/transition/approval/monitoring regression: 70 tests, 697 assertions; frontend: 2 files, 3 tests; TypeScript, ESLint, Wayfinder, 7 routes, client build 4,972 modules, SSR build 1,624 modules, syntax, formatting, and diff checks pass).
 
 ## Task 8: Add teams, queues, service ownership, and grouped IT & Support navigation
 

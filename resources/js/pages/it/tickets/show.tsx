@@ -12,6 +12,7 @@ import {
     type TicketLinkedAlert,
     type TicketLinkedChange,
     type TicketLinkedDevice,
+    type TicketLinkedMajorIncident,
     type TicketLinkedProblem,
 } from '@/components/it/ticket-linked-context';
 import {
@@ -107,6 +108,7 @@ interface Props {
         alerts: TicketLinkedAlert[];
         changes: TicketLinkedChange[];
         problems: TicketLinkedProblem[];
+        major_incidents: TicketLinkedMajorIncident[];
     };
     can: {
         manage: boolean;
@@ -595,6 +597,7 @@ export default function ItTicketShow({
                             alerts={linked_context.alerts}
                             changes={linked_context.changes}
                             problems={linked_context.problems}
+                            majorIncidents={linked_context.major_incidents}
                         />
 
                         {ticket.provisioning_request ? (

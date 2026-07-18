@@ -12,6 +12,7 @@ import {
     CircleHelp,
     ExternalLink,
     Link2,
+    Megaphone,
     Server,
     ShieldAlert,
 } from 'lucide-react';
@@ -64,12 +65,26 @@ export interface TicketLinkedChange {
     ticket_href: string;
 }
 
+export interface TicketLinkedMajorIncident {
+    id: number;
+    reference: string;
+    title: string;
+    workflow_state: string;
+    severity: string;
+    impact_summary: string | null;
+    restored_at: string | null;
+    next_update_due_at: string | null;
+    href: string;
+    ticket_href: string;
+}
+
 interface Props {
     recoveredAt: string | null;
     devices: TicketLinkedDevice[];
     alerts: TicketLinkedAlert[];
     problems?: TicketLinkedProblem[];
     changes?: TicketLinkedChange[];
+    majorIncidents?: TicketLinkedMajorIncident[];
 }
 
 interface StatusPresentation {
@@ -89,16 +104,22 @@ function statusPresentation(status: string): StatusPresentation {
         case 'online':
         case 'resolved':
         case 'closed':
+        case 'restored':
             return { variant: 'success', icon: CheckCircle2 };
         case 'degraded':
         case 'warning':
         case 'medium':
         case 'waiting':
+        case 'monitoring':
             return { variant: 'warning', icon: AlertTriangle };
         case 'critical':
         case 'failed':
         case 'high':
         case 'offline':
+        case 'sev1':
+        case 'sev2':
+        case 'declared':
+        case 'responding':
             return { variant: 'critical', icon: CircleAlert };
         case 'open':
         case 'in_progress':
@@ -126,12 +147,14 @@ export function TicketLinkedContext({
     alerts,
     problems = [],
     changes = [],
+    majorIncidents = [],
 }: Props) {
     const hasLinks =
         devices.length > 0 ||
         alerts.length > 0 ||
         problems.length > 0 ||
-        changes.length > 0;
+        changes.length > 0 ||
+        majorIncidents.length > 0;
 
     return (
         <section
@@ -178,6 +201,61 @@ export function TicketLinkedContext({
                     <p className="mt-1 text-[12px] text-muted-foreground">
                         No linked monitoring records are visible.
                     </p>
+                </div>
+            ) : null}
+
+            {majorIncidents.length > 0 ? (
+                <div className="mt-3">
+                    <h3 className="text-[10.5px] font-bold tracking-wide text-status-critical uppercase">
+                        Major incident command
+                    </h3>
+                    <ul className="mt-1.5 space-y-2">
+                        {majorIncidents.map((incident) => (
+                            <li
+                                key={incident.id}
+                                className="overflow-hidden rounded-xl border border-status-critical/35 bg-status-critical-bg"
+                            >
+                                <Link
+                                    href={incident.href}
+                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
+                                >
+                                    <Megaphone
+                                        aria-hidden="true"
+                                        className="mt-0.5 h-4 w-4 flex-none text-status-critical"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span className="font-mono text-[12px] font-bold">
+                                                {incident.reference}
+                                            </span>
+                                            <ExternalLink
+                                                aria-hidden="true"
+                                                className="h-3.5 w-3.5 text-muted-foreground"
+                                            />
+                                        </span>
+                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
+                                            {incident.title}
+                                        </span>
+                                    </span>
+                                </Link>
+                                <div className="space-y-1 border-t border-status-critical/20 px-3 py-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <ContextStatus
+                                            value={incident.severity}
+                                        />
+                                        <ContextStatus
+                                            value={incident.workflow_state}
+                                        />
+                                    </div>
+                                    {incident.impact_summary ? (
+                                        <p className="text-[11.5px] text-foreground">
+                                            {incident.impact_summary}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             ) : null}
 

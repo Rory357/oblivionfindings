@@ -43,6 +43,8 @@ use App\Models\FleetWorkOrder;
 use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
 use App\Models\ItChange;
+use App\Models\ItMajorIncident;
+use App\Models\ItMajorIncidentUpdate;
 use App\Models\ItProblem;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItQueue;
@@ -199,6 +201,8 @@ class AppServiceProvider extends ServiceProvider
             'it_ticket' => ItTicket::class,
             'it_provisioning_request' => ItProvisioningRequest::class,
             'it_change' => ItChange::class,
+            'it_major_incident' => ItMajorIncident::class,
+            'it_major_incident_update' => ItMajorIncidentUpdate::class,
             'it_problem' => ItProblem::class,
             'it_ticket_comment' => ItTicketComment::class,
             'it_team' => ItTeam::class,

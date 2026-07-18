@@ -13,7 +13,7 @@ use BackedEnum;
 final class ItTicketContextPresenter
 {
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -41,7 +41,46 @@ final class ItTicketContextPresenter
             'tasks' => $this->presentTasks($ticket, $viewer),
             'problems' => $this->presentProblems($ticket, $viewer),
             'changes' => $this->presentChanges($ticket, $viewer),
+            'major_incidents' => $this->presentMajorIncidents($ticket, $viewer),
         ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function presentMajorIncidents(ItTicket $ticket, User $viewer): array
+    {
+        if (! $viewer->canDo('it.view')) {
+            return [];
+        }
+
+        return $ticket->links
+            ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'major_incident_member'
+                && $link->linkable instanceof ItTicket
+                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
+                && $link->linkable->work_type === 'major_incident')
+            ->map(function (ItTicketLink $link): ?array {
+                $majorIncidentTicket = $link->linkable;
+                $majorIncidentTicket->loadMissing('majorIncidentProfile');
+                if (! $majorIncidentTicket->majorIncidentProfile) {
+                    return null;
+                }
+                $profile = $majorIncidentTicket->majorIncidentProfile;
+
+                return [
+                    'id' => $profile->id,
+                    'reference' => $majorIncidentTicket->reference,
+                    'title' => $majorIncidentTicket->title,
+                    'workflow_state' => $majorIncidentTicket->workflow_state,
+                    'severity' => $profile->severity,
+                    'impact_summary' => $profile->impact_summary,
+                    'restored_at' => $profile->restored_at?->toIso8601String(),
+                    'next_update_due_at' => $profile->next_update_due_at?->toIso8601String(),
+                    'href' => "/it/major-incidents/{$profile->id}",
+                    'ticket_href' => "/it/tickets/{$majorIncidentTicket->id}",
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** @return array<int, array<string, mixed>> */

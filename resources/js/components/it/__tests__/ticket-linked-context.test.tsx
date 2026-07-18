@@ -69,6 +69,19 @@ const changeFixture = {
     ticket_href: '/it/tickets/52',
 };
 
+const majorIncidentFixture = {
+    id: 12,
+    reference: 'IT-000060',
+    title: 'All-site identity outage',
+    workflow_state: 'responding',
+    severity: 'sev1',
+    impact_summary: 'Authentication is unavailable across all active sites.',
+    restored_at: null,
+    next_update_due_at: '2026-07-19T22:30:00Z',
+    href: '/it/major-incidents/12',
+    ticket_href: '/it/tickets/60',
+};
+
 it('shows monitoring recovery and canonical deep links without raw payloads', () => {
     render(
         <TicketLinkedContext
@@ -77,6 +90,7 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
             alerts={[alertFixture]}
             problems={[problemFixture]}
             changes={[changeFixture]}
+            majorIncidents={[majorIncidentFixture]}
         />,
     );
 
@@ -103,5 +117,10 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
         '/it/changes/9',
     );
     expect(screen.getByText('Scheduled maintenance')).toBeVisible();
+    expect(screen.getByText('Major incident command')).toBeVisible();
+    expect(screen.getByRole('link', { name: /IT-000060/i })).toHaveAttribute(
+        'href',
+        '/it/major-incidents/12',
+    );
     expect(screen.queryByText(/signal_payload/i)).not.toBeInTheDocument();
 });
