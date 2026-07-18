@@ -132,7 +132,7 @@ Progress notes:
 ## Implementation plans
 
 1. `docs/superpowers/plans/2026-07-18-it-support-monitoring-foundation-vertical-slice.md`
-2. IT & Support service-management expansion plan, created after plan 1 contract review.
+2. `docs/superpowers/plans/2026-07-18-it-support-service-management-expansion.md`
 3. Security & Devices information-architecture and workspace plan, created after plan 1 projection review.
 4. Native discovery, protocol, topology, and collector runtime plan, created after plan 1 runtime-contract review.
 5. Device management, command, secrets, and audit plan, created after plans 3 and 4 establish capabilities.
