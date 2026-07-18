@@ -137,7 +137,7 @@ Run: `git add resources/js/pages/sites/tabs/types.ts resources/js/pages/sites/ta
 - Create: `resources/js/hooks/use-ui-preference.ts`
 - Create: `resources/js/test/use-ui-preference.test.tsx`
 
-- [ ] **Step 1: Write failing endpoint tests**
+- [x] **Step 1: Write failing endpoint tests**
 
 Prove authentication is required, values are stored only for the acting user, the same user/key pair is updated rather than duplicated, invalid keys/JSON shapes fail validation, and one user cannot address another user's record. The schema contract is:
 
@@ -152,13 +152,13 @@ Schema::create('user_ui_preferences', function (Blueprint $table): void {
 });
 ```
 
-- [ ] **Step 2: Prove the feature test fails**
+- [x] **Step 2: Prove the feature test fails**
 
 Run: `php artisan test tests/Feature/Settings/UiPreferenceTest.php`
 
 Expected: FAIL because the route and table do not exist.
 
-- [ ] **Step 3: Implement the generic model and endpoint**
+- [x] **Step 3: Implement the generic model and endpoint**
 
 Expose authenticated `PUT /settings/ui-preferences/{key}` as `settings.ui-preferences.update`. Restrict keys to `^[a-z0-9][a-z0-9._-]{0,119}$`, require `value` to be an array, and use:
 
@@ -169,11 +169,11 @@ $preference = $request->user()->uiPreferences()->updateOrCreate(
 );
 ```
 
-- [ ] **Step 4: Write the failing hook test**
+- [x] **Step 4: Write the failing hook test**
 
 Verify optimistic pin toggles, `sites.profile.pinned-tabs` request payload, duplicate removal, rollback on failure, and an accessible error message.
 
-- [ ] **Step 5: Implement and verify the hook**
+- [x] **Step 5: Implement and verify the hook**
 
 Run: `npm test -- resources/js/test/use-ui-preference.test.tsx`
 
@@ -181,7 +181,7 @@ Run: `php artisan test tests/Feature/Settings/UiPreferenceTest.php`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run: `git add database/migrations/2026_07_18_000100_create_user_ui_preferences_table.php app/Models/UserUiPreference.php app/Models/User.php app/Http/Requests/Settings/UpdateUiPreferenceRequest.php app/Http/Controllers/Settings/UiPreferenceController.php routes/settings.php tests/Feature/Settings/UiPreferenceTest.php resources/js/hooks/use-ui-preference.ts resources/js/test/use-ui-preference.test.tsx && git diff --cached --check && git commit -m "feat(settings): persist generic UI preferences"`
 

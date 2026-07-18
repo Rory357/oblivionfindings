@@ -1,34 +1,40 @@
 <?php
 
-use App\Http\Controllers\Settings\AppearanceController;
-use App\Http\Controllers\Settings\PasswordController;
-use App\Http\Controllers\Settings\ProfileController;
-use App\Http\Controllers\Settings\PushSubscriptionController;
-use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
-use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\AccessController;
-use App\Http\Controllers\Settings\RolesController;
-use App\Http\Controllers\Settings\BrandingController;
-use App\Http\Controllers\Settings\AuditLogSettingsController;
-use App\Http\Controllers\Settings\ServiceContextController;
-use App\Http\Controllers\Settings\NotificationPreferencesController;
-use App\Http\Controllers\Settings\NotificationEscalationsController;
-use App\Http\Controllers\Settings\ModuleSettingsController;
 use App\Http\Controllers\Settings\ApiSettingsController;
+use App\Http\Controllers\Settings\AppearanceController;
+use App\Http\Controllers\Settings\AuditLogSettingsController;
+use App\Http\Controllers\Settings\BrandingController;
 use App\Http\Controllers\Settings\CalendarSyncOAuthController;
 use App\Http\Controllers\Settings\CalendarSyncSettingsController;
 use App\Http\Controllers\Settings\DataSettingsController;
 use App\Http\Controllers\Settings\EmailSettingsController;
+use App\Http\Controllers\Settings\ItMailboxOAuthController;
+use App\Http\Controllers\Settings\ItMailboxSettingsController;
+use App\Http\Controllers\Settings\ModuleSettingsController;
+use App\Http\Controllers\Settings\NotificationEscalationsController;
+use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
+use App\Http\Controllers\Settings\PasswordController;
+use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\PushSubscriptionController;
+use App\Http\Controllers\Settings\RolesController;
 use App\Http\Controllers\Settings\SecurityPolicyController;
+use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\SsoConfigController;
 use App\Http\Controllers\Settings\SsoGroupController;
+use App\Http\Controllers\Settings\TerminologyController;
+use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
+use App\Http\Controllers\Settings\UiPreferenceController;
 use App\Http\Controllers\Settings\UserManagementRedirectController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('settings', '/settings/profile');
+
+    Route::put('settings/ui-preferences/{key}', [UiPreferenceController::class, 'update'])
+        ->name('settings.ui-preferences.update');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -113,7 +119,6 @@ Route::middleware('auth')->group(function () {
     Route::post('settings/service-contexts', [ServiceContextController::class, 'store'])
         ->middleware('permission:settings.service_contexts.manage')
         ->name('settings.service_contexts.store');
-
 
     Route::post('settings/service-contexts/default', [ServiceContextController::class, 'setDefault'])
         ->middleware('permission:settings.service_contexts.manage')
@@ -330,17 +335,17 @@ Route::middleware('auth')->group(function () {
     // the hourly PollItMailboxJob reads. Same admin gate as calendar-sync;
     // the OAuth flow mirrors it (E6).
     Route::middleware('permission:integrations.manage_tenant_secrets')->group(function () {
-        Route::get('settings/it-mailbox', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'index'])
+        Route::get('settings/it-mailbox', [ItMailboxSettingsController::class, 'index'])
             ->name('settings.it-mailbox');
-        Route::put('settings/it-mailbox/mailbox/{provider}', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'updateMailbox'])
+        Route::put('settings/it-mailbox/mailbox/{provider}', [ItMailboxSettingsController::class, 'updateMailbox'])
             ->name('settings.it-mailbox.mailbox');
-        Route::post('settings/it-mailbox/poll-now', [\App\Http\Controllers\Settings\ItMailboxSettingsController::class, 'pollNow'])
+        Route::post('settings/it-mailbox/poll-now', [ItMailboxSettingsController::class, 'pollNow'])
             ->name('settings.it-mailbox.poll-now');
-        Route::get('settings/it-mailbox/connect/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'redirect'])
+        Route::get('settings/it-mailbox/connect/{provider}', [ItMailboxOAuthController::class, 'redirect'])
             ->name('settings.it-mailbox.connect');
-        Route::get('settings/it-mailbox/callback/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'callback'])
+        Route::get('settings/it-mailbox/callback/{provider}', [ItMailboxOAuthController::class, 'callback'])
             ->name('settings.it-mailbox.callback');
-        Route::delete('settings/it-mailbox/connect/{provider}', [\App\Http\Controllers\Settings\ItMailboxOAuthController::class, 'disconnect'])
+        Route::delete('settings/it-mailbox/connect/{provider}', [ItMailboxOAuthController::class, 'disconnect'])
             ->name('settings.it-mailbox.disconnect');
     });
 
