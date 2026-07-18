@@ -313,17 +313,17 @@ Run: `git add app/Http/Controllers/Sites/SiteProfileController.php app/Services/
 - Create: `resources/js/pages/sites/tabs/site-profile-states.tsx`
 - Create: `resources/js/test/site-profile-shell.test.tsx`
 
-- [ ] **Step 1: Write failing shell tests**
+- [x] **Step 1: Write failing shell tests**
 
 Assert explicit `site.brand_colour` reaches `PageHero`, missing brand colour falls through to the organisation primary token, readiness changes the URL/tab without `scrollIntoView`, hero stats and key contacts are permission-shaped, `?tab=hazards` opens Safety, unknown tabs normalize once, group data requests use `router.reload({ only: [...] })`, and loading/error/locked states remain distinct.
 
-- [ ] **Step 2: Prove the shell test fails**
+- [x] **Step 2: Prove the shell test fails**
 
 Run: `npm test -- resources/js/test/site-profile-shell.test.tsx`
 
 Expected: FAIL against the legacy monolith.
 
-- [ ] **Step 3: Implement the slim shell**
+- [x] **Step 3: Implement the slim shell**
 
 The shell owns only title/breadcrumbs, `PageHero`, registry navigation, query synchronization, optional-group loading, retry, active-tab rendering, and Site-owned dialog hosts. Pass:
 
@@ -341,13 +341,13 @@ The shell owns only title/breadcrumbs, `PageHero`, registry navigation, query sy
 
 Use `replaceState` semantics for tab normalization and `preserveState`/`preserveScroll` for partial reloads. Never inspect protected optional data to decide visibility.
 
-- [ ] **Step 4: Verify shell and shared navigation**
+- [x] **Step 4: Verify shell and shared navigation**
 
 Run: `npm test -- resources/js/test/site-profile-shell.test.tsx resources/js/test/site-profile-registry.test.ts resources/js/test/page-grouped-profile-nav.test.tsx resources/js/test/client-profile-navigation.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add resources/js/pages/sites/show.tsx resources/js/pages/sites/tabs/site-profile-states.tsx resources/js/test/site-profile-shell.test.tsx && git diff --cached --check && git commit -m "feat(sites): build branded site profile shell"`
 
