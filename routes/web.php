@@ -8,6 +8,7 @@ use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
 use App\Http\Controllers\It\ItTicketController;
+use App\Http\Controllers\It\ItWorkTaskController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\TodayDashboardController;
@@ -200,6 +201,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
         Route::post('/it/tickets/{ticket}/transitions', [ItTicketController::class, 'transition'])->name('it.tickets.transitions.store');
+        Route::post('/it/tickets/{ticket}/tasks', [ItWorkTaskController::class, 'store'])->name('it.tickets.tasks.store');
+        Route::patch('/it/tickets/{ticket}/tasks/{task}', [ItWorkTaskController::class, 'update'])->name('it.tickets.tasks.update');
+        Route::post('/it/tickets/{ticket}/tasks/{task}/complete', [ItWorkTaskController::class, 'complete'])->name('it.tickets.tasks.complete');
+        Route::post('/it/tickets/{ticket}/tasks/{task}/reopen', [ItWorkTaskController::class, 'reopen'])->name('it.tickets.tasks.reopen');
         Route::post('/it/tickets/{ticket}/merge', [ItTicketController::class, 'merge'])->name('it.tickets.merge');
         Route::post('/it/tickets/{ticket}/approvals', [ItTicketController::class, 'requestApproval'])->name('it.tickets.approvals.request');
         Route::post('/it/approvals/{approval}/decide', [ItTicketController::class, 'decideApproval'])->name('it.approvals.decide');

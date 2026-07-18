@@ -6,13 +6,14 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
+use App\Models\ItWorkTask;
 use App\Models\User;
 use BackedEnum;
 
 final class ItTicketContextPresenter
 {
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -37,7 +38,48 @@ final class ItTicketContextPresenter
         return [
             'devices' => $devices,
             'alerts' => $alerts,
+            'tasks' => $this->presentTasks($ticket, $viewer),
         ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function presentTasks(ItTicket $ticket, User $viewer): array
+    {
+        if (! $viewer->canDo('it.view')) {
+            return [];
+        }
+
+        return $ticket->tasks()
+            ->with(['dependencies:id,title,status', 'team:id,name', 'assignee:id,name', 'completedBy:id,name'])
+            ->get()
+            ->map(fn (ItWorkTask $task): array => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'description' => $task->description,
+                'status' => $task->status,
+                'due_at' => $task->due_at?->toIso8601String(),
+                'is_required' => $task->is_required,
+                'evidence_required' => $task->evidence_required,
+                'evidence' => $task->evidence,
+                'completion_note' => $task->completion_note,
+                'completed_at' => $task->completed_at?->toIso8601String(),
+                'sort_order' => $task->sort_order,
+                'team' => $task->team ? ['id' => $task->team->id, 'name' => $task->team->name] : null,
+                'assignee' => $task->assignee ? ['id' => $task->assignee->id, 'name' => $task->assignee->name] : null,
+                'completed_by' => $task->completedBy
+                    ? ['id' => $task->completedBy->id, 'name' => $task->completedBy->name]
+                    : null,
+                'dependencies' => $task->dependencies
+                    ->map(fn (ItWorkTask $dependency): array => [
+                        'id' => $dependency->id,
+                        'title' => $dependency->title,
+                        'status' => $dependency->status,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     private function canViewDevice(ItTicket $ticket, Device $device, User $viewer): bool

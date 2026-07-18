@@ -108,11 +108,11 @@ The missing service-management layers are governed type lifecycles, service cata
 - Modify `routes/web.php`
 - Create `tests/Feature/It/ItWorkTaskTest.php`
 
-- [ ] Write failing tests for required/optional tasks, ordering, dependencies, team/user assignment, due dates, evidence requirement, completion, reopening, and tenant/security gates.
-- [ ] Block resolution when required tasks or approvals remain incomplete.
-- [ ] Record every task mutation in the canonical ticket event timeline.
-- [ ] Expose permission-safe task and dependency context in the ticket workspace payload.
-- [ ] Commit as `feat(it): add governed work tasks`.
+- [x] Write failing tests for required/optional tasks, ordering, dependencies, cycle rejection, team/user assignment, due dates, evidence requirement, completion, reopening, and tenant/security gates.
+- [x] Block resolution when required tasks or approvals remain incomplete.
+- [x] Record every task mutation in the canonical ticket event timeline.
+- [x] Expose permission-safe task and dependency context in the ticket workspace payload.
+- [x] Commit as `feat(it): add governed work tasks` (integrated regression: 33 tests, 331 assertions; TypeScript, route generation, syntax, and formatting pass).
 
 ## Task 5: Implement Problems and known errors end to end
 

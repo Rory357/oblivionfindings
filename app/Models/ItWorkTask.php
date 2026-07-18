@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItWorkTask extends Model
@@ -54,6 +55,26 @@ class ItWorkTask extends Model
     public function children(): HasMany
     {
         return $this->hasMany(ItWorkTask::class, 'parent_task_id');
+    }
+
+    public function dependencies(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ItWorkTask::class,
+            'it_work_task_dependencies',
+            'task_id',
+            'depends_on_task_id',
+        )->withTimestamps();
+    }
+
+    public function dependents(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ItWorkTask::class,
+            'it_work_task_dependencies',
+            'depends_on_task_id',
+            'task_id',
+        )->withTimestamps();
     }
 
     public function team(): BelongsTo
