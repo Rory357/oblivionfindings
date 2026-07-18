@@ -2745,7 +2745,7 @@ The final audit must:
 - state explicitly that no finding was deferred;
 - contain no `Deferred`, `Not tested`, `Partial`, unresolved P0–P3, or ambiguous completion language.
 
-- [ ] **Step 10: Commit and push the final evidence**
+- [x] **Step 10: Commit and push the final evidence**
 
 Do not commit credentials, server dumps, or sensitive raw data. Commit the audit, ledger, and appropriate redacted screenshots:
 
@@ -2759,7 +2759,7 @@ if ($LASTEXITCODE -ne 0) { throw 'origin/main advanced during acceptance; reconc
 git push origin HEAD:main
 ```
 
-- [ ] **Step 11: Sync the docs-only evidence commit to the server**
+- [x] **Step 11: Sync the docs-only evidence commit to the server**
 
 ```bash
 cd /var/www/oblivionfindings
@@ -2769,7 +2769,7 @@ git rev-parse HEAD
 
 Expected: the server checkout advances to the final evidence SHA without changing runtime code.
 
-- [ ] **Step 12: Perform final completion audit**
+- [x] **Step 12: Perform final completion audit**
 
 Run locally and on the server:
 
@@ -2789,3 +2789,12 @@ Expected:
 - no required work remains.
 
 Only after this evidence is current and internally consistent may the persistent goal be marked complete.
+
+Task 21 completed:
+
+- runtime acceptance SHA `20a9691811583b62cd371c1ab047d130c4cc3286` was deployed and live-proven;
+- evidence commit `215918ef9a3dad327ee9fd6112baecd331656e8b` was pushed to `main` and fast-forwarded onto the server;
+- seven distinct personas passed the live golden relay in actual desktop Chrome;
+- all 17 golden criteria and alternate branches A–F passed;
+- D-01 through D-19 are Closed with implementation, automated, live, database, log, and screenshot evidence;
+- the closing checkpoint reruns the identical-SHA, clean-worktree, audit-status, HTTP, log, and diff-integrity checks after publication.
