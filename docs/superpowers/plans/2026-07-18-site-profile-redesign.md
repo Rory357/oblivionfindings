@@ -80,7 +80,7 @@ Run: `git add resources/js/components/page/grouped-profile-nav.tsx resources/js/
 - Create: `resources/js/pages/sites/tabs/registry.ts`
 - Create: `resources/js/test/site-profile-registry.test.ts`
 
-- [ ] **Step 1: Write failing registry tests**
+- [x] **Step 1: Write failing registry tests**
 
 Test the exact five groups and tabs from the approved design, house/day-service/head-office labels, head-office exclusions, permission-shaped locked tabs, group-data ownership, warning totals, and safe normalization of unknown or hidden `?tab=` values.
 
@@ -107,17 +107,17 @@ export type SiteProfileTabDefinition = {
 };
 ```
 
-- [ ] **Step 2: Prove the registry test fails**
+- [x] **Step 2: Prove the registry test fails**
 
 Run: `npm test -- resources/js/test/site-profile-registry.test.ts`
 
 Expected: FAIL because the registry module does not exist.
 
-- [ ] **Step 3: Implement registry helpers**
+- [x] **Step 3: Implement registry helpers**
 
 Export `siteProfileGroups`, `siteProfileTabs`, `visibleSiteProfileTabs`, `resolveSiteProfileTab`, `dataGroupForTab`, and `warningTotalsByGroup`. `resolveSiteProfileTab` returns the requested visible tab or `overview`; it never returns a hidden or unauthorized tab.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `npm test -- resources/js/test/site-profile-registry.test.ts`
 
