@@ -321,13 +321,16 @@ class SiteControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('sites/show')
                 ->has('site')
-                ->has('clients')
-                ->has('contacts')
-                ->has('documents')
-                ->has('assets')
-                ->has('checklist')
-                ->has('can_edit')
-                ->has('can')
+                ->has('hero')
+                ->has('permissions')
+                ->has('attention')
+                ->has('overview')
+                ->has('readiness')
+                ->has('uiPreferences')
+                ->missing('peopleData')
+                ->missing('safetyData')
+                ->missing('operationsData')
+                ->missing('adminData')
             );
     }
 
@@ -351,7 +354,8 @@ class SiteControllerTest extends TestCase
             ->get("/sites/{$site->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('checklist', 12)
+                ->has('readiness.critical', 7)
+                ->has('readiness.recommended', 5)
             );
     }
 
@@ -384,16 +388,19 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'sites/show',
+                'X-Inertia-Partial-Data' => 'operationsData',
+            ])
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('checklistsData.stats')
-                ->has('checklistsData.activeRuns', 1)
-                ->where('checklistsData.activeRuns.0.template.name', 'Profile Summary Checklist')
-                ->has('runDetail')
-                ->has('templateDetail')
-                ->missing('checklistsSummary')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.operationsData.checklists.summary.recent', 1)
+            ->assertJsonPath('props.operationsData.checklists.items.0.name', 'Profile Summary Checklist')
+            ->assertJsonStructure(['props' => ['operationsData' => ['checklists' => ['href']]]])
+            ->assertJsonMissingPath('props.checklistsData')
+            ->assertJsonMissingPath('props.runDetail')
+            ->assertJsonMissingPath('props.templateDetail');
     }
 
     public function test_site_show_exposes_inspections_summary_for_profile_tab(): void
@@ -441,18 +448,17 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'sites/show',
+                'X-Inertia-Partial-Data' => 'safetyData',
+            ])
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('inspectionsSummary.active_schedules', 2)
-                ->where('inspectionsSummary.overdue_schedules', 1)
-                ->where('inspectionsSummary.due_soon_schedules', 1)
-                ->where('inspectionsSummary.failed_records', 1)
-                ->has('inspectionsSummary.schedules', 2)
-                ->has('inspectionsSummary.records', 2)
-                ->where('inspectionsSummary.records.0.result', 'fail')
-                ->where('inspectionsSummary.records.0.findings', 'Exit lighting failed.')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.safetyData.inspections.summary.active', 2)
+            ->assertJsonPath('props.safetyData.inspections.summary.overdue', 1)
+            ->assertJsonCount(2, 'props.safetyData.inspections.items')
+            ->assertJsonStructure(['props' => ['safetyData' => ['inspections' => ['href']]]]);
     }
 
     public function test_site_show_includes_linked_assets(): void
@@ -461,11 +467,14 @@ class SiteControllerTest extends TestCase
         Asset::factory()->count(3)->forSite($site)->create();
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'sites/show',
+                'X-Inertia-Partial-Data' => 'operationsData',
+            ])
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets', 3)
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonCount(3, 'props.operationsData.assets.items');
     }
 
     public function test_site_show_returns_document_folders(): void
@@ -486,12 +495,15 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'sites/show',
+                'X-Inertia-Partial-Data' => 'adminData',
+            ])
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('documents.0.folder', 'Compliance')
-                ->where('documents.0.category', 'safety')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.adminData.documents.items.0.folder', 'Compliance')
+            ->assertJsonPath('props.adminData.documents.items.0.category', 'safety');
     }
 
     public function test_site_documents_manager_lists_foldered_documents(): void

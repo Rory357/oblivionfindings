@@ -13,6 +13,7 @@ use App\Http\Controllers\AssetOwnershipController;
 use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\Sites\SiteProfileController;
 use App\Http\Controllers\SiteClientController;
 use App\Http\Controllers\SiteContactController;
 use App\Http\Controllers\SiteDocumentController;
@@ -32,7 +33,7 @@ Route::middleware(['auth'])->group(function () {
     // Sites
     Route::middleware('permission:sites.viewAny')->group(function () {
         Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
-        Route::get('/sites/{site}', [SiteController::class, 'show'])
+        Route::get('/sites/{site}', SiteProfileController::class)
             ->whereNumber('site')
             ->name('sites.show');
 
