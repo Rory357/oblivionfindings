@@ -7,6 +7,7 @@ use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
@@ -33,7 +34,6 @@ use App\Notifications\It\TicketRepliedNotification;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Inertia\Inertia;
 
 /**
@@ -49,6 +49,7 @@ class ItTicketController extends Controller
     public function __construct(
         private readonly ItTicketContextPresenter $contextPresenter,
         private readonly ItWorkTransitionService $transitionService,
+        private readonly ItEmailDeliveryService $emailDeliveries,
     ) {}
 
     public function show(Request $request, ItTicket $ticket)
@@ -310,9 +311,15 @@ class ItTicketController extends Controller
                     ->when($ticket->assignee, fn ($c) => $c->push($ticket->assignee))
                     ->unique('id')
                     ->reject(fn ($u) => $u->id === $user->id);
-                NotificationFacade::send($recipients, new TicketRepliedNotification($ticket, 'agent_side'));
+                $this->emailDeliveries->send(
+                    $recipients,
+                    new TicketRepliedNotification($ticket, 'agent_side', $comment->id),
+                );
             } elseif ($ticket->requester && $ticket->requester_user_id !== $user->id) {
-                $ticket->requester->notify(new TicketRepliedNotification($ticket, 'requester'));
+                $this->emailDeliveries->send(
+                    $ticket->requester,
+                    new TicketRepliedNotification($ticket, 'requester', $comment->id),
+                );
             }
         }
 
@@ -446,7 +453,7 @@ class ItTicketController extends Controller
         }
 
         if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
-            $ticket->assignee->notify(new TicketReopenedNotification($ticket));
+            $this->emailDeliveries->send($ticket->assignee, new TicketReopenedNotification($ticket));
         }
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
@@ -527,7 +534,7 @@ class ItTicketController extends Controller
         // Every agent who could sign off, except the one who asked.
         $approvers = ItStaffDirectory::agents($tenantId)->reject(fn (User $u) => $u->id === $user->id);
         if ($approvers->isNotEmpty()) {
-            NotificationFacade::send($approvers, new TicketApprovalNotification($ticket, 'requested'));
+            $this->emailDeliveries->send($approvers, new TicketApprovalNotification($ticket, 'requested'));
         }
 
         return redirect()->back()->with('success', "Approval requested for {$ticket->reference}.");
@@ -558,7 +565,7 @@ class ItTicketController extends Controller
 
         $requester = User::find($approval->requested_by);
         if ($requester) {
-            $requester->notify(new TicketApprovalNotification($ticket, $status));
+            $this->emailDeliveries->send($requester, new TicketApprovalNotification($ticket, $status));
         }
 
         return redirect()->back()->with('success', "Approval {$status} for {$ticket->reference}.");
@@ -702,7 +709,7 @@ class ItTicketController extends Controller
             'via' => 'bulk',
         ]);
         if ($assignee && $assignee->id !== $actor->id) {
-            $assignee->notify(new TicketAssignedNotification($ticket));
+            $this->emailDeliveries->send($assignee, new TicketAssignedNotification($ticket));
         }
 
         return true;

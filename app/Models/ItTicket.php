@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Support\It\BusinessHours;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -312,6 +313,18 @@ class ItTicket extends Model
     {
         return $this->belongsToMany(User::class, 'it_ticket_watchers', 'ticket_id', 'user_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Resolved without reopening and with no more than one requester-visible
+     * reply. Internal technician notes do not change first-contact resolution.
+     */
+    public function scopeFirstContactResolved(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('resolved_at')
+            ->where('reopened_count', 0)
+            ->whereHas('comments', fn (Builder $comments) => $comments->where('is_internal', false), '<=', 1);
     }
 
     /** Files attached at raise time (thread replies carry their own). */

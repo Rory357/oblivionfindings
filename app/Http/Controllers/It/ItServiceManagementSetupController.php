@@ -4,6 +4,8 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
@@ -14,16 +16,23 @@ use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
 use App\Http\Requests\It\StoreItProvisioningTemplateRequest;
 use App\Http\Requests\It\StoreItServiceIdentityRequest;
+use App\Models\ItApiRequest;
+use App\Models\ItAutomationRun;
+use App\Models\ItCatalogItem;
+use App\Models\ItEmailDelivery;
+use App\Models\ItMailboxConnection;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItServiceIdentity;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
 use DomainException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class ItServiceManagementSetupController extends Controller
@@ -34,12 +43,18 @@ class ItServiceManagementSetupController extends Controller
         private readonly ItServiceManagementSetupService $setupService,
         private readonly ItServiceIdentityCredentialService $identityCredentials,
         private readonly ItProvisioningTemplateService $provisioningTemplates,
+        private readonly ItAutomationScheduleCatalog $automationCatalog,
+        private readonly ItEmailDeliveryService $emailDeliveries,
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ItTeam::class);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $automationPeriod = $request->validate([
+            'automation_from' => ['nullable', 'date_format:Y-m-d'],
+            'automation_to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
 
         $teams = ItTeam::query()
             ->forTenant($tenantId)
@@ -185,6 +200,93 @@ class ItServiceManagementSetupController extends Controller
                 ])->values(),
             ])->values();
 
+        $deliveryRows = Schema::hasTable('it_email_deliveries')
+            ? ItEmailDelivery::query()
+                ->forTenant($tenantId)
+                ->with([
+                    'ticket:id,reference,title',
+                    'provisioningRequest:id,item',
+                    'recipient:id,name',
+                    'retryAttempt:id,retry_of_delivery_id',
+                ])
+                ->latest('id')
+                ->limit(100)
+                ->get()
+            : collect();
+        $failedDeliveryCount = Schema::hasTable('it_email_deliveries')
+            ? ItEmailDelivery::query()
+                ->forTenant($tenantId)
+                ->whereIn('status', ['failed', 'bounced'])
+                ->count()
+            : 0;
+        $automationDefinitions = Schema::hasTable('it_automation_runs')
+            ? $this->automationCatalog->definitions($tenantId)
+            : [];
+        $automationRuns = Schema::hasTable('it_automation_runs')
+            ? ItAutomationRun::query()
+                ->forTenantOrSystem($tenantId)
+                ->when($automationPeriod['automation_from'] ?? null, fn ($query, $from) => $query->whereDate('started_at', '>=', $from))
+                ->when($automationPeriod['automation_to'] ?? null, fn ($query, $to) => $query->whereDate('started_at', '<=', $to))
+                ->latest('id')
+                ->limit(100)
+                ->get()
+            : collect();
+        $catalogItems = Schema::hasTable('it_catalog_items')
+            ? ItCatalogItem::query()->forTenant($tenantId)->get()
+            : collect();
+        $mailboxes = Schema::hasTable('it_mailbox_connections')
+            ? ItMailboxConnection::query()->where('tenant_id', $tenantId)->get()
+            : collect();
+        $apiErrors = Schema::hasTable('it_api_requests')
+            ? ItApiRequest::query()->forTenant($tenantId)->where('response_status', '>=', 400)->count()
+            : 0;
+
+        $operationsAudit = [
+            'teams' => [
+                'total' => $teams->count(),
+                'active' => $teams->where('is_active', true)->count(),
+                'missing_manager' => $teams->whereNull('manager')->count(),
+                'without_members' => $teams->filter(fn (array $team) => $team['workload']['members'] === 0)->count(),
+            ],
+            'queues' => [
+                'total' => $queues->count(),
+                'active' => $queues->where('is_active', true)->count(),
+                'missing_team' => $queues->whereNull('team')->count(),
+                'without_default_assignee' => $queues->filter(fn (array $queue) => empty($queue['filter_rules']['default_assignee_user_id']))->count(),
+            ],
+            'catalogue' => [
+                'total' => $catalogItems->count(),
+                'published' => $catalogItems->where('is_published', true)->count(),
+                'missing_service' => $catalogItems->whereNull('it_service_id')->count(),
+            ],
+            'forms' => [
+                'configured' => $catalogItems->filter(fn (ItCatalogItem $item) => count($item->form_schema['fields'] ?? []) > 0)->count(),
+                'empty' => $catalogItems->filter(fn (ItCatalogItem $item) => count($item->form_schema['fields'] ?? []) === 0)->count(),
+            ],
+            'email' => [
+                'connections' => $mailboxes->count(),
+                'connected' => $mailboxes->where('status', ItMailboxConnection::STATUS_CONNECTED)->count(),
+                'connection_errors' => $mailboxes->where('status', ItMailboxConnection::STATUS_ERROR)->count(),
+                'failed_or_bounced' => $failedDeliveryCount,
+            ],
+            'api' => [
+                'identities' => $apiIdentities->count(),
+                'active' => $apiIdentities->where('is_active', true)->count(),
+                'revoked' => $apiIdentities->whereNotNull('revoked_at')->count(),
+                'request_errors' => $apiErrors,
+            ],
+            'slas' => [
+                'custom_policies' => Schema::hasTable('it_sla_policies')
+                    ? ItSlaPolicy::query()->where('tenant_id', $tenantId)->count()
+                    : 0,
+                'effective_priorities' => count(ItSlaPolicy::DEFAULTS),
+            ],
+            'settings' => [
+                'inbound_status_callback' => filled(config('it.inbound_mail.secret')),
+                'outbound_status_callback' => filled(config('it.outbound_mail.status_secret')),
+            ],
+        ];
+
         return Inertia::render('it/setup/index', [
             'teams' => $teams,
             'queues' => $queues,
@@ -192,6 +294,43 @@ class ItServiceManagementSetupController extends Controller
             'apiIdentities' => $apiIdentities,
             'oneTimeApiCredential' => $request->session()->get('it_api_credential'),
             'provisioningTemplates' => $provisioningTemplates,
+            'operationsAudit' => $operationsAudit,
+            'emailDeliveries' => $deliveryRows->map(fn (ItEmailDelivery $delivery) => [
+                'id' => $delivery->id,
+                'notification_uuid' => $delivery->notification_uuid,
+                'ticket' => $delivery->ticket ? [
+                    'id' => $delivery->ticket->id,
+                    'reference' => $delivery->ticket->reference,
+                    'title' => $delivery->ticket->title,
+                ] : null,
+                'provisioning' => $delivery->provisioningRequest ? [
+                    'id' => $delivery->provisioningRequest->id,
+                    'item' => $delivery->provisioningRequest->item,
+                ] : null,
+                'recipient' => $delivery->recipient?->name,
+                'recipient_email' => $delivery->recipient_email,
+                'subject' => $delivery->subject,
+                'status' => $delivery->status,
+                'attempt_count' => $delivery->attempt_count,
+                'retry_count' => $delivery->retry_count,
+                'last_error' => $delivery->last_error,
+                'queued_at' => $delivery->queued_at?->toIso8601String(),
+                'accepted_at' => $delivery->accepted_at?->toIso8601String(),
+                'provider_status_at' => $delivery->provider_status_at?->toIso8601String(),
+                'delivered_at' => $delivery->delivered_at?->toIso8601String(),
+                'can_retry' => in_array($delivery->status, ['failed', 'bounced'], true)
+                    && $delivery->retryAttempt === null,
+            ])->values(),
+            'automationDefinitions' => $automationDefinitions,
+            'automationRuns' => $automationRuns->map(fn (ItAutomationRun $run) => [
+                'id' => $run->id,
+                'automation_key' => $run->automation_key,
+                'status' => $run->status,
+                'started_at' => $run->started_at?->toIso8601String(),
+                'finished_at' => $run->finished_at?->toIso8601String(),
+                'runtime_ms' => $run->runtime_ms,
+                'error_summary' => $run->error_summary,
+            ])->values(),
             'agents' => ItStaffDirectory::agents($tenantId)
                 ->sortBy('name')
                 ->map(fn (User $user) => $this->userOption($user))
@@ -326,6 +465,18 @@ class ItServiceManagementSetupController extends Controller
 
         return redirect()->route('it.setup.index')
             ->with('success', 'Provisioning template updated.');
+    }
+
+    public function retryEmailDelivery(Request $request, ItEmailDelivery $delivery)
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        try {
+            $this->emailDeliveries->retry($delivery, $request->user(), $tenantId);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Email queued for another delivery attempt.');
     }
 
     /** @param callable(int): mixed $action */

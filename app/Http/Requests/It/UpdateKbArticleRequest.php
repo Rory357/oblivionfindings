@@ -29,7 +29,24 @@ class UpdateKbArticleRequest extends FormRequest
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'category' => ['sometimes', 'required', Rule::in(ItKbArticle::CATEGORIES)],
             'body' => ['sometimes', 'required', 'string', 'max:20000'],
-            'status' => ['sometimes', 'required', Rule::in(ItKbArticle::STATUSES)],
+            'status' => ['prohibited'],
+            'audience' => ['sometimes', 'required', Rule::in(ItKbArticle::AUDIENCES)],
+            'site_scope' => ['nullable', 'array', 'max:100', 'required_if:audience,specific_sites'],
+            'site_scope.*' => [
+                'integer',
+                Rule::exists('sites', 'id')->where(fn ($query) => $query->where('tenant_id', $this->user()?->organization_id)),
+            ],
+            'owner_user_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('organization_id', $this->user()?->organization_id)),
+            ],
+            'related_service_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('it_services', 'id')->where(fn ($query) => $query->where('tenant_id', $this->user()?->organization_id)),
+            ],
+            'review_due_at' => ['nullable', 'date'],
         ];
     }
 }

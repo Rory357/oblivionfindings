@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,7 +19,7 @@ use Illuminate\Notifications\Notification;
  * and title ONLY — ticket descriptions may name the people we support and
  * never leave the app.
  */
-class TicketCreatedNotification extends Notification implements ShouldQueue
+class TicketCreatedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
@@ -26,6 +27,20 @@ class TicketCreatedNotification extends Notification implements ShouldQueue
         private ItTicket $ticket,
         private string $audience = 'receipt', // receipt | urgent_alert
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'tenant_id' => (int) $this->ticket->tenant_id,
+            'ticket_id' => (int) $this->ticket->id,
+            'audience' => $this->audience,
+            'type' => 'ticket_created',
+            'subject' => $this->audience === 'urgent_alert'
+                ? "Urgent IT ticket {$this->ticket->reference} — {$this->ticket->title}"
+                : "Ticket {$this->ticket->reference} raised — {$this->ticket->title}",
+            'retry_context' => ['audience' => $this->audience],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

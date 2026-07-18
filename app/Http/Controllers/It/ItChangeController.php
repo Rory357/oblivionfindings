@@ -34,11 +34,17 @@ class ItChangeController extends Controller
     {
         $this->authorize('viewAny', ItChange::class);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $period = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
         $filters = [
             'type' => trim((string) $request->query('type', '')),
             'risk' => trim((string) $request->query('risk', '')),
             'state' => trim((string) $request->query('state', '')),
             'q' => trim((string) $request->query('q', '')),
+            'from' => (string) ($period['from'] ?? ''),
+            'to' => (string) ($period['to'] ?? ''),
         ];
 
         $changes = ItChange::query()
@@ -47,6 +53,8 @@ class ItChangeController extends Controller
             ->when($filters['type'] !== '', fn ($query) => $query->where('change_type', $filters['type']))
             ->when($filters['risk'] !== '', fn ($query) => $query->where('risk_level', $filters['risk']))
             ->when($filters['state'] !== '', fn ($query) => $query->whereHas('ticket', fn ($ticket) => $ticket->where('workflow_state', $filters['state'])))
+            ->when($filters['from'] !== '', fn ($query) => $query->whereDate('validated_at', '>=', $filters['from']))
+            ->when($filters['to'] !== '', fn ($query) => $query->whereDate('validated_at', '<=', $filters['to']))
             ->when($filters['q'] !== '', function ($query) use ($filters) {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
                 $query->where(fn ($nested) => $nested

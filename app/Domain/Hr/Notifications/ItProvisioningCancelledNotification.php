@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrOnboardingTask;
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItProvisioningRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,7 +15,7 @@ use Illuminate\Notifications\Notification;
  * from one of their checklist tasks was cancelled in the /it queue — the task
  * stays open and needs to be resolved (or removed) manually.
  */
-class ItProvisioningCancelledNotification extends Notification implements ShouldQueue
+class ItProvisioningCancelledNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
@@ -23,6 +24,20 @@ class ItProvisioningCancelledNotification extends Notification implements Should
         private HrOnboardingTask $task,
         private ?string $reason = null,
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'tenant_id' => (int) $this->provisioning->tenant_id,
+            'provisioning_request_id' => (int) $this->provisioning->id,
+            'type' => 'it_provisioning_cancelled',
+            'subject' => "IT request cancelled — “{$this->provisioning->item}”",
+            'retry_context' => [
+                'task_id' => (int) $this->task->id,
+                'reason' => $this->reason,
+            ],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

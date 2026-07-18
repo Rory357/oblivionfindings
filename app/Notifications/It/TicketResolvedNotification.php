@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,7 +15,7 @@ use Illuminate\Notifications\Notification;
  * heads-up. Reference + title only (frontline privacy) — the resolution
  * note itself stays on the thread.
  */
-class TicketResolvedNotification extends Notification implements ShouldQueue
+class TicketResolvedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
@@ -22,6 +23,18 @@ class TicketResolvedNotification extends Notification implements ShouldQueue
         private ItTicket $ticket,
         private string $audience = 'requester', // requester | watcher
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'tenant_id' => (int) $this->ticket->tenant_id,
+            'ticket_id' => (int) $this->ticket->id,
+            'audience' => $this->audience,
+            'type' => 'ticket_resolved',
+            'subject' => "Resolved — {$this->ticket->reference} {$this->ticket->title}",
+            'retry_context' => ['audience' => $this->audience],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

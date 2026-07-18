@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
@@ -13,7 +14,6 @@ use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Notification;
 
 /**
  * §G scheduler, run hourly: re-derives every open ticket's SLA state from
@@ -44,8 +44,11 @@ class CheckItSlaStates extends Command
     /** @var array<int, Collection<int, User>> */
     private array $adminsByTenant = [];
 
-    public function handle(): int
+    private ItEmailDeliveryService $emailDeliveries;
+
+    public function handle(ItEmailDeliveryService $emailDeliveries): int
     {
+        $this->emailDeliveries = $emailDeliveries;
         $now = now();
         $atRisk = $breached = $escalated = 0;
 
@@ -180,7 +183,7 @@ class CheckItSlaStates extends Command
 
         $recipients = $recipients->unique('id');
         if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new TicketSlaNotification($ticket, $state, $clock));
+            $this->emailDeliveries->send($recipients, new TicketSlaNotification($ticket, $state, $clock));
         }
     }
 
@@ -221,7 +224,7 @@ class CheckItSlaStates extends Command
 
         $admins = $this->admins((int) $ticket->tenant_id);
         if ($admins->isNotEmpty()) {
-            Notification::send($admins, new TicketSlaNotification($ticket, 'escalation'));
+            $this->emailDeliveries->send($admins, new TicketSlaNotification($ticket, 'escalation'));
         }
 
         return true;

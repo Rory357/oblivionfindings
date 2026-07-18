@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItCatalogSubmissionService;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\StoreCatalogRequest;
@@ -12,7 +13,6 @@ use App\Models\ItTicket;
 use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 
 class ItCatalogController extends Controller
 {
@@ -20,6 +20,7 @@ class ItCatalogController extends Controller
 
     public function __construct(
         private readonly ItCatalogSubmissionService $submissionService,
+        private readonly ItEmailDeliveryService $emailDeliveries,
     ) {}
 
     public function index(Request $request)
@@ -64,11 +65,11 @@ class ItCatalogController extends Controller
         $result = $outcome['result'];
 
         if ($outcome['created'] && $result instanceof ItTicket) {
-            $user->notify(new TicketCreatedNotification($result, 'receipt'));
+            $this->emailDeliveries->send($user, new TicketCreatedNotification($result, 'receipt'));
             if ($result->priority === 'urgent') {
                 $agents = ItStaffDirectory::agents($tenantId)
                     ->reject(fn (User $agent) => $agent->id === $user->id);
-                Notification::send($agents, new TicketCreatedNotification($result, 'urgent_alert'));
+                $this->emailDeliveries->send($agents, new TicketCreatedNotification($result, 'urgent_alert'));
             }
         }
 

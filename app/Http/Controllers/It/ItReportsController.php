@@ -4,8 +4,14 @@ namespace App\Http\Controllers\It;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\ItAutomationRun;
+use App\Models\ItChange;
+use App\Models\ItMajorIncident;
+use App\Models\ItProblem;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItService;
 use App\Models\ItTicket;
+use App\Models\ItTicketLink;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -182,7 +188,243 @@ class ItReportsController extends Controller
             'top_requesters' => $ticketsReady ? $this->topRequesters($tenantId, $from, $to) : [],
             'agent_workload' => $ticketsReady ? $this->agentWorkload($tenantId) : [],
             'provisioning' => $requestsReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
+            'backlog_age' => $ticketsReady ? $this->backlogAge($tenantId) : $this->emptyBacklogAge(),
+            'reopen_rate' => $ticketsReady ? $this->reopenRate($tenantId, $from, $to) : $this->emptyRate(),
+            'first_contact_resolution' => $ticketsReady ? $this->firstContactResolution($tenantId, $from, $to) : $this->emptyRate(),
+            'channels' => $ticketsReady ? $this->channels($tenantId, $from, $to) : [],
+            'major_incidents' => Schema::hasTable('it_major_incidents') ? $this->majorIncidents($tenantId, $from, $to) : ['declared' => 0, 'restored' => 0, 'open' => 0],
+            'change_success' => Schema::hasTable('it_changes') ? $this->changeSuccess($tenantId, $from, $to) : ['successful' => 0, 'failed' => 0, 'inconclusive' => 0],
+            'recurring_problems' => Schema::hasTable('it_problems') ? $this->problemOutcomes($tenantId, $from, $to) : ['total' => 0, 'known_errors' => 0, 'root_causes' => 0],
+            'automation_outcomes' => Schema::hasTable('it_automation_runs') ? $this->automationOutcomes($tenantId, $from, $to) : ['succeeded' => 0, 'failed' => 0, 'skipped' => 0],
+            'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($tenantId, $from, $to) : [],
+            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($tenantId, $from, $to) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
+            'quality' => $ticketsReady ? $this->qualityGaps($tenantId) : [],
         ];
+    }
+
+    /** @return array<string, array{count: int, href: string}> */
+    private function backlogAge(int $tenantId): array
+    {
+        $base = fn () => ItTicket::query()->forTenant($tenantId)->whereIn('status', ItTicket::OPEN_STATUSES);
+        $now = now();
+        $twoDays = $now->copy()->subDays(2);
+        $sevenDays = $now->copy()->subDays(7);
+        $thirtyDays = $now->copy()->subDays(30);
+
+        return [
+            'under_2_days' => ['count' => $base()->where('created_at', '>=', $twoDays)->count(), 'href' => $this->ticketHref(['age' => 'under_2', 'open_only' => 1])],
+            'days_2_to_7' => ['count' => $base()->where('created_at', '>=', $sevenDays)->where('created_at', '<', $twoDays)->count(), 'href' => $this->ticketHref(['age' => '2_7', 'open_only' => 1])],
+            'days_8_to_30' => ['count' => $base()->where('created_at', '>=', $thirtyDays)->where('created_at', '<', $sevenDays)->count(), 'href' => $this->ticketHref(['age' => '8_30', 'open_only' => 1])],
+            'over_30_days' => ['count' => $base()->where('created_at', '<', $thirtyDays)->count(), 'href' => $this->ticketHref(['age' => 'over_30', 'open_only' => 1])],
+        ];
+    }
+
+    /** @return array<string, int|float|null|string> */
+    private function reopenRate(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $resolved = ItTicket::query()->forTenant($tenantId)->whereBetween('resolved_at', [$from, $to]);
+        $total = (clone $resolved)->count();
+        $reopened = (clone $resolved)->where('reopened_count', '>', 0)->count();
+
+        return [
+            'resolved' => $total,
+            'reopened' => $reopened,
+            'rate' => $total > 0 ? round($reopened / $total * 100, 1) : null,
+            'href' => $this->ticketHref([
+                'reopened' => 1,
+                'resolved_from' => $from->toDateString(),
+                'resolved_to' => $to->toDateString(),
+            ]),
+        ];
+    }
+
+    /** @return array<string, int|float|null|string> */
+    private function firstContactResolution(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $resolved = ItTicket::query()->forTenant($tenantId)->whereBetween('resolved_at', [$from, $to]);
+        $total = (clone $resolved)->count();
+        $firstContact = (clone $resolved)->firstContactResolved()->count();
+
+        return [
+            'resolved' => $total,
+            'first_contact' => min($firstContact, $total),
+            'rate' => $total > 0 ? round(min($firstContact, $total) / $total * 100, 1) : null,
+            'href' => $this->ticketHref([
+                'first_contact' => 1,
+                'resolved_from' => $from->toDateString(),
+                'resolved_to' => $to->toDateString(),
+            ]),
+        ];
+    }
+
+    /** @return array<string, array{count: int, href: string}> */
+    private function channels(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $counts = ItTicket::query()
+            ->forTenant($tenantId)
+            ->whereBetween('created_at', [$from, $to])
+            ->selectRaw('source, COUNT(*) AS aggregate')
+            ->groupBy('source')
+            ->pluck('aggregate', 'source');
+
+        return collect(ItTicket::SOURCES)
+            ->mapWithKeys(fn (string $source) => [$source => [
+                'count' => (int) ($counts[$source] ?? 0),
+                'href' => $this->ticketHref([
+                    'source' => $source,
+                    'from' => $from->toDateString(),
+                    'to' => $to->toDateString(),
+                ]),
+            ]])
+            ->all();
+    }
+
+    /** @return array<string, int|float|null|string> */
+    private function majorIncidents(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $query = ItMajorIncident::query()->forTenant($tenantId)->whereBetween('declared_at', [$from, $to]);
+        $declared = (clone $query)->count();
+        $restored = (clone $query)->whereNotNull('restored_at')->count();
+        $avg = (clone $query)->whereNotNull('restored_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, declared_at, restored_at)) AS minutes')
+            ->value('minutes');
+
+        return [
+            'declared' => $declared,
+            'restored' => $restored,
+            'open' => $declared - $restored,
+            'avg_restore_minutes' => $avg === null ? null : (int) round((float) $avg),
+            'href' => $this->periodHref('/it/major-incidents', $from, $to),
+        ];
+    }
+
+    /** @return array<string, int|float|null|string> */
+    private function changeSuccess(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $query = ItChange::query()->forTenant($tenantId)->whereBetween('validated_at', [$from, $to]);
+        $counts = (clone $query)->selectRaw('validation_result, COUNT(*) AS aggregate')->groupBy('validation_result')->pluck('aggregate', 'validation_result');
+        $measured = (int) $counts->sum();
+
+        return [
+            'successful' => (int) ($counts['successful'] ?? 0),
+            'failed' => (int) ($counts['failed'] ?? 0),
+            'inconclusive' => (int) ($counts['inconclusive'] ?? 0),
+            'success_rate' => $measured > 0 ? round(((int) ($counts['successful'] ?? 0)) / $measured * 100, 1) : null,
+            'href' => $this->periodHref('/it/changes', $from, $to),
+        ];
+    }
+
+    /** @return array<string, int|string> */
+    private function problemOutcomes(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $query = ItProblem::query()->forTenant($tenantId)->whereBetween('created_at', [$from, $to]);
+
+        return [
+            'total' => (clone $query)->count(),
+            'known_errors' => (clone $query)->whereNotNull('known_error_at')->count(),
+            'root_causes' => (clone $query)->whereNotNull('root_cause')->where('root_cause', '!=', '')->count(),
+            'href' => $this->periodHref('/it/problems', $from, $to),
+        ];
+    }
+
+    /** @return array<string, int|string> */
+    private function automationOutcomes(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $counts = ItAutomationRun::query()
+            ->forTenantOrSystem($tenantId)
+            ->whereBetween('started_at', [$from, $to])
+            ->selectRaw('status, COUNT(*) AS aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return [
+            'succeeded' => (int) ($counts['succeeded'] ?? 0),
+            'failed' => (int) ($counts['failed'] ?? 0),
+            'skipped' => (int) ($counts['skipped'] ?? 0),
+            'href' => '/it/setup?'.http_build_query([
+                'tab' => 'operations',
+                'automation_from' => $from->toDateString(),
+                'automation_to' => $to->toDateString(),
+            ]).'#automations',
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function serviceReliability(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        return ItService::query()
+            ->forTenant($tenantId)
+            ->withCount([
+                'tickets as ticket_count' => fn ($query) => $query->whereBetween('created_at', [$from, $to]),
+                'tickets as open_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES),
+                'tickets as sla_breach_count' => fn ($query) => $query->whereBetween('created_at', [$from, $to])->where('sla_state', 'breached'),
+            ])
+            ->orderByDesc('ticket_count')
+            ->orderBy('name')
+            ->limit(20)
+            ->get()
+            ->map(fn (ItService $service) => [
+                'service_id' => $service->id,
+                'service' => $service->name,
+                'status' => $service->status,
+                'tickets' => (int) $service->ticket_count,
+                'open' => (int) $service->open_count,
+                'sla_breaches' => (int) $service->sla_breach_count,
+                'href' => $this->ticketHref([
+                    'service' => $service->id,
+                    'from' => $from->toDateString(),
+                    'to' => $to->toDateString(),
+                ]),
+            ])
+            ->all();
+    }
+
+    /** @return array<string, int|string> */
+    private function deviceReliability(int $tenantId, Carbon $from, Carbon $to): array
+    {
+        $query = ItTicketLink::query()
+            ->forTenant($tenantId)
+            ->where('linkable_type', 'security_device')
+            ->where('relationship', 'affected_device')
+            ->whereHas('ticket', fn ($ticket) => $ticket->whereBetween('created_at', [$from, $to]));
+
+        return [
+            'affected_devices' => (clone $query)->distinct('linkable_id')->count('linkable_id'),
+            'open_incidents' => (clone $query)->whereHas('ticket', fn ($ticket) => $ticket->whereIn('status', ItTicket::OPEN_STATUSES))->count(),
+            'recovered' => (clone $query)->whereHas('ticket', fn ($ticket) => $ticket->whereNotNull('monitoring_recovered_at'))->count(),
+            'href' => $this->ticketHref([
+                'device_linked' => 1,
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+            ]),
+        ];
+    }
+
+    /** @return array<string, array{count: int, href: string}> */
+    private function qualityGaps(int $tenantId): array
+    {
+        $base = fn () => ItTicket::query()->forTenant($tenantId)->whereIn('status', ItTicket::OPEN_STATUSES);
+
+        return [
+            'missing_service' => ['count' => $base()->whereNull('it_service_id')->count(), 'href' => $this->ticketHref(['missing' => 'service', 'open_only' => 1])],
+            'missing_queue' => ['count' => $base()->whereNull('queue_id')->count(), 'href' => $this->ticketHref(['missing' => 'queue', 'open_only' => 1])],
+            'missing_team' => ['count' => $base()->whereNull('team_id')->count(), 'href' => $this->ticketHref(['missing' => 'team', 'open_only' => 1])],
+            'unassigned' => ['count' => $base()->whereNull('assigned_to_user_id')->count(), 'href' => $this->ticketHref(['missing' => 'assignee', 'open_only' => 1])],
+        ];
+    }
+
+    /** @param array<string, int|string> $filters */
+    private function ticketHref(array $filters): string
+    {
+        return '/it?'.http_build_query(['tab' => 'tickets', ...$filters]);
+    }
+
+    private function periodHref(string $path, Carbon $from, Carbon $to): string
+    {
+        return $path.'?'.http_build_query([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+        ]);
     }
 
     /**
@@ -380,5 +622,22 @@ class ItReportsController extends Controller
     private function emptyProvisioning(): array
     {
         return ['raised' => 0, 'fulfilled' => 0, 'avg_days' => null];
+    }
+
+    /** @return array<string, array{count: int, href: string}> */
+    private function emptyBacklogAge(): array
+    {
+        return [
+            'under_2_days' => ['count' => 0, 'href' => '/it?tab=tickets&age=under_2'],
+            'days_2_to_7' => ['count' => 0, 'href' => '/it?tab=tickets&age=2_7'],
+            'days_8_to_30' => ['count' => 0, 'href' => '/it?tab=tickets&age=8_30'],
+            'over_30_days' => ['count' => 0, 'href' => '/it?tab=tickets&age=over_30'],
+        ];
+    }
+
+    /** @return array{resolved: int, reopened: int, rate: null, href: string} */
+    private function emptyRate(): array
+    {
+        return ['resolved' => 0, 'reopened' => 0, 'rate' => null, 'href' => '/it?tab=tickets'];
     }
 }

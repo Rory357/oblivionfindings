@@ -177,12 +177,18 @@ describe('IT & Support grouped navigation', () => {
         expect(screen.getByText('Network operations')).toBeVisible();
         expect(screen.getAllByText('4 open')[0]).toBeVisible();
         expect(screen.getByRole('button', { name: /New team/i })).toBeVisible();
-        expect(screen.queryByRole('button', { name: /New queue/i })).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /New queue/i }),
+        ).not.toBeInTheDocument();
 
         const { fireEvent } = await import('@testing-library/react');
         fireEvent.click(screen.getByRole('tab', { name: 'Queues' }));
-        expect(screen.getByRole('button', { name: /New queue/i })).toBeVisible();
-        expect(screen.queryByRole('button', { name: /New team/i })).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /New queue/i }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: /New team/i }),
+        ).not.toBeInTheDocument();
     });
 
     it('shows scoped API identity metadata and a one-time credential in setup', () => {
@@ -281,7 +287,10 @@ describe('IT & Support grouped navigation', () => {
                                 approval_required: true,
                                 evidence_required: true,
                                 due_offset_days: 0,
-                                fulfiller_fields: ['employee_number', 'position_role'],
+                                fulfiller_fields: [
+                                    'employee_number',
+                                    'position_role',
+                                ],
                             },
                         ],
                     },
@@ -289,11 +298,19 @@ describe('IT & Support grouped navigation', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Provisioning workflows' }));
+        fireEvent.click(
+            screen.getByRole('tab', { name: 'Provisioning workflows' }),
+        );
 
-        expect(screen.getByRole('heading', { name: 'Lifecycle workflow templates' })).toBeVisible();
+        expect(
+            screen.getByRole('heading', {
+                name: 'Lifecycle workflow templates',
+            }),
+        ).toBeVisible();
         expect(screen.getByText('Clinical joiner')).toBeVisible();
-        expect(screen.getByText('Grant approved healthcare system access')).toBeVisible();
+        expect(
+            screen.getByText('Grant approved healthcare system access'),
+        ).toBeVisible();
         expect(screen.getByText('Role: Registered Nurse')).toBeVisible();
 
         fireEvent.click(screen.getByRole('button', { name: 'New template' }));
@@ -303,6 +320,107 @@ describe('IT & Support grouped navigation', () => {
         expect(dialog).toHaveTextContent('Minimum employee details shown');
         expect(dialog).toHaveTextContent('Approval required');
         expect(dialog).toHaveTextContent('Evidence required');
+    });
+
+    it('shows configuration, email delivery, and existing scheduler health in one operations audit', async () => {
+        const { fireEvent } = await import('@testing-library/react');
+        render(
+            <ItSetupIndex
+                teams={[]}
+                queues={[]}
+                services={[]}
+                agents={[]}
+                sites={[]}
+                apiIdentities={[]}
+                oneTimeApiCredential={null}
+                provisioningTemplates={[]}
+                operationsAudit={{
+                    teams: {
+                        total: 2,
+                        active: 2,
+                        missing_manager: 1,
+                        without_members: 0,
+                    },
+                    queues: {
+                        total: 3,
+                        active: 3,
+                        missing_team: 0,
+                        without_default_assignee: 1,
+                    },
+                    catalogue: { total: 4, published: 3, missing_service: 1 },
+                    forms: { configured: 3, empty: 1 },
+                    email: {
+                        connections: 1,
+                        connected: 1,
+                        connection_errors: 0,
+                        failed_or_bounced: 1,
+                    },
+                    api: {
+                        identities: 2,
+                        active: 1,
+                        revoked: 1,
+                        request_errors: 0,
+                    },
+                    slas: { custom_policies: 4, effective_priorities: 4 },
+                    settings: {
+                        inbound_status_callback: true,
+                        outbound_status_callback: true,
+                    },
+                }}
+                emailDeliveries={[
+                    {
+                        id: 14,
+                        notification_uuid: 'delivery-14',
+                        ticket: {
+                            id: 9,
+                            reference: 'IT-0009',
+                            title: 'Cannot connect',
+                        },
+                        recipient: 'Alex Agent',
+                        recipient_email: 'alex@example.test',
+                        subject: 'Update on IT-0009',
+                        status: 'bounced',
+                        attempt_count: 1,
+                        retry_count: 0,
+                        last_error: 'Mailbox rejected the message.',
+                        queued_at: '2026-07-19T10:00:00Z',
+                        delivered_at: null,
+                        can_retry: true,
+                    },
+                ]}
+                automationDefinitions={[
+                    {
+                        key: 'it.check-sla',
+                        label: 'SLA watchdog',
+                        expression: '* * * * *',
+                        timezone: 'Pacific/Auckland',
+                        next_run_at: '2026-07-19T10:01:00Z',
+                        without_overlapping: true,
+                        on_one_server: true,
+                        latest_status: 'succeeded',
+                        latest_at: '2026-07-19T10:00:00Z',
+                    },
+                ]}
+                automationRuns={[]}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Operations audit' }));
+
+        expect(
+            screen.getByRole('heading', { name: 'Configuration audit' }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('heading', { name: 'Email delivery' }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: /Retry delivery/ }),
+        ).toBeVisible();
+        expect(screen.getByText('SLA watchdog')).toBeVisible();
+        expect(screen.getByText(/existing Laravel schedules/)).toBeVisible();
+        expect(
+            screen.getByText(/does not create a second scheduler/),
+        ).toBeVisible();
     });
 
     it('turns the service catalogue into a searchable human workspace', async () => {

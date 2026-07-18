@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,13 +13,23 @@ use Illuminate\Notifications\Notification;
  * A settled ticket is back: tells the assignee their fix didn't stick (or
  * an agent reopened it). Reference + title only.
  */
-class TicketReopenedNotification extends Notification implements ShouldQueue
+class TicketReopenedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
     public function __construct(
         private ItTicket $ticket,
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'tenant_id' => (int) $this->ticket->tenant_id,
+            'ticket_id' => (int) $this->ticket->id,
+            'type' => 'ticket_reopened',
+            'subject' => "Reopened — {$this->ticket->reference} {$this->ticket->title}",
+        ];
+    }
 
     public function via(object $notifiable): array
     {

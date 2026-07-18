@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\HrApiController;
 use App\Http\Controllers\Api\ItApiWorkItemController;
+use App\Http\Controllers\It\ItEmailDeliveryWebhookController;
+use App\Http\Controllers\It\ItInboundEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('hr')->name('api.hr.')->group(function () {
@@ -18,8 +20,11 @@ Route::middleware(['auth:sanctum'])->prefix('hr')->name('api.hr.')->group(functi
 // §P-S4 email-to-ticket webhook — unauthenticated, shared-secret verified in the
 // controller (inert until IT_INBOUND_MAIL_SECRET is set). Stateless: no session,
 // no CSRF. A provider maps its payload to {from, subject, text, message_id}.
-Route::post('/it/email/inbound', \App\Http\Controllers\It\ItInboundEmailController::class)
+Route::post('/it/email/inbound', ItInboundEmailController::class)
     ->name('api.it.email.inbound');
+Route::post('/it/email/deliveries/status', ItEmailDeliveryWebhookController::class)
+    ->middleware('throttle:api')
+    ->name('api.it.email.deliveries.status');
 
 Route::prefix('v1/it')->name('api.v1.it.')->middleware(['it.service', 'it.api.request'])->group(function () {
     Route::post('/work-items', [ItApiWorkItemController::class, 'store'])

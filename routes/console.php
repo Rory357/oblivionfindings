@@ -30,6 +30,7 @@ use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendOfferExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendPipRemindersJob;
 use App\Domain\Hr\Jobs\SendWellbeingRemindersJob;
+use App\Domain\It\Services\ItAutomationScheduleCatalog;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
@@ -50,7 +51,6 @@ use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
-use App\Jobs\PollItMailboxJob;
 use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
@@ -91,26 +91,9 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
-// IT helpdesk: tickets resolved 7+ days ago auto-close (the requester's
-// reopen window has passed): 07:10 NZ daily.
-app(Schedule::class)
-    ->command('it:close-resolved')
-    ->timezone('Pacific/Auckland')
-    ->dailyAt('07:10');
-
-// IT helpdesk SLA watchdog: hourly at-risk/breach transitions plus the
-// unassigned-urgent escalation (idempotent — one notification per transition).
-app(Schedule::class)
-    ->command('it:check-sla')
-    ->timezone('Pacific/Auckland')
-    ->hourly();
-
-// IT helpdesk email-in: poll the connected support mailbox(es) for unread
-// mail → tickets/replies via InboundEmailIngestor. Inert until an
-// ItMailboxConnection is connected (E4/E6).
-app(Schedule::class)
-    ->job(new PollItMailboxJob)
-    ->hourly();
+// IT service operations owns these three definitions so the scheduler and
+// the HTTP health view consume one canonical cadence and name catalogue.
+app(ItAutomationScheduleCatalog::class)->register();
 
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)

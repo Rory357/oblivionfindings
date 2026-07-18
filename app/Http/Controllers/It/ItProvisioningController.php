@@ -8,6 +8,7 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
 use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkTransitionService;
@@ -21,9 +22,11 @@ use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningWorkflow;
+use App\Models\ItService;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
@@ -33,7 +36,6 @@ use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -53,6 +55,7 @@ class ItProvisioningController extends Controller
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketRoutingService $routingService,
         private readonly ItProvisioningRequestLifecycleService $provisioningLifecycle,
+        private readonly ItEmailDeliveryService $emailDeliveries,
     ) {}
 
     /* ================================================================== */
@@ -75,6 +78,17 @@ class ItProvisioningController extends Controller
             'ticket_status' => $this->cleanFilter($request->query('ticket_status'), ItTicket::STATUSES),
             'ticket_priority' => $this->cleanFilter($request->query('ticket_priority'), ItTicket::PRIORITIES),
             'ticket_category' => $this->cleanFilter($request->query('ticket_category'), ItTicket::CATEGORIES),
+            'source' => $this->cleanFilter($request->query('source'), ItTicket::SOURCES),
+            'work_type' => $this->cleanFilter($request->query('work_type'), ItTicket::WORK_TYPES),
+            'service' => is_numeric($request->query('service')) ? (int) $request->query('service') : null,
+            'age' => $this->cleanFilter($request->query('age'), ['under_2', '2_7', '8_30', 'over_30']),
+            'missing' => $this->cleanFilter($request->query('missing'), ['service', 'queue', 'team', 'assignee']),
+            'reopened' => $request->boolean('reopened'),
+            'first_contact' => $request->boolean('first_contact'),
+            'open_only' => $request->boolean('open_only'),
+            'device_linked' => $request->boolean('device_linked'),
+            'resolved_from' => $this->cleanDate($request->query('resolved_from')),
+            'resolved_to' => $this->cleanDate($request->query('resolved_to')),
             'sla' => $this->cleanFilter($request->query('sla'), ItTicket::SLA_STATES),
             'view' => $this->cleanFilter($request->query('view'), array_keys(self::TICKET_VIEWS)),
             'q' => trim((string) $request->query('q', '')) !== '' ? trim((string) $request->query('q')) : null,
@@ -104,6 +118,22 @@ class ItProvisioningController extends Controller
             'slaCalendar' => $this->slaCalendar($tenantId),
             'overview' => $this->overview($tenantId),
             'kbArticles' => $this->kbArticles($tenantId),
+            'kbOptions' => [
+                'owners' => ItStaffDirectory::agents($tenantId)
+                    ->sortBy('name')
+                    ->map(fn (User $agent) => ['id' => $agent->id, 'name' => $agent->name])
+                    ->values(),
+                'sites' => Site::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+                'services' => ItService::query()
+                    ->forTenant($tenantId)
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+            ],
         ] : [];
 
         return Inertia::render('it/index', [
@@ -121,7 +151,7 @@ class ItProvisioningController extends Controller
                 ->all() : [],
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
-            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId) : [],
+            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId, $user) : [],
             'summary' => $this->summary($tenantId, $user->id, $isAgent),
             'can' => [
                 'view' => $isAgent,
@@ -402,7 +432,12 @@ class ItProvisioningController extends Controller
                     $creator = $task->checklist?->created_by
                         ? User::find($task->checklist->created_by)
                         : null;
-                    $creator?->notify(new ItProvisioningCancelledNotification($provisioning, $task, $reason));
+                    if ($creator) {
+                        $this->emailDeliveries->send(
+                            $creator,
+                            new ItProvisioningCancelledNotification($provisioning, $task, $reason),
+                        );
+                    }
                 }
             } catch (\Throwable $exception) {
                 Log::warning('Failed to annotate/notify onboarding task after IT request cancellation', [
@@ -755,11 +790,13 @@ class ItProvisioningController extends Controller
         // on-behalf-of colleague when an agent logs it. Plus an urgent alert
         // to the agents working the queue — never to the actor themselves.
         $requester = $requesterId === $user->id ? $user : User::query()->find($requesterId);
-        $requester?->notify(new TicketCreatedNotification($ticket, 'receipt'));
+        if ($requester) {
+            $this->emailDeliveries->send($requester, new TicketCreatedNotification($ticket, 'receipt'));
+        }
         if ($ticket->priority === 'urgent') {
             $agents = ItStaffDirectory::agents($tenantId)
                 ->reject(fn (User $agent) => $agent->id === $user->id);
-            NotificationFacade::send($agents, new TicketCreatedNotification($ticket, 'urgent_alert'));
+            $this->emailDeliveries->send($agents, new TicketCreatedNotification($ticket, 'urgent_alert'));
         }
 
         return redirect()->back()
@@ -868,7 +905,7 @@ class ItProvisioningController extends Controller
                 'to' => $ticket->assigned_to_user_id,
             ]);
             if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
-                $ticket->assignee->notify(new TicketAssignedNotification($ticket));
+                $this->emailDeliveries->send($ticket->assignee, new TicketAssignedNotification($ticket));
             }
         }
 
@@ -920,10 +957,10 @@ class ItProvisioningController extends Controller
         if ($request->boolean('notify_requester', true)
             && $ticket->requester
             && $ticket->requester_user_id !== $user->id) {
-            $ticket->requester->notify(new TicketResolvedNotification($ticket, 'requester'));
+            $this->emailDeliveries->send($ticket->requester, new TicketResolvedNotification($ticket, 'requester'));
         }
         $watchers = $ticket->watchers()->get()->reject(fn (User $w) => $w->id === $user->id);
-        NotificationFacade::send($watchers, new TicketResolvedNotification($ticket, 'watcher'));
+        $this->emailDeliveries->send($watchers, new TicketResolvedNotification($ticket, 'watcher'));
 
         return redirect()->back()->with('success', "Resolved {$ticket->reference} — the requester can see the fix.");
     }
@@ -1133,6 +1170,24 @@ class ItProvisioningController extends Controller
             ->when($filters['ticket_status'], fn ($q, $status) => $q->where('status', $status))
             ->when($filters['ticket_priority'], fn ($q, $priority) => $q->where('priority', $priority))
             ->when($filters['ticket_category'], fn ($q, $category) => $q->where('category', $category))
+            ->when($filters['source'], fn ($q, $source) => $q->where('source', $source))
+            ->when($filters['work_type'], fn ($q, $workType) => $q->where('work_type', $workType))
+            ->when($filters['service'], fn ($q, $service) => $q->where('it_service_id', $service))
+            ->when($filters['age'], fn ($q, $age) => $this->applyTicketAge($q, $age))
+            ->when($filters['missing'], fn ($q, $missing) => $q->whereNull(match ($missing) {
+                'service' => 'it_service_id',
+                'queue' => 'queue_id',
+                'team' => 'team_id',
+                default => 'assigned_to_user_id',
+            }))
+            ->when($filters['reopened'], fn ($q) => $q->where('reopened_count', '>', 0))
+            ->when($filters['first_contact'], fn ($q) => $q->firstContactResolved())
+            ->when($filters['open_only'], fn ($q) => $q->whereIn('status', ItTicket::OPEN_STATUSES))
+            ->when($filters['device_linked'], fn ($q) => $q->whereHas('links', fn ($links) => $links
+                ->where('linkable_type', 'security_device')
+                ->where('relationship', 'affected_device')))
+            ->when($filters['resolved_from'], fn ($q, $from) => $q->whereDate('resolved_at', '>=', $from))
+            ->when($filters['resolved_to'], fn ($q, $to) => $q->whereDate('resolved_at', '<=', $to))
             ->when($filters['sla'], fn ($q, $sla) => $q->where('sla_state', $sla))
             ->when($filters['assignee'], fn ($q, $assignee) => $q->where('assigned_to_user_id', $assignee))
             ->when($filters['from'], fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
@@ -1161,6 +1216,21 @@ class ItProvisioningController extends Controller
                 'updated' => $t->updated_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
             ]);
+    }
+
+    private function applyTicketAge($query, string $age): void
+    {
+        $now = now();
+        $twoDays = $now->copy()->subDays(2);
+        $sevenDays = $now->copy()->subDays(7);
+        $thirtyDays = $now->copy()->subDays(30);
+
+        match ($age) {
+            'under_2' => $query->where('created_at', '>=', $twoDays),
+            '2_7' => $query->where('created_at', '>=', $sevenDays)->where('created_at', '<', $twoDays),
+            '8_30' => $query->where('created_at', '>=', $thirtyDays)->where('created_at', '<', $sevenDays),
+            'over_30' => $query->where('created_at', '<', $thirtyDays),
+        };
     }
 
     /**
@@ -1484,7 +1554,7 @@ class ItProvisioningController extends Controller
 
         return ItKbArticle::query()
             ->forTenant($tenantId)
-            ->with('author:id,name')
+            ->with(['author:id,name', 'owner:id,name', 'service:id,name'])
             ->orderByDesc('updated_at')
             ->limit(200)
             ->get()
@@ -1494,12 +1564,23 @@ class ItProvisioningController extends Controller
                 'slug' => $a->slug,
                 'category' => $a->category,
                 'status' => $a->status,
+                'audience' => $a->audience,
+                'site_scope' => $a->site_scope ?? [],
                 'body' => $a->body,
                 'views' => (int) $a->view_count,
                 'helpful_yes' => (int) $a->helpful_yes,
                 'helpful_no' => (int) $a->helpful_no,
                 'helpful_percent' => $a->helpfulPercent(),
+                'deflections' => (int) $a->deflection_count,
                 'author' => $a->author?->name,
+                'owner_user_id' => $a->owner_user_id,
+                'owner' => $a->owner?->name,
+                'related_service_id' => $a->related_service_id,
+                'related_service' => $a->service?->name,
+                'review_due_at' => $a->review_due_at?->toDateString(),
+                'review_started_at' => $a->review_started_at?->toIso8601String(),
+                'published_at' => $a->published_at?->toIso8601String(),
+                'retired_at' => $a->retired_at?->toIso8601String(),
                 'updated' => $a->updated_at?->diffForHumans(short: true),
             ])
             ->all();
@@ -1512,18 +1593,35 @@ class ItProvisioningController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function kbPublished(int $tenantId): array
+    private function kbPublished(int $tenantId, User $user): array
     {
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
 
+        $profile = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->first(['primary_site_id', 'secondary_site_ids']);
+        $userSiteIds = array_values(array_filter([
+            $profile?->primary_site_id,
+            ...($profile?->secondary_site_ids ?? []),
+        ]));
+
         return ItKbArticle::query()
             ->forTenant($tenantId)
             ->published()
+            ->whereIn('audience', ['all_staff', 'specific_sites'])
+            ->with('service:id,name')
             ->orderByDesc('updated_at')
             ->limit(200)
             ->get()
+            ->filter(fn (ItKbArticle $article) => $article->audience === 'all_staff'
+                || array_intersect(
+                    array_map('intval', $article->site_scope ?? []),
+                    array_map('intval', $userSiteIds),
+                ) !== [])
+            ->values()
             ->map(fn (ItKbArticle $a) => [
                 'id' => $a->id,
                 'title' => $a->title,
@@ -1533,6 +1631,8 @@ class ItProvisioningController extends Controller
                 'helpful_yes' => (int) $a->helpful_yes,
                 'helpful_no' => (int) $a->helpful_no,
                 'helpful_percent' => $a->helpfulPercent(),
+                'related_service' => $a->service?->name,
+                'review_due_at' => $a->review_due_at?->toDateString(),
             ])
             ->all();
     }

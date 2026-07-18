@@ -30,11 +30,19 @@ class ItProblemController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
         $state = trim((string) $request->query('state', ''));
         $search = trim((string) $request->query('q', ''));
+        $period = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $from = (string) ($period['from'] ?? '');
+        $to = (string) ($period['to'] ?? '');
 
         $problems = ItProblem::query()
             ->forTenant($tenantId)
             ->with('ticket:id,tenant_id,reference,title,priority,status,workflow_state,next_action,updated_at')
             ->when($state !== '', fn ($query) => $query->whereHas('ticket', fn ($ticket) => $ticket->where('workflow_state', $state)))
+            ->when($from !== '', fn ($query) => $query->whereDate('created_at', '>=', $from))
+            ->when($to !== '', fn ($query) => $query->whereDate('created_at', '<=', $to))
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
                 $query->where(fn ($nested) => $nested
@@ -51,7 +59,12 @@ class ItProblemController extends Controller
 
         return Inertia::render('it/problems/index', [
             'problems' => $problems,
-            'filters' => ['state' => $state ?: null, 'q' => $search ?: null],
+            'filters' => [
+                'state' => $state ?: null,
+                'q' => $search ?: null,
+                'from' => $from ?: null,
+                'to' => $to ?: null,
+            ],
             'can' => ['manage' => $request->user()->canDo('it.manage')],
         ]);
     }

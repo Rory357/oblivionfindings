@@ -26,7 +26,9 @@ test.describe('IT & Support service management navigation', () => {
         await expect(
             page.getByRole('button', { name: 'New team' }),
         ).toBeVisible();
-        await expect(page.getByRole('button', { name: 'New queue' })).toHaveCount(0);
+        await expect(
+            page.getByRole('button', { name: 'New queue' }),
+        ).toHaveCount(0);
         await page.getByRole('tab', { name: 'Queues' }).click();
         await expect(
             page.getByRole('button', { name: 'New queue' }),
@@ -37,20 +39,42 @@ test.describe('IT & Support service management navigation', () => {
         ).toBeVisible();
         await page.getByRole('tab', { name: 'Provisioning workflows' }).click();
         await expect(
-            page.getByRole('heading', { name: 'Provisioning workflows', level: 1 }),
+            page.getByRole('heading', {
+                name: 'Provisioning workflows',
+                level: 1,
+            }),
         ).toBeVisible();
         await expect(
-            page.getByRole('heading', { name: 'Lifecycle workflow templates', level: 2 }),
+            page.getByRole('heading', {
+                name: 'Lifecycle workflow templates',
+                level: 2,
+            }),
         ).toBeVisible();
         await expect(page.getByText('Standard joiner')).toBeVisible();
-        await expect(page.getByText('Verify and grant approved healthcare system access')).toBeVisible();
-        await expect(page.getByRole('button', { name: 'New template' })).toBeVisible();
+        await expect(
+            page.getByText(
+                'Verify and grant approved healthcare system access',
+            ),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: 'New template' }),
+        ).toBeVisible();
         await page.getByRole('button', { name: 'New template' }).click();
         const templateDialog = page.getByRole('dialog');
-        await expect(templateDialog.getByRole('heading', { name: 'New lifecycle template' })).toBeVisible();
-        await expect(templateDialog.getByText('Minimum employee details shown')).toBeVisible();
-        await expect(templateDialog.getByText('Approval required')).toBeVisible();
-        await expect(templateDialog.getByText('Evidence required')).toBeVisible();
+        await expect(
+            templateDialog.getByRole('heading', {
+                name: 'New lifecycle template',
+            }),
+        ).toBeVisible();
+        await expect(
+            templateDialog.getByText('Minimum employee details shown'),
+        ).toBeVisible();
+        await expect(
+            templateDialog.getByText('Approval required'),
+        ).toBeVisible();
+        await expect(
+            templateDialog.getByText('Evidence required'),
+        ).toBeVisible();
         await templateDialog.getByRole('button', { name: 'Cancel' }).click();
         await page.getByRole('tab', { name: 'API identities' }).click();
         await expect(
@@ -70,6 +94,20 @@ test.describe('IT & Support service management navigation', () => {
             ),
         ).toBeVisible();
         await page.getByRole('button', { name: 'Cancel' }).click();
+        await page.getByRole('tab', { name: 'Operations audit' }).click();
+        await expect(
+            page.getByRole('heading', {
+                name: 'Configuration audit',
+                level: 2,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', { name: 'Email delivery', level: 2 }),
+        ).toBeVisible();
+        await expect(page.getByText('SLA watchdog')).toBeVisible();
+        await expect(
+            page.getByText(/does not create a second scheduler/),
+        ).toBeVisible();
 
         if (testInfo.project.name.includes('desktop')) {
             const sidebar = page.locator('aside').filter({

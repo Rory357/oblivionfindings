@@ -37,10 +37,16 @@ class ItMajorIncidentController extends Controller
     {
         $this->authorize('viewAny', ItMajorIncident::class);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $period = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
         $filters = [
             'severity' => trim((string) $request->query('severity', '')),
             'state' => trim((string) $request->query('state', '')),
             'q' => trim((string) $request->query('q', '')),
+            'from' => (string) ($period['from'] ?? ''),
+            'to' => (string) ($period['to'] ?? ''),
         ];
 
         $majorIncidents = ItMajorIncident::query()
@@ -52,6 +58,8 @@ class ItMajorIncidentController extends Controller
             ])
             ->when($filters['severity'] !== '', fn ($query) => $query->where('severity', $filters['severity']))
             ->when($filters['state'] !== '', fn ($query) => $query->whereHas('ticket', fn ($ticket) => $ticket->where('workflow_state', $filters['state'])))
+            ->when($filters['from'] !== '', fn ($query) => $query->whereDate('declared_at', '>=', $filters['from']))
+            ->when($filters['to'] !== '', fn ($query) => $query->whereDate('declared_at', '<=', $filters['to']))
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
                 $query->where(fn ($nested) => $nested

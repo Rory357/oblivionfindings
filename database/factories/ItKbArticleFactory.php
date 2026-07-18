@@ -26,15 +26,19 @@ class ItKbArticleFactory extends Factory
             'category' => $this->faker->randomElement(ItTicket::CATEGORIES),
             'body' => $this->faker->paragraphs(2, true),
             'status' => 'draft',
+            'audience' => 'all_staff',
+            'site_scope' => null,
             'author_user_id' => User::factory(),
+            'owner_user_id' => null,
             'view_count' => 0,
             'helpful_yes' => 0,
             'helpful_no' => 0,
+            'deflection_count' => 0,
         ];
     }
 
     public function published(): static
     {
-        return $this->state(fn () => ['status' => 'published']);
+        return $this->state(fn () => ['status' => 'published', 'published_at' => now()]);
     }
 }

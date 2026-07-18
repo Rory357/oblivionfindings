@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Domain\It\InboundEmailIngestor;
+use App\Domain\It\Services\ItAutomationRunRecorder;
 use App\Models\ItInboundEmail;
 use App\Models\ItMailboxConnection;
 use App\Services\GoogleGmailService;
@@ -14,6 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * E4 — the email-in pull ingress (mirrors SyncCalendarJob). For every
@@ -28,19 +30,42 @@ class PollItMailboxJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(InboundEmailIngestor $ingestor): void
+    public function handle(InboundEmailIngestor $ingestor, ItAutomationRunRecorder $recorder): void
     {
-        ItMailboxConnection::query()
-            ->connected()
-            ->get()
-            ->each(fn (ItMailboxConnection $connection) => $this->poll($connection, $ingestor));
+        $startedAt = microtime(true);
+        $run = $recorder->begin('it.poll-mailbox', '0 * * * *');
+        try {
+            $connections = ItMailboxConnection::query()
+                ->connected()
+                ->get();
+            $failed = 0;
+            foreach ($connections as $connection) {
+                $failed += $this->poll($connection, $ingestor) ? 0 : 1;
+            }
+            $recorder->completeRun(
+                $run,
+                $failed > 0 ? 'failed' : 'succeeded',
+                (int) round((microtime(true) - $startedAt) * 1000),
+                $failed > 0 ? "{$failed} mailbox connection(s) failed." : null,
+                ['connections' => $connections->count(), 'failed' => $failed],
+            );
+        } catch (Throwable $exception) {
+            $recorder->completeRun(
+                $run,
+                'failed',
+                (int) round((microtime(true) - $startedAt) * 1000),
+                Str::limit($exception->getMessage(), 2000, ''),
+            );
+
+            throw $exception;
+        }
     }
 
-    private function poll(ItMailboxConnection $connection, InboundEmailIngestor $ingestor): void
+    private function poll(ItMailboxConnection $connection, InboundEmailIngestor $ingestor): bool
     {
         $mailbox = $connection->mailboxEmail();
         if (! $mailbox) {
-            return;
+            return false;
         }
 
         // Both services expose the same listUnreadMessages/markRead pair over
@@ -51,7 +76,7 @@ class PollItMailboxJob implements ShouldQueue
             default => null,
         };
         if (! $service) {
-            return;
+            return false;
         }
 
         try {
@@ -69,12 +94,16 @@ class PollItMailboxJob implements ShouldQueue
             }
 
             $connection->update(['last_polled_at' => now(), 'last_error' => null]);
-        } catch (\Throwable $e) {
+
+            return true;
+        } catch (Throwable $e) {
             Log::error("IT mailbox poll failed for connection #{$connection->id}: {$e->getMessage()}");
             $connection->update([
                 'status' => ItMailboxConnection::STATUS_ERROR,
                 'last_error' => Str::limit($e->getMessage(), 500),
             ]);
+
+            return false;
         }
     }
 }

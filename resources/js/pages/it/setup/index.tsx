@@ -8,6 +8,13 @@ import {
     ItProvisioningTemplates,
     type ProvisioningTemplate,
 } from '@/components/it/it-provisioning-templates';
+import {
+    ItServiceOperations,
+    type AutomationDefinition,
+    type AutomationRunRow,
+    type EmailDeliveryRow,
+    type OperationsAudit,
+} from '@/components/it/it-service-operations';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -22,11 +29,12 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import {
+    Activity,
     Boxes,
-    KeyRound,
     GitMerge,
+    KeyRound,
     Network,
     Pencil,
     Plus,
@@ -34,7 +42,7 @@ import {
     Route,
     UsersRound,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 
 interface Agent {
     id: number;
@@ -99,6 +107,10 @@ interface Props {
     apiIdentities: ItApiIdentity[];
     oneTimeApiCredential: OneTimeApiCredential | null;
     provisioningTemplates: ProvisioningTemplate[];
+    operationsAudit?: OperationsAudit;
+    emailDeliveries?: EmailDeliveryRow[];
+    automationDefinitions?: AutomationDefinition[];
+    automationRuns?: AutomationRunRow[];
     generatedAt?: string;
 }
 
@@ -132,10 +144,35 @@ export default function ItSetupIndex({
     apiIdentities,
     oneTimeApiCredential,
     provisioningTemplates,
+    operationsAudit,
+    emailDeliveries = [],
+    automationDefinitions = [],
+    automationRuns = [],
     generatedAt,
 }: Props) {
-    const [tab, setTab] = useState<'teams' | 'queues' | 'services' | 'provisioning' | 'api'>(
-        oneTimeApiCredential ? 'api' : 'teams',
+    const requestedTab = new URLSearchParams(
+        usePage().url.split('?')[1] ?? '',
+    ).get('tab');
+    type SetupTab =
+        | 'teams'
+        | 'queues'
+        | 'services'
+        | 'provisioning'
+        | 'api'
+        | 'operations';
+    const [tab, setTab] = useState<SetupTab>(
+        oneTimeApiCredential
+            ? 'api'
+            : [
+                    'teams',
+                    'queues',
+                    'services',
+                    'provisioning',
+                    'api',
+                    'operations',
+                ].includes(requestedTab ?? '')
+              ? (requestedTab as SetupTab)
+              : 'teams',
     );
     const [teamOpen, setTeamOpen] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
@@ -263,12 +300,16 @@ export default function ItSetupIndex({
         services: 'Teams, queues & services',
         provisioning: 'Provisioning workflows',
         api: 'API identities',
+        operations: 'Operations audit',
     }[tab];
-    const setupDescription = tab === 'provisioning'
-        ? 'Turn HR joiner, mover and leaver events into governed, traceable IT work without copying employee, asset, or device ownership.'
-        : tab === 'api'
-          ? 'Manage authenticated machine identities with explicit scopes, field allowlists, signatures, rate limits, expiry, and revocation.'
-          : 'Define accountable ownership, workload routing, and safe default assignment without hiding where work went.';
+    const setupDescription =
+        tab === 'provisioning'
+            ? 'Turn HR joiner, mover and leaver events into governed, traceable IT work without copying employee, asset, or device ownership.'
+            : tab === 'api'
+              ? 'Manage authenticated machine identities with explicit scopes, field allowlists, signatures, rate limits, expiry, and revocation.'
+              : tab === 'operations'
+                ? 'See configuration gaps, email delivery failures, and the health of the existing IT automations in one place.'
+                : 'Define accountable ownership, workload routing, and safe default assignment without hiding where work went.';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -316,9 +357,39 @@ export default function ItSetupIndex({
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {tab === 'teams' ? <Button variant="outline" onClick={() => openTeam()}><Plus className="h-4 w-4" aria-hidden="true" /> New team</Button> : null}
-                                {tab === 'queues' ? <Button variant="outline" onClick={() => openQueue()}><Plus className="h-4 w-4" aria-hidden="true" /> New queue</Button> : null}
-                                {tab === 'services' ? <Button onClick={() => openService()}><Plus className="h-4 w-4" aria-hidden="true" /> New service</Button> : null}
+                                {tab === 'teams' ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => openTeam()}
+                                    >
+                                        <Plus
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        New team
+                                    </Button>
+                                ) : null}
+                                {tab === 'queues' ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => openQueue()}
+                                    >
+                                        <Plus
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        New queue
+                                    </Button>
+                                ) : null}
+                                {tab === 'services' ? (
+                                    <Button onClick={() => openService()}>
+                                        <Plus
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        New service
+                                    </Button>
+                                ) : null}
                             </div>
                         </div>
                     </header>
@@ -362,6 +433,13 @@ export default function ItSetupIndex({
                             icon={KeyRound}
                         >
                             API identities
+                        </Tab>
+                        <Tab
+                            active={tab === 'operations'}
+                            onClick={() => setTab('operations')}
+                            icon={Activity}
+                        >
+                            Operations audit
                         </Tab>
                     </div>
 
@@ -424,6 +502,14 @@ export default function ItSetupIndex({
                             oneTimeCredential={oneTimeApiCredential}
                             agents={agents}
                             sites={sites}
+                        />
+                    ) : null}
+                    {tab === 'operations' && operationsAudit ? (
+                        <ItServiceOperations
+                            audit={operationsAudit}
+                            deliveries={emailDeliveries}
+                            automationDefinitions={automationDefinitions}
+                            automationRuns={automationRuns}
                         />
                     ) : null}
                 </main>

@@ -230,12 +230,12 @@ The missing service-management layers are governed type lifecycles, service cata
 - Add migrations only for reviewed missing state
 - Add focused domain, controller, and component tests
 
-- [ ] Add knowledge draft/review/publish/retire, audience/site scope, owner, review date, feedback, related service, and deflection evidence.
-- [ ] Add outbound email delivery/bounce visibility and technician action; never silently discard failures.
-- [ ] Add automation run visibility and reconcile existing scheduled commands/jobs without a duplicate scheduler.
-- [ ] Expand reports with backlog age, reopen/first-contact rate, channels, major incidents, change success, recurring problems, automation outcome, service/device reliability, and data-quality gaps with reconcilable drill-down filters.
-- [ ] Add admin audit views for teams, queues, catalogue, forms, email/API channels, SLAs, and settings.
-- [ ] Commit as `feat(it): complete service operations`.
+- [x] Add knowledge draft/review/publish/retire, audience/site scope, owner, review date, feedback, related service, and deflection evidence.
+- [x] Add outbound email delivery/bounce visibility and technician action; never silently discard failures.
+- [x] Add automation run visibility and reconcile existing scheduled commands/jobs without a duplicate scheduler.
+- [x] Expand reports with backlog age, reopen/first-contact rate, channels, major incidents, change success, recurring problems, automation outcome, service/device reliability, and data-quality gaps with reconcilable drill-down filters.
+- [x] Add admin audit views for teams, queues, catalogue, forms, email/API channels, SLAs, and settings.
+- [x] Commit as `feat(it): complete service operations` (focused backend: 18 tests, 207 assertions; frontend: 1 file, 7 tests; browser: desktop and mobile, 2 tests; TypeScript, targeted ESLint, client build 4,979 modules, SSR build 1,631 modules, 7 lifecycle/report/delivery routes, all 3 guarded IT schedules, 44-file PHP syntax, targeted Pint, diff checks, and Critical/Important code review pass).
 
 ## Task 12: Verify the complete IT & Support stream and update the master ledger
 

@@ -218,6 +218,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
         Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
         Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
+        Route::post('/it/setup/email-deliveries/{delivery}/retry', [ItServiceManagementSetupController::class, 'retryEmailDelivery'])->name('it.setup.email-deliveries.retry');
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
         Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');
@@ -256,6 +257,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         // Knowledge base authoring (§I) — agents create/edit/publish/delete.
         Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
         Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
+        Route::post('/it/kb/{article}/submit-review', [ItKbController::class, 'submitReview'])->name('it.kb.submit-review');
+        Route::post('/it/kb/{article}/publish', [ItKbController::class, 'publish'])->name('it.kb.publish');
+        Route::post('/it/kb/{article}/retire', [ItKbController::class, 'retire'])->name('it.kb.retire');
+        Route::post('/it/kb/{article}/restore', [ItKbController::class, 'restore'])->name('it.kb.restore');
         Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
     });
 });

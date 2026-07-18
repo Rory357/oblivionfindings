@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,14 +15,28 @@ use Illuminate\Notifications\Notification;
  * notes never notify. Reference + title only (frontline privacy): the reply
  * body may name the people we support and never leaves the app.
  */
-class TicketRepliedNotification extends Notification implements ShouldQueue
+class TicketRepliedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
     public function __construct(
         private ItTicket $ticket,
         private string $audience = 'requester', // requester | agent_side
+        private ?int $commentId = null,
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'tenant_id' => (int) $this->ticket->tenant_id,
+            'ticket_id' => (int) $this->ticket->id,
+            'comment_id' => $this->commentId,
+            'audience' => $this->audience,
+            'type' => 'ticket_replied',
+            'subject' => "New reply — {$this->ticket->reference} {$this->ticket->title}",
+            'retry_context' => ['audience' => $this->audience],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

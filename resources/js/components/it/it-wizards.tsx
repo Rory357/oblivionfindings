@@ -22,6 +22,7 @@ import {
     Timer,
     User,
     UserCheck,
+    Users,
     Wifi,
     X,
 } from 'lucide-react';
@@ -156,13 +157,30 @@ export interface KbRow {
     slug: string;
     category: string;
     status: string;
+    audience: string;
+    site_scope: number[];
     body: string | null;
     views: number;
     helpful_yes: number;
     helpful_no: number;
     helpful_percent: number | null;
+    deflections: number;
     author: string | null;
+    owner_user_id: number | null;
+    owner: string | null;
+    related_service_id: number | null;
+    related_service: string | null;
+    review_due_at: string | null;
+    review_started_at: string | null;
+    published_at: string | null;
+    retired_at: string | null;
     updated: string | null;
+}
+
+export interface KbOptions {
+    owners: Array<{ id: number; name: string }>;
+    sites: Array<{ id: number; name: string }>;
+    services: Array<{ id: number; name: string }>;
 }
 
 /** A published-article suggestion for raise-time deflection (§I). */
@@ -175,7 +193,10 @@ export interface KbSuggestion {
 export type ItModal =
     | { type: 'ticket'; provisioning?: { id: number; item: string } }
     | { type: 'raise' }
-    | { type: 'resolve'; ticket: { id: number; reference: string | null; title: string } }
+    | {
+          type: 'resolve';
+          ticket: { id: number; reference: string | null; title: string };
+      }
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'fail-request'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
@@ -194,7 +215,9 @@ export interface KbDraft {
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
  *  from the page passed to onSuccess — `back()->with('error')` fires onSuccess,
  *  not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -214,6 +237,7 @@ export function ItWizard({
     slaPolicies,
     slaCalendar,
     kbSuggestions = [],
+    kbOptions = { owners: [], sites: [], services: [] },
     onOpenArticle,
     onDraftKb,
     onClose,
@@ -225,6 +249,7 @@ export function ItWizard({
     slaPolicies?: SlaPolicyGrid | null;
     slaCalendar?: SlaCalendar | null;
     kbSuggestions?: KbSuggestion[];
+    kbOptions?: KbOptions;
     onOpenArticle?: (id: number) => void;
     onDraftKb?: (draft: KbDraft) => void;
     onClose: () => void;
@@ -250,7 +275,14 @@ export function ItWizard({
                 />
             );
         case 'kb':
-            return <KbArticleDialog article={modal.article} draft={modal.draft} onClose={onClose} />;
+            return (
+                <KbArticleDialog
+                    article={modal.article}
+                    draft={modal.draft}
+                    options={kbOptions}
+                    onClose={onClose}
+                />
+            );
         case 'raise':
             return (
                 <RaiseTicketDialog
@@ -261,21 +293,42 @@ export function ItWizard({
             );
         case 'sla':
             return slaPolicies ? (
-                <SlaPolicyDialog policies={slaPolicies} calendar={slaCalendar} onClose={onClose} />
+                <SlaPolicyDialog
+                    policies={slaPolicies}
+                    calendar={slaCalendar}
+                    onClose={onClose}
+                />
             ) : null;
         case 'resolve':
-            return <ResolveTicketDialog ticket={modal.ticket} onDraftKb={onDraftKb} onClose={onClose} />;
+            return (
+                <ResolveTicketDialog
+                    ticket={modal.ticket}
+                    onDraftKb={onDraftKb}
+                    onClose={onClose}
+                />
+            );
         case 'fulfil':
-            return <FulfilRequestDialog request={modal.request} onClose={onClose} />;
+            return (
+                <FulfilRequestDialog
+                    request={modal.request}
+                    onClose={onClose}
+                />
+            );
         case 'fail-request':
-            return <FailRequestDialog request={modal.request} onClose={onClose} />;
+            return (
+                <FailRequestDialog request={modal.request} onClose={onClose} />
+            );
         case 'assign-request':
             return (
                 <AssignDialog
                     heading="Assign request"
                     subject={modal.request.item}
                     currentId={modal.request.assignee?.id ?? null}
-                    endpoint={{ method: 'post', url: `/it/provisioning/${modal.request.id}/assign`, field: 'assigned_to_user_id' }}
+                    endpoint={{
+                        method: 'post',
+                        url: `/it/provisioning/${modal.request.id}/assign`,
+                        field: 'assigned_to_user_id',
+                    }}
                     assignees={assignees}
                     onClose={onClose}
                 />
@@ -286,7 +339,11 @@ export function ItWizard({
                     heading="Assign ticket"
                     subject={modal.ticket.title}
                     currentId={modal.ticket.assignee?.id ?? null}
-                    endpoint={{ method: 'patch', url: `/it/tickets/${modal.ticket.id}`, field: 'assigned_to_user_id' }}
+                    endpoint={{
+                        method: 'patch',
+                        url: `/it/tickets/${modal.ticket.id}`,
+                        field: 'assigned_to_user_id',
+                    }}
                     assignees={assignees}
                     onClose={onClose}
                 />
@@ -301,21 +358,50 @@ export function ItWizard({
 const TICKET_STEPS: readonly WizardStep[] = [
     { key: 'details', label: 'Details', blurb: 'What & where', icon: FileText },
     { key: 'triage', label: 'Triage', blurb: 'Priority & owner', icon: Flag },
-    { key: 'review', label: 'Review', blurb: 'Confirm & log', icon: CheckCircle2 },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & log',
+        icon: CheckCircle2,
+    },
 ];
 
 const CATEGORY_OPTIONS = [
-    { key: 'hardware', label: 'Hardware', description: 'Laptops, phones, printers & devices', icon: Laptop },
-    { key: 'account', label: 'Account', description: 'Logins, email & software access', icon: Mail },
-    { key: 'network', label: 'Network', description: 'Wi-Fi, VPN & connectivity', icon: Wifi },
-    { key: 'other', label: 'Other', description: 'Anything else IT should look at', icon: Server },
+    {
+        key: 'hardware',
+        label: 'Hardware',
+        description: 'Laptops, phones, printers & devices',
+        icon: Laptop,
+    },
+    {
+        key: 'account',
+        label: 'Account',
+        description: 'Logins, email & software access',
+        icon: Mail,
+    },
+    {
+        key: 'network',
+        label: 'Network',
+        description: 'Wi-Fi, VPN & connectivity',
+        icon: Wifi,
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        description: 'Anything else IT should look at',
+        icon: Server,
+    },
 ] as const;
 
 const PRIORITY_OPTIONS = [
     { key: 'low', label: 'Low', description: 'When time allows' },
     { key: 'normal', label: 'Normal', description: 'Business as usual' },
     { key: 'high', label: 'High', description: 'Blocking someone’s work' },
-    { key: 'urgent', label: 'Urgent', description: 'Site-wide / safety impact' },
+    {
+        key: 'urgent',
+        label: 'Urgent',
+        description: 'Site-wide / safety impact',
+    },
 ] as const;
 
 function CreateTicketWizard({
@@ -333,7 +419,10 @@ function CreateTicketWizard({
 }) {
     const wizard = useWizard(TICKET_STEPS.length);
     const [done, setDone] = useState(false);
-    const [created, setCreated] = useState<{ id: number; reference: string | null } | null>(null);
+    const [created, setCreated] = useState<{
+        id: number;
+        reference: string | null;
+    } | null>(null);
 
     const form = useForm<{
         title: string;
@@ -361,12 +450,17 @@ function CreateTicketWizard({
         attachments: [],
     });
 
-    const assignee = assignees.find((a) => String(a.id) === form.data.assigned_to_user_id) ?? null;
-    const asset = assetOptions.find((a) => String(a.id) === form.data.asset_id) ?? null;
+    const assignee =
+        assignees.find((a) => String(a.id) === form.data.assigned_to_user_id) ??
+        null;
+    const asset =
+        assetOptions.find((a) => String(a.id) === form.data.asset_id) ?? null;
     const requesterName =
         form.data.requester_user_id === UNASSIGNED
             ? 'Me (myself)'
-            : (assignees.find((a) => String(a.id) === form.data.requester_user_id)?.name ?? undefined);
+            : (assignees.find(
+                  (a) => String(a.id) === form.data.requester_user_id,
+              )?.name ?? undefined);
     const detailsValid = form.data.title.trim().length > 0;
 
     // Live SLA preview — the effective targets for the chosen priority,
@@ -384,10 +478,18 @@ function CreateTicketWizard({
     const submit = () => {
         form.transform((data) => ({
             ...data,
-            requester_user_id: data.requester_user_id === UNASSIGNED ? null : Number(data.requester_user_id),
-            assigned_to_user_id: data.assigned_to_user_id === UNASSIGNED ? null : Number(data.assigned_to_user_id),
-            asset_id: data.asset_id === UNASSIGNED ? null : Number(data.asset_id),
-            subcategory: data.subcategory.trim() === '' ? null : data.subcategory,
+            requester_user_id:
+                data.requester_user_id === UNASSIGNED
+                    ? null
+                    : Number(data.requester_user_id),
+            assigned_to_user_id:
+                data.assigned_to_user_id === UNASSIGNED
+                    ? null
+                    : Number(data.assigned_to_user_id),
+            asset_id:
+                data.asset_id === UNASSIGNED ? null : Number(data.asset_id),
+            subcategory:
+                data.subcategory.trim() === '' ? null : data.subcategory,
         }));
         form.post('/it/tickets', {
             preserveScroll: true,
@@ -403,11 +505,16 @@ function CreateTicketWizard({
                     | undefined;
                 setCreated(
                     flash?.it_ticket?.id
-                        ? { id: flash.it_ticket.id, reference: flash.it_ticket.reference ?? null }
+                        ? {
+                              id: flash.it_ticket.id,
+                              reference: flash.it_ticket.reference ?? null,
+                          }
                         : null,
                 );
                 setDone(true);
-                toast.success(`Ticket logged${flash?.it_ticket?.reference ? ` — ${flash.it_ticket.reference}` : ''}.`);
+                toast.success(
+                    `Ticket logged${flash?.it_ticket?.reference ? ` — ${flash.it_ticket.reference}` : ''}.`,
+                );
             },
         });
     };
@@ -443,7 +550,11 @@ function CreateTicketWizard({
             success={
                 done ? (
                     <WizardSuccessPane
-                        title={created?.reference ? `Logged — ${created.reference}` : 'Ticket logged'}
+                        title={
+                            created?.reference
+                                ? `Logged — ${created.reference}`
+                                : 'Ticket logged'
+                        }
                         blurb={
                             <>
                                 “{form.data.title}” is now in the helpdesk queue
@@ -453,7 +564,13 @@ function CreateTicketWizard({
                         actions={
                             <>
                                 {created ? (
-                                    <Button onClick={() => router.visit(`/it/tickets/${created.id}`)}>
+                                    <Button
+                                        onClick={() =>
+                                            router.visit(
+                                                `/it/tickets/${created.id}`,
+                                            )
+                                        }
+                                    >
                                         Open {created.reference ?? 'ticket'}
                                     </Button>
                                 ) : null}
@@ -481,11 +598,17 @@ function CreateTicketWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !detailsValid}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !detailsValid}
+                        >
                             {form.processing ? 'Logging…' : 'Log ticket'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={wizard.index === 0 && !detailsValid}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={wizard.index === 0 && !detailsValid}
+                        >
                             Continue
                         </Button>
                     )}
@@ -501,20 +624,33 @@ function CreateTicketWizard({
                     />
                     {provisioning ? (
                         <InfoCard icon={Server}>
-                            Linked to provisioning request — “{provisioning.item}”. The ticket will
-                            show on that request too.
+                            Linked to provisioning request — “
+                            {provisioning.item}”. The ticket will show on that
+                            request too.
                         </InfoCard>
                     ) : null}
                     <div className="grid gap-3.5">
                         {assignees.length > 0 ? (
-                            <Field label="Requester" hint="who hit the problem" error={form.errors.requester_user_id}>
+                            <Field
+                                label="Requester"
+                                hint="who hit the problem"
+                                error={form.errors.requester_user_id}
+                            >
                                 <SelectInput
                                     value={form.data.requester_user_id}
-                                    onChange={(v) => form.setData('requester_user_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('requester_user_id', v)
+                                    }
                                     placeholder="Me (myself)"
                                     options={[
-                                        { value: UNASSIGNED, label: 'Me — logging for myself' },
-                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'Me — logging for myself',
+                                        },
+                                        ...assignees.map((a) => ({
+                                            value: String(a.id),
+                                            label: a.name,
+                                        })),
                                     ]}
                                 />
                             </Field>
@@ -522,15 +658,23 @@ function CreateTicketWizard({
                         <Field label="Title" required error={form.errors.title}>
                             <Input
                                 value={form.data.title}
-                                onChange={(e) => form.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Printer offline — Sunnyside Lodge"
                                 maxLength={255}
                             />
                         </Field>
-                        <Field label="Detail" hint="optional" error={form.errors.description}>
+                        <Field
+                            label="Detail"
+                            hint="optional"
+                            error={form.errors.description}
+                        >
                             <Textarea
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Anything that helps IT reproduce or locate the issue…"
                                 rows={4}
                             />
@@ -542,18 +686,34 @@ function CreateTicketWizard({
                                 options={[...CATEGORY_OPTIONS]}
                             />
                         </Field>
-                        <Field label="Subcategory" hint="optional" error={form.errors.subcategory}>
+                        <Field
+                            label="Subcategory"
+                            hint="optional"
+                            error={form.errors.subcategory}
+                        >
                             <Input
                                 value={form.data.subcategory}
-                                onChange={(e) => form.setData('subcategory', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('subcategory', e.target.value)
+                                }
                                 placeholder="e.g. Label printer, VPN, mailbox…"
                                 maxLength={255}
                             />
                         </Field>
-                        <Field label="Photos or files" hint="optional" error={form.errors.attachments}>
+                        <Field
+                            label="Photos or files"
+                            hint="optional"
+                            error={form.errors.attachments}
+                        >
                             <FileDropzone
                                 onFiles={(files) =>
-                                    form.setData('attachments', [...form.data.attachments, ...files].slice(0, 5))
+                                    form.setData(
+                                        'attachments',
+                                        [
+                                            ...form.data.attachments,
+                                            ...files,
+                                        ].slice(0, 5),
+                                    )
                                 }
                                 accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
                                 title="Drop a photo or file"
@@ -566,7 +726,9 @@ function CreateTicketWizard({
                                     onRemove={() =>
                                         form.setData(
                                             'attachments',
-                                            form.data.attachments.filter((_, j) => j !== i),
+                                            form.data.attachments.filter(
+                                                (_, j) => j !== i,
+                                            ),
                                         )
                                     }
                                 />
@@ -593,58 +755,104 @@ function CreateTicketWizard({
                         </Field>
                         {slaTarget ? (
                             <InfoCard icon={Timer}>
-                                First response due <strong>{dueLabel(slaTarget.first_response_minutes)}</strong>,
-                                resolution by <strong>{dueLabel(slaTarget.resolution_minutes)}</strong> at this priority.
+                                First response due{' '}
+                                <strong>
+                                    {dueLabel(slaTarget.first_response_minutes)}
+                                </strong>
+                                , resolution by{' '}
+                                <strong>
+                                    {dueLabel(slaTarget.resolution_minutes)}
+                                </strong>{' '}
+                                at this priority.
                             </InfoCard>
                         ) : null}
                         {/* Triage is agent work — self-service requesters get no
                             assignee list from the server, so these fields hide. */}
                         {assignees.length > 0 ? (
-                            <Field label="Assign to" hint="optional — leave unassigned for triage" error={form.errors.assigned_to_user_id}>
+                            <Field
+                                label="Assign to"
+                                hint="optional — leave unassigned for triage"
+                                error={form.errors.assigned_to_user_id}
+                            >
                                 <SelectInput
                                     value={form.data.assigned_to_user_id}
-                                    onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('assigned_to_user_id', v)
+                                    }
                                     placeholder="Unassigned"
                                     options={[
-                                        { value: UNASSIGNED, label: 'Unassigned' },
-                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'Unassigned',
+                                        },
+                                        ...assignees.map((a) => ({
+                                            value: String(a.id),
+                                            label: a.name,
+                                        })),
                                     ]}
                                 />
                             </Field>
                         ) : null}
                         {assetOptions.length > 0 ? (
-                            <Field label="Linked asset" hint="optional — from the assets register" error={form.errors.asset_id}>
+                            <Field
+                                label="Linked asset"
+                                hint="optional — from the assets register"
+                                error={form.errors.asset_id}
+                            >
                                 <SelectInput
                                     value={form.data.asset_id}
-                                    onChange={(v) => form.setData('asset_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('asset_id', v)
+                                    }
                                     placeholder="No asset"
                                     options={[
-                                        { value: UNASSIGNED, label: 'No asset' },
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'No asset',
+                                        },
                                         ...assetOptions.map((a) => ({
                                             value: String(a.id),
-                                            label: a.tag ? `${a.name} · ${a.tag}` : a.name,
+                                            label: a.tag
+                                                ? `${a.name} · ${a.tag}`
+                                                : a.name,
                                         })),
                                     ]}
                                 />
                             </Field>
                         ) : null}
                         {assignees.length > 0 ? (
-                            <Field label="Watchers" hint="optional — kept in the loop on updates">
+                            <Field
+                                label="Watchers"
+                                hint="optional — kept in the loop on updates"
+                            >
                                 <SelectInput
                                     value={UNASSIGNED}
                                     onChange={addWatcher}
                                     placeholder="Add a watcher"
                                     options={[
-                                        { value: UNASSIGNED, label: 'Add a watcher…' },
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'Add a watcher…',
+                                        },
                                         ...assignees
-                                            .filter((a) => !form.data.watchers.includes(a.id))
-                                            .map((a) => ({ value: String(a.id), label: a.name })),
+                                            .filter(
+                                                (a) =>
+                                                    !form.data.watchers.includes(
+                                                        a.id,
+                                                    ),
+                                            )
+                                            .map((a) => ({
+                                                value: String(a.id),
+                                                label: a.name,
+                                            })),
                                     ]}
                                 />
                                 {form.data.watchers.length > 0 ? (
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                         {form.data.watchers.map((id) => {
-                                            const w = assignees.find((a) => a.id === id);
+                                            const w = assignees.find(
+                                                (a) => a.id === id,
+                                            );
                                             return (
                                                 <span
                                                     key={id}
@@ -657,7 +865,11 @@ function CreateTicketWizard({
                                                         onClick={() =>
                                                             form.setData(
                                                                 'watchers',
-                                                                form.data.watchers.filter((x) => x !== id),
+                                                                form.data.watchers.filter(
+                                                                    (x) =>
+                                                                        x !==
+                                                                        id,
+                                                                ),
                                                             )
                                                         }
                                                         aria-label={`Remove ${w?.name ?? 'watcher'}`}
@@ -684,36 +896,83 @@ function CreateTicketWizard({
                         blurb="Check the ticket before it lands in the queue."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={FileText} title="Details" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Requester" value={requesterName} />
+                        <ReviewCard
+                            icon={FileText}
+                            title="Details"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Requester"
+                                value={requesterName}
+                            />
                             <ReviewRow label="Title" value={form.data.title} />
                             <ReviewRow
                                 label="Category"
-                                value={CATEGORY_OPTIONS.find((c) => c.key === form.data.category)?.label}
+                                value={
+                                    CATEGORY_OPTIONS.find(
+                                        (c) => c.key === form.data.category,
+                                    )?.label
+                                }
                             />
-                            <ReviewRow label="Subcategory" value={form.data.subcategory || undefined} />
-                            <ReviewRow label="Detail" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Subcategory"
+                                value={form.data.subcategory || undefined}
+                            />
+                            <ReviewRow
+                                label="Detail"
+                                value={form.data.description || undefined}
+                            />
                             <ReviewRow
                                 label="Files"
-                                value={form.data.attachments.length > 0 ? `${form.data.attachments.length} attached` : undefined}
+                                value={
+                                    form.data.attachments.length > 0
+                                        ? `${form.data.attachments.length} attached`
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={Flag} title="Triage" onEdit={() => wizard.goTo(1)}>
+                        <ReviewCard
+                            icon={Flag}
+                            title="Triage"
+                            onEdit={() => wizard.goTo(1)}
+                        >
                             <ReviewRow
                                 label="Priority"
-                                value={PRIORITY_OPTIONS.find((p) => p.key === form.data.priority)?.label}
+                                value={
+                                    PRIORITY_OPTIONS.find(
+                                        (p) => p.key === form.data.priority,
+                                    )?.label
+                                }
                             />
                             {slaTarget ? (
-                                <ReviewRow label="Resolution due" value={dueLabel(slaTarget.resolution_minutes)} />
+                                <ReviewRow
+                                    label="Resolution due"
+                                    value={dueLabel(
+                                        slaTarget.resolution_minutes,
+                                    )}
+                                />
                             ) : null}
-                            <ReviewRow label="Assign to" value={assignee?.name} />
+                            <ReviewRow
+                                label="Assign to"
+                                value={assignee?.name}
+                            />
                             <ReviewRow
                                 label="Asset"
-                                value={asset ? (asset.tag ? `${asset.name} · ${asset.tag}` : asset.name) : undefined}
+                                value={
+                                    asset
+                                        ? asset.tag
+                                            ? `${asset.name} · ${asset.tag}`
+                                            : asset.name
+                                        : undefined
+                                }
                             />
                             <ReviewRow
                                 label="Watchers"
-                                value={form.data.watchers.length > 0 ? `${form.data.watchers.length}` : undefined}
+                                value={
+                                    form.data.watchers.length > 0
+                                        ? `${form.data.watchers.length}`
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
                     </div>
@@ -733,10 +992,30 @@ const PROVISIONING_STEPS: readonly WizardStep[] = [
 ];
 
 const REQUEST_TYPE_OPTIONS = [
-    { key: 'account', label: 'Account', description: 'Email, logins & software', icon: Mail },
-    { key: 'access', label: 'Access', description: 'Systems & permissions', icon: KeyRound },
-    { key: 'equipment', label: 'Equipment', description: 'Laptop, phone & devices', icon: Laptop },
-    { key: 'other', label: 'Other', description: 'Anything else to provision', icon: Server },
+    {
+        key: 'account',
+        label: 'Account',
+        description: 'Email, logins & software',
+        icon: Mail,
+    },
+    {
+        key: 'access',
+        label: 'Access',
+        description: 'Systems & permissions',
+        icon: KeyRound,
+    },
+    {
+        key: 'equipment',
+        label: 'Equipment',
+        description: 'Laptop, phone & devices',
+        icon: Laptop,
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        description: 'Anything else to provision',
+        icon: Server,
+    },
 ] as const;
 
 function NewProvisioningRequestDialog({
@@ -761,14 +1040,22 @@ function NewProvisioningRequestDialog({
         notes: '',
     });
 
-    const employee = employeeOptions.find((e) => String(e.id) === form.data.employee_profile_id) ?? null;
-    const detailsValid = form.data.employee_profile_id !== '' && form.data.item.trim().length > 0;
+    const employee =
+        employeeOptions.find(
+            (e) => String(e.id) === form.data.employee_profile_id,
+        ) ?? null;
+    const detailsValid =
+        form.data.employee_profile_id !== '' &&
+        form.data.item.trim().length > 0;
 
     const submit = () => {
         form.transform((data) => ({
             ...data,
             employee_profile_id: Number(data.employee_profile_id),
-            assigned_to_user_id: data.assigned_to_user_id === UNASSIGNED ? null : Number(data.assigned_to_user_id),
+            assigned_to_user_id:
+                data.assigned_to_user_id === UNASSIGNED
+                    ? null
+                    : Number(data.assigned_to_user_id),
             due_date: data.due_date === '' ? null : data.due_date,
             notes: data.notes.trim() === '' ? null : data.notes,
         }));
@@ -825,7 +1112,10 @@ function NewProvisioningRequestDialog({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !detailsValid}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !detailsValid}
+                        >
                             {form.processing ? 'Raising…' : 'Raise request'}
                         </Button>
                     ) : (
@@ -838,14 +1128,27 @@ function NewProvisioningRequestDialog({
         >
             {wizard.index === 0 && (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Who & what" blurb="Who’s this for, and what needs provisioning?" />
+                    <StepHead
+                        icon={FileText}
+                        title="Who & what"
+                        blurb="Who’s this for, and what needs provisioning?"
+                    />
                     <div className="grid gap-3.5">
-                        <Field label="Employee" required error={form.errors.employee_profile_id}>
+                        <Field
+                            label="Employee"
+                            required
+                            error={form.errors.employee_profile_id}
+                        >
                             <SelectInput
                                 value={form.data.employee_profile_id}
-                                onChange={(v) => form.setData('employee_profile_id', v)}
+                                onChange={(v) =>
+                                    form.setData('employee_profile_id', v)
+                                }
                                 placeholder="Choose an employee"
-                                options={employeeOptions.map((e) => ({ value: String(e.id), label: e.name }))}
+                                options={employeeOptions.map((e) => ({
+                                    value: String(e.id),
+                                    label: e.name,
+                                }))}
                             />
                         </Field>
                         <Field label="Type" error={form.errors.type}>
@@ -858,7 +1161,9 @@ function NewProvisioningRequestDialog({
                         <Field label="Item" required error={form.errors.item}>
                             <Input
                                 value={form.data.item}
-                                onChange={(e) => form.setData('item', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('item', e.target.value)
+                                }
                                 placeholder="e.g. Replacement laptop"
                                 maxLength={255}
                             />
@@ -868,7 +1173,11 @@ function NewProvisioningRequestDialog({
             )}
             {wizard.index === 1 && (
                 <WizardStepPane>
-                    <StepHead icon={Flag} title="Assign & schedule" blurb="Owner, priority and a due date if there is one." />
+                    <StepHead
+                        icon={Flag}
+                        title="Assign & schedule"
+                        blurb="Owner, priority and a due date if there is one."
+                    />
                     <div className="grid gap-3.5">
                         <Field label="Priority" error={form.errors.priority}>
                             <TilePicker
@@ -878,29 +1187,53 @@ function NewProvisioningRequestDialog({
                             />
                         </Field>
                         {assignees.length > 0 ? (
-                            <Field label="Assign to" hint="optional" error={form.errors.assigned_to_user_id}>
+                            <Field
+                                label="Assign to"
+                                hint="optional"
+                                error={form.errors.assigned_to_user_id}
+                            >
                                 <SelectInput
                                     value={form.data.assigned_to_user_id}
-                                    onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('assigned_to_user_id', v)
+                                    }
                                     placeholder="Unassigned"
                                     options={[
-                                        { value: UNASSIGNED, label: 'Unassigned' },
-                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'Unassigned',
+                                        },
+                                        ...assignees.map((a) => ({
+                                            value: String(a.id),
+                                            label: a.name,
+                                        })),
                                     ]}
                                 />
                             </Field>
                         ) : null}
-                        <Field label="Due date" hint="optional" error={form.errors.due_date}>
+                        <Field
+                            label="Due date"
+                            hint="optional"
+                            error={form.errors.due_date}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.due_date}
-                                onChange={(e) => form.setData('due_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('due_date', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Notes" hint="optional" error={form.errors.notes}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            error={form.errors.notes}
+                        >
                             <Textarea
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 rows={3}
                                 placeholder="Anything the fulfiller should know…"
                             />
@@ -917,15 +1250,40 @@ function NewProvisioningRequestDialog({
 /* ================================================================== */
 
 const RAISE_STEPS: readonly WizardStep[] = [
-    { key: 'raise', label: 'Raise a ticket', blurb: 'Under 30 seconds', icon: Ticket },
+    {
+        key: 'raise',
+        label: 'Raise a ticket',
+        blurb: 'Under 30 seconds',
+        icon: Ticket,
+    },
 ];
 
 /** Plain-language categories for people mid-shift — no IT jargon. */
 const RAISE_CATEGORY_OPTIONS = [
-    { key: 'hardware', label: 'Device or hardware', description: 'Phone, laptop, printer, charger…', icon: Laptop },
-    { key: 'account', label: 'Account or sign-in', description: 'Locked out, passwords, email', icon: User },
-    { key: 'network', label: 'Wi-Fi or network', description: 'No internet, VPN trouble', icon: Wifi },
-    { key: 'other', label: 'Something else', description: 'Anything IT should look at', icon: Server },
+    {
+        key: 'hardware',
+        label: 'Device or hardware',
+        description: 'Phone, laptop, printer, charger…',
+        icon: Laptop,
+    },
+    {
+        key: 'account',
+        label: 'Account or sign-in',
+        description: 'Locked out, passwords, email',
+        icon: User,
+    },
+    {
+        key: 'network',
+        label: 'Wi-Fi or network',
+        description: 'No internet, VPN trouble',
+        icon: Wifi,
+    },
+    {
+        key: 'other',
+        label: 'Something else',
+        description: 'Anything IT should look at',
+        icon: Server,
+    },
 ] as const;
 
 /** Plain-language urgency → priority. The requester never sees "P1". */
@@ -970,7 +1328,9 @@ function RaiseTicketDialog({
     const query = form.data.title.trim().toLowerCase();
     const kbMatches =
         onOpenArticle && query.length >= 3
-            ? kbSuggestions.filter((s) => s.title.toLowerCase().includes(query)).slice(0, 3)
+            ? kbSuggestions
+                  .filter((s) => s.title.toLowerCase().includes(query))
+                  .slice(0, 3)
             : [];
 
     const submit = () => {
@@ -1009,11 +1369,16 @@ function RaiseTicketDialog({
             success={
                 done ? (
                     <WizardSuccessPane
-                        title={reference ? `Raised — ${reference}` : 'Ticket raised'}
+                        title={
+                            reference
+                                ? `Raised — ${reference}`
+                                : 'Ticket raised'
+                        }
                         blurb={
                             <>
-                                IT can see it now. We’ll email you when it’s picked up or
-                                resolved — and you can track it any time in <strong>My tickets</strong>.
+                                IT can see it now. We’ll email you when it’s
+                                picked up or resolved — and you can track it any
+                                time in <strong>My tickets</strong>.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -1026,7 +1391,10 @@ function RaiseTicketDialog({
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={form.processing || !valid}>
+                    <Button
+                        onClick={submit}
+                        disabled={form.processing || !valid}
+                    >
                         {form.processing ? 'Raising…' : 'Raise ticket'}
                     </Button>
                 </>
@@ -1039,23 +1407,35 @@ function RaiseTicketDialog({
                     blurb="One line is enough — you can add detail if it helps."
                 />
                 <div className="grid gap-3.5">
-                    <Field label="What's broken?" required error={form.errors.title}>
+                    <Field
+                        label="What's broken?"
+                        required
+                        error={form.errors.title}
+                    >
                         <Input
                             value={form.data.title}
-                            onChange={(e) => form.setData('title', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('title', e.target.value)
+                            }
                             placeholder="e.g. My work phone won’t charge"
                             maxLength={255}
                             autoFocus
                         />
                     </Field>
-                    <Field label="What kind of thing is it?" error={form.errors.category}>
+                    <Field
+                        label="What kind of thing is it?"
+                        error={form.errors.category}
+                    >
                         <TilePicker
                             value={form.data.category}
                             onChange={(v) => form.setData('category', v)}
                             options={[...RAISE_CATEGORY_OPTIONS]}
                         />
                     </Field>
-                    <Field label="How urgent is it?" error={form.errors.priority}>
+                    <Field
+                        label="How urgent is it?"
+                        error={form.errors.priority}
+                    >
                         <Segmented
                             value={form.data.priority}
                             onChange={(v) => form.setData('priority', v)}
@@ -1065,7 +1445,8 @@ function RaiseTicketDialog({
                     {kbMatches.length > 0 ? (
                         <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
                             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
-                                <BookOpen className="h-3.5 w-3.5" /> These might fix it now
+                                <BookOpen className="h-3.5 w-3.5" /> These might
+                                fix it now
                             </div>
                             <div className="mt-1.5 flex flex-col gap-1">
                                 {kbMatches.map((s) => (
@@ -1076,8 +1457,12 @@ function RaiseTicketDialog({
                                         onClick={() => onOpenArticle?.(s.id)}
                                         className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-primary/10"
                                     >
-                                        <span className="truncate font-medium">{s.title}</span>
-                                        <span className="flex-none text-[11px] text-muted-foreground">Read →</span>
+                                        <span className="truncate font-medium">
+                                            {s.title}
+                                        </span>
+                                        <span className="flex-none text-[11px] text-muted-foreground">
+                                            Read →
+                                        </span>
                                     </button>
                                 ))}
                             </div>
@@ -1085,10 +1470,19 @@ function RaiseTicketDialog({
                     ) : null}
                     {moreDetails ? (
                         <>
-                            <Field label="More details" hint="optional" error={form.errors.description}>
+                            <Field
+                                label="More details"
+                                hint="optional"
+                                error={form.errors.description}
+                            >
                                 <Textarea
                                     value={form.data.description}
-                                    onChange={(e) => form.setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Anything that helps IT find or fix it — where you are, what you tried…"
                                     rows={4}
                                 />
@@ -1102,7 +1496,10 @@ function RaiseTicketDialog({
                                     onFiles={(files) =>
                                         form.setData(
                                             'attachments',
-                                            [...form.data.attachments, ...files].slice(0, 5),
+                                            [
+                                                ...form.data.attachments,
+                                                ...files,
+                                            ].slice(0, 5),
                                         )
                                     }
                                     accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
@@ -1116,7 +1513,9 @@ function RaiseTicketDialog({
                                         onRemove={() =>
                                             form.setData(
                                                 'attachments',
-                                                form.data.attachments.filter((_, j) => j !== i),
+                                                form.data.attachments.filter(
+                                                    (_, j) => j !== i,
+                                                ),
                                             )
                                         }
                                     />
@@ -1144,7 +1543,12 @@ function RaiseTicketDialog({
 /* ================================================================== */
 
 const RESOLVE_STEPS: readonly WizardStep[] = [
-    { key: 'resolve', label: 'Resolve', blurb: 'What fixed it', icon: CheckCircle2 },
+    {
+        key: 'resolve',
+        label: 'Resolve',
+        blurb: 'What fixed it',
+        icon: CheckCircle2,
+    },
 ];
 
 export function ResolveTicketDialog({
@@ -1200,9 +1604,12 @@ export function ResolveTicketDialog({
                         title="Resolved"
                         blurb={
                             <>
-                                The resolution note is on the thread as the final reply
-                                {form.data.notify_requester ? ' and the requester has been emailed' : ''}.
-                                It auto-closes in 7 days unless reopened.
+                                The resolution note is on the thread as the
+                                final reply
+                                {form.data.notify_requester
+                                    ? ' and the requester has been emailed'
+                                    : ''}
+                                . It auto-closes in 7 days unless reopened.
                             </>
                         }
                         actions={
@@ -1210,9 +1617,15 @@ export function ResolveTicketDialog({
                                 {onDraftKb ? (
                                     <Button
                                         variant="outline"
-                                        onClick={() => onDraftKb({ title: ticket.title, body: form.data.note })}
+                                        onClick={() =>
+                                            onDraftKb({
+                                                title: ticket.title,
+                                                body: form.data.note,
+                                            })
+                                        }
                                     >
-                                        <BookOpen className="h-3.5 w-3.5" /> Draft KB article
+                                        <BookOpen className="h-3.5 w-3.5" />{' '}
+                                        Draft KB article
                                     </Button>
                                 ) : null}
                                 <Button onClick={onClose}>Done</Button>
@@ -1227,7 +1640,10 @@ export function ResolveTicketDialog({
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={form.processing || !valid}>
+                    <Button
+                        onClick={submit}
+                        disabled={form.processing || !valid}
+                    >
                         {form.processing ? 'Resolving…' : 'Resolve ticket'}
                     </Button>
                 </>
@@ -1240,10 +1656,16 @@ export function ResolveTicketDialog({
                     blurb="Posted to the thread as the final public reply — the requester reads this."
                 />
                 <div className="grid gap-3.5">
-                    <Field label="Resolution note" required error={form.errors.note}>
+                    <Field
+                        label="Resolution note"
+                        required
+                        error={form.errors.note}
+                    >
                         <Textarea
                             value={form.data.note}
-                            onChange={(e) => form.setData('note', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('note', e.target.value)
+                            }
                             placeholder="e.g. Replaced the charging cable and tested — holding 100% overnight."
                             rows={5}
                             autoFocus
@@ -1252,7 +1674,9 @@ export function ResolveTicketDialog({
                     <label className="flex items-center gap-2 text-[13px] font-medium">
                         <Checkbox
                             checked={form.data.notify_requester}
-                            onCheckedChange={(v) => form.setData('notify_requester', v === true)}
+                            onCheckedChange={(v) =>
+                                form.setData('notify_requester', v === true)
+                            }
                         />
                         Email the requester that it’s fixed
                     </label>
@@ -1267,12 +1691,25 @@ export function ResolveTicketDialog({
 /* ================================================================== */
 
 const SLA_STEPS: readonly WizardStep[] = [
-    { key: 'targets', label: 'SLA targets', blurb: 'Minutes per priority', icon: Timer },
-    { key: 'hours', label: 'Business hours', blurb: 'When the clock runs', icon: CalendarClock },
+    {
+        key: 'targets',
+        label: 'SLA targets',
+        blurb: 'Minutes per priority',
+        icon: Timer,
+    },
+    {
+        key: 'hours',
+        label: 'Business hours',
+        blurb: 'When the clock runs',
+        icon: CalendarClock,
+    },
 ];
 
 /** §G defaults — what "Reset to defaults" restores. */
-const SLA_DEFAULTS: Record<string, { first_response_minutes: string; resolution_minutes: string }> = {
+const SLA_DEFAULTS: Record<
+    string,
+    { first_response_minutes: string; resolution_minutes: string }
+> = {
     urgent: { first_response_minutes: '60', resolution_minutes: '240' },
     high: { first_response_minutes: '240', resolution_minutes: '1440' },
     normal: { first_response_minutes: '1440', resolution_minutes: '4320' },
@@ -1309,7 +1746,10 @@ function minutesHuman(raw: string): string {
     return `${Number.isInteger(d) ? d : d.toFixed(1)} d`;
 }
 
-type SlaFormData = Record<string, { first_response_minutes: string; resolution_minutes: string }>;
+type SlaFormData = Record<
+    string,
+    { first_response_minutes: string; resolution_minutes: string }
+>;
 
 export function SlaPolicyDialog({
     policies,
@@ -1326,7 +1766,13 @@ export function SlaPolicyDialog({
         enabled: calendar?.enabled ?? false,
         open_time: calendar?.open_time ?? '08:00',
         close_time: calendar?.close_time ?? '17:00',
-        working_days: calendar?.working_days ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
+        working_days: calendar?.working_days ?? [
+            'mon',
+            'tue',
+            'wed',
+            'thu',
+            'fri',
+        ],
         holiday_dates: calendar?.holiday_dates ?? [],
     });
     const [holidayDraft, setHolidayDraft] = useState('');
@@ -1352,8 +1798,11 @@ export function SlaPolicyDialog({
     // Nested error keys ("urgent.resolution_minutes") aren't in the typed map.
     const errors = form.errors as Record<string, string | undefined>;
 
-    const set = (priority: string, field: 'first_response_minutes' | 'resolution_minutes', value: string) =>
-        form.setData(priority, { ...form.data[priority], [field]: value });
+    const set = (
+        priority: string,
+        field: 'first_response_minutes' | 'resolution_minutes',
+        value: string,
+    ) => form.setData(priority, { ...form.data[priority], [field]: value });
 
     const toggleDay = (key: string) =>
         setCal((c) => ({
@@ -1364,12 +1813,18 @@ export function SlaPolicyDialog({
         }));
     const addHoliday = () => {
         if (holidayDraft && !cal.holiday_dates.includes(holidayDraft)) {
-            setCal((c) => ({ ...c, holiday_dates: [...c.holiday_dates, holidayDraft].sort() }));
+            setCal((c) => ({
+                ...c,
+                holiday_dates: [...c.holiday_dates, holidayDraft].sort(),
+            }));
         }
         setHolidayDraft('');
     };
     const removeHoliday = (d: string) =>
-        setCal((c) => ({ ...c, holiday_dates: c.holiday_dates.filter((x) => x !== d) }));
+        setCal((c) => ({
+            ...c,
+            holiday_dates: c.holiday_dates.filter((x) => x !== d),
+        }));
 
     const submit = () => {
         form.transform((data) => ({
@@ -1420,7 +1875,9 @@ export function SlaPolicyDialog({
                 wizard.isFirst ? (
                     <Button
                         variant="ghost"
-                        onClick={() => form.setData(structuredClone(SLA_DEFAULTS))}
+                        onClick={() =>
+                            form.setData(structuredClone(SLA_DEFAULTS))
+                        }
                         disabled={form.processing}
                     >
                         <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
@@ -1447,195 +1904,275 @@ export function SlaPolicyDialog({
             }
         >
             {wizard.index === 0 && (
-            <WizardStepPane>
-                <StepHead
-                    icon={Timer}
-                    title="Response & resolution targets"
-                    blurb="Minutes from creation. First response stops at the first public agent reply; resolution pauses while a ticket waits on its requester."
-                />
-                <div className="grid gap-3">
-                    {Object.keys(SLA_DEFAULTS).map((priority) => (
-                        <div key={priority} className="rounded-xl border border-border bg-muted/30 p-3.5">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <div className="text-[13px] font-bold capitalize">{priority}</div>
-                                    <div className="text-[11.5px] text-muted-foreground">
-                                        {SLA_PRIORITY_HINTS[priority]}
+                <WizardStepPane>
+                    <StepHead
+                        icon={Timer}
+                        title="Response & resolution targets"
+                        blurb="Minutes from creation. First response stops at the first public agent reply; resolution pauses while a ticket waits on its requester."
+                    />
+                    <div className="grid gap-3">
+                        {Object.keys(SLA_DEFAULTS).map((priority) => (
+                            <div
+                                key={priority}
+                                className="rounded-xl border border-border bg-muted/30 p-3.5"
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <div className="text-[13px] font-bold capitalize">
+                                            {priority}
+                                        </div>
+                                        <div className="text-[11.5px] text-muted-foreground">
+                                            {SLA_PRIORITY_HINTS[priority]}
+                                        </div>
                                     </div>
+                                    {policies[priority]?.is_custom ? (
+                                        <StatusBadge variant="info" size="sm">
+                                            Custom
+                                        </StatusBadge>
+                                    ) : (
+                                        <StatusBadge
+                                            variant="neutral"
+                                            size="sm"
+                                        >
+                                            Default
+                                        </StatusBadge>
+                                    )}
                                 </div>
-                                {policies[priority]?.is_custom ? (
-                                    <StatusBadge variant="info" size="sm">
-                                        Custom
-                                    </StatusBadge>
-                                ) : (
-                                    <StatusBadge variant="neutral" size="sm">
-                                        Default
-                                    </StatusBadge>
-                                )}
+                                <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
+                                    <Field
+                                        label="First response (minutes)"
+                                        error={
+                                            errors[
+                                                `${priority}.first_response_minutes`
+                                            ]
+                                        }
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                min={5}
+                                                value={
+                                                    form.data[priority]
+                                                        .first_response_minutes
+                                                }
+                                                onChange={(e) =>
+                                                    set(
+                                                        priority,
+                                                        'first_response_minutes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                aria-label={`${priority} first response minutes`}
+                                            />
+                                            <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
+                                                ={' '}
+                                                {minutesHuman(
+                                                    form.data[priority]
+                                                        .first_response_minutes,
+                                                )}
+                                            </span>
+                                        </div>
+                                    </Field>
+                                    <Field
+                                        label="Resolution (minutes)"
+                                        error={
+                                            errors[
+                                                `${priority}.resolution_minutes`
+                                            ]
+                                        }
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                min={5}
+                                                value={
+                                                    form.data[priority]
+                                                        .resolution_minutes
+                                                }
+                                                onChange={(e) =>
+                                                    set(
+                                                        priority,
+                                                        'resolution_minutes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                aria-label={`${priority} resolution minutes`}
+                                            />
+                                            <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
+                                                ={' '}
+                                                {minutesHuman(
+                                                    form.data[priority]
+                                                        .resolution_minutes,
+                                                )}
+                                            </span>
+                                        </div>
+                                    </Field>
+                                </div>
                             </div>
-                            <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
-                                <Field
-                                    label="First response (minutes)"
-                                    error={errors[`${priority}.first_response_minutes`]}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min={5}
-                                            value={form.data[priority].first_response_minutes}
-                                            onChange={(e) =>
-                                                set(priority, 'first_response_minutes', e.target.value)
-                                            }
-                                            aria-label={`${priority} first response minutes`}
-                                        />
-                                        <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
-                                            = {minutesHuman(form.data[priority].first_response_minutes)}
-                                        </span>
-                                    </div>
-                                </Field>
-                                <Field
-                                    label="Resolution (minutes)"
-                                    error={errors[`${priority}.resolution_minutes`]}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min={5}
-                                            value={form.data[priority].resolution_minutes}
-                                            onChange={(e) =>
-                                                set(priority, 'resolution_minutes', e.target.value)
-                                            }
-                                            aria-label={`${priority} resolution minutes`}
-                                        />
-                                        <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
-                                            = {minutesHuman(form.data[priority].resolution_minutes)}
-                                        </span>
-                                    </div>
-                                </Field>
-                            </div>
-                        </div>
-                    ))}
-                    <InfoCard icon={Timer}>
-                        {cal.enabled
-                            ? 'Clocks run on the business-hours calendar set in the next step.'
-                            : 'Clocks run 24/7 — set a business-hours calendar in the next step to pause them overnight and at weekends.'}{' '}
-                        Changing targets never rewrites tickets already on the queue.
-                    </InfoCard>
-                </div>
-            </WizardStepPane>
+                        ))}
+                        <InfoCard icon={Timer}>
+                            {cal.enabled
+                                ? 'Clocks run on the business-hours calendar set in the next step.'
+                                : 'Clocks run 24/7 — set a business-hours calendar in the next step to pause them overnight and at weekends.'}{' '}
+                            Changing targets never rewrites tickets already on
+                            the queue.
+                        </InfoCard>
+                    </div>
+                </WizardStepPane>
             )}
 
             {wizard.index === 1 && (
-            <WizardStepPane>
-                <StepHead
-                    icon={CalendarClock}
-                    title="Business hours"
-                    blurb="When enabled, SLA clocks only tick during these hours — a Friday-evening ticket is due the next working morning, not over the weekend."
-                />
-                <div className="grid gap-3.5">
-                    <label className="flex items-center gap-2 text-[13px] font-medium">
-                        <Checkbox
-                            checked={cal.enabled}
-                            onCheckedChange={(v) => setCal((c) => ({ ...c, enabled: v === true }))}
-                        />
-                        Run SLA clocks on a business-hours calendar
-                    </label>
+                <WizardStepPane>
+                    <StepHead
+                        icon={CalendarClock}
+                        title="Business hours"
+                        blurb="When enabled, SLA clocks only tick during these hours — a Friday-evening ticket is due the next working morning, not over the weekend."
+                    />
+                    <div className="grid gap-3.5">
+                        <label className="flex items-center gap-2 text-[13px] font-medium">
+                            <Checkbox
+                                checked={cal.enabled}
+                                onCheckedChange={(v) =>
+                                    setCal((c) => ({
+                                        ...c,
+                                        enabled: v === true,
+                                    }))
+                                }
+                            />
+                            Run SLA clocks on a business-hours calendar
+                        </label>
 
-                    {cal.enabled ? (
-                        <>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <Field label="Opens" error={errors.open_time}>
-                                    <Input
-                                        type="time"
-                                        value={cal.open_time}
-                                        onChange={(e) => setCal((c) => ({ ...c, open_time: e.target.value }))}
-                                        aria-label="Business hours open time"
-                                    />
-                                </Field>
-                                <Field label="Closes" error={errors.close_time}>
-                                    <Input
-                                        type="time"
-                                        value={cal.close_time}
-                                        onChange={(e) => setCal((c) => ({ ...c, close_time: e.target.value }))}
-                                        aria-label="Business hours close time"
-                                    />
-                                </Field>
-                            </div>
-
-                            <Field label="Working days" error={errors.working_days}>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {SLA_WORKING_DAYS.map((d) => {
-                                        const on = cal.working_days.includes(d.key);
-                                        return (
-                                            // eslint-disable-next-line no-restricted-syntax -- selector chip: custom selected fill + aria-pressed, not a <Button>
-                                            <button
-                                                key={d.key}
-                                                type="button"
-                                                aria-pressed={on}
-                                                onClick={() => toggleDay(d.key)}
-                                                className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
-                                                    on
-                                                        ? 'border-primary bg-primary text-primary-foreground'
-                                                        : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
-                                                }`}
-                                            >
-                                                {d.short}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </Field>
-
-                            <Field label="Public holidays (optional)">
-                                <div className="grid gap-2">
-                                    {cal.holiday_dates.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {cal.holiday_dates.map((d) => (
-                                                <span
-                                                    key={d}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[12px]"
-                                                >
-                                                    {d}
-                                                    {/* eslint-disable-next-line no-restricted-syntax -- tiny inline remove-chip control */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeHoliday(d)}
-                                                        aria-label={`Remove holiday ${d}`}
-                                                        className="text-muted-foreground hover:text-foreground"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2">
+                        {cal.enabled ? (
+                            <>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field
+                                        label="Opens"
+                                        error={errors.open_time}
+                                    >
                                         <Input
-                                            type="date"
-                                            value={holidayDraft}
-                                            onChange={(e) => setHolidayDraft(e.target.value)}
-                                            aria-label="Add a public holiday"
+                                            type="time"
+                                            value={cal.open_time}
+                                            onChange={(e) =>
+                                                setCal((c) => ({
+                                                    ...c,
+                                                    open_time: e.target.value,
+                                                }))
+                                            }
+                                            aria-label="Business hours open time"
                                         />
-                                        <Button variant="outline" onClick={addHoliday} disabled={!holidayDraft}>
-                                            Add
-                                        </Button>
-                                    </div>
+                                    </Field>
+                                    <Field
+                                        label="Closes"
+                                        error={errors.close_time}
+                                    >
+                                        <Input
+                                            type="time"
+                                            value={cal.close_time}
+                                            onChange={(e) =>
+                                                setCal((c) => ({
+                                                    ...c,
+                                                    close_time: e.target.value,
+                                                }))
+                                            }
+                                            aria-label="Business hours close time"
+                                        />
+                                    </Field>
                                 </div>
-                            </Field>
 
-                            <InfoCard icon={CalendarClock}>
-                                These hours apply to every priority. Weekends and listed holidays don’t count
-                                against any SLA clock.
+                                <Field
+                                    label="Working days"
+                                    error={errors.working_days}
+                                >
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {SLA_WORKING_DAYS.map((d) => {
+                                            const on =
+                                                cal.working_days.includes(
+                                                    d.key,
+                                                );
+                                            return (
+                                                // eslint-disable-next-line no-restricted-syntax -- selector chip: custom selected fill + aria-pressed, not a <Button>
+                                                <button
+                                                    key={d.key}
+                                                    type="button"
+                                                    aria-pressed={on}
+                                                    onClick={() =>
+                                                        toggleDay(d.key)
+                                                    }
+                                                    className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                                        on
+                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
+                                                    }`}
+                                                >
+                                                    {d.short}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </Field>
+
+                                <Field label="Public holidays (optional)">
+                                    <div className="grid gap-2">
+                                        {cal.holiday_dates.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {cal.holiday_dates.map((d) => (
+                                                    <span
+                                                        key={d}
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[12px]"
+                                                    >
+                                                        {d}
+                                                        {/* eslint-disable-next-line no-restricted-syntax -- tiny inline remove-chip control */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                removeHoliday(d)
+                                                            }
+                                                            aria-label={`Remove holiday ${d}`}
+                                                            className="text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="date"
+                                                value={holidayDraft}
+                                                onChange={(e) =>
+                                                    setHolidayDraft(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                aria-label="Add a public holiday"
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                onClick={addHoliday}
+                                                disabled={!holidayDraft}
+                                            >
+                                                Add
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </Field>
+
+                                <InfoCard icon={CalendarClock}>
+                                    These hours apply to every priority.
+                                    Weekends and listed holidays don’t count
+                                    against any SLA clock.
+                                </InfoCard>
+                            </>
+                        ) : (
+                            <InfoCard icon={Timer}>
+                                Clocks run 24/7 — every minute counts, including
+                                nights and weekends. Enable a calendar above to
+                                pause them outside working hours.
                             </InfoCard>
-                        </>
-                    ) : (
-                        <InfoCard icon={Timer}>
-                            Clocks run 24/7 — every minute counts, including nights and weekends. Enable a
-                            calendar above to pause them outside working hours.
-                        </InfoCard>
-                    )}
-                </div>
-            </WizardStepPane>
+                        )}
+                    </div>
+                </WizardStepPane>
             )}
         </WizardShell>
     );
@@ -1654,15 +2191,21 @@ export interface MergeTarget {
 }
 
 const MERGE_STEPS: readonly WizardStep[] = [
-    { key: 'target', label: 'Merge target', blurb: 'Pick the survivor', icon: GitMerge },
+    {
+        key: 'target',
+        label: 'Merge target',
+        blurb: 'Pick the survivor',
+        icon: GitMerge,
+    },
 ];
 
-const MERGE_PRIORITY_VARIANT: Record<string, 'critical' | 'info' | 'neutral'> = {
-    urgent: 'critical',
-    high: 'critical',
-    normal: 'info',
-    low: 'neutral',
-};
+const MERGE_PRIORITY_VARIANT: Record<string, 'critical' | 'info' | 'neutral'> =
+    {
+        urgent: 'critical',
+        high: 'critical',
+        normal: 'info',
+        low: 'neutral',
+    };
 
 export function MergeTicketDialog({
     ticket,
@@ -1682,7 +2225,8 @@ export function MergeTicketDialog({
         if (!term) return targets;
         return targets.filter(
             (t) =>
-                (t.reference ?? '').toLowerCase().includes(term) || t.title.toLowerCase().includes(term),
+                (t.reference ?? '').toLowerCase().includes(term) ||
+                t.title.toLowerCase().includes(term),
         );
     }, [q, targets]);
 
@@ -1696,7 +2240,10 @@ export function MergeTicketDialog({
             { target_ticket_id: selected },
             {
                 onSuccess: () => toast.success('Ticket merged.'),
-                onError: () => toast.error('Could not merge — the target may no longer be open.'),
+                onError: () =>
+                    toast.error(
+                        'Could not merge — the target may no longer be open.',
+                    ),
                 onFinish: () => setProcessing(false),
             },
         );
@@ -1761,16 +2308,27 @@ export function MergeTicketDialog({
                                         aria-pressed={on}
                                         onClick={() => setSelected(t.id)}
                                         className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
-                                            on ? 'border-primary ring-1 ring-primary' : 'border-border hover:bg-muted'
+                                            on
+                                                ? 'border-primary ring-1 ring-primary'
+                                                : 'border-border hover:bg-muted'
                                         }`}
                                     >
                                         <div className="min-w-0">
-                                            <div className="truncate text-[13px] font-semibold">{t.title}</div>
+                                            <div className="truncate text-[13px] font-semibold">
+                                                {t.title}
+                                            </div>
                                             <div className="font-mono text-[11.5px] text-muted-foreground">
                                                 {t.reference ?? `#${t.id}`}
                                             </div>
                                         </div>
-                                        <StatusBadge variant={MERGE_PRIORITY_VARIANT[t.priority] ?? 'neutral'} size="sm">
+                                        <StatusBadge
+                                            variant={
+                                                MERGE_PRIORITY_VARIANT[
+                                                    t.priority
+                                                ] ?? 'neutral'
+                                            }
+                                            size="sm"
+                                        >
                                             {t.priority}
                                         </StatusBadge>
                                     </button>
@@ -1779,8 +2337,9 @@ export function MergeTicketDialog({
                         )}
                     </div>
                     <InfoCard icon={GitMerge}>
-                        Merging can’t be undone. The duplicate stays in the record — closed and linked to
-                        the survivor — so nothing is lost.
+                        Merging can’t be undone. The duplicate stays in the
+                        record — closed and linked to the survivor — so nothing
+                        is lost.
                     </InfoCard>
                 </div>
             </WizardStepPane>
@@ -1789,18 +2348,34 @@ export function MergeTicketDialog({
 }
 
 /* ================================================================== */
-/*  KB article (agent, 3 steps: Basics → Content → Review)            */
+/*  KB article (agent, 4 steps: Basics → Audience → Content → Review) */
 /* ================================================================== */
 
 const KB_STEPS: readonly WizardStep[] = [
-    { key: 'basics', label: 'Basics', blurb: 'Title & category', icon: FileText },
-    { key: 'content', label: 'Content', blurb: 'Write & preview', icon: BookOpen },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
-];
-
-const KB_STATUS_OPTIONS = [
-    { value: 'draft', label: 'Draft — only agents see it' },
-    { value: 'published', label: 'Published — staff can find it' },
+    {
+        key: 'basics',
+        label: 'Basics',
+        blurb: 'Title & category',
+        icon: FileText,
+    },
+    {
+        key: 'audience',
+        label: 'Ownership',
+        blurb: 'Audience & review',
+        icon: Users,
+    },
+    {
+        key: 'content',
+        label: 'Content',
+        blurb: 'Write & preview',
+        icon: BookOpen,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 /** A safe, block-level markdown preview: `#`/`##`/`###` headings, `-`/`*`
@@ -1810,14 +2385,32 @@ export function KbPreview({ body }: { body: string }) {
         <div className="space-y-1.5 text-[13px] leading-relaxed">
             {body.split('\n').map((raw, i) => {
                 const line = raw.trim();
-                if (line === '') return <div key={i} className="h-1.5" aria-hidden />;
-                if (line.startsWith('### ')) return <div key={i} className="text-[13px] font-bold">{line.slice(4)}</div>;
-                if (line.startsWith('## ')) return <div key={i} className="text-[14px] font-bold">{line.slice(3)}</div>;
-                if (line.startsWith('# ')) return <div key={i} className="text-[15px] font-bold">{line.slice(2)}</div>;
+                if (line === '')
+                    return <div key={i} className="h-1.5" aria-hidden />;
+                if (line.startsWith('### '))
+                    return (
+                        <div key={i} className="text-[13px] font-bold">
+                            {line.slice(4)}
+                        </div>
+                    );
+                if (line.startsWith('## '))
+                    return (
+                        <div key={i} className="text-[14px] font-bold">
+                            {line.slice(3)}
+                        </div>
+                    );
+                if (line.startsWith('# '))
+                    return (
+                        <div key={i} className="text-[15px] font-bold">
+                            {line.slice(2)}
+                        </div>
+                    );
                 if (/^[-*]\s/.test(line)) {
                     return (
                         <div key={i} className="flex gap-2">
-                            <span aria-hidden className="text-muted-foreground">•</span>
+                            <span aria-hidden className="text-muted-foreground">
+                                •
+                            </span>
                             <span>{line.replace(/^[-*]\s/, '')}</span>
                         </div>
                     );
@@ -1831,10 +2424,12 @@ export function KbPreview({ body }: { body: string }) {
 function KbArticleDialog({
     article,
     draft,
+    options,
     onClose,
 }: {
     article?: KbRow;
     draft?: KbDraft;
+    options: KbOptions;
     onClose: () => void;
 }) {
     const editing = Boolean(article);
@@ -1846,21 +2441,30 @@ function KbArticleDialog({
     const form = useForm({
         title: article?.title ?? draft?.title ?? '',
         category: article?.category ?? draft?.category ?? 'hardware',
-        status: article?.status ?? 'draft',
+        audience: article?.audience ?? 'all_staff',
+        site_scope: article?.site_scope ?? ([] as number[]),
+        owner_user_id: String(article?.owner_user_id ?? ''),
+        related_service_id: String(article?.related_service_id ?? ''),
+        review_due_at: article?.review_due_at ?? '',
         body: article?.body ?? draft?.body ?? '',
     });
 
     const basicsValid = form.data.title.trim().length > 0;
     const contentValid = form.data.body.trim().length > 0;
+    const savedState = editing
+        ? {
+              title: 'Article updated',
+              blurb: ' with its lifecycle state unchanged',
+              action: 'Save changes',
+          }
+        : {
+              title: 'Draft saved',
+              blurb: ' as a draft, ready to send for review',
+              action: 'Save draft',
+          };
 
     const afterSave = (addAnother: boolean) => {
-        toast.success(
-            editing
-                ? 'Article updated.'
-                : form.data.status === 'published'
-                  ? 'Article published.'
-                  : 'Draft saved.',
-        );
+        toast.success(editing ? 'Article updated.' : `${savedState.title}.`);
         if (addAnother && !editing) {
             form.reset();
             wizard.goTo(0);
@@ -1913,11 +2517,11 @@ function KbArticleDialog({
             success={
                 done ? (
                     <WizardSuccessPane
-                        title={editing ? 'Article saved' : form.data.status === 'published' ? 'Article published' : 'Draft saved'}
+                        title={editing ? 'Article saved' : savedState.title}
                         blurb={
                             <>
                                 “{form.data.title}” is in the knowledge base
-                                {form.data.status === 'published' ? ' and staff can find it now' : ' as a draft'}.
+                                {savedState.blurb}.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -1942,28 +2546,36 @@ function KbArticleDialog({
                                 <Button
                                     variant="outline"
                                     onClick={() => submit(true)}
-                                    disabled={form.processing || !basicsValid || !contentValid}
+                                    disabled={
+                                        form.processing ||
+                                        !basicsValid ||
+                                        !contentValid
+                                    }
                                 >
                                     Save & add another
                                 </Button>
                             ) : null}
                             <Button
                                 onClick={() => submit(false)}
-                                disabled={form.processing || !basicsValid || !contentValid}
+                                disabled={
+                                    form.processing ||
+                                    !basicsValid ||
+                                    !contentValid
+                                }
                             >
-                                {form.processing
-                                    ? 'Saving…'
-                                    : editing
-                                      ? 'Save changes'
-                                      : form.data.status === 'published'
-                                        ? 'Publish'
-                                        : 'Save draft'}
+                                {form.processing ? 'Saving…' : savedState.action}
                             </Button>
                         </>
                     ) : (
                         <Button
                             onClick={wizard.next}
-                            disabled={(wizard.index === 0 && !basicsValid) || (wizard.index === 1 && !contentValid)}
+                            disabled={
+                                (wizard.index === 0 && !basicsValid) ||
+                                (wizard.index === 1 &&
+                                    form.data.audience === 'specific_sites' &&
+                                    form.data.site_scope.length === 0) ||
+                                (wizard.index === 2 && !contentValid)
+                            }
                         >
                             Continue
                         </Button>
@@ -1973,12 +2585,18 @@ function KbArticleDialog({
         >
             {wizard.index === 0 && (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Basics" blurb="What’s it about, and is it ready to publish?" />
+                    <StepHead
+                        icon={FileText}
+                        title="Basics"
+                        blurb="What’s it about? New articles start as drafts."
+                    />
                     <div className="grid gap-3.5">
                         <Field label="Title" required error={form.errors.title}>
                             <Input
                                 value={form.data.title}
-                                onChange={(e) => form.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Reset your work password"
                                 maxLength={255}
                             />
@@ -1990,27 +2608,174 @@ function KbArticleDialog({
                                 options={[...CATEGORY_OPTIONS]}
                             />
                         </Field>
-                        <Field label="Status" error={form.errors.status}>
-                            <SelectInput
-                                value={form.data.status}
-                                onChange={(v) => form.setData('status', v)}
-                                placeholder="Choose a status"
-                                options={KB_STATUS_OPTIONS}
-                            />
-                        </Field>
                     </div>
                 </WizardStepPane>
             )}
 
             {wizard.index === 1 && (
                 <WizardStepPane>
-                    <StepHead icon={BookOpen} title="Content" blurb="Markdown on the left, live preview on the right." />
+                    <StepHead
+                        icon={Users}
+                        title="Ownership & audience"
+                        blurb="Keep the article accountable and show it only where it applies."
+                    />
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <Field label="Audience" error={form.errors.audience}>
+                            <SelectInput
+                                value={form.data.audience}
+                                onChange={(value) =>
+                                    form.setData('audience', value)
+                                }
+                                placeholder="Choose who can find it"
+                                options={[
+                                    { value: 'all_staff', label: 'All staff' },
+                                    {
+                                        value: 'specific_sites',
+                                        label: 'Only selected sites',
+                                    },
+                                    {
+                                        value: 'it_agents',
+                                        label: 'IT agents only',
+                                    },
+                                ]}
+                            />
+                        </Field>
+                        <Field
+                            label="Article owner"
+                            error={form.errors.owner_user_id}
+                        >
+                            <SelectInput
+                                value={form.data.owner_user_id || UNASSIGNED}
+                                onChange={(value) =>
+                                    form.setData(
+                                        'owner_user_id',
+                                        value === UNASSIGNED ? '' : value,
+                                    )
+                                }
+                                placeholder="Choose an owner"
+                                options={[
+                                    {
+                                        value: UNASSIGNED,
+                                        label: 'Use me as owner',
+                                    },
+                                    ...options.owners.map((owner) => ({
+                                        value: String(owner.id),
+                                        label: owner.name,
+                                    })),
+                                ]}
+                            />
+                        </Field>
+                        <Field
+                            label="Related service"
+                            error={form.errors.related_service_id}
+                        >
+                            <SelectInput
+                                value={
+                                    form.data.related_service_id || UNASSIGNED
+                                }
+                                onChange={(value) =>
+                                    form.setData(
+                                        'related_service_id',
+                                        value === UNASSIGNED ? '' : value,
+                                    )
+                                }
+                                placeholder="Choose a service"
+                                options={[
+                                    {
+                                        value: UNASSIGNED,
+                                        label: 'No related service',
+                                    },
+                                    ...options.services.map((service) => ({
+                                        value: String(service.id),
+                                        label: service.name,
+                                    })),
+                                ]}
+                            />
+                        </Field>
+                        <Field
+                            label="Review due"
+                            error={form.errors.review_due_at}
+                        >
+                            <Input
+                                type="date"
+                                value={form.data.review_due_at}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'review_due_at',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                        {form.data.audience === 'specific_sites' ? (
+                            <fieldset className="rounded-xl border border-border p-3 lg:col-span-2">
+                                <legend className="px-1 text-sm font-medium">
+                                    Sites that can find this article
+                                </legend>
+                                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                                    {options.sites.map((site) => (
+                                        <label
+                                            key={site.id}
+                                            className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-muted/50"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={form.data.site_scope.includes(
+                                                    site.id,
+                                                )}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'site_scope',
+                                                        event.target.checked
+                                                            ? [
+                                                                  ...form.data
+                                                                      .site_scope,
+                                                                  site.id,
+                                                              ]
+                                                            : form.data.site_scope.filter(
+                                                                  (id) =>
+                                                                      id !==
+                                                                      site.id,
+                                                              ),
+                                                    )
+                                                }
+                                            />
+                                            {site.name}
+                                        </label>
+                                    ))}
+                                </div>
+                                {form.errors.site_scope ? (
+                                    <p className="mt-2 text-xs text-status-critical">
+                                        {form.errors.site_scope}
+                                    </p>
+                                ) : null}
+                            </fieldset>
+                        ) : null}
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 2 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={BookOpen}
+                        title="Content"
+                        blurb="Markdown on the left, live preview on the right."
+                    />
                     <div className="grid gap-3 lg:grid-cols-2">
-                        <Field label="Article (markdown)" required error={form.errors.body}>
+                        <Field
+                            label="Article (markdown)"
+                            required
+                            error={form.errors.body}
+                        >
                             <Textarea
                                 value={form.data.body}
-                                onChange={(e) => form.setData('body', e.target.value)}
-                                placeholder={'# Steps\n1. Open the portal\n2. Click Forgot password\n\n- Check spam for the reset email'}
+                                onChange={(e) =>
+                                    form.setData('body', e.target.value)
+                                }
+                                placeholder={
+                                    '# Steps\n1. Open the portal\n2. Click Forgot password\n\n- Check spam for the reset email'
+                                }
                                 rows={14}
                                 className="font-mono text-[12.5px]"
                             />
@@ -2023,7 +2788,9 @@ function KbArticleDialog({
                                 {form.data.body.trim() ? (
                                     <KbPreview body={form.data.body} />
                                 ) : (
-                                    <p className="text-[13px] text-muted-foreground">Nothing to preview yet.</p>
+                                    <p className="text-[13px] text-muted-foreground">
+                                        Nothing to preview yet.
+                                    </p>
                                 )}
                             </div>
                         </div>
@@ -2031,20 +2798,64 @@ function KbArticleDialog({
                 </WizardStepPane>
             )}
 
-            {wizard.index === 2 && (
+            {wizard.index === 3 && (
                 <WizardStepPane>
-                    <StepHead icon={ClipboardCheck} title="Review & save" blurb="A quick check before it lands in the knowledge base." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Review & save"
+                        blurb="A quick check before it lands in the knowledge base."
+                    />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={FileText} title="Basics" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={FileText}
+                            title="Basics"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Title" value={form.data.title} />
                             <ReviewRow
                                 label="Category"
-                                value={CATEGORY_OPTIONS.find((c) => c.key === form.data.category)?.label}
+                                value={
+                                    CATEGORY_OPTIONS.find(
+                                        (c) => c.key === form.data.category,
+                                    )?.label
+                                }
                             />
-                            <ReviewRow label="Status" value={form.data.status === 'published' ? 'Published' : 'Draft'} />
+                            <ReviewRow
+                                label="Lifecycle status"
+                                value="Draft"
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={BookOpen} title="Content" onEdit={() => wizard.goTo(1)}>
-                            <ReviewRow label="Length" value={`${form.data.body.trim().length} characters`} />
+                        <ReviewCard
+                            icon={Users}
+                            title="Ownership"
+                            onEdit={() => wizard.goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Audience"
+                                value={form.data.audience.replace(/_/g, ' ')}
+                            />
+                            <ReviewRow
+                                label="Sites"
+                                value={
+                                    form.data.audience === 'specific_sites'
+                                        ? `${form.data.site_scope.length} selected`
+                                        : 'Not restricted by site'
+                                }
+                            />
+                            <ReviewRow
+                                label="Review due"
+                                value={form.data.review_due_at || 'Not set'}
+                            />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={BookOpen}
+                            title="Content"
+                            onEdit={() => wizard.goTo(2)}
+                        >
+                            <ReviewRow
+                                label="Length"
+                                value={`${form.data.body.trim().length} characters`}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>
@@ -2058,7 +2869,12 @@ function KbArticleDialog({
 /* ================================================================== */
 
 const FULFIL_STEPS: readonly WizardStep[] = [
-    { key: 'fulfil', label: 'Fulfil request', blurb: 'Confirm it’s done', icon: CheckCircle2 },
+    {
+        key: 'fulfil',
+        label: 'Fulfil request',
+        blurb: 'Confirm it’s done',
+        icon: CheckCircle2,
+    },
 ];
 
 function FulfilRequestDialog({
@@ -2109,8 +2925,16 @@ function FulfilRequestDialog({
                         title="Request fulfilled"
                         blurb={
                             <>
-                                “{request.item}” for {request.employee.name} is done
-                                {request.from_onboarding ? <> — the linked onboarding task has been completed too</> : null}.
+                                “{request.item}” for {request.employee.name} is
+                                done
+                                {request.from_onboarding ? (
+                                    <>
+                                        {' '}
+                                        — the linked onboarding task has been
+                                        completed too
+                                    </>
+                                ) : null}
+                                .
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -2137,24 +2961,38 @@ function FulfilRequestDialog({
                 <div className="grid gap-3.5">
                     {request.workflow ? (
                         <InfoCard icon={GitMerge}>
-                            Stage {request.stage ?? 1} of the {request.workflow.lifecycle_type.replace('_', ' ')} workflow
-                            {request.responsible_team ? ` · owned by ${request.responsible_team.name}` : ''}.
+                            Stage {request.stage ?? 1} of the{' '}
+                            {request.workflow.lifecycle_type.replace('_', ' ')}{' '}
+                            workflow
+                            {request.responsible_team
+                                ? ` · owned by ${request.responsible_team.name}`
+                                : ''}
+                            .
                         </InfoCard>
                     ) : null}
                     {request.approval_required ? (
                         <InfoCard icon={UserCheck}>
-                            Approval is {request.approval_status === 'approved' ? `recorded${request.approver ? ` by ${request.approver.name}` : ''}` : 'required before fulfilment'}.
+                            Approval is{' '}
+                            {request.approval_status === 'approved'
+                                ? `recorded${request.approver ? ` by ${request.approver.name}` : ''}`
+                                : 'required before fulfilment'}
+                            .
                         </InfoCard>
                     ) : null}
                     {request.dependency_request_ids.length > 0 ? (
                         <InfoCard icon={GitMerge}>
-                            Earlier workflow steps must be completed before this step can be fulfilled.
+                            Earlier workflow steps must be completed before this
+                            step can be fulfilled.
                         </InfoCard>
                     ) : null}
                     {request.from_onboarding ? (
                         <InfoCard icon={ClipboardCheck}>
-                            Fulfilling this request also completes the linked onboarding task
-                            {request.sign_off_required ? ' and records you as the sign-off' : ''}.
+                            Fulfilling this request also completes the linked
+                            onboarding task
+                            {request.sign_off_required
+                                ? ' and records you as the sign-off'
+                                : ''}
+                            .
                         </InfoCard>
                     ) : null}
                     <Field
@@ -2164,15 +3002,23 @@ function FulfilRequestDialog({
                     >
                         <Input
                             value={form.data.external_ref}
-                            onChange={(e) => form.setData('external_ref', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('external_ref', e.target.value)
+                            }
                             placeholder="e.g. M365 user id, helpdesk #4821"
                             maxLength={255}
                         />
                     </Field>
-                    <Field label="Notes" hint="optional" error={form.errors.notes}>
+                    <Field
+                        label="Notes"
+                        hint="optional"
+                        error={form.errors.notes}
+                    >
                         <Textarea
                             value={form.data.notes}
-                            onChange={(e) => form.setData('notes', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('notes', e.target.value)
+                            }
                             placeholder="Anything worth recording about how this was set up…"
                             rows={4}
                         />
@@ -2185,7 +3031,12 @@ function FulfilRequestDialog({
                         >
                             <Textarea
                                 value={form.data.evidence_summary}
-                                onChange={(e) => form.setData('evidence_summary', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'evidence_summary',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. Account sign-in verified; laptop OF-104 returned and inspected"
                                 rows={3}
                             />
@@ -2193,16 +3044,22 @@ function FulfilRequestDialog({
                     ) : null}
                     {Object.keys(request.fulfiller_context).length > 0 ? (
                         <div className="rounded-xl border border-border bg-muted/35 p-3">
-                            <p className="text-xs font-semibold text-foreground">Minimum details for fulfilment</p>
+                            <p className="text-xs font-semibold text-foreground">
+                                Minimum details for fulfilment
+                            </p>
                             <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                                {Object.entries(request.fulfiller_context).map(([key, value]) => (
-                                    <div key={key}>
-                                        <dt className="text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                            {key.replaceAll('_', ' ')}
-                                        </dt>
-                                        <dd className="text-xs text-foreground">{formatContextValue(value)}</dd>
-                                    </div>
-                                ))}
+                                {Object.entries(request.fulfiller_context).map(
+                                    ([key, value]) => (
+                                        <div key={key}>
+                                            <dt className="text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                {key.replaceAll('_', ' ')}
+                                            </dt>
+                                            <dd className="text-xs text-foreground">
+                                                {formatContextValue(value)}
+                                            </dd>
+                                        </div>
+                                    ),
+                                )}
                             </dl>
                         </div>
                     ) : null}
@@ -2224,7 +3081,10 @@ function formatContextValue(value: unknown): string {
     }
 
     return Object.entries(record)
-        .map(([key, nested]) => `${key.replaceAll('_', ' ')}: ${formatContextValue(nested)}`)
+        .map(
+            ([key, nested]) =>
+                `${key.replaceAll('_', ' ')}: ${formatContextValue(nested)}`,
+        )
         .join(' · ');
 }
 
@@ -2233,10 +3093,21 @@ function formatContextValue(value: unknown): string {
 /* ================================================================== */
 
 const FAIL_STEPS: readonly WizardStep[] = [
-    { key: 'failure', label: 'Record failure', blurb: 'Explain the blocker', icon: X },
+    {
+        key: 'failure',
+        label: 'Record failure',
+        blurb: 'Explain the blocker',
+        icon: X,
+    },
 ];
 
-function FailRequestDialog({ request, onClose }: { request: RequestRow; onClose: () => void }) {
+function FailRequestDialog({
+    request,
+    onClose,
+}: {
+    request: RequestRow;
+    onClose: () => void;
+}) {
     const [done, setDone] = useState(false);
     const form = useForm({ failure_reason: request.failure_reason ?? '' });
 
@@ -2278,8 +3149,17 @@ function FailRequestDialog({ request, onClose }: { request: RequestRow; onClose:
             }
             footerEnd={
                 <>
-                    <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                    <Button variant="destructive" onClick={submit} disabled={form.processing || form.data.failure_reason.trim().length < 3}>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={submit}
+                        disabled={
+                            form.processing ||
+                            form.data.failure_reason.trim().length < 3
+                        }
+                    >
                         {form.processing ? 'Recording…' : 'Record failure'}
                     </Button>
                 </>
@@ -2291,10 +3171,15 @@ function FailRequestDialog({ request, onClose }: { request: RequestRow; onClose:
                     title="What prevented completion?"
                     blurb="Use a specific, operational reason. The employee’s private HR data is not included here."
                 />
-                <Field label="Failure reason" error={form.errors.failure_reason}>
+                <Field
+                    label="Failure reason"
+                    error={form.errors.failure_reason}
+                >
                     <Textarea
                         value={form.data.failure_reason}
-                        onChange={(event) => form.setData('failure_reason', event.target.value)}
+                        onChange={(event) =>
+                            form.setData('failure_reason', event.target.value)
+                        }
                         placeholder="e.g. Supplier has no stock; delivery is now expected on 24 July"
                         rows={5}
                         maxLength={2000}
@@ -2310,7 +3195,12 @@ function FailRequestDialog({ request, onClose }: { request: RequestRow; onClose:
 /* ================================================================== */
 
 const ASSIGN_STEPS: readonly WizardStep[] = [
-    { key: 'assign', label: 'Pick an owner', blurb: 'Who works this?', icon: User },
+    {
+        key: 'assign',
+        label: 'Pick an owner',
+        blurb: 'Who works this?',
+        icon: User,
+    },
 ];
 
 function initials(name: string): string {
@@ -2394,7 +3284,8 @@ function AssignDialog({
                         title="Owner assigned"
                         blurb={
                             <>
-                                “{subject}” is now with {picked?.name ?? 'the new owner'}.
+                                “{subject}” is now with{' '}
+                                {picked?.name ?? 'the new owner'}.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -2406,7 +3297,10 @@ function AssignDialog({
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={form.processing || !picked}>
+                    <Button
+                        onClick={submit}
+                        disabled={form.processing || !picked}
+                    >
                         {form.processing ? 'Assigning…' : 'Assign'}
                     </Button>
                 </>
@@ -2435,7 +3329,9 @@ function AssignDialog({
                             <button
                                 key={a.id}
                                 type="button"
-                                onClick={() => form.setData(endpoint.field, String(a.id))}
+                                onClick={() =>
+                                    form.setData(endpoint.field, String(a.id))
+                                }
                                 className={`flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left transition-colors ${active ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
                             >
                                 <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-primary/10 text-[12.5px] font-bold text-primary">
@@ -2444,7 +3340,9 @@ function AssignDialog({
                                 <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold">
                                     {a.name}
                                 </span>
-                                {active ? <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" /> : null}
+                                {active ? (
+                                    <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
+                                ) : null}
                             </button>
                         );
                     })}
