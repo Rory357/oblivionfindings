@@ -66,7 +66,20 @@ The rows below are the closeout source of truth. Each row must finish as **Compl
 
 ## Final handoff checkpoint
 
-- Final SHA: reported in the final handoff after the local closeout commit; this ledger is part of that commit, so it cannot self-record its own content hash.
+- Feature SHA: `3a8c8ff40d4d69c60c8901bef048510fa0810376`. Merge commit: `6f5ed377093bee792ddf76410a4a7a2f0d9d94b2`. Final release-code SHA after the live-found mobile containment fix: `33818691fe8932e625c335e61d405de3472c3bb2`.
 - Changed files: 47 current paths across 7 backend/seeder files, shared/page frontend implementation, component/feature/e2e tests, this ledger, and one refreshed tracked local smoke screenshot; the final handoff reports the committed count after artifact review.
 - Final screenshots: the 18 named `desktop-1440x900-*`, `compact-1024x768-*`, and `mobile-390x844-*` PNGs in `C:\Users\steph\.codex\visualizations\2026\07\18\019f72b9-9681-7280-b689-3e63546df62e\control-room-ui-consistency`.
-- Genuine blockers: none. No merge, push, deployment, live-server access, or live credentials were used.
+- Original-goal publish boundary: the implementation session did not merge, push, deploy, or use live credentials. The later release session was separately and explicitly authorised by the user; its results are recorded below.
+
+## Release and dev-server closeout — 2026-07-18
+
+- Release worktree: `C:\Users\steph\.config\superpowers\worktrees\oblivionfindings\codex-control-room-ui-release`; branch: `codex/control-room-ui-release`; clean release base: `4fac428ffae63e3406d011441672e262b7d99171`.
+- Merge: `6f5ed377093bee792ddf76410a4a7a2f0d9d94b2` merged feature `3a8c8ff40d4d69c60c8901bef048510fa0810376` into the verified base without conflicts and was pushed to `origin/main` without force.
+- Fresh release verification before the first push: Control Room 554 tests / 4,352 assertions / 1,080.54s; H&S bridge, handover-acceptance, and site-isolation 53 tests / 426 assertions / 253.75s; presenter unit 3 tests / 28 assertions / 270.66s; targeted Vitest 9 files / 30 tests; TypeScript, ESLint, Prettier, Pint, PHP syntax, and diff whitespace passed; client build 4,975 modules / 4m25s; SSR build 1,627 modules / 47.19s.
+- Live acceptance found one genuine narrow-width gap after the first deploy: Active alerts exposed its 600px pager as a 304px document overflow at the 390px viewport. Test-first follow-up `33818691fe8932e625c335e61d405de3472c3bb2` added a shrink-safe shared workspace root and a pager-local horizontal boundary without hiding or changing any page action.
+- Follow-up verification: the two new regression tests failed for the observed containment contract and then passed; the full related frontend sweep passed 16 files / 47 tests; TypeScript, changed-file ESLint, Prettier, and diff whitespace passed; client build transformed 4,975 modules in 5m16s; SSR transformed 1,627 modules in 56.96s.
+- Dev server: `/var/www/oblivionfindings` reached `33818691fe8932e625c335e61d405de3472c3bb2` on both `HEAD` and `origin/main`; tracked status was clean; the asset manifest rebuilt at `2026-07-18 07:37:53 UTC`; pending migrations were 0; one queue worker was running; `/login` returned HTTP 200; the latest 500 Laravel log lines contained 0 `ERROR`, `CRITICAL`, `ALERT`, or `EMERGENCY` entries.
+- Chrome live proof: all six primary routes rendered the exact shared headings and one `Control Room workspace` navigation with the correct `aria-current`. At 390px all six reported document `scrollWidth = clientWidth = 375` with no page overflow and no console warnings/errors. Active-alert navigation and its 600px pager remained independently horizontally scrollable. At 1440px Active alerts remained overflow-free with `Page 1 of 59 (1769 total alerts)` intact.
+- Live escalation proof: 1,639 alerts remained bounded to 30 rendered action rows; Emergency displayed `1639/20`, `1639 breached`, and `Severe overload · 8195%`; the capacity text explicitly states that the threshold is not a hard limit and every alert remains in the paginated worklist. Overflow-button, keyboard, and right-click paths exposed the same seven authorised actions; Escape closed the menu and returned focus to the trigger or originating row.
+- Live screenshots: `C:\Users\steph\.codex\visualizations\2026\07\18\019f72b9-9681-7280-b689-3e63546df62e\control-room-ui-consistency\live-dev` contains the six final 1440×900 route captures plus final 390×844 Active alerts, Escalations, and Shifts captures.
+- Genuine blockers: none.
