@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Data\ItTransitionInput;
+use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
+use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -16,6 +19,7 @@ use App\Http\Requests\It\MergeTicketRequest;
 use App\Http\Requests\It\RequestApprovalRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
+use App\Http\Requests\It\TransitionItWorkRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
@@ -26,6 +30,7 @@ use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
+use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
@@ -43,6 +48,7 @@ class ItTicketController extends Controller
 
     public function __construct(
         private readonly ItTicketContextPresenter $contextPresenter,
+        private readonly ItWorkTransitionService $transitionService,
     ) {}
 
     public function show(Request $request, ItTicket $ticket)
@@ -275,21 +281,26 @@ class ItTicketController extends Controller
         // First PUBLIC agent reply stops the response clock.
         if ($isAgentSide && ! $isInternal && ! $ticket->first_responded_at) {
             $ticket->first_responded_at = now();
+            $ticket->save();
         }
 
         // The ball comes back from the requester: resume the resolution
         // clock and put the ticket back in the working pile.
-        if ($isRequester && $ticket->status === 'waiting') {
-            $from = $ticket->status;
-            $ticket->stopWaiting();
-            ItTicketEvent::record($ticket, 'status_changed', $user->id, [
-                'from' => $from,
-                'to' => $ticket->status,
-                'via' => 'requester_reply',
-            ]);
+        if ($isRequester
+            && $ticket->status === 'waiting'
+            && $ticket->workflow_state !== ItWorkflowState::ApprovalPending->value
+            && in_array($ticket->waiting_party, [null, 'requester'], true)) {
+            $ticket = $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: $tenantId,
+                    actor: $user,
+                    to: ItWorkflowState::InProgress,
+                    reason: 'Requester replied',
+                    source: 'requester_reply',
+                ),
+            );
         }
-
-        $ticket->save();
 
         // Public replies notify the other side of the conversation; internal
         // notes notify nobody (they do not exist for requesters).
@@ -341,6 +352,35 @@ class ItTicketController extends Controller
         );
     }
 
+    public function transition(TransitionItWorkRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+        $validated = $request->validated();
+
+        try {
+            $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: $tenantId,
+                    actor: $user,
+                    to: ItWorkflowState::from((string) $validated['workflow_state']),
+                    reason: $validated['reason'] ?? null,
+                    waitingParty: $validated['waiting_party'] ?? null,
+                    nextAction: $validated['next_action'] ?? null,
+                    resolutionCode: $validated['resolution_code'] ?? null,
+                    resolutionSummary: $validated['resolution_summary'] ?? null,
+                    source: 'workspace',
+                ),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', "Updated {$ticket->reference}.");
+    }
+
     /** Close a settled (or abandoned) ticket — terminal until reopened. */
     public function close(Request $request, ItTicket $ticket)
     {
@@ -353,14 +393,20 @@ class ItTicketController extends Controller
             return redirect()->back()->with('error', 'This ticket is already closed.');
         }
 
-        if ($ticket->status === 'waiting') {
-            $ticket->stopWaiting('closed');
+        try {
+            $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: $tenantId,
+                    actor: $user,
+                    to: ItWorkflowState::Closed,
+                    reason: 'Closed by technician',
+                    source: 'legacy_close',
+                ),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
-        $ticket->status = 'closed';
-        $ticket->closed_at = now();
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'closed', $user->id);
 
         return redirect()->back()->with('success', "Closed {$ticket->reference}.");
     }
@@ -384,16 +430,20 @@ class ItTicketController extends Controller
             return redirect()->back()->with('error', 'Only resolved or closed tickets can be reopened.');
         }
 
-        $ticket->status = 'open';
-        $ticket->resolved_at = null;
-        $ticket->closed_at = null;
-        $ticket->reopened_count = (int) $ticket->reopened_count + 1;
-        // The clock runs again — a previously met/breached verdict no longer
-        // describes an open ticket; the SLA engine re-evaluates from here.
-        $ticket->sla_state = 'ok';
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'reopened', $user->id);
+        try {
+            $ticket = $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: $tenantId,
+                    actor: $user,
+                    to: ItWorkflowState::Submitted,
+                    reason: 'Work reopened',
+                    source: 'legacy_reopen',
+                ),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
             $ticket->assignee->notify(new TicketReopenedNotification($ticket));
@@ -687,21 +737,27 @@ class ItTicketController extends Controller
             return false;
         }
 
-        $from = $ticket->status;
-        if ($status === 'waiting') {
-            $ticket->startWaiting();
-        } elseif ($ticket->status === 'waiting') {
-            $ticket->stopWaiting($status);
-        } else {
-            $ticket->status = $status;
-        }
-        $ticket->save();
+        $target = match ($status) {
+            'open' => ItWorkflowState::Submitted,
+            'in_progress' => ItWorkflowState::InProgress,
+            'waiting' => ItWorkflowState::Waiting,
+        };
 
-        ItTicketEvent::record($ticket, 'status_changed', $actor->id, [
-            'from' => $from,
-            'to' => $ticket->status,
-            'via' => 'bulk',
-        ]);
+        try {
+            $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: (int) $ticket->tenant_id,
+                    actor: $actor,
+                    to: $target,
+                    reason: $status === 'waiting' ? 'Waiting on requester' : 'Bulk status update',
+                    waitingParty: $status === 'waiting' ? 'requester' : null,
+                    source: 'bulk_status',
+                ),
+            );
+        } catch (DomainException) {
+            return false;
+        }
 
         return true;
     }
@@ -712,15 +768,20 @@ class ItTicketController extends Controller
             return false;
         }
 
-        if ($ticket->status === 'waiting') {
-            $ticket->stopWaiting('closed');
-        } else {
-            $ticket->status = 'closed';
+        try {
+            $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    tenantId: (int) $ticket->tenant_id,
+                    actor: $actor,
+                    to: ItWorkflowState::Closed,
+                    reason: 'Bulk close',
+                    source: 'bulk_close',
+                ),
+            );
+        } catch (DomainException) {
+            return false;
         }
-        $ticket->closed_at = now();
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'closed', $actor->id, ['via' => 'bulk']);
 
         return true;
     }

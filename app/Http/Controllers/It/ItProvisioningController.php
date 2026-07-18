@@ -5,10 +5,14 @@ namespace App\Http\Controllers\It;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Domain\It\Data\ItTransitionInput;
+use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\BulkProvisioningActionRequest;
+use App\Http\Requests\It\ResolveTicketRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
 use App\Models\ItKbArticle;
@@ -19,7 +23,9 @@ use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
+use App\Notifications\It\TicketResolvedNotification;
 use App\Support\It\BusinessHours;
+use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +46,7 @@ class ItProvisioningController extends Controller
 
     public function __construct(
         private readonly OnboardingService $onboardingService,
+        private readonly ItWorkTransitionService $transitionService,
     ) {}
 
     /* ================================================================== */
@@ -744,45 +751,73 @@ class ItProvisioningController extends Controller
                 'sometimes', 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
+            'waiting_reason' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'waiting_party' => ['sometimes', 'nullable', Rule::in(['requester', 'vendor', 'approver', 'team', 'change', 'other'])],
+            'next_action' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'resolution_code' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'resolution_summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ]);
 
-        // §P-S3: block a status→resolved move until approval is signed off.
-        if (($validated['status'] ?? null) === 'resolved'
-            && $ticket->requires_approval && $ticket->approvalState() !== 'approved') {
-            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
-        }
-
         $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
-        $update = $validated;
+        $targetStatus = $validated['status'] ?? null;
 
-        if (array_key_exists('status', $validated)) {
-            $update['resolved_at'] = $validated['status'] === 'resolved'
-                ? ($ticket->resolved_at ?? now())
-                : null;
+        if ($targetStatus !== null && $targetStatus !== $ticket->status) {
+            $targetState = match ($targetStatus) {
+                'open' => ItWorkflowState::Submitted,
+                'in_progress' => ItWorkflowState::InProgress,
+                'waiting' => ItWorkflowState::Waiting,
+                'resolved' => ItWorkflowState::Resolved,
+                'closed' => ItWorkflowState::Closed,
+            };
+            $source = match (true) {
+                $targetStatus === 'resolved' => 'legacy_resolve',
+                $targetStatus === 'closed' => 'legacy_close',
+                in_array($ticket->status, ['resolved', 'closed'], true) && $targetStatus === 'open' => 'legacy_reopen',
+                default => 'legacy_status',
+            };
 
-            // The waiting clock: entering pauses the SLA, leaving banks the
-            // paused minutes (ItTicket::startWaiting/stopWaiting mutate the
-            // model; drop status from the mass-update so they own it).
-            if ($validated['status'] === 'waiting' && $original['status'] !== 'waiting') {
-                $ticket->startWaiting();
-                unset($update['status']);
-            } elseif ($original['status'] === 'waiting' && $validated['status'] !== 'waiting') {
-                $ticket->stopWaiting($validated['status']);
-                unset($update['status']);
+            try {
+                $ticket = $this->transitionService->transition(
+                    $ticket,
+                    new ItTransitionInput(
+                        tenantId: $tenantId,
+                        actor: $user,
+                        to: $targetState,
+                        reason: $validated['waiting_reason']
+                            ?? ($targetStatus === 'waiting' ? 'Waiting on requester' : 'Ticket properties updated'),
+                        waitingParty: $targetStatus === 'waiting'
+                            ? ($validated['waiting_party'] ?? 'requester')
+                            : null,
+                        nextAction: $validated['next_action'] ?? null,
+                        resolutionCode: $targetStatus === 'resolved'
+                            ? ($validated['resolution_code'] ?? $ticket->resolution_code ?? 'resolved')
+                            : null,
+                        resolutionSummary: $targetStatus === 'resolved'
+                            ? ($validated['resolution_summary'] ?? $ticket->resolution_summary ?? 'Resolved from ticket properties.')
+                            : null,
+                        source: $source,
+                    ),
+                );
+            } catch (DomainException $exception) {
+                return redirect()->back()->with('error', $exception->getMessage());
             }
         }
+
+        $update = $validated;
+        unset(
+            $update['status'],
+            $update['waiting_reason'],
+            $update['waiting_party'],
+            $update['next_action'],
+            $update['resolution_code'],
+            $update['resolution_summary'],
+        );
 
         $ticket->fill($update);
         $ticket->save();
         $ticket->refresh();
 
         // Activity trail + assignee notification, once per actual change.
-        if ($ticket->status !== $original['status']) {
-            ItTicketEvent::record($ticket, 'status_changed', $user->id, [
-                'from' => $original['status'],
-                'to' => $ticket->status,
-            ]);
-        }
         if ($ticket->priority !== $original['priority']) {
             // Re-target the SLA clock for the new priority (same anchor).
             $ticket->stampSlaDueDates();
@@ -806,7 +841,7 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', 'Ticket updated.');
     }
 
-    public function resolveTicket(\App\Http\Requests\It\ResolveTicketRequest $request, ItTicket $ticket)
+    public function resolveTicket(ResolveTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
         $tenantId = $this->resolveHrTenantIdForUser($user);
@@ -816,46 +851,45 @@ class ItProvisioningController extends Controller
             return redirect()->back()->with('error', 'This ticket is already resolved.');
         }
 
-        // §P-S3: an approval-category ticket can't be resolved until signed off.
-        if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
-            return redirect()->back()->with('error', 'This ticket needs manager approval before it can be resolved.');
-        }
+        try {
+            $ticket = DB::transaction(function () use ($ticket, $request, $user, $tenantId): ItTicket {
+                $transitioned = $this->transitionService->transition(
+                    $ticket,
+                    new ItTransitionInput(
+                        tenantId: $tenantId,
+                        actor: $user,
+                        to: ItWorkflowState::Resolved,
+                        reason: 'Technician resolution',
+                        resolutionCode: (string) ($ticket->resolution_code ?: 'restored'),
+                        resolutionSummary: (string) $request->validated('note'),
+                        source: 'legacy_resolve',
+                    ),
+                );
 
-        // The resolution note is the final PUBLIC reply — "what fixed it"
-        // always lands on the record, visible to the requester.
-        $ticket->comments()->create([
-            'tenant_id' => $ticket->tenant_id,
-            'author_user_id' => $user->id,
-            'body' => $request->validated('note'),
-            'is_internal' => false,
-        ]);
+                // The resolution note is the final PUBLIC reply — "what fixed
+                // it" always lands on the record, visible to the requester.
+                $transitioned->comments()->create([
+                    'tenant_id' => $transitioned->tenant_id,
+                    'author_user_id' => $user->id,
+                    'body' => $request->validated('note'),
+                    'is_internal' => false,
+                ]);
 
-        if ($ticket->status === 'waiting') {
-            $ticket->stopWaiting('resolved');
+                return $transitioned;
+            });
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
-        $ticket->status = 'resolved';
-        $ticket->resolved_at = now();
-        if (! $ticket->first_responded_at) {
-            $ticket->first_responded_at = now();
-        }
-        // Inside the resolution target → the SLA is met. (Due dates are
-        // stamped by the SLA engine; without one there is nothing to meet.)
-        if ($ticket->resolution_due_at && now()->lte($ticket->resolution_due_at->copy()->addMinutes((int) $ticket->sla_paused_minutes))) {
-            $ticket->sla_state = 'met';
-        }
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'resolved', $user->id);
 
         // Requester hears (unless they resolved it themselves, or the agent
         // untoggled it); watchers always hear — minus the actor.
         if ($request->boolean('notify_requester', true)
             && $ticket->requester
             && $ticket->requester_user_id !== $user->id) {
-            $ticket->requester->notify(new \App\Notifications\It\TicketResolvedNotification($ticket, 'requester'));
+            $ticket->requester->notify(new TicketResolvedNotification($ticket, 'requester'));
         }
         $watchers = $ticket->watchers()->get()->reject(fn (User $w) => $w->id === $user->id);
-        NotificationFacade::send($watchers, new \App\Notifications\It\TicketResolvedNotification($ticket, 'watcher'));
+        NotificationFacade::send($watchers, new TicketResolvedNotification($ticket, 'watcher'));
 
         return redirect()->back()->with('success', "Resolved {$ticket->reference} — the requester can see the fix.");
     }

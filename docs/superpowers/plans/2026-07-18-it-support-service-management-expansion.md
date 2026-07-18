@@ -67,12 +67,12 @@ The missing service-management layers are governed type lifecycles, service cata
 - Modify `routes/web.php`
 - Create `tests/Feature/It/ItWorkTransitionTest.php`
 
-- [ ] Write failing transition tests for incident, service request, security request, problem, change, task, and major incident.
-- [ ] Require allowed transition, actor permission, waiting party/reason, required tasks, required approvals, resolution code/summary, timestamps, SLA behavior, and one immutable event in one transaction.
-- [ ] Route new transitions through the service and adapt existing resolve/close/reopen/update actions without changing their public routes.
-- [ ] Reject direct invalid workflow-state mutations and tenant-crossing actors.
-- [ ] Verify lifecycle, approval, SLA, workspace, and merge regressions.
-- [ ] Commit as `feat(it): govern work item transitions`.
+- [x] Write failing transition tests for incident, service request, security request, problem, change, task, and major incident.
+- [x] Require allowed transition, actor permission, waiting party/reason, required tasks, required approvals, resolution code/summary, timestamps, SLA behavior, and one immutable event in one transaction.
+- [x] Route new transitions through the service and adapt existing resolve/close/reopen/update actions without changing their public routes.
+- [x] Reject direct invalid workflow-state mutations and tenant-crossing actors.
+- [x] Verify lifecycle, approval, SLA, workspace, and merge regressions (88 tests, 607 assertions; TypeScript and targeted formatting also pass).
+- [x] Commit as `feat(it): govern work item transitions`.
 
 ## Task 3: Add service catalogue, forms, and canonical request intake
 

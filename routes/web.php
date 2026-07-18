@@ -196,6 +196,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
+        Route::post('/it/tickets/{ticket}/transitions', [ItTicketController::class, 'transition'])->name('it.tickets.transitions.store');
         Route::post('/it/tickets/{ticket}/merge', [ItTicketController::class, 'merge'])->name('it.tickets.merge');
         Route::post('/it/tickets/{ticket}/approvals', [ItTicketController::class, 'requestApproval'])->name('it.tickets.approvals.request');
         Route::post('/it/approvals/{approval}/decide', [ItTicketController::class, 'decideApproval'])->name('it.approvals.decide');
