@@ -43,8 +43,12 @@ use App\Models\FleetWorkOrder;
 use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItQueue;
+use App\Models\ItService;
+use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
+use App\Models\ItWorkTask;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingInvestigation;
@@ -193,6 +197,10 @@ class AppServiceProvider extends ServiceProvider
             'it_ticket' => ItTicket::class,
             'it_provisioning_request' => ItProvisioningRequest::class,
             'it_ticket_comment' => ItTicketComment::class,
+            'it_team' => ItTeam::class,
+            'it_queue' => ItQueue::class,
+            'it_service' => ItService::class,
+            'it_work_task' => ItWorkTask::class,
             'security_device' => Device::class,
             'control_room_alert' => ControlRoomAlert::class,
         ]);

@@ -30,7 +30,15 @@ class ItTicket extends Model
 
     public const SOURCES = ['portal', 'agent', 'system', 'email'];
 
-    public const WORK_TYPES = ['incident', 'service_request', 'problem', 'change', 'task'];
+    public const WORK_TYPES = [
+        'incident',
+        'service_request',
+        'problem',
+        'change',
+        'task',
+        'security_request',
+        'major_incident',
+    ];
 
     public const IMPACTS = ['individual', 'team', 'site', 'organization'];
 
@@ -47,8 +55,14 @@ class ItTicket extends Model
         'title',
         'description',
         'requester_user_id',
+        'requested_for_user_id',
         'assigned_to_user_id',
+        'owner_user_id',
         'asset_id',
+        'site_id',
+        'team_id',
+        'queue_id',
+        'it_service_id',
         'provisioning_request_id',
         'merged_into_ticket_id',
         'merged_at',
@@ -56,15 +70,20 @@ class ItTicket extends Model
         'subcategory',
         'source',
         'work_type',
+        'workflow_state',
         'priority',
         'impact',
         'urgency',
+        'is_sensitive',
         'status',
         'status_reason',
         'waiting_reason',
+        'waiting_party',
+        'next_action',
         'requires_approval',
         'first_response_due_at',
         'resolution_due_at',
+        'due_at',
         'first_responded_at',
         'sla_state',
         'sla_paused_minutes',
@@ -94,6 +113,8 @@ class ItTicket extends Model
         'reopened_count' => 'integer',
         'csat_score' => 'integer',
         'requires_approval' => 'boolean',
+        'is_sensitive' => 'boolean',
+        'due_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -159,15 +180,45 @@ class ItTicket extends Model
         return $this->belongsTo(User::class, 'requester_user_id');
     }
 
+    public function requestedFor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_for_user_id');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     /** Linked entry in the canonical (fleet-)assets register. */
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'asset_id');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'site_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(ItTeam::class, 'team_id');
+    }
+
+    public function queue(): BelongsTo
+    {
+        return $this->belongsTo(ItQueue::class, 'queue_id');
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(ItService::class, 'it_service_id');
     }
 
     /** The provisioning request this ticket was raised from, if any. */
@@ -229,6 +280,11 @@ class ItTicket extends Model
     public function links(): HasMany
     {
         return $this->hasMany(ItTicketLink::class, 'ticket_id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(ItWorkTask::class, 'ticket_id')->orderBy('sort_order')->orderBy('id');
     }
 
     public function linked(string $relationship): HasMany

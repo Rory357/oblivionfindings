@@ -44,13 +44,13 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create factories for every new model
 - Create `tests/Feature/It/ItServiceManagementSchemaTest.php`
 
-- [ ] Write failing schema and relationship tests.
-- [ ] Run the focused test and verify RED.
-- [ ] Create tenant-scoped teams, queues, operational services, work tasks, team membership, and the shared ticket fields: `requested_for_user_id`, `owner_user_id`, `site_id`, `team_id`, `queue_id`, `it_service_id`, `workflow_state`, `is_sensitive`, `waiting_party`, `next_action`, and `due_at`.
-- [ ] Extend `WORK_TYPES` with `security_request` and `major_incident` while retaining every existing value.
-- [ ] Add relationships, casts, factories, indexes, and stable morph aliases.
-- [ ] Verify the focused schema test and the existing ticket schema regression.
-- [ ] Commit as `feat(it): add service management core`.
+- [x] Write failing schema and relationship tests.
+- [x] Run the focused test and verify RED.
+- [x] Create tenant-scoped teams, queues, operational services, work tasks, team membership, and the shared ticket fields: `requested_for_user_id`, `owner_user_id`, `site_id`, `team_id`, `queue_id`, `it_service_id`, `workflow_state`, `is_sensitive`, `waiting_party`, `next_action`, and `due_at`.
+- [x] Extend `WORK_TYPES` with `security_request` and `major_incident` while retaining every existing value.
+- [x] Add relationships, casts, factories, indexes, and stable morph aliases.
+- [x] Verify the focused schema test and the existing ticket schema regression.
+- [x] Commit as `feat(it): add service management core`.
 
 ## Task 2: Centralize governed lifecycle transitions
 

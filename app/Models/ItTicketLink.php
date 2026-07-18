@@ -8,6 +8,22 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ItTicketLink extends Model
 {
+    public const RELATIONSHIPS = [
+        'affected_device',
+        'source_alert',
+        'affected_service',
+        'affected_site',
+        'affected_asset',
+        'affected_vehicle',
+        'source_record',
+        'knowledge_article',
+        'related_incident',
+        'related_problem',
+        'related_change',
+        'major_incident_member',
+        'command_request',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'ticket_id',
