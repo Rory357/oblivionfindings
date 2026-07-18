@@ -565,11 +565,11 @@ Run: `git add resources/js/pages/sites/tabs/documents.tsx resources/js/pages/sit
 - Create: `tests/Feature/Sites/SiteProfileAuthorizationTest.php`
 - Create: `resources/js/test/site-profile-accessibility.test.tsx`
 
-- [ ] **Step 1: Add failing cross-cutting tests**
+- [x] **Step 1: Add failing cross-cutting tests**
 
 Backend: foreign Site isolation, archived Site behaviour, restricted module payloads, unauthorized deep links, canonical action URLs, and no protected counts. Frontend: visible focus, 44px touch targets, keyboard group/tab/search operation, Escape handling, text/icon status cues, narrow card layout, and no browser confirm APIs.
 
-- [ ] **Step 2: Prove failures and apply the smallest integration fixes**
+- [x] **Step 2: Prove failures and apply the smallest integration fixes**
 
 Run: `php artisan test tests/Feature/Sites/SiteProfileAuthorizationTest.php`
 
@@ -577,7 +577,7 @@ Run: `npm test -- resources/js/test/site-profile-accessibility.test.tsx`
 
 Expected: tests fail for any unintegrated boundary, then pass after focused fixes.
 
-- [ ] **Step 3: Run affected module suites**
+- [x] **Step 3: Run affected module suites**
 
 Run: `php artisan test tests/Feature/SiteControllerTest.php tests/Feature/Sites tests/Feature/Operations/ClientProfileSensitivePayloadTest.php`
 
@@ -585,7 +585,7 @@ Run: `npm test -- resources/js/test/site-profile-*.test.ts resources/js/test/sit
 
 Expected: PASS. Record exact test/assertion counts in the post-audit.
 
-- [ ] **Step 4: Run static and build gates**
+- [x] **Step 4: Run static and build gates**
 
 Run: `vendor/bin/pint --dirty`
 
@@ -597,7 +597,7 @@ Run: `npx vite build --ssr`
 
 Expected: all exit 0. If `npm run types` reports missing generated route modules, run `php artisan wayfinder:generate` once and rerun the type gate.
 
-- [ ] **Step 5: Commit integration polish**
+- [x] **Step 5: Commit integration polish**
 
 Run: `git add app resources routes tests database docs && git diff --cached --check && git commit -m "test(sites): cover profile integration boundaries"`
 

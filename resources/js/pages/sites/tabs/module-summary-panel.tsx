@@ -132,6 +132,7 @@ export function SiteProfileModuleSummary({
                                         <Button
                                             variant="ghost"
                                             size="sm"
+                                            className="min-h-11"
                                             asChild
                                         >
                                             <Link href={item.href}>

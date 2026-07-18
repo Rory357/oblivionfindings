@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientLeaveRequest;
@@ -190,15 +189,11 @@ it('does not let an Inertia partial request bypass the transport section gate', 
         'client_funds.manage',
     ]);
     $client = Client::factory()->create(['organization_id' => 1]);
-    $inertiaVersion = app(HandleInertiaRequests::class)->version(request());
-
     $this->actingAs($finance)
-        ->get("/operations/clients/{$client->id}", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Version' => $inertiaVersion,
-            'X-Inertia-Partial-Component' => 'operations/clients/show',
-            'X-Inertia-Partial-Data' => 'transport',
-        ])
+        ->get(
+            "/operations/clients/{$client->id}",
+            $this->inertiaPartialHeaders('operations/clients/show', 'transport'),
+        )
         ->assertOk()
         ->assertHeader('X-Inertia', 'true')
         ->assertJsonPath('component', 'operations/clients/show')

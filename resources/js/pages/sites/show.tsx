@@ -86,6 +86,7 @@ export type SiteProfileSite = {
     phone?: string | null;
     email?: string | null;
     is_active: boolean;
+    archived: boolean;
     address?: string | null;
     region?: string | null;
     is_high_risk: boolean;
@@ -96,7 +97,7 @@ export type SiteProfileSite = {
 export type SiteProfileHeroData = {
     description: string;
     brand_colour?: string | null;
-    status: 'active' | 'inactive';
+    status: 'active' | 'inactive' | 'archived';
     readiness: { score: number; missing_critical: number };
     attention: { total: number; critical: number; warning: number };
     occupancy: { label: string; total: number; occupied: number };
@@ -440,8 +441,16 @@ export default function SiteShow(props: SiteProfileProps) {
                                 tone: 'default',
                             },
                             {
-                                label: site.is_active ? 'Active' : 'Inactive',
-                                tone: site.is_active ? 'success' : 'warning',
+                                label:
+                                    hero.status === 'archived'
+                                        ? 'Archived'
+                                        : hero.status === 'active'
+                                          ? 'Active'
+                                          : 'Inactive',
+                                tone:
+                                    hero.status === 'active'
+                                        ? 'success'
+                                        : 'warning',
                             },
                             ...(site.is_high_risk
                                 ? [
@@ -466,6 +475,7 @@ export default function SiteShow(props: SiteProfileProps) {
                                 onOpenGroup={(_group, tab) => selectTab(tab)}
                                 onSearch={() => setSearchOpen(true)}
                                 testIdPrefix="site-profile"
+                                ariaLabel="Site Profile groups"
                             />
                         }
                     />
@@ -475,16 +485,19 @@ export default function SiteShow(props: SiteProfileProps) {
                     tabs={groupTabs}
                     activeTab={activeTab}
                     onTab={selectTab}
-                    renderLink={(tab, className, inner) => (
+                    renderLink={(tab, className, inner, tabProps) => (
                         <Link
                             key={tab.key}
                             href={tab.href ?? '#'}
                             className={className}
+                            {...tabProps}
                         >
                             {inner}
                         </Link>
                     )}
                     testIdPrefix="site-profile"
+                    ariaLabel="Site Profile sections"
+                    panelId="site-profile-tab-panel"
                     pinnedTabs={pinned.value}
                     onPinnedTabsChange={pinned.setValue}
                 />
@@ -493,14 +506,22 @@ export default function SiteShow(props: SiteProfileProps) {
                         {pinned.error}
                     </p>
                 ) : null}
-                <SiteProfileContent
-                    active={active}
-                    props={props}
-                    loadingGroups={loadingGroups}
-                    groupErrors={groupErrors}
-                    onNavigate={selectTab}
-                    onRetry={(group) => requestGroup(group, true)}
-                />
+                <div
+                    id="site-profile-tab-panel"
+                    role="tabpanel"
+                    aria-labelledby={`site-profile-tab-${activeTab}`}
+                    tabIndex={0}
+                    className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    <SiteProfileContent
+                        active={active}
+                        props={props}
+                        loadingGroups={loadingGroups}
+                        groupErrors={groupErrors}
+                        onNavigate={selectTab}
+                        onRetry={(group) => requestGroup(group, true)}
+                    />
+                </div>
             </PageLayout>
             <TabSearchPalette
                 open={searchOpen}
@@ -508,6 +529,7 @@ export default function SiteShow(props: SiteProfileProps) {
                 groups={navGroups}
                 onTab={selectTab}
                 testIdPrefix="site-profile"
+                searchLabel="Find a Site Profile section"
             />
         </AppLayout>
     );

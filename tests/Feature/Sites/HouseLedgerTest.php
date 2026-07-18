@@ -306,11 +306,7 @@ class HouseLedgerTest extends TestCase
             );
 
         $response = $this->actingAs($this->admin)
-            ->get("/sites/{$this->houseSite->id}", [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'adminData',
-            ])
+            ->get("/sites/{$this->houseSite->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
             ->assertOk()
             ->assertJsonPath(
                 'props.adminData.financials.house_ledger.href',

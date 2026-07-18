@@ -106,6 +106,7 @@ export function SiteProfileContacts({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
+                                            className="min-h-11"
                                             onClick={() =>
                                                 setEditContact(contact)
                                             }
@@ -117,7 +118,7 @@ export function SiteProfileContacts({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="text-status-critical"
+                                            className="min-h-11 text-status-critical"
                                             onClick={() =>
                                                 setDeleteContact(contact)
                                             }

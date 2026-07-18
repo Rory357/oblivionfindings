@@ -54,11 +54,7 @@ test('site show defers credential counts and never exposes credential fields', f
         );
 
     $response = $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Partial-Component' => 'sites/show',
-            'X-Inertia-Partial-Data' => 'adminData',
-        ])
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
         ->assertOk()
         ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
         ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
@@ -235,11 +231,7 @@ test('site show for a vendor-only user exposes only the deferred vendor count', 
     expect($vendorOnly->canDo('credentials.view'))->toBeFalse();
 
     $response = $this->actingAs($vendorOnly)
-        ->get("/sites/{$this->site->id}", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Partial-Component' => 'sites/show',
-            'X-Inertia-Partial-Data' => 'adminData',
-        ])
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
         ->assertOk()
         ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
         ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', null)
@@ -280,11 +272,7 @@ test('site show for a credential-only user exposes only the deferred credential 
     expect($credentialOnly->canDo('credentials.view'))->toBeTrue();
 
     $response = $this->actingAs($credentialOnly)
-        ->get("/sites/{$this->site->id}", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Partial-Component' => 'sites/show',
-            'X-Inertia-Partial-Data' => 'adminData',
-        ])
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
         ->assertOk()
         ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', null)
         ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
@@ -314,11 +302,7 @@ test('site show for an admin exposes both deferred counts without records', func
     ]);
 
     $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Partial-Component' => 'sites/show',
-            'X-Inertia-Partial-Data' => 'adminData',
-        ])
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
         ->assertOk()
         ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
         ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)

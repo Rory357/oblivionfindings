@@ -20,7 +20,8 @@ class SitePolicy
             return false;
         }
 
-        return $this->canViewType($user, $site->type)
+        return $this->canAccessTenant($user, $site)
+            && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
 
@@ -31,7 +32,9 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
-        return $user->canDo('sites.update')
+        return ! $site->archived
+            && $user->canDo('sites.update')
+            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
@@ -39,6 +42,7 @@ class SitePolicy
     public function delete(User $user, Site $site): bool
     {
         return $user->canDo('sites.archive')
+            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
@@ -46,8 +50,22 @@ class SitePolicy
     public function archive(User $user, Site $site): bool
     {
         return $user->canDo('sites.archive')
+            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
+    }
+
+    private function canAccessTenant(User $user, Site $site): bool
+    {
+        if ($this->siteAccess()->isUnrestrictedPlatformUser($user)) {
+            return true;
+        }
+
+        $organizationId = $user->organization_id;
+
+        return $organizationId !== null
+            && $site->tenant_id !== null
+            && (int) $site->tenant_id === (int) $organizationId;
     }
 
     private function canViewType(User $user, string $type): bool

@@ -3,11 +3,13 @@
 import { cn } from '@/lib/utils';
 import { Pin, PinOff, Search } from 'lucide-react';
 import {
+    Fragment,
     useEffect,
     useMemo,
     useRef,
     useState,
     type ComponentType,
+    type KeyboardEvent as ReactKeyboardEvent,
     type ReactNode,
 } from 'react';
 
@@ -28,6 +30,16 @@ export type GroupedProfileNavGroup = {
     label: string;
     icon: IconType;
     tabs: GroupedProfileNavTab[];
+};
+
+export type TierTwoTabAccessibilityProps = {
+    id: string;
+    role: 'tab';
+    'aria-selected': boolean;
+    'aria-controls'?: string;
+    tabIndex: number;
+    onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+    'data-test': string;
 };
 
 function CountPill({ n, active }: { n?: number; active?: boolean }) {
@@ -114,6 +126,7 @@ export function GroupPillRail({
     onOpenGroup,
     onSearch,
     testIdPrefix = 'client',
+    ariaLabel = 'Profile groups',
 }: {
     groups: GroupedProfileNavGroup[];
     openGroup: string;
@@ -121,8 +134,10 @@ export function GroupPillRail({
     onOpenGroup: (key: string, tabKey: string) => void;
     onSearch: () => void;
     testIdPrefix?: string;
+    ariaLabel?: string;
 }) {
     const rememberedTabs = useRef<Record<string, string>>({});
+    const groupButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
     useEffect(() => {
         const activeGroup = groups.find((group) =>
@@ -134,8 +149,12 @@ export function GroupPillRail({
     }, [activeTab, groups]);
 
     return (
-        <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-2.5">
-            {groups.map((group) => {
+        <div
+            role="toolbar"
+            aria-label={ariaLabel}
+            className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-2.5"
+        >
+            {groups.map((group, index) => {
                 const isOpen = group.key === openGroup;
                 const hasActive = group.tabs.some(
                     (tab) => tab.key === activeTab,
@@ -149,6 +168,9 @@ export function GroupPillRail({
                 return (
                     <button
                         key={group.key}
+                        ref={(node) => {
+                            groupButtonRefs.current[index] = node;
+                        }}
                         type="button"
                         onClick={() => {
                             const remembered =
@@ -160,6 +182,24 @@ export function GroupPillRail({
                                 ? remembered
                                 : group.tabs.find((tab) => !tab.disabled)?.key;
                             if (target) onOpenGroup(group.key, target);
+                        }}
+                        onKeyDown={(event) => {
+                            const lastIndex = groups.length - 1;
+                            const nextIndex =
+                                event.key === 'ArrowRight'
+                                    ? (index + 1) % groups.length
+                                    : event.key === 'ArrowLeft'
+                                      ? (index - 1 + groups.length) %
+                                        groups.length
+                                      : event.key === 'Home'
+                                        ? 0
+                                        : event.key === 'End'
+                                          ? lastIndex
+                                          : null;
+                            if (nextIndex === null) return;
+
+                            event.preventDefault();
+                            groupButtonRefs.current[nextIndex]?.focus();
                         }}
                         aria-pressed={isOpen}
                         data-test={`${testIdPrefix}-group-${group.key}`}
@@ -207,6 +247,8 @@ export function TierTwoTabs({
     onTab,
     renderLink,
     testIdPrefix = 'client',
+    ariaLabel = 'Profile sections',
+    panelId,
     pinnedTabs = [],
     onPinnedTabsChange,
 }: {
@@ -217,15 +259,54 @@ export function TierTwoTabs({
         tab: GroupedProfileNavTab,
         className: string,
         inner: ReactNode,
+        accessibilityProps: TierTwoTabAccessibilityProps,
     ) => ReactNode;
     testIdPrefix?: string;
+    ariaLabel?: string;
+    panelId?: string;
     pinnedTabs?: string[];
     onPinnedTabsChange?: (tabs: string[]) => void;
 }) {
+    const moveTab = (
+        event: ReactKeyboardEvent<HTMLElement>,
+        index: number,
+    ) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+            return;
+        }
+
+        event.preventDefault();
+        const enabled = tabs.filter((tab) => !tab.disabled);
+        if (!enabled.length) return;
+
+        const current = enabled.findIndex((tab) => tab.key === tabs[index].key);
+        const target =
+            event.key === 'Home'
+                ? enabled[0]
+                : event.key === 'End'
+                  ? enabled.at(-1)
+                  : enabled[
+                        (current +
+                            (event.key === 'ArrowRight' ? 1 : -1) +
+                            enabled.length) %
+                            enabled.length
+                    ];
+        if (!target) return;
+
+        document
+            .getElementById(`${testIdPrefix}-tab-${target.key}`)
+            ?.focus();
+        onTab(target.key);
+    };
+
     return (
         <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/85 px-4 backdrop-blur md:-mx-6 md:px-6">
-            <div className="scrollbar-none flex items-center gap-0.5 overflow-x-auto">
-                {tabs.map((tab) => {
+            <div
+                role="tablist"
+                aria-label={ariaLabel}
+                className="scrollbar-none flex items-center gap-0.5 overflow-x-auto"
+            >
+                {tabs.map((tab, index) => {
                     const isActive = tab.key === activeTab;
                     const isPinned = pinnedTabs.includes(tab.key);
                     const Icon = tab.icon;
@@ -247,22 +328,37 @@ export function TierTwoTabs({
                             />
                         </>
                     );
+                    const accessibilityProps: TierTwoTabAccessibilityProps = {
+                        id: `${testIdPrefix}-tab-${tab.key}`,
+                        role: 'tab',
+                        'aria-selected': isActive,
+                        ...(panelId ? { 'aria-controls': panelId } : {}),
+                        tabIndex: isActive ? 0 : -1,
+                        onKeyDown: (event) => moveTab(event, index),
+                        'data-test': `${testIdPrefix}-tab-${tab.key}`,
+                    };
                     const tabControl = tab.href ? (
-                        renderLink(tab, className, inner)
+                        renderLink(
+                            tab,
+                            className,
+                            inner,
+                            accessibilityProps,
+                        )
                     ) : (
                         <button
                             type="button"
                             onClick={() => onTab(tab.key)}
-                            aria-pressed={isActive}
+                            {...accessibilityProps}
                             disabled={tab.disabled}
-                            data-test={`${testIdPrefix}-tab-${tab.key}`}
                             className={className}
                         >
                             {inner}
                         </button>
                     );
 
-                    if (!onPinnedTabsChange) return tabControl;
+                    if (!onPinnedTabsChange) {
+                        return <Fragment key={tab.key}>{tabControl}</Fragment>;
+                    }
 
                     return (
                         <div key={tab.key} className="flex items-center">
@@ -279,7 +375,7 @@ export function TierTwoTabs({
                                             : [...pinnedTabs, tab.key],
                                     )
                                 }
-                                className="inline-flex h-11 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             >
                                 {isPinned ? (
                                     <PinOff className="h-3.5 w-3.5" />
@@ -302,15 +398,18 @@ export function TabSearchPalette({
     groups,
     onTab,
     testIdPrefix = 'client',
+    searchLabel = 'Find a profile section',
 }: {
     open: boolean;
     onClose: () => void;
     groups: GroupedProfileNavGroup[];
     onTab: (key: string) => void;
     testIdPrefix?: string;
+    searchLabel?: string;
 }) {
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
     const flat = useMemo(
         () =>
             groups.flatMap((group) =>
@@ -325,8 +424,17 @@ export function TabSearchPalette({
     );
 
     useEffect(() => {
-        if (!open) return;
+        if (!open) {
+            previousFocusRef.current?.focus();
+            previousFocusRef.current = null;
 
+            return;
+        }
+
+        previousFocusRef.current =
+            document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
         setQuery('');
         const timeout = window.setTimeout(() => inputRef.current?.focus(), 30);
         return () => window.clearTimeout(timeout);
@@ -372,6 +480,7 @@ export function TabSearchPalette({
                         ref={inputRef}
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
+                        aria-label={searchLabel}
                         placeholder="Jump to a section…"
                         className="h-12 w-full bg-transparent text-sm outline-none focus-visible:ring-0"
                     />

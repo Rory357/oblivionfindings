@@ -75,11 +75,7 @@ class SiteProfilePayloadTest extends TestCase
     public function test_partial_request_materializes_only_the_requested_optional_group(): void
     {
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'safetyData',
-            ])
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'safetyData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('component', 'sites/show')
@@ -100,11 +96,7 @@ class SiteProfilePayloadTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'adminData',
-            ])
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
             ->assertOk()
             ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1);
 
@@ -153,11 +145,7 @@ class SiteProfilePayloadTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'adminData',
-            ])
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
             ->assertOk()
             ->assertJsonCount(12, 'props.adminData.documents.items')
             ->assertJsonPath('props.adminData.documents.summary.total', 14)
@@ -243,21 +231,13 @@ class SiteProfilePayloadTest extends TestCase
 
         DB::flushQueryLog();
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'safetyData',
-            ])
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'safetyData'))
             ->assertOk();
         $safetyQueries = count(DB::getQueryLog());
 
         DB::flushQueryLog();
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'adminData',
-            ])
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
             ->assertOk();
         $adminQueries = count(DB::getQueryLog());
         DB::disableQueryLog();

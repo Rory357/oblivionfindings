@@ -78,6 +78,7 @@ export function SiteProfileReadiness({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
+                                            className="min-h-11"
                                             onClick={() =>
                                                 onNavigate(
                                                     READINESS_TABS[

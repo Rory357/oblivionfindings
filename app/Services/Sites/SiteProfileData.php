@@ -77,8 +77,12 @@ class SiteProfileData
     {
         $this->primeViewerPermissions($user);
         $canViewClients = $this->canViewClients($user) && $site->type !== 'head_office';
-        $canPlaceClients = $canViewClients && $user->canDo('clients.assignments.update');
-        $canCreateClients = $canViewClients && $user->canDo('clients.create');
+        $canPlaceClients = ! $site->archived
+            && $canViewClients
+            && $user->canDo('clients.assignments.update');
+        $canCreateClients = ! $site->archived
+            && $canViewClients
+            && $user->canDo('clients.create');
         $canViewStaff = $user->canDo('staff.viewAny');
         $canViewCoverage = $user->canDo('rostering.viewAny') && $site->type !== 'head_office';
         $clientFormOptions = ($canCreateClients || $canPlaceClients)
@@ -178,9 +182,6 @@ class SiteProfileData
                     'safeguarding' => $clients->where('safeguarding_flag', true)->count(),
                 ] : null,
                 'available' => $availableClients,
-                'create_href' => $user->canDo('clients.create')
-                    ? route('clients.create', ['site_id' => $site->id])
-                    : null,
                 'can_create' => $canCreateClients,
                 'can_place_existing' => $canPlaceClients,
                 'create_options' => $canCreateClients ? $clientFormOptions : null,
@@ -206,18 +207,18 @@ class SiteProfileData
             ],
             'contacts' => [
                 'items' => $contacts,
-                'can_manage' => $user->canDo('sites.update'),
+                'can_manage' => ! $site->archived && $user->can('update', $site),
             ],
             'staff_requirements' => [
                 'locked' => ! $canViewStaff,
                 'items' => $staffRequirements,
-                'can_manage' => $canViewStaff && $user->canDo('sites.update'),
+                'can_manage' => ! $site->archived && $canViewStaff && $user->can('update', $site),
             ],
             'shift_coverage' => [
                 'locked' => ! $canViewCoverage,
                 'summary' => $canViewCoverage
                     ? $this->coverage->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id)
-                    : [],
+                    : null,
                 'href' => $canViewCoverage ? route('operations.rostering.index', ['site_id' => $site->id]) : null,
             ],
         ];
@@ -476,7 +477,7 @@ class SiteProfileData
             'calendar' => [
                 'locked' => ! $user->canDo('calendar.view'),
                 'items' => $calendar,
-                'summary' => ['upcoming' => $calendar->count()],
+                'summary' => $user->canDo('calendar.view') ? ['upcoming' => $calendar->count()] : null,
                 'href' => $user->canDo('calendar.view') ? route('sites.calendar.index', $site) : null,
             ],
             'checklists' => [
@@ -491,8 +492,8 @@ class SiteProfileData
                 'href' => $canViewChecklists ? route('sites.checklists.index', $site) : null,
             ],
             'meal_planner' => [
-                'locked' => ! $user->canDo('sites.meals.view') || $site->type === 'head_office',
-                'href' => $user->canDo('sites.meals.view') && $site->type !== 'head_office'
+                'locked' => $site->archived || ! $user->canDo('sites.meals.view') || $site->type === 'head_office',
+                'href' => ! $site->archived && $user->canDo('sites.meals.view') && $site->type !== 'head_office'
                     ? route('sites.meals.plan.index', $site)
                     : null,
             ],
@@ -643,6 +644,7 @@ class SiteProfileData
             'phone' => $site->phone,
             'email' => $site->email,
             'is_active' => (bool) $site->is_active,
+            'archived' => (bool) $site->archived,
             'address' => $site->address,
             'address_line_1' => $site->address_line_1,
             'address_line_2' => $site->address_line_2,
@@ -691,8 +693,8 @@ class SiteProfileData
                 ])->values()
             : collect();
 
-        $quickActions = collect([
-            $permissions['sites.update'] ? [
+        $quickActions = collect($site->archived ? [] : [
+            $permissions['site.update'] ? [
                 'id' => 'edit_site',
                 'label' => 'Edit Site',
                 'href' => route('sites.edit', $site),
@@ -719,7 +721,7 @@ class SiteProfileData
             'title' => $site->name,
             'description' => $site->address ?: 'Address not yet recorded',
             'brand_colour' => $site->brand_colour,
-            'status' => $site->is_active ? 'active' : 'inactive',
+            'status' => $site->archived ? 'archived' : ($site->is_active ? 'active' : 'inactive'),
             'readiness' => [
                 'score' => $readiness['score'],
                 'missing_critical' => count($readiness['missing_critical']),

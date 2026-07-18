@@ -189,7 +189,12 @@ export function SiteProfileClients({
                                             'Placement details not recorded'}
                                     </p>
                                 </div>
-                                <Button variant="ghost" size="sm" asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="min-h-11"
+                                    asChild
+                                >
                                     <Link href={client.href}>
                                         Open profile
                                         <ExternalLink className="ml-2 h-4 w-4" />
@@ -200,7 +205,7 @@ export function SiteProfileClients({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className="text-status-critical"
+                                        className="min-h-11 text-status-critical"
                                         onClick={() => setUnlinkClient(client)}
                                     >
                                         Unlink

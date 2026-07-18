@@ -37,7 +37,12 @@ export function SiteProfileErrorState({
                         Your other Site Profile sections are still available.
                     </p>
                 </div>
-                <Button type="button" variant="outline" onClick={onRetry}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={onRetry}
+                >
                     Try again
                 </Button>
             </CardContent>
@@ -79,7 +84,12 @@ export function SiteProfileEmptyState({
     action?: { label: string; href?: string; onClick?: () => void };
 }) {
     const actionButton = action ? (
-        <Button type="button" variant="outline" onClick={action.onClick}>
+        <Button
+            type="button"
+            variant="outline"
+            className="min-h-11"
+            onClick={action.onClick}
+        >
             {action.label}
         </Button>
     ) : null;
@@ -95,7 +105,7 @@ export function SiteProfileEmptyState({
                     </p>
                 </div>
                 {action?.href ? (
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" className="min-h-11" asChild>
                         <Link href={action.href}>{action.label}</Link>
                     </Button>
                 ) : (

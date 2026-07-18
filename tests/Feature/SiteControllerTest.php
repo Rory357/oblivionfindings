@@ -388,11 +388,7 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}", [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'operationsData',
-            ])
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'operationsData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('props.operationsData.checklists.summary.total', 1)
@@ -456,11 +452,7 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}", [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'safetyData',
-            ])
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'safetyData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('props.safetyData.inspections.summary.active', 2)
@@ -475,11 +467,7 @@ class SiteControllerTest extends TestCase
         Asset::factory()->count(15)->forSite($site)->create();
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}", [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'operationsData',
-            ])
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'operationsData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('props.operationsData.assets.summary.total', 15)
@@ -505,11 +493,7 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}", [
-                'X-Inertia' => 'true',
-                'X-Inertia-Partial-Component' => 'sites/show',
-                'X-Inertia-Partial-Data' => 'adminData',
-            ])
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('props.adminData.documents.items.0.folder', 'Compliance')
@@ -583,6 +567,7 @@ class SiteControllerTest extends TestCase
     {
         Storage::fake('local');
 
+        $this->admin->forceFill(['organization_id' => 7])->save();
         $site = Site::factory()->create(['tenant_id' => 7]);
         $file = UploadedFile::fake()->create('maintenance-plan.pdf', 12, 'application/pdf');
 

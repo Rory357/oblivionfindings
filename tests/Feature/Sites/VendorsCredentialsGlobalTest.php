@@ -8,13 +8,14 @@ use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
 use App\Models\SiteVendor;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->sync([Role::query()->where('name', 'admin')->firstOrFail()->id]);
@@ -80,7 +81,7 @@ test('global index exposes enriched vendor/credential fields and manage flags', 
         );
 });
 
-test('vendor compliance fields persist and are exposed in global and site profile surfaces', function () {
+test('vendor compliance fields persist globally while the site profile keeps only the canonical summary', function () {
     $this->actingAs($this->admin)
         ->from('/vendors')
         ->post("/sites/{$this->site->id}/vendors", [
@@ -132,14 +133,12 @@ test('vendor compliance fields persist and are exposed in global and site profil
         );
 
     $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}")
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('vendors.0.company_name', 'SafeWorks NZ')
-            ->where('vendors.0.hs_induction_completed', true)
-            ->where('vendors.0.insurance_expiry', '2026-12-31')
-            ->where('vendors.0.hs_performance_rating', 'good')
-        );
+        ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
+        ->assertJsonPath('props.adminData.vendors_credentials.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
+        ->assertJsonMissingPath('props.vendors')
+        ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
 });
 
 test('vendor flags endpoint toggles preferred and active', function () {
@@ -261,7 +260,7 @@ test('global feeds are scoped to the user\'s assigned sites (no horizontal acces
     HrEmployeeProfile::create([
         'user_id' => $scoped->id,
         'tenant_id' => $siteA->tenant_id,
-        'employee_number' => 'EMP-' . $scoped->id,
+        'employee_number' => 'EMP-'.$scoped->id,
         'work_email' => 'scoped@example.test',
         'position_title' => 'Maintenance Coordinator',
         'position_role' => 'maintenance_coordinator',
