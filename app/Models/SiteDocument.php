@@ -10,6 +10,8 @@ class SiteDocument extends Model
 {
     use AuditableChanges;
 
+    public const PROFILE_LIMIT = 12;
+
     protected $fillable = [
         'tenant_id',
         'site_id',

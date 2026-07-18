@@ -6,8 +6,6 @@ import {
     useGroupedProfileSearchShortcut,
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useUiPreference } from '@/hooks/use-ui-preference';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -29,11 +27,16 @@ import { SiteProfileCalendar } from './tabs/calendar';
 import { SiteProfileChecklists } from './tabs/checklists';
 import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
 import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
+import { SiteProfileDocuments } from './tabs/documents';
 import { SiteProfileDrills } from './tabs/drills';
 import {
     SiteProfileEmergencyPlan,
     type EmergencyPlanModule,
 } from './tabs/emergency-plan';
+import {
+    SiteProfileFinancials,
+    type SiteProfileFinancialsModule,
+} from './tabs/financials';
 import { SiteProfileFirstAid } from './tabs/first-aid';
 import { SiteProfileFleet } from './tabs/fleet';
 import { SiteProfileHardware } from './tabs/hardware';
@@ -52,6 +55,7 @@ import {
     visibleSiteProfileTabs,
 } from './tabs/registry';
 import { SiteProfileRiskAssessments } from './tabs/risk-assessments';
+import { SiteProfileServices } from './tabs/services';
 import {
     SiteProfileShiftCoverage,
     type SiteShiftCoverageData,
@@ -71,6 +75,7 @@ import type {
     SiteProfileDataGroup,
     SiteProfilePermissionMap,
 } from './tabs/types';
+import { SiteProfileVendors } from './tabs/vendors';
 
 export type SiteProfileSite = {
     id: number;
@@ -175,8 +180,6 @@ export type SiteReadinessData = {
     is_active_but_incomplete: boolean;
 };
 
-type OptionalGroupData = Record<string, unknown>;
-
 type SitePeopleData = {
     clients: SiteClientsData;
     contacts: SiteContactsData;
@@ -205,6 +208,13 @@ type SiteOperationsData = {
     plan: SitePlanSummaryModule;
 };
 
+type SiteAdminData = {
+    documents: SiteProfileSummaryModule;
+    financials: SiteProfileFinancialsModule;
+    vendors_credentials: SiteProfileSummaryModule;
+    services: SiteProfileSummaryModule;
+};
+
 export type SiteProfileProps = {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
@@ -216,7 +226,7 @@ export type SiteProfileProps = {
     peopleData?: SitePeopleData;
     safetyData?: SiteSafetyData;
     operationsData?: SiteOperationsData;
-    adminData?: OptionalGroupData;
+    adminData?: SiteAdminData;
 };
 
 const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
@@ -224,10 +234,6 @@ const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
     add_client: Plus,
     add_calendar_event: CalendarPlus,
     report_hazard: ShieldAlert,
-};
-
-const MODULE_KEYS: Record<string, string> = {
-    vendors: 'vendors_credentials',
 };
 
 function currentRequestedTab(): string | null {
@@ -683,117 +689,24 @@ function SiteProfileContent({
         }
     }
 
-    const key = MODULE_KEYS[active.id] ?? active.id;
-    const module = (groupData as OptionalGroupData)[key];
-    return <ModuleSummaryPanel label={active.label} module={module} />;
-}
-
-function ModuleSummaryPanel({
-    label,
-    module,
-}: {
-    label: string;
-    module: unknown;
-}) {
-    if (!module || typeof module !== 'object') {
-        return (
-            <SiteProfileEmptyState
-                title={`No ${label.toLowerCase()} yet`}
-                description="There is nothing to show for this Site."
-            />
-        );
+    if (dataGroup === 'adminData') {
+        const admin = groupData as SiteAdminData;
+        switch (active.id) {
+            case 'documents':
+                return <SiteProfileDocuments data={admin.documents} />;
+            case 'financials':
+                return <SiteProfileFinancials data={admin.financials} />;
+            case 'vendors':
+                return <SiteProfileVendors data={admin.vendors_credentials} />;
+            case 'services':
+                return <SiteProfileServices data={admin.services} />;
+        }
     }
 
-    const data = module as Record<string, unknown>;
-    if (data.locked === true) return <SiteProfileLockedState label={label} />;
-    const items = Array.isArray(data.items)
-        ? (data.items as Array<Record<string, unknown>>)
-        : [];
-    const summary =
-        data.summary && typeof data.summary === 'object'
-            ? (data.summary as Record<string, unknown>)
-            : null;
-    const href = typeof data.href === 'string' ? data.href : null;
-
     return (
-        <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-xl font-semibold">{label}</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Site summary from the owning module.
-                    </p>
-                </div>
-                {href ? (
-                    <Button asChild>
-                        <Link href={href}>
-                            Open {label}{' '}
-                            <ExternalLink className="ml-2 h-4 w-4" />
-                        </Link>
-                    </Button>
-                ) : null}
-            </div>
-            {summary ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {Object.entries(summary).map(([key, value]) => (
-                        <Card key={key}>
-                            <CardContent className="p-4">
-                                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                    {key.replaceAll('_', ' ')}
-                                </p>
-                                <p className="mt-1 text-2xl font-bold tabular-nums">
-                                    {String(value ?? '—')}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            ) : null}
-            {items.length ? (
-                <Card>
-                    <CardContent className="divide-y p-0">
-                        {items.map((item, index) => (
-                            <div
-                                key={String(item.id ?? index)}
-                                className="flex min-h-11 items-start gap-3 px-4 py-3"
-                            >
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium">
-                                        {String(
-                                            item.name ??
-                                                item.title ??
-                                                item.description ??
-                                                `${label} item`,
-                                        )}
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                        {[
-                                            item.status,
-                                            item.due_date,
-                                            item.scheduled_date,
-                                            item.next_due_date,
-                                        ]
-                                            .filter(Boolean)
-                                            .map(String)
-                                            .join(' · ') || 'Details available'}
-                                    </p>
-                                </div>
-                                {typeof item.href === 'string' ? (
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <Link href={item.href}>Open</Link>
-                                    </Button>
-                                ) : null}
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            ) : (
-                <SiteProfileEmptyState
-                    title={`No ${label.toLowerCase()} yet`}
-                    description="The owning module has no records for this Site."
-                    action={href ? { label: `Open ${label}`, href } : undefined}
-                />
-            )}
-        </div>
+        <SiteProfileEmptyState
+            title={`${active.label} is not configured`}
+            description="This section has no Site-specific data yet."
+        />
     );
 }

@@ -106,13 +106,72 @@ class SiteProfilePayloadTest extends TestCase
                 'X-Inertia-Partial-Data' => 'adminData',
             ])
             ->assertOk()
-            ->assertJsonPath('props.adminData.vendors_credentials.credential_count', 1);
+            ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1);
 
         $serialized = $response->getContent();
         $this->assertStringNotContainsString('SITE_PROFILE_SECRET_SENTINEL', $serialized);
         $this->assertStringNotContainsString('SITE_PROFILE_IV_SENTINEL', $serialized);
         $this->assertStringNotContainsString('encrypted_value', $serialized);
         $this->assertStringNotContainsString('totp_secret', $serialized);
+    }
+
+    public function test_admin_payload_is_bounded_and_links_to_canonical_owners(): void
+    {
+        foreach (range(1, 14) as $index) {
+            SiteDocument::query()->create([
+                'site_id' => $this->site->id,
+                'uploaded_by_user_id' => $this->admin->id,
+                'title' => "Admin document {$index}",
+                'category' => 'compliance',
+                'storage_disk' => 'private',
+                'storage_path' => "sites/admin-document-{$index}.pdf",
+                'original_name' => "admin-document-{$index}.pdf",
+                'mime_type' => 'application/pdf',
+                'size_bytes' => 100,
+                'expiry_date' => now()->addDays($index),
+            ]);
+
+            ServiceContext::factory()->create([
+                'site_id' => $this->site->id,
+                'name' => "Admin service {$index}",
+                'is_active' => $index !== 14,
+            ]);
+        }
+
+        $vendor = SiteVendor::query()->create([
+            'site_id' => $this->site->id,
+            'service_type' => 'maintenance',
+            'company_name' => 'Canonical Vendor',
+            'is_active' => true,
+        ]);
+        SiteCredential::query()->create([
+            'site_id' => $this->site->id,
+            'vendor_id' => $vendor->id,
+            'label' => 'Canonical Credential',
+            'credential_type' => 'password',
+            'encrypted_value' => 'NEVER_SERIALIZE_THIS_VALUE',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('sites.show', $this->site), [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'sites/show',
+                'X-Inertia-Partial-Data' => 'adminData',
+            ])
+            ->assertOk()
+            ->assertJsonCount(12, 'props.adminData.documents.items')
+            ->assertJsonPath('props.adminData.documents.summary.total', 14)
+            ->assertJsonPath('props.adminData.documents.summary.shown', 12)
+            ->assertJsonPath('props.adminData.documents.href', route('sites.documents.index', $this->site))
+            ->assertJsonPath('props.adminData.financials.href', route('finance.sites.financial-dashboard', $this->site))
+            ->assertJsonPath('props.adminData.financials.house_ledger.href', route('sites.ledger.index', $this->site))
+            ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
+            ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
+            ->assertJsonPath('props.adminData.vendors_credentials.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
+            ->assertJsonCount(12, 'props.adminData.services.items')
+            ->assertJsonPath('props.adminData.services.summary.total', 14)
+            ->assertJsonPath('props.adminData.services.summary.active', 13)
+            ->assertJsonPath('props.adminData.services.href', route('settings.service_contexts'));
     }
 
     public function test_shell_and_optional_groups_stay_within_explicit_query_ceilings(): void

@@ -521,14 +521,18 @@ Run: `git add resources/js/pages/sites/tabs/calendar.tsx resources/js/pages/site
 - Create: `resources/js/pages/sites/tabs/services.tsx`
 - Modify: `resources/js/pages/sites/show.tsx`
 - Create: `resources/js/test/site-profile-admin-tabs.test.tsx`
+- Modify: `app/Models/SiteDocument.php`
+- Modify: `app/Models/ServiceContext.php`
+- Modify: `app/Services/Sites/SiteProfileData.php`
 - Modify: `tests/Feature/Sites/SiteCredentialDialogTest.php`
 - Modify: `tests/Feature/Sites/HouseLedgerTest.php`
+- Modify: `tests/Feature/Sites/SiteProfilePayloadTest.php`
 
-- [ ] **Step 1: Write failing Admin ownership tests**
+- [x] **Step 1: Write failing Admin ownership tests**
 
-Assert Documents uses the Site-owned shared wizard/confirm primitives; Financials shows a permission-shaped summary and links to the Finance Site Dashboard instead of labelling the house ledger as all financials; Vendors & Credentials exposes status/count summaries and `/vendors?site_id={id}` only; no credential secret or duplicate reveal/edit dialog enters the Site Profile bundle or payload.
+Assert Documents keeps upload/edit/folder ownership in the existing Site Documents workspace; Financials shows a permission-shaped summary and links to the Finance Site Dashboard instead of labelling the house ledger as all financials; Vendors & Credentials exposes status/count summaries and `/vendors?site_id={id}` only; no credential secret or duplicate reveal/edit dialog enters the Site Profile bundle or payload.
 
-- [ ] **Step 2: Prove the tests fail**
+- [x] **Step 2: Prove the tests fail**
 
 Run: `npm test -- resources/js/test/site-profile-admin-tabs.test.tsx`
 
@@ -536,11 +540,11 @@ Run: `php artisan test tests/Feature/Sites/SiteCredentialDialogTest.php tests/Fe
 
 Expected: frontend FAIL against the duplicate Vendor/Credential register; backend establishes current audited reveal and ledger behaviour before compatibility assertions are updated.
 
-- [ ] **Step 3: Extract Admin components and canonical links**
+- [x] **Step 3: Extract Admin components and canonical links**
 
 Remove duplicate Vendor/Credential dialog hosts and management tables from the Site Profile. Keep secrets out of `adminData`; reveal remains only in the canonical Vendor workspace. Render house ledger as a clearly named secondary link where permission permits, not as the Financials tab body.
 
-- [ ] **Step 4: Verify Admin behaviour and secret non-disclosure**
+- [x] **Step 4: Verify Admin behaviour and secret non-disclosure**
 
 Run: `npm test -- resources/js/test/site-profile-admin-tabs.test.tsx resources/js/test/site-profile-shell.test.tsx`
 
@@ -548,7 +552,7 @@ Run: `php artisan test tests/Feature/Sites/SiteCredentialDialogTest.php tests/Fe
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add resources/js/pages/sites/tabs/documents.tsx resources/js/pages/sites/tabs/financials.tsx resources/js/pages/sites/tabs/vendors.tsx resources/js/pages/sites/tabs/services.tsx resources/js/pages/sites/show.tsx resources/js/test/site-profile-admin-tabs.test.tsx tests/Feature/Sites/SiteCredentialDialogTest.php tests/Feature/Sites/HouseLedgerTest.php && git diff --cached --check && git commit -m "refactor(sites): consolidate site admin workflows"`
 

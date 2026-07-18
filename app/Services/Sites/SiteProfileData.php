@@ -15,7 +15,6 @@ use App\Models\SiteCalendarEvent;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteCredential;
 use App\Models\SiteDocument;
-use App\Models\SiteDocumentFolder;
 use App\Models\SiteHazard;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SiteStaffRequirement;
@@ -527,11 +526,23 @@ class SiteProfileData
     {
         $this->primeViewerPermissions($user);
 
-        $documents = SiteDocument::query()
-            ->where('site_id', $site->id)
+        $documentQuery = SiteDocument::query()->where('site_id', $site->id);
+        $today = now()->toDateString();
+        $documentCounts = (clone $documentQuery)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw(
+                'SUM(CASE WHEN expiry_date >= ? AND expiry_date <= ? THEN 1 ELSE 0 END) as expiring_soon',
+                [$today, now()->addDays(60)->toDateString()],
+            )
+            ->selectRaw(
+                'SUM(CASE WHEN expiry_date < ? THEN 1 ELSE 0 END) as expired',
+                [$today],
+            )
+            ->first();
+        $documents = (clone $documentQuery)
             ->with('uploadedBy:id,name')
             ->orderByDesc('created_at')
-            ->limit(100)
+            ->limit(SiteDocument::PROFILE_LIMIT)
             ->get()
             ->map(fn (SiteDocument $document) => [
                 'id' => $document->id,
@@ -545,61 +556,77 @@ class SiteProfileData
                 'size_bytes' => $document->size_bytes,
                 'uploaded_by' => $document->uploadedBy?->name,
                 'created_at' => $document->created_at?->toISOString(),
-                'download_href' => route('sites.documents.download', [$site, $document]),
+                'href' => route('sites.documents.download', [$site, $document]),
             ])->values();
-
-        $folders = SiteDocumentFolder::query()
-            ->where('site_id', $site->id)
-            ->orderBy('name')
-            ->limit(100)
-            ->pluck('name')
-            ->values();
 
         $canViewVendors = $user->canDo('vendors.view');
         $canViewCredentials = $user->canDo('credentials.view');
+        $canViewFinancials = $user->canDo('finance.dashboard');
+        $canViewHouseLedger = in_array($site->type, ['house', 'residential'], true)
+            && $user->canDo('sites.ledger.view');
+        $canManageServiceContexts = $user->canDo('settings.service_contexts.manage');
+
+        $serviceQuery = $site->serviceContexts();
+        $serviceCounts = (clone $serviceQuery)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active')
+            ->first();
+        $services = (clone $serviceQuery)
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->limit(ServiceContext::PROFILE_LIMIT)
+            ->get(['id', 'name', 'type', 'description', 'is_active'])
+            ->map(fn (ServiceContext $context) => [
+                'id' => $context->id,
+                'name' => $context->name,
+                'type' => $context->type?->value,
+                'description' => $context->description,
+                'status' => $context->is_active ? 'active' : 'inactive',
+            ])->values();
 
         return [
             'documents' => [
                 'items' => $documents,
-                'folders' => $folders,
                 'summary' => [
-                    'total' => $documents->count(),
-                    'expiring' => $documents->filter(fn (array $document) => $document['expiry_date']
-                        && $document['expiry_date'] <= now()->addDays(60)->toDateString())->count(),
+                    'total' => (int) ($documentCounts?->total ?? 0),
+                    'shown' => $documents->count(),
+                    'expiring_soon' => (int) ($documentCounts?->expiring_soon ?? 0),
+                    'expired' => (int) ($documentCounts?->expired ?? 0),
                 ],
                 'href' => route('sites.documents.index', $site),
             ],
             'financials' => [
-                'locked' => ! $user->canDo('finance.dashboard'),
-                'href' => $user->canDo('finance.dashboard')
+                'locked' => ! $canViewFinancials,
+                'href' => $canViewFinancials
                     ? route('finance.sites.financial-dashboard', $site)
                     : null,
+                'house_ledger' => $canViewHouseLedger ? [
+                    'href' => route('sites.ledger.index', $site),
+                    'label' => 'House ledger',
+                ] : null,
             ],
             'vendors_credentials' => [
                 'locked' => ! $canViewVendors && ! $canViewCredentials,
-                'vendor_count' => $canViewVendors
-                    ? SiteVendor::query()->where('site_id', $site->id)->where('is_active', true)->count()
-                    : null,
-                'credential_count' => $canViewCredentials
-                    ? SiteCredential::query()->where('site_id', $site->id)->count()
-                    : null,
+                'summary' => $canViewVendors || $canViewCredentials ? [
+                    'vendors' => $canViewVendors
+                        ? SiteVendor::query()->where('site_id', $site->id)->where('is_active', true)->count()
+                        : null,
+                    'credentials' => $canViewCredentials
+                        ? SiteCredential::query()->where('site_id', $site->id)->count()
+                        : null,
+                ] : null,
                 'href' => $canViewVendors || $canViewCredentials
                     ? route('sites.vendors.global', ['site_id' => $site->id])
                     : null,
             ],
             'services' => [
-                'items' => $site->serviceContexts()
-                    ->orderByDesc('is_active')
-                    ->orderBy('name')
-                    ->limit(100)
-                    ->get(['id', 'name', 'type', 'description', 'is_active'])
-                    ->map(fn ($context) => [
-                        'id' => $context->id,
-                        'name' => $context->name,
-                        'type' => $context->type,
-                        'description' => $context->description,
-                        'is_active' => (bool) $context->is_active,
-                    ])->values(),
+                'items' => $services,
+                'summary' => [
+                    'total' => (int) ($serviceCounts?->total ?? 0),
+                    'active' => (int) ($serviceCounts?->active ?? 0),
+                    'shown' => $services->count(),
+                ],
+                'href' => $canManageServiceContexts ? route('settings.service_contexts') : null,
             ],
         ];
     }
