@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
@@ -33,6 +34,7 @@ use App\Models\ClientNote;
 use App\Models\ClientPathPlan;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
+use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FirstAidRecord;
 use App\Models\FleetFuelLog;
@@ -191,6 +193,8 @@ class AppServiceProvider extends ServiceProvider
             'it_ticket' => ItTicket::class,
             'it_provisioning_request' => ItProvisioningRequest::class,
             'it_ticket_comment' => ItTicketComment::class,
+            'security_device' => Device::class,
+            'control_room_alert' => ControlRoomAlert::class,
         ]);
 
         Shift::observe(ShiftObserver::class);

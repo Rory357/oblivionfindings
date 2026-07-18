@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\QueryException;
 
 /**
  * A helpdesk ticket, raised self-service by any staff member (source
@@ -28,6 +29,12 @@ class ItTicket extends Model
     public const STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 
     public const SOURCES = ['portal', 'agent', 'system', 'email'];
+
+    public const WORK_TYPES = ['incident', 'service_request', 'problem', 'change', 'task'];
+
+    public const IMPACTS = ['individual', 'team', 'site', 'organization'];
+
+    public const URGENCIES = ['low', 'normal', 'high', 'critical'];
 
     public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
@@ -48,8 +55,13 @@ class ItTicket extends Model
         'category',
         'subcategory',
         'source',
+        'work_type',
         'priority',
+        'impact',
+        'urgency',
         'status',
+        'status_reason',
+        'waiting_reason',
         'requires_approval',
         'first_response_due_at',
         'resolution_due_at',
@@ -58,6 +70,9 @@ class ItTicket extends Model
         'sla_paused_minutes',
         'waiting_since',
         'resolved_at',
+        'resolution_code',
+        'resolution_summary',
+        'monitoring_recovered_at',
         'closed_at',
         'reopened_count',
         'csat_score',
@@ -71,6 +86,7 @@ class ItTicket extends Model
         'first_responded_at' => 'datetime',
         'waiting_since' => 'datetime',
         'resolved_at' => 'datetime',
+        'monitoring_recovered_at' => 'datetime',
         'closed_at' => 'datetime',
         'merged_at' => 'datetime',
         'csat_submitted_at' => 'datetime',
@@ -103,7 +119,7 @@ class ItTicket extends Model
         $max = (int) static::query()
             ->forTenant($tenantId)
             ->whereNotNull('reference')
-            ->selectRaw("MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq")
+            ->selectRaw('MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq')
             ->value('seq');
 
         return sprintf('IT-%06d', $max + 1);
@@ -124,7 +140,7 @@ class ItTicket extends Model
         do {
             try {
                 return static::create($attributes);
-            } catch (\Illuminate\Database\QueryException $exception) {
+            } catch (QueryException $exception) {
                 $attempts++;
                 $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
                 if (! $collidedOnReference || $attempts >= 5) {
@@ -208,6 +224,16 @@ class ItTicket extends Model
     public function events(): MorphMany
     {
         return $this->morphMany(ItTicketEvent::class, 'subject');
+    }
+
+    public function links(): HasMany
+    {
+        return $this->hasMany(ItTicketLink::class, 'ticket_id');
+    }
+
+    public function linked(string $relationship): HasMany
+    {
+        return $this->links()->where('relationship', $relationship);
     }
 
     public function watchers(): BelongsToMany

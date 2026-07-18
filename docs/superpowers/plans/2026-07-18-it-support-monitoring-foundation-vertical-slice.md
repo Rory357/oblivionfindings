@@ -604,7 +604,7 @@ git commit -m "feat(monitoring): resolve device alerts on recovery"
 - Modify: `database/factories/ItTicketFactory.php`
 - Test: `tests/Feature/It/ItMonitoringTicketIntegrationTest.php`
 
-- [ ] **Step 1: Write failing model and tenant-boundary tests**
+- [x] **Step 1: Write failing model and tenant-boundary tests**
 
 ```php
 it('links one ticket idempotently to a canonical device and alert', function () {
@@ -642,7 +642,7 @@ it('allows a system incident without a human requester', function () {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -652,7 +652,7 @@ php artisan test tests/Feature/It/ItMonitoringTicketIntegrationTest.php --filter
 
 Expected: FAIL because service-management columns and typed links do not exist.
 
-- [ ] **Step 3: Add ticket fields and link table**
+- [x] **Step 3: Add ticket fields and link table**
 
 The migration must:
 
@@ -693,7 +693,7 @@ Schema::create('it_ticket_links', function (Blueprint $table) {
 
 The down migration restores requester non-null only after failing explicitly if system tickets still exist; it must not silently invent requester identities.
 
-- [ ] **Step 4: Add `ItTicketLink` and tenant-safe service**
+- [x] **Step 4: Add `ItTicketLink` and tenant-safe service**
 
 ```php
 final class ItTicketLinkService
@@ -752,7 +752,7 @@ Add `links(): HasMany` and `linked(string $relationship): HasMany` to `ItTicket`
 'control_room_alert' => \App\Models\ControlRoomAlert::class,
 ```
 
-- [ ] **Step 5: Run focused tests and existing IT schema tests**
+- [x] **Step 5: Run focused tests and existing IT schema tests**
 
 Run:
 
@@ -762,7 +762,7 @@ php artisan test tests/Feature/It/ItMonitoringTicketIntegrationTest.php tests/Fe
 
 Expected: PASS with no regression to existing ticket references, comments, events, watchers, or provisioning links.
 
-- [ ] **Step 6: Commit typed work links**
+- [x] **Step 6: Commit typed work links**
 
 ```powershell
 git add database/migrations/2026_07_18_100002_extend_it_work_and_create_ticket_links.php app/Models/ItTicket.php app/Models/ItTicketLink.php app/Domain/It/Services/ItTicketLinkService.php app/Providers/AppServiceProvider.php database/factories/ItTicketFactory.php tests/Feature/It/ItMonitoringTicketIntegrationTest.php
