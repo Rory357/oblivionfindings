@@ -360,21 +360,21 @@ Run: `git add resources/js/pages/sites/show.tsx resources/js/pages/sites/tabs/si
 - Create: `resources/js/pages/sites/tabs/attention-panel.tsx`
 - Create: `resources/js/test/site-profile-overview.test.tsx`
 
-- [ ] **Step 1: Write failing presentation tests**
+- [x] **Step 1: Write failing presentation tests**
 
 Cover setup/readiness banner, occupancy, attention severity plus text/icon cues, resolution links, contact summary, location/access/map, safety summary, services, notes, recent activity, zero-state actions, and no repeated hero-only content. Verify Readiness actions call `onNavigate(tab)` rather than scrolling the document.
 
-- [ ] **Step 2: Prove the tests fail**
+- [x] **Step 2: Prove the tests fail**
 
 Run: `npm test -- resources/js/test/site-profile-overview.test.tsx`
 
 Expected: FAIL because the focused components do not exist.
 
-- [ ] **Step 3: Move and simplify the current overview/readiness UI**
+- [x] **Step 3: Move and simplify the current overview/readiness UI**
 
 Reuse existing cards and formatters. Every empty panel uses `SiteProfileEmptyState`; denied modules use `SiteProfileLockedState`; no-data and loading must not share markup. Preserve semantic status tokens independently of the hero brand colour.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `npm test -- resources/js/test/site-profile-overview.test.tsx resources/js/test/site-profile-shell.test.tsx`
 

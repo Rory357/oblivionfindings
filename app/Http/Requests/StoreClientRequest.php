@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AssetGeofence;
 use App\Models\Client;
+use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Services\Clients\ClientWorkerEligibility;
 use Illuminate\Foundation\Http\FormRequest;
@@ -181,13 +184,23 @@ class StoreClientRequest extends FormRequest
                 return;
             }
 
-            $belongsToSite = SiteHouseRoom::query()
+            $roomIsAvailable = SiteHouseRoom::query()
                 ->whereKey($roomId)
                 ->where('site_id', $siteId)
+                ->when(
+                    $this->user()?->organization_id !== null,
+                    fn ($query) => $query->where(
+                        'tenant_id',
+                        $this->user()->organization_id,
+                    ),
+                )
+                ->where('is_active', true)
+                ->where('is_assignable', true)
+                ->whereNull('assigned_client_id')
                 ->exists();
 
-            if (! $belongsToSite) {
-                $validator->errors()->add('room_id', 'Selected room does not belong to the chosen site.');
+            if (! $roomIsAvailable) {
+                $validator->errors()->add('room_id', 'Choose an available room at the selected Site.');
             }
         });
 
@@ -206,6 +219,55 @@ class StoreClientRequest extends FormRequest
                 $validator->errors()->add(
                     'key_worker_id',
                     'Choose an eligible key worker from this organisation.',
+                );
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
+            $organizationId = $this->user()?->organization_id;
+            if ($organizationId === null) {
+                return;
+            }
+
+            if (
+                filled($this->input('site_id'))
+                && ! $validator->errors()->has('site_id')
+                && ! Site::query()
+                    ->forTenant($organizationId)
+                    ->whereKey((int) $this->input('site_id'))
+                    ->exists()
+            ) {
+                $validator->errors()->add(
+                    'site_id',
+                    'Choose a Site from this organisation.',
+                );
+            }
+
+            if (
+                filled($this->input('service_context_id'))
+                && ! $validator->errors()->has('service_context_id')
+                && ! ServiceContext::query()
+                    ->forOrganization($organizationId)
+                    ->whereKey((int) $this->input('service_context_id'))
+                    ->exists()
+            ) {
+                $validator->errors()->add(
+                    'service_context_id',
+                    'Choose a service context from this organisation.',
+                );
+            }
+
+            if (
+                filled($this->input('house_geofence_id'))
+                && ! $validator->errors()->has('house_geofence_id')
+                && ! AssetGeofence::query()
+                    ->forOrganization($organizationId)
+                    ->whereKey((int) $this->input('house_geofence_id'))
+                    ->exists()
+            ) {
+                $validator->errors()->add(
+                    'house_geofence_id',
+                    'Choose a geofence from this organisation.',
                 );
             }
         });

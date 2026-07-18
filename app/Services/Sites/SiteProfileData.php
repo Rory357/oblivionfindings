@@ -9,6 +9,7 @@ use App\Models\EmergencyDrill;
 use App\Models\FirstAidRecord;
 use App\Models\HsRiskAssessment;
 use App\Models\PpeInventory;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Models\SiteChecklistRun;
@@ -21,6 +22,8 @@ use App\Models\SiteStaffRequirement;
 use App\Models\SiteVendor;
 use App\Models\User;
 use App\Models\UserUiPreference;
+use App\Services\Clients\ClientFormOptions;
+use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ShiftCoverageService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -34,6 +37,8 @@ class SiteProfileData
         private readonly SiteTypePlanService $typePlans,
         private readonly ShiftCoverageService $coverage,
         private readonly DeviceRegistryService $devices,
+        private readonly ClientFormOptions $clientFormOptions,
+        private readonly ClientWorkerEligibility $clientWorkers,
     ) {}
 
     /** @return array<string, mixed> */
@@ -42,7 +47,13 @@ class SiteProfileData
         $this->primeViewerPermissions($user);
         $this->primeReadinessCounts($site);
 
-        $site->loadMissing('primaryContact:id,name');
+        $site->loadMissing([
+            'primaryContact:id,name',
+            'managerContact:id,site_id,name,role,phone,email,is_primary',
+            'siteLeadContact:id,site_id,name,role,phone,email,is_primary',
+            'afterHoursContact:id,site_id,name,role,phone,email,is_primary',
+            'primarySiteContact:id,site_id,name,role,phone,email,is_primary',
+        ]);
 
         $permissions = $this->permissions($user, $site);
         $readiness = $this->readiness->evaluate($site);
@@ -68,22 +79,28 @@ class SiteProfileData
         $this->primeViewerPermissions($user);
         $canViewClients = $this->canViewClients($user) && $site->type !== 'head_office';
         $canPlaceClients = $canViewClients && $user->canDo('clients.assignments.update');
+        $canCreateClients = $canViewClients && $user->canDo('clients.create');
         $canViewStaff = $user->canDo('staff.viewAny');
         $canViewCoverage = $user->canDo('rostering.viewAny') && $site->type !== 'head_office';
+        $clientFormOptions = ($canCreateClients || $canPlaceClients)
+            ? $this->clientFormOptions->forOrganization($site->tenant_id ?? $user->organization_id)
+            : null;
 
         $clients = $canViewClients
             ? $site->clients()
-                ->with(['keyWorker:id,name', 'serviceContext:id,name,type'])
+                ->with(['keyWorker:id,name', 'serviceContext:id,name,type', 'room:id,name'])
                 ->orderBy('first_name')
                 ->orderBy('last_name')
                 ->limit(100)
                 ->get([
                     'id', 'site_id', 'first_name', 'last_name', 'preferred_name',
                     'status', 'profile_photo_path', 'risk_level', 'safeguarding_flag',
-                    'service_start_date', 'service_context_id', 'key_worker_id',
+                    'service_start_date', 'service_context_id', 'key_worker_id', 'room_id',
                 ])
                 ->map(fn (Client $client) => [
                     'id' => $client->id,
+                    'first_name' => $client->first_name,
+                    'last_name' => $client->last_name,
                     'name' => $client->full_name,
                     'preferred_name' => $client->preferred_name,
                     'status' => $client->status,
@@ -93,6 +110,7 @@ class SiteProfileData
                     'service_start_date' => $client->service_start_date?->toDateString(),
                     'key_worker' => $client->keyWorker?->only(['id', 'name']),
                     'service_context' => $client->serviceContext?->only(['id', 'name', 'type']),
+                    'room' => $client->room?->only(['id', 'name']),
                     'href' => route('clients.show', $client),
                 ])->values()
             : collect();
@@ -107,6 +125,8 @@ class SiteProfileData
                 ->get(['id', 'first_name', 'last_name', 'preferred_name', 'status'])
                 ->map(fn (Client $client) => [
                     'id' => $client->id,
+                    'first_name' => $client->first_name,
+                    'last_name' => $client->last_name,
                     'name' => $client->full_name,
                     'preferred_name' => $client->preferred_name,
                     'status' => $client->status,
@@ -162,7 +182,28 @@ class SiteProfileData
                 'create_href' => $user->canDo('clients.create')
                     ? route('clients.create', ['site_id' => $site->id])
                     : null,
+                'can_create' => $canCreateClients,
                 'can_place_existing' => $canPlaceClients,
+                'create_options' => $canCreateClients ? $clientFormOptions : null,
+                'placement_options' => $canPlaceClients ? [
+                    'rooms' => $site->houseRooms()
+                        ->available()
+                        ->orderBy('sort_order')
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'notes']),
+                    'service_contexts' => ServiceContext::query()
+                        ->forOrganization($site->tenant_id ?? $user->organization_id)
+                        ->where(fn (Builder $query) => $query
+                            ->whereNull('site_id')
+                            ->orWhere('site_id', $site->id))
+                        ->where('is_active', true)
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'type']),
+                    'key_workers' => $this->clientWorkers
+                        ->queryForOrganization($site->tenant_id ?? $user->organization_id)
+                        ->orderBy('name')
+                        ->get(['id', 'name']),
+                ] : null,
             ],
             'contacts' => [
                 'items' => $contacts,
@@ -560,6 +601,10 @@ class SiteProfileData
             'medication_storage_location' => $site->medication_storage_location,
             'notes' => $site->notes,
             'primary_contact' => $site->primaryContact?->only(['id', 'name']),
+            'manager_contact' => $site->managerContact?->only(['id', 'name', 'role', 'phone', 'email', 'is_primary']),
+            'site_lead_contact' => $site->siteLeadContact?->only(['id', 'name', 'role', 'phone', 'email', 'is_primary']),
+            'after_hours_contact' => $site->afterHoursContact?->only(['id', 'name', 'role', 'phone', 'email', 'is_primary']),
+            'primary_site_contact' => $site->primarySiteContact?->only(['id', 'name', 'role', 'phone', 'email', 'is_primary']),
         ];
     }
 

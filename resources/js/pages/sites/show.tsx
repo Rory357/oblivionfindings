@@ -24,6 +24,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
+import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
 import { SiteProfileOverview } from './tabs/overview';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
@@ -33,11 +35,19 @@ import {
     visibleSiteProfileTabs,
 } from './tabs/registry';
 import {
+    SiteProfileShiftCoverage,
+    type SiteShiftCoverageData,
+} from './tabs/shift-coverage';
+import {
     SiteProfileEmptyState,
     SiteProfileErrorState,
     SiteProfileLoadingState,
     SiteProfileLockedState,
 } from './tabs/site-profile-states';
+import {
+    SiteProfileStaffRequirements,
+    type SiteStaffRequirementsData,
+} from './tabs/staff-requirements';
 import type {
     ResolvedSiteProfileTab,
     SiteProfileDataGroup,
@@ -149,6 +159,13 @@ export type SiteReadinessData = {
 
 type OptionalGroupData = Record<string, unknown>;
 
+type SitePeopleData = {
+    clients: SiteClientsData;
+    contacts: SiteContactsData;
+    staff_requirements: SiteStaffRequirementsData;
+    shift_coverage: SiteShiftCoverageData;
+};
+
 export type SiteProfileProps = {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
@@ -157,7 +174,7 @@ export type SiteProfileProps = {
     overview: SiteProfileOverviewData;
     readiness: SiteReadinessData;
     uiPreferences: { pinned_tabs: string[] };
-    peopleData?: OptionalGroupData;
+    peopleData?: SitePeopleData;
     safetyData?: OptionalGroupData;
     operationsData?: OptionalGroupData;
     adminData?: OptionalGroupData;
@@ -543,8 +560,39 @@ function SiteProfileContent({
         return <SiteProfileLoadingState label={active.label} />;
     }
 
+    if (dataGroup === 'peopleData') {
+        const people = groupData as SitePeopleData;
+        switch (active.id) {
+            case 'clients':
+                return (
+                    <SiteProfileClients
+                        siteId={props.site.id}
+                        data={people.clients}
+                    />
+                );
+            case 'contacts':
+                return (
+                    <SiteProfileContacts
+                        siteId={props.site.id}
+                        data={people.contacts}
+                    />
+                );
+            case 'staff_requirements':
+                return (
+                    <SiteProfileStaffRequirements
+                        siteId={props.site.id}
+                        data={people.staff_requirements}
+                    />
+                );
+            case 'shift_coverage':
+                return (
+                    <SiteProfileShiftCoverage data={people.shift_coverage} />
+                );
+        }
+    }
+
     const key = MODULE_KEYS[active.id] ?? active.id;
-    const module = groupData[key];
+    const module = (groupData as OptionalGroupData)[key];
     return <ModuleSummaryPanel label={active.label} module={module} />;
 }
 

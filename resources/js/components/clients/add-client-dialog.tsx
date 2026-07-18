@@ -872,10 +872,18 @@ function AddClientBody({
             forceFormData: true,
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const flash = page.props.flash as
+                    | { created_client_id?: number | null }
+                    | undefined;
+                const savedClientId = isEditMode
+                    ? clientId
+                    : (flash?.created_client_id ?? null);
+                if (savedClientId) {
+                    onSaved?.(savedClientId);
+                }
                 if (isEditMode && clientId) {
                     setDone(true);
-                    onSaved?.(clientId);
                 } else if (addAnother) {
                     resetAll();
                 } else {

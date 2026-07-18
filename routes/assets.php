@@ -88,10 +88,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sites/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
             ->name('sites.geocode.search');
 
-        // Site clients (link existing, quick-create, unlink)
-        Route::post('/sites/{site}/clients', [SiteClientController::class, 'store'])
-            ->whereNumber('site')
-            ->name('sites.clients.store');
+        // Site clients (place existing or unlink; creation stays in clients.store)
         Route::post('/sites/{site}/clients/link', [SiteClientController::class, 'link'])
             ->whereNumber('site')
             ->name('sites.clients.link');

@@ -82,6 +82,7 @@ use App\Services\AuditLogger;
 use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
+use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientOnboardingAccess;
 use App\Services\Clients\ClientPhotoMediaUrls;
 use App\Services\Clients\ClientPhotoStorage;
@@ -238,65 +239,9 @@ class ClientController extends Controller
             // Option lists for the in-context "Add client" wizard so it can
             // render without an extra round-trip.
             ...($user->canDo('clients.create')
-                ? $this->clientFormOptions($user->organization_id)
+                ? app(ClientFormOptions::class)->forOrganization($user->organization_id)
                 : []),
         ]);
-    }
-
-    /**
-     * Shared option lists for the Add Client wizard (and the legacy create page):
-     * sites, service contexts, assignable key workers and monitored-home
-     * geofences, plus the org default service context.
-     */
-    private function clientFormOptions(?int $organizationId = null): array
-    {
-        $defaultServiceContextId = ServiceContext::defaultId();
-        if (
-            $defaultServiceContextId !== null
-            && ! ServiceContext::query()
-                ->forOrganization($organizationId)
-                ->whereKey($defaultServiceContextId)
-                ->exists()
-        ) {
-            $defaultServiceContextId = null;
-        }
-
-        return [
-            'sites' => Site::query()
-                ->forTenant($organizationId)
-                ->where('is_active', true)
-                ->with(['houseRooms' => fn ($query) => $query
-                    ->where('is_active', true)
-                    ->where('is_assignable', true)
-                    ->orderBy('sort_order')
-                    ->orderBy('name')])
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Site $site) => [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
-                        'id' => $room->id,
-                        'name' => $room->name,
-                        'notes' => $room->notes,
-                    ])->values(),
-                ]),
-            'serviceContexts' => ServiceContext::query()
-                ->forOrganization($organizationId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'type', 'name']),
-            'keyWorkers' => app(ClientWorkerEligibility::class)
-                ->queryForOrganization($organizationId)
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'geofences' => AssetGeofence::query()
-                ->forOrganization($organizationId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'defaultServiceContextId' => $defaultServiceContextId,
-        ];
     }
 
     /** Two-letter initials from a display name (e.g. "Mere Tipene" → "MT"). */
@@ -2396,7 +2341,7 @@ class ClientController extends Controller
 
         return inertia(
             'operations/clients/create',
-            $this->clientFormOptions($request->user()?->organization_id),
+            app(ClientFormOptions::class)->forOrganization($request->user()?->organization_id),
         );
     }
 
@@ -2441,8 +2386,26 @@ class ClientController extends Controller
             }
 
             $auth = $request->user();
+            $clientFields['organization_id'] = $auth->organization_id;
 
             $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth) {
+                if (! empty($clientFields['room_id'])) {
+                    $roomIsStillAvailable = SiteHouseRoom::query()
+                        ->whereKey((int) $clientFields['room_id'])
+                        ->where('site_id', $clientFields['site_id'] ?? null)
+                        ->where('is_active', true)
+                        ->where('is_assignable', true)
+                        ->whereNull('assigned_client_id')
+                        ->lockForUpdate()
+                        ->exists();
+
+                    if (! $roomIsStillAvailable) {
+                        throw ValidationException::withMessages([
+                            'room_id' => 'This room is no longer available.',
+                        ]);
+                    }
+                }
+
                 $client = Client::create($clientFields);
                 $this->syncClientRoomAssignment($client);
 
@@ -2544,6 +2507,8 @@ class ClientController extends Controller
             return redirect()
                 ->route('clients.index')
                 ->with('success', 'Client created successfully.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
