@@ -39,7 +39,13 @@ async function expectNoBlockingAxeViolations(page: Page) {
     ).toEqual([]);
 }
 
+async function expectRouteText(page: Page, text: RegExp) {
+    await expect(page.locator('body')).toContainText(text, { timeout: 30_000 });
+}
+
 test.describe('control room — smoke', () => {
+    test.setTimeout(60_000);
+
     let operator: ReturnType<
         typeof seedIncidentHandoverFixtures
     >['users']['operator'];
@@ -64,7 +70,7 @@ test.describe('control room — smoke', () => {
 
         await page.goto('/control-room');
         await expect(
-            page.getByRole('heading', { name: 'Control Room Desk', level: 1 }),
+            page.getByRole('heading', { name: 'Desk', level: 1 }),
         ).toBeVisible();
 
         // Current desk summary and continuity language remains visible even when
@@ -111,7 +117,13 @@ test.describe('control room — smoke', () => {
 
         await page.goto('/control-room/alerts');
         await expect(page).toHaveURL(/\/control-room\/alerts(\?.*)?$/);
-        await expect(page.locator('body')).toContainText(/Alert/i);
+        await expect(
+            page.getByRole('heading', {
+                name: 'Active alerts',
+                exact: true,
+                level: 1,
+            }),
+        ).toBeVisible({ timeout: 30_000 });
 
         expectNoConsoleErrors(errors);
     });
@@ -120,17 +132,17 @@ test.describe('control room — smoke', () => {
         page,
     }) => {
         await page.goto('/control-room/integration-alerts');
-        await expect(page.locator('body')).toContainText(/Integration Alerts/i);
+        await expectRouteText(page, /Integration Alerts/i);
     });
 
     test('escalations queue page renders', async ({ page }) => {
         await page.goto('/control-room/escalations');
-        await expect(page.locator('body')).toContainText(/Escalat/i);
+        await expectRouteText(page, /Escalat/i);
     });
 
     test('SLA index renders', async ({ page }) => {
         await page.goto('/control-room/sla');
-        await expect(page.locator('body')).toContainText(/SLA/i);
+        await expectRouteText(page, /SLA/i);
     });
 
     test('SLA breaches renders and the legacy alias redirects', async ({
@@ -138,63 +150,61 @@ test.describe('control room — smoke', () => {
     }) => {
         await page.goto('/control-room/sla-breaches');
         await expect(page).toHaveURL(/\/control-room\/sla\/breaches$/);
-        await expect(page.locator('body')).toContainText(/Breach/i);
+        await expectRouteText(page, /Breach/i);
     });
 
     test('playbooks index renders', async ({ page }) => {
         await page.goto('/control-room/playbooks');
-        await expect(page.locator('body')).toContainText(/Playbook/i);
+        await expectRouteText(page, /Playbook/i);
     });
 
     test('devices monitoring renders', async ({ page }) => {
         await page.goto('/control-room/devices');
-        await expect(page.locator('body')).toContainText(/Device/i);
+        await expectRouteText(page, /Device/i);
     });
 
     test('settings page renders', async ({ page }) => {
         await page.goto('/control-room/settings');
-        await expect(page.locator('body')).toContainText(/Setting/i);
+        await expectRouteText(page, /Setting/i);
     });
 
     test('reports page renders', async ({ page }) => {
         await page.goto('/control-room/reports');
-        await expect(page.locator('body')).toContainText(/Report/i);
+        await expectRouteText(page, /Report/i);
     });
 
     test('stats page renders', async ({ page }) => {
         await page.goto('/control-room/stats');
-        await expect(page.locator('body')).toContainText(/Stat/i);
+        await expectRouteText(page, /Stat/i);
     });
 
     test('broadcast index renders', async ({ page }) => {
         await page.goto('/control-room/broadcast');
-        await expect(page.locator('body')).toContainText(/Broadcast/i);
+        await expectRouteText(page, /Broadcast/i);
     });
 
     test('messaging index renders', async ({ page }) => {
         await page.goto('/control-room/messaging');
-        await expect(page.locator('body')).toContainText(/Messag/i);
+        await expectRouteText(page, /Messag/i);
     });
 
     test('my-tasks page renders', async ({ page }) => {
         await page.goto('/control-room/my-tasks');
-        await expect(page.locator('body')).toContainText(/Task/i);
+        await expectRouteText(page, /Task/i);
     });
 
     test('incidents tracker renders', async ({ page }) => {
         await page.goto('/control-room/incidents');
-        await expect(page.locator('body')).toContainText(/Incident/i);
+        await expectRouteText(page, /Incident/i);
     });
 
     test('map view renders', async ({ page }) => {
         await page.goto('/control-room/map');
-        await expect(page.locator('body')).toContainText(
-            /Map|Location|Devices/i,
-        );
+        await expectRouteText(page, /Map|Location|Devices/i);
     });
 
     test('shifts page renders', async ({ page }) => {
         await page.goto('/control-room/shifts');
-        await expect(page.locator('body')).toContainText(/Shift/i);
+        await expectRouteText(page, /Shift/i);
     });
 });

@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
+import { Copy, Eye } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -51,6 +58,18 @@ const row: AlertWorklistRow = {
         label: 'Continue response',
         href: '/control-room/alerts/31',
     },
+    actions: {
+        can_claim: true,
+        can_acknowledge: true,
+        can_move_queue: true,
+        can_escalate: true,
+        can_create_incident: true,
+        can_snooze: true,
+        can_unsnooze: false,
+        can_copy_reference: true,
+        incident_href: null,
+        health_safety_href: null,
+    },
     href: '/control-room/alerts/31',
 };
 
@@ -84,6 +103,108 @@ describe('canonical alert worklist', () => {
             screen.getByRole('button', {
                 name: 'Continue response for CR-2026-0031',
             }),
+        ).toBeInTheDocument();
+    });
+
+    it('uses one responsive row that becomes a real mobile card without a nested scroller', () => {
+        render(
+            <AlertWorklist
+                rows={[row]}
+                selected={new Set()}
+                onSelectionChange={vi.fn()}
+                onSort={vi.fn()}
+                onOpen={vi.fn()}
+                getActions={() => [
+                    {
+                        key: 'open',
+                        label: 'Open alert',
+                        onSelect: vi.fn(),
+                    },
+                ]}
+            />,
+        );
+
+        const worklist = screen.getByRole('region', {
+            name: 'Actionable alerts',
+        });
+        expect(worklist).not.toHaveClass('overflow-x-auto');
+        expect(screen.getByTestId('alert-worklist-row')).toHaveClass(
+            'grid-cols-[auto_minmax(0,1fr)_auto]',
+        );
+        expect(screen.getByTestId('alert-worklist-row')).toHaveClass(
+            'md:grid-cols-[2.5rem_minmax(0,2fr)_minmax(14rem,1fr)_minmax(12rem,0.8fr)_auto]',
+        );
+        expect(
+            screen.getByRole('button', {
+                name: 'Actions for CR-2026-0031',
+            }),
+        ).toHaveClass('min-h-11');
+    });
+
+    it('keeps an empty queue inside the bounded worklist with useful recovery copy', () => {
+        render(
+            <AlertWorklist
+                rows={[]}
+                selected={new Set()}
+                onSelectionChange={vi.fn()}
+                onSort={vi.fn()}
+                onOpen={vi.fn()}
+                heading="Escalation worklist"
+                allowSorting={false}
+            />,
+        );
+
+        expect(
+            screen.getByRole('region', { name: 'Escalation worklist' }),
+        ).toBeInTheDocument();
+        expect(screen.getByText('No alerts in this view')).toBeInTheDocument();
+        expect(screen.getByText(/clear the filters/i)).toBeInTheDocument();
+    });
+
+    it('exposes identical permission-filtered actions by right click and overflow', async () => {
+        render(
+            <AlertWorklist
+                rows={[row]}
+                selected={new Set()}
+                onSelectionChange={vi.fn()}
+                onSort={vi.fn()}
+                onOpen={vi.fn()}
+                getActions={() => [
+                    {
+                        key: 'open',
+                        label: 'Open alert',
+                        icon: Eye,
+                        onSelect: vi.fn(),
+                    },
+                    {
+                        key: 'copy',
+                        label: 'Copy reference',
+                        icon: Copy,
+                        onSelect: vi.fn(),
+                    },
+                ]}
+            />,
+        );
+
+        fireEvent.contextMenu(screen.getByTestId('alert-worklist-row'), {
+            clientX: 180,
+            clientY: 120,
+        });
+        expect(
+            await screen.findByRole('menuitem', { name: 'Open alert' }),
+        ).toBeInTheDocument();
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        await waitFor(() =>
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument(),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Actions for CR-2026-0031',
+            }),
+        );
+        expect(
+            await screen.findByRole('menuitem', { name: 'Copy reference' }),
         ).toBeInTheDocument();
     });
 });

@@ -58,6 +58,8 @@ class ControlRoomMyTasksControllerTest extends TestCase
                 ->component('control-room/my-tasks')
                 ->has('my_alerts', 1)
                 ->where('my_alerts.0.id', $mine->id)
+                ->where('my_alerts.0.actions.can_claim', false)
+                ->where('my_alerts.0.actions.can_copy_reference', true)
                 ->has('stats')
                 ->has('can')
             );

@@ -100,6 +100,35 @@ class ControlRoomShiftControllerTest extends TestCase
         );
     }
 
+    public function test_shift_index_returns_record_level_actions_for_active_and_recent_shifts(): void
+    {
+        Shift::query()->create([
+            'name' => 'Active Shift',
+            'starts_at' => now()->subHour(),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->coordinator->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+        Shift::query()->create([
+            'name' => 'Previous Shift',
+            'starts_at' => now()->subHours(3),
+            'ends_at' => now()->subHours(2),
+            'status' => 'completed',
+            'shift_lead_user_id' => $this->visibleWorker->id,
+            'team_members' => [$this->visibleWorker->id],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room/shifts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('activeShift.actions.can_open_handover', true)
+                ->where('activeShift.actions.can_add_note', true)
+                ->where('activeShift.actions.can_copy_summary', true)
+                ->where('recentShifts.0.actions.can_copy_summary', true)
+            );
+    }
+
     public function test_shift_store_rejects_out_of_scope_staff_selection(): void
     {
         $this->actingAs($this->coordinator)

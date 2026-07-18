@@ -63,6 +63,51 @@ SQL;
     }
 
     /**
+     * Apply the escalation workspace order. Queue tier and time in the current
+     * queue are explicit here because they are not part of the general alert
+     * worklist contract.
+     */
+    public function applyEscalation(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+        $applicableSla = "`escalation_sla`.`id` IS NOT NULL AND `escalation_sla`.`sla_definition_id` IS NOT NULL AND (`escalation_sla`.`ended_as` IS NULL OR `escalation_sla`.`ended_as` NOT IN ('reconciled_no_match', 'dismissed'))";
+        $breached = <<<'SQL'
+CASE WHEN `escalation_sla`.`id` IS NOT NULL
+    AND `escalation_sla`.`sla_definition_id` IS NOT NULL
+    AND (`escalation_sla`.`ended_as` IS NULL OR `escalation_sla`.`ended_as` NOT IN ('reconciled_no_match', 'dismissed'))
+    AND (
+        `escalation_sla`.`acknowledge_breached` = 1
+        OR `escalation_sla`.`response_breached` = 1
+        OR `escalation_sla`.`resolution_breached` = 1
+        OR (`escalation_sla`.`acknowledged_at` IS NULL AND `escalation_sla`.`acknowledge_deadline` < CURRENT_TIMESTAMP)
+        OR (`escalation_sla`.`responded_at` IS NULL AND `escalation_sla`.`response_deadline` < CURRENT_TIMESTAMP)
+        OR (`escalation_sla`.`resolved_at` IS NULL AND `escalation_sla`.`resolution_deadline` < CURRENT_TIMESTAMP)
+        OR (`escalation_sla`.`acknowledged_at` > `escalation_sla`.`acknowledge_deadline`)
+        OR (`escalation_sla`.`responded_at` > `escalation_sla`.`response_deadline`)
+        OR (`escalation_sla`.`resolved_at` > `escalation_sla`.`resolution_deadline`)
+    ) THEN 0 ELSE 1 END
+SQL;
+        $nextDeadline = 'LEAST('
+            ."COALESCE(CASE WHEN {$applicableSla} AND `escalation_sla`.`acknowledged_at` IS NULL THEN `escalation_sla`.`acknowledge_deadline` END, '9999-12-31 23:59:59'),"
+            ."COALESCE(CASE WHEN {$applicableSla} AND `escalation_sla`.`responded_at` IS NULL THEN `escalation_sla`.`response_deadline` END, '9999-12-31 23:59:59'),"
+            ."COALESCE(CASE WHEN {$applicableSla} AND `escalation_sla`.`resolved_at` IS NULL THEN `escalation_sla`.`resolution_deadline` END, '9999-12-31 23:59:59'),"
+            ."COALESCE(`{$table}`.`due_at`, '9999-12-31 23:59:59')"
+            .')';
+
+        return $query
+            ->leftJoin('control_room_alert_sla as escalation_sla', 'escalation_sla.alert_id', '=', "{$table}.id")
+            ->orderByRaw($breached)
+            ->orderByDesc('worklist_queue.tier')
+            ->orderByRaw("CASE LOWER(`{$table}`.`severity`) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END")
+            ->orderByRaw("CASE WHEN {$nextDeadline} = '9999-12-31 23:59:59' THEN 1 ELSE 0 END")
+            ->orderByRaw("{$nextDeadline} ASC")
+            ->orderByRaw('CASE WHEN `current_queue_entry`.`entered_queue_at` IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('current_queue_entry.entered_queue_at')
+            ->orderBy("{$table}.triggered_at")
+            ->orderBy("{$table}.id");
+    }
+
+    /**
      * Mirror the database order for already-loaded alerts and compact widgets.
      *
      * @param  Collection<int, ControlRoomAlert>  $alerts

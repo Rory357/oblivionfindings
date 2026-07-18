@@ -217,7 +217,7 @@ test.describe('control room — alert lifecycle (show page)', () => {
         const textarea = workspace.getByPlaceholder('Add an operator note…');
         await textarea.fill('E2E note from Playwright');
         await workspace
-            .getByRole('button', { name: 'Note', exact: true })
+            .getByRole('button', { name: 'Add note', exact: true })
             .click();
 
         await expect(

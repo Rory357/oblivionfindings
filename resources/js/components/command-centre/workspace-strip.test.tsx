@@ -63,4 +63,22 @@ describe('WorkspaceStrip', () => {
         expect(desk.className).toContain('focus-visible:ring-2');
         expect(desk).not.toHaveAttribute('role', 'tab');
     });
+
+    it('stays compact and scrolls horizontally instead of stretching into six large tiles', () => {
+        render(<WorkspaceStrip current="/control-room/alerts" />);
+
+        const navigation = screen.getByRole('navigation', {
+            name: 'Control Room workspace',
+        });
+        const destinations = navigation.firstElementChild;
+
+        expect(destinations).toHaveClass('overflow-x-auto');
+        expect(destinations).not.toHaveClass('grid-cols-6');
+        expect(screen.getByRole('link', { name: 'Desk' })).toHaveClass(
+            'min-w-max',
+        );
+        expect(screen.getByRole('link', { name: 'Active alerts' })).toHaveClass(
+            'min-h-11',
+        );
+    });
 });

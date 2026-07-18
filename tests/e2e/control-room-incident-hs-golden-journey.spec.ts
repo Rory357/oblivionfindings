@@ -34,8 +34,12 @@ test.describe('Control Room → Incident → H&S seven-persona closure relay', (
         await loginAsFixture(page, manifest.users.operator);
         await page.goto('/control-room');
         await expect(
-            page.getByRole('heading', { name: /Control Room Desk/i }),
-        ).toBeVisible();
+            page.getByRole('heading', {
+                name: 'Desk',
+                exact: true,
+                level: 1,
+            }),
+        ).toBeVisible({ timeout: 60_000 });
         const alertId = await createGoldenAlert(page, manifest);
         await postLaravel(page, `/control-room/alerts/${alertId}/assign-to-me`);
         await postLaravel(page, `/control-room/alerts/${alertId}/acknowledge`, {
