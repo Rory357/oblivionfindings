@@ -28,7 +28,7 @@
 - Create: `resources/js/test/page-grouped-profile-nav.test.tsx`
 - Verify: `resources/js/test/client-profile-navigation.test.tsx`
 
-- [ ] **Step 1: Write failing shared-navigation tests**
+- [x] **Step 1: Write failing shared-navigation tests**
 
 Cover group selection, remembered tab per group, count and warning badges, configurable test IDs, `/` search, keyboard selection, and pin/unpin callbacks. Use this public contract:
 
@@ -52,23 +52,23 @@ export type GroupedProfileNavProps = {
 };
 ```
 
-- [ ] **Step 2: Prove the new test fails**
+- [x] **Step 2: Prove the new test fails**
 
 Run: `npm test -- resources/js/test/page-grouped-profile-nav.test.tsx`
 
 Expected: FAIL because `@/components/page/grouped-profile-nav` does not exist.
 
-- [ ] **Step 3: Extract the generic primitive and retain compatibility exports**
+- [x] **Step 3: Extract the generic primitive and retain compatibility exports**
 
 Move the existing `GroupPillRail`, `TierTwoTabs`, and `TabSearchPalette` behaviour into the shared file. Build test IDs from `${testIdPrefix}-group-*`, `${testIdPrefix}-tab-*`, and `${testIdPrefix}-search`. Make warning badges expose visible text and an accessible label. Re-export the shared symbols from `components/clients/profile/nav.tsx` so Client Profile imports remain valid.
 
-- [ ] **Step 4: Verify shared and Client Profile navigation**
+- [x] **Step 4: Verify shared and Client Profile navigation**
 
 Run: `npm test -- resources/js/test/page-grouped-profile-nav.test.tsx resources/js/test/client-profile-navigation.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add resources/js/components/page/grouped-profile-nav.tsx resources/js/components/clients/profile/nav.tsx resources/js/test/page-grouped-profile-nav.test.tsx && git diff --cached --check && git commit -m "refactor(ui): share grouped profile navigation"`
 
@@ -85,8 +85,17 @@ Run: `git add resources/js/components/page/grouped-profile-nav.tsx resources/js/
 Test the exact five groups and tabs from the approved design, house/day-service/head-office labels, head-office exclusions, permission-shaped locked tabs, group-data ownership, warning totals, and safe normalization of unknown or hidden `?tab=` values.
 
 ```ts
-export type SiteProfileDataGroup = 'peopleData' | 'safetyData' | 'operationsData' | 'adminData';
-export type SiteProfileGroupId = 'overview' | 'people' | 'safety' | 'operations' | 'admin';
+export type SiteProfileDataGroup =
+    | 'peopleData'
+    | 'safetyData'
+    | 'operationsData'
+    | 'adminData';
+export type SiteProfileGroupId =
+    | 'overview'
+    | 'people'
+    | 'safety'
+    | 'operations'
+    | 'admin';
 
 export type SiteProfileTabDefinition = {
     id: string;
