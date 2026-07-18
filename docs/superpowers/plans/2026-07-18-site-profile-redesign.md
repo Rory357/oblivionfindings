@@ -194,7 +194,7 @@ Run: `git add database/migrations/2026_07_18_000100_create_user_ui_preferences_t
 - Create: `database/migrations/2026_07_18_000200_add_site_profile_attention_indexes.php`
 - Verify: `app/Models/PpeInventory.php`
 
-- [ ] **Step 1: Write failing attention aggregation tests**
+- [x] **Step 1: Write failing attention aggregation tests**
 
 Seed overdue hazards/actions, inspections, drills, documents, staffing gaps, assets/PPE, Checklists, and hardware. Assert this stable shape, real resolution links, severity ordering, a maximum of eight rows, permission filtering, and no credential secret fields:
 
@@ -206,34 +206,34 @@ Seed overdue hazards/actions, inspections, drills, documents, staffing gaps, ass
 ]
 ```
 
-- [ ] **Step 2: Prove the service test fails**
+- [x] **Step 2: Prove the service test fails**
 
 Run: `php artisan test tests/Feature/Sites/SiteProfileAttentionServiceTest.php`
 
 Expected: FAIL because the service does not exist.
 
-- [ ] **Step 3: Implement source-specific private collectors**
+- [x] **Step 3: Implement source-specific private collectors**
 
 Each collector selects only fields needed for the digest, filters by `site_id`, permission, status, and due/review date, and returns a normalized item with `source`, `severity`, `title`, `detail`, `due_date`, `tab`, and `href`. Merge, severity-sort, and cap rows after calculating uncapped counts. Do not cache the result.
 
-- [ ] **Step 4: Add only confirmed composite indexes**
+- [x] **Step 4: Add only confirmed composite indexes**
 
 Add reversible indexes for the filters the service actually executes:
 
 ```text
+site_hazards(site_id, status, due_date)
 site_hazards(site_id, status, review_date)
+emergency_drills(site_id, status, scheduled_at)
 site_documents(site_id, expiry_date)
-site_staff_requirements(site_id, is_active)
 assets(site_id, requires_inspection, inspection_due_at)
 assets(site_id, requires_maintenance, maintenance_due_at)
-location_hardware(site_id, status, last_seen_at)
 ppe_inventory(site_id, status, next_inspection_due)
 ppe_inventory(site_id, status, expiry_date)
 ```
 
-Before finalizing the migration, compare every index against the current MySQL schema and omit any equivalent existing prefix.
+Before finalizing the migration, compare every index against the current MySQL schema and omit any equivalent existing prefix. Hardware attention must query the canonical `devices` registry through active `device_assignments`; do not query or index the deprecated `location_hardware` compatibility shadow. The existing `dev_assign_target_active_idx` and tenant device health/status indexes cover that canonical path.
 
-- [ ] **Step 5: Verify digest behaviour and migration reversibility**
+- [x] **Step 5: Verify digest behaviour and migration reversibility**
 
 Run: `php artisan test tests/Feature/Sites/SiteProfileAttentionServiceTest.php`
 
@@ -241,7 +241,7 @@ Run: `php artisan migrate --pretend --path=database/migrations/2026_07_18_000200
 
 Expected: PASS and valid `up` SQL.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run: `git add app/Services/Sites/SiteProfileAttentionService.php tests/Feature/Sites/SiteProfileAttentionServiceTest.php database/migrations/2026_07_18_000200_add_site_profile_attention_indexes.php && git diff --cached --check && git commit -m "feat(sites): aggregate profile attention items"`
 

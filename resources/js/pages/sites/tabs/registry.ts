@@ -241,7 +241,7 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         label: literal('Hardware'),
         icon: HardDrive,
         dataGroup: 'operationsData',
-        permission: 'security-devices.view',
+        permission: 'securityDevices.devices.view',
         warningSource: 'hardware',
     },
     {
