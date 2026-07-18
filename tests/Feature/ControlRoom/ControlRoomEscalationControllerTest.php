@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Models\ControlRoom\AlertQueue;
+use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Factories\ControlRoomAlertFactory;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,7 +29,7 @@ class ControlRoomEscalationControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->site = Site::factory()->create(['tenant_id' => 1]);
 
@@ -62,8 +66,105 @@ class ControlRoomEscalationControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/escalations')
-                ->has('queues')
+                ->where('queues.0.alert_count', 2)
+                ->where('queues.0.capacity', 20)
+                ->where('queues.0.utilization_percent', 10)
+                ->missing('queues.0.alerts')
+                ->has('worklist.data', 2)
                 ->has('allQueues')
+            );
+    }
+
+    public function test_index_paginates_the_primary_worklist_and_explains_over_capacity_pressure(): void
+    {
+        $queue = TriageQueue::create([
+            'name' => 'Emergency',
+            'code' => 'emergency-pressure',
+            'tier' => 3,
+            'is_active' => true,
+        ]);
+
+        $this->alertFactory()->open()->count(31)->create(['queue_id' => $queue->id]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/escalations')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('queues.0.alert_count', 31)
+                ->where('queues.0.capacity', 20)
+                ->where('queues.0.utilization_percent', 155)
+                ->where('queues.0.pressure_label', 'Over capacity')
+                ->where('queues.0.capacity_explanation', '20-alert operational display threshold; alerts remain paginated and no work is hidden.')
+                ->has('worklist.data', 30)
+                ->where('worklist.total', 31)
+                ->where('summary.active_queues', 1)
+                ->where('summary.total_alerts', 31)
+            );
+    }
+
+    public function test_index_filters_one_shared_worklist_by_queue(): void
+    {
+        $tier1 = TriageQueue::create(['name' => 'Tier 1', 'code' => 'filter-t1', 'tier' => 1, 'is_active' => true]);
+        $tier2 = TriageQueue::create(['name' => 'Tier 2', 'code' => 'filter-t2', 'tier' => 2, 'is_active' => true]);
+        $visible = $this->alertFactory()->open()->create(['queue_id' => $tier2->id]);
+        $this->alertFactory()->open()->create(['queue_id' => $tier1->id]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/escalations?queue_id='.$tier2->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('worklist.data', 1)
+                ->where('worklist.data.0.id', $visible->id)
+                ->where('filters.queue_id', (string) $tier2->id)
+            );
+    }
+
+    public function test_worklist_orders_breaches_then_queue_tier_then_severity_and_queue_age(): void
+    {
+        $tier1 = TriageQueue::create(['name' => 'Tier 1', 'code' => 'order-t1', 'tier' => 1, 'is_active' => true]);
+        $tier3 = TriageQueue::create(['name' => 'Emergency', 'code' => 'order-t3', 'tier' => 3, 'is_active' => true]);
+        $slaDefinition = SlaDefinition::create([
+            'name' => 'Ordering SLA',
+            'code' => 'ordering-sla',
+            'acknowledge_target_minutes' => 5,
+            'is_active' => true,
+        ]);
+
+        $tier3Older = $this->alertFactory()->open()->create([
+            'queue_id' => $tier3->id,
+            'severity' => 'medium',
+            'triggered_at' => now()->subHours(2),
+        ]);
+        $tier3Newer = $this->alertFactory()->open()->create([
+            'queue_id' => $tier3->id,
+            'severity' => 'medium',
+            'triggered_at' => now()->subHour(),
+        ]);
+        $tier1Critical = $this->alertFactory()->open()->create([
+            'queue_id' => $tier1->id,
+            'severity' => 'critical',
+        ]);
+        $breached = $this->alertFactory()->open()->create([
+            'queue_id' => $tier1->id,
+            'severity' => 'low',
+        ]);
+        AlertSla::create([
+            'alert_id' => $breached->id,
+            'sla_definition_id' => $slaDefinition->id,
+            'acknowledge_deadline' => now()->subMinute(),
+            'acknowledge_breached' => true,
+        ]);
+        AlertQueue::create(['alert_id' => $tier3Older->id, 'queue_id' => $tier3->id, 'entered_at' => now()->subHours(3)]);
+        AlertQueue::create(['alert_id' => $tier3Newer->id, 'queue_id' => $tier3->id, 'entered_at' => now()->subHours(2)]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/escalations')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('worklist.data.0.id', $breached->id)
+                ->where('worklist.data.1.id', $tier3Older->id)
+                ->where('worklist.data.2.id', $tier3Newer->id)
+                ->where('worklist.data.3.id', $tier1Critical->id)
             );
     }
 

@@ -1,8 +1,10 @@
+import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
 import {
     AlertWorkspaceDialog,
     type AlertWorkspaceDetail,
 } from '@/components/control-room/alert-workspace-dialog';
 import { CommandCentreTabs } from '@/components/control-room/command-centre-tabs';
+import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
 import {
     AnalyticsPanel,
     type DeskAnalytics,
@@ -177,6 +179,14 @@ export function ControlRoomDashboardView({
         );
     };
 
+    const rowActions = (row: AlertWorklistRow) =>
+        buildControlRoomAlertRowActions(row, {
+            openWorkspace,
+            post: (href) => router.post(href, {}, { preserveScroll: true }),
+            visit: (href) => router.visit(href),
+            copy: (value) => void navigator.clipboard?.writeText(value),
+        });
+
     const openAnalytics = () => {
         setAnalyticsOpen(true);
         if (!analytics) {
@@ -237,6 +247,7 @@ export function ControlRoomDashboardView({
                     queues={queues}
                     onFilter={applyFilters}
                     onOpen={openWorkspace}
+                    getActions={rowActions}
                 />
                 <aside className="space-y-5">
                     <ContinuityPanel handover={handover} />
@@ -295,7 +306,7 @@ export default function ControlRoomDashboard(props: ControlRoomDashboardProps) {
             ]}
             contentClassName="overflow-x-hidden"
         >
-            <Head title="Control Room Desk" />
+            <Head title="Desk - Control Room" />
             <ControlRoomDashboardView {...props} />
         </AppLayout>
     );

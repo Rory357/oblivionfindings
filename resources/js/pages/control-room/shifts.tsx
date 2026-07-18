@@ -1,4 +1,8 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,18 +30,17 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     ArrowRightLeft,
     Calendar,
-    CheckCircle,
     Clock,
+    Copy,
+    Eye,
     MessageSquarePlus,
     Pin,
     Plus,
-    TrendingUp,
     User,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 // --- TypeScript Interfaces ---
 
@@ -62,6 +65,11 @@ interface ActiveShift {
     handover_version: number;
     handover_prepared_at: string | null;
     incoming_lead: StaffMember | null;
+    actions: {
+        can_open_handover: boolean;
+        can_add_note: boolean;
+        can_copy_summary: boolean;
+    };
 }
 
 interface OperatorNote {
@@ -88,6 +96,9 @@ interface RecentShift {
     alerts_resolved: number;
     alerts_escalated: number;
     duration_minutes: number | null;
+    actions: {
+        can_copy_summary: boolean;
+    };
 }
 
 interface Props {
@@ -203,6 +214,65 @@ export default function ControlRoomShifts({
         }
     };
 
+    const activeShiftActions = (): ControlRoomRowAction[] => {
+        if (!activeShift) return [];
+        const actions: ControlRoomRowAction[] = [];
+
+        if (activeShift.actions.can_open_handover) {
+            actions.push({
+                key: 'handover',
+                label:
+                    activeShift.handover_status === 'prepared'
+                        ? 'Review prepared handover'
+                        : 'Prepare handover',
+                icon: Eye,
+                onSelect: () =>
+                    router.visit(
+                        `/control-room/shifts/${activeShift.id}/handover`,
+                    ),
+            });
+        }
+        if (activeShift.actions.can_add_note) {
+            actions.push({
+                key: 'add-note',
+                label: 'Add operator note',
+                icon: MessageSquarePlus,
+                onSelect: () => setNoteOpen(true),
+            });
+        }
+        if (activeShift.actions.can_copy_summary) {
+            actions.push({
+                key: 'copy-summary',
+                label: 'Copy shift summary',
+                icon: Copy,
+                onSelect: () =>
+                    void navigator.clipboard?.writeText(
+                        `${activeShift.name}: ${activeShift.alerts_created} created, ${activeShift.alerts_resolved} resolved, ${activeShift.alerts_escalated} escalated`,
+                    ),
+            });
+        }
+
+        return actions;
+    };
+
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            if (document.hidden) return;
+            router.reload({
+                only: [
+                    'activeShift',
+                    'notes',
+                    'recentShifts',
+                    'openAlertsCount',
+                    'criticalAlertsCount',
+                ],
+                preserveScroll: true,
+            });
+        }, 30_000);
+
+        return () => window.clearInterval(interval);
+    }, []);
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -215,7 +285,7 @@ export default function ControlRoomShifts({
                 <CommandCentrePage
                     current="/control-room/shifts"
                     icon={Calendar}
-                    title="Control Room shifts"
+                    title="Shifts"
                     description="Keep the live desk staffed and transfer ownership through a prepared, accepted handover."
                     status={
                         activeShift ? 'Active shift running' : 'No active shift'
@@ -225,6 +295,55 @@ export default function ControlRoomShifts({
                             ? 'Incoming acceptance required'
                             : undefined
                     }
+                    metricGroups={[
+                        {
+                            title: 'Shift operations',
+                            icon: Calendar,
+                            metrics: [
+                                {
+                                    label: 'Open now',
+                                    value: String(openAlertsCount),
+                                    caption: 'active alerts',
+                                    tone:
+                                        openAlertsCount > 0
+                                            ? 'warning'
+                                            : 'success',
+                                },
+                                {
+                                    label: 'Critical',
+                                    value: String(criticalAlertsCount),
+                                    caption: 'act first',
+                                    tone:
+                                        criticalAlertsCount > 0
+                                            ? 'critical'
+                                            : 'success',
+                                },
+                                {
+                                    label: 'Resolved',
+                                    value: String(
+                                        activeShift?.alerts_resolved ?? 0,
+                                    ),
+                                    caption: activeShift
+                                        ? 'this shift'
+                                        : 'no active shift',
+                                    tone: 'success',
+                                },
+                                {
+                                    label: 'Escalated',
+                                    value: String(
+                                        activeShift?.alerts_escalated ?? 0,
+                                    ),
+                                    caption: activeShift
+                                        ? 'this shift'
+                                        : 'no active shift',
+                                    tone:
+                                        (activeShift?.alerts_escalated ?? 0) > 0
+                                            ? 'warning'
+                                            : 'neutral',
+                                },
+                            ],
+                        },
+                    ]}
                     actions={
                         can.manage && !activeShift ? (
                             <Dialog
@@ -349,326 +468,329 @@ export default function ControlRoomShifts({
                 >
                     {/* Current Active Shift */}
                     {activeShift ? (
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <CardTitle className="flex items-center gap-2">
-                                            {activeShift.name}
-                                            <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
-                                                Active
-                                            </Badge>
-                                            {activeShift.handover_status ===
-                                                'prepared' && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
-                                                >
-                                                    Handover prepared
-                                                </Badge>
-                                            )}
-                                        </CardTitle>
-                                        <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-3.5 w-3.5" />
-                                                Started{' '}
-                                                {formatRelative(
-                                                    activeShift.starts_at,
-                                                )}
-                                            </span>
-                                            {activeShift.shift_lead && (
-                                                <span className="flex items-center gap-1">
-                                                    <User className="h-3.5 w-3.5" />
-                                                    Lead:{' '}
-                                                    {
-                                                        activeShift.shift_lead
-                                                            .name
-                                                    }
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {can.manage && (
-                                        <div className="flex gap-2">
-                                            <Dialog
-                                                open={noteOpen}
-                                                onOpenChange={setNoteOpen}
-                                            >
-                                                <DialogTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                    >
-                                                        <MessageSquarePlus className="mr-2 h-4 w-4" />
-                                                        Add Note
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="sm:max-w-lg">
-                                                    <form
-                                                        onSubmit={handleAddNote}
-                                                    >
-                                                        <DialogHeader>
-                                                            <DialogTitle>
-                                                                Add Operator
-                                                                Note
-                                                            </DialogTitle>
-                                                            <DialogDescription>
-                                                                Record an
-                                                                observation,
-                                                                action, or
-                                                                decision for
-                                                                this shift.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <div className="mt-4 space-y-4">
-                                                            <div>
-                                                                <Label>
-                                                                    Note Type
-                                                                </Label>
-                                                                <Select
-                                                                    value={
-                                                                        noteType
-                                                                    }
-                                                                    onValueChange={
-                                                                        setNoteType
+                        <ControlRoomRowActions
+                            label={`Actions for ${activeShift.name}`}
+                            items={activeShiftActions()}
+                        >
+                            {({ rowProps, overflowButton }) => (
+                                <Card {...rowProps}>
+                                    <CardHeader className="pb-3">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="min-w-0">
+                                                <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 break-words">
+                                                    <span className="min-w-0 break-words">
+                                                        {activeShift.name}
+                                                    </span>
+                                                    <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                        Active
+                                                    </Badge>
+                                                    {activeShift.handover_status ===
+                                                        'prepared' && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                                        >
+                                                            Handover prepared
+                                                        </Badge>
+                                                    )}
+                                                </CardTitle>
+                                                <div className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3.5 w-3.5" />
+                                                        Started{' '}
+                                                        {formatRelative(
+                                                            activeShift.starts_at,
+                                                        )}
+                                                    </span>
+                                                    {activeShift.shift_lead && (
+                                                        <span className="flex items-center gap-1">
+                                                            <User className="h-3.5 w-3.5" />
+                                                            Lead:{' '}
+                                                            {
+                                                                activeShift
+                                                                    .shift_lead
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                                                {can.manage && (
+                                                    <>
+                                                        <Dialog
+                                                            open={noteOpen}
+                                                            onOpenChange={
+                                                                setNoteOpen
+                                                            }
+                                                        >
+                                                            <DialogTrigger
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                >
+                                                                    <MessageSquarePlus className="mr-2 h-4 w-4" />
+                                                                    Add Note
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="sm:max-w-lg">
+                                                                <form
+                                                                    onSubmit={
+                                                                        handleAddNote
                                                                     }
                                                                 >
-                                                                    <SelectTrigger>
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        <SelectItem value="note">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>
+                                                                            Add
+                                                                            Operator
                                                                             Note
-                                                                        </SelectItem>
-                                                                        <SelectItem value="action">
-                                                                            Action
-                                                                        </SelectItem>
-                                                                        <SelectItem value="escalation">
-                                                                            Escalation
-                                                                        </SelectItem>
-                                                                        <SelectItem value="decision">
-                                                                            Decision
-                                                                        </SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            </div>
-                                                            <div>
-                                                                <Label htmlFor="note-content">
-                                                                    Content
-                                                                </Label>
-                                                                <Textarea
-                                                                    id="note-content"
-                                                                    value={
-                                                                        noteContent
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        setNoteContent(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
-                                                                    rows={4}
-                                                                    maxLength={
-                                                                        2000
-                                                                    }
-                                                                    required
-                                                                    placeholder="Enter note details..."
-                                                                />
-                                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                                    {
-                                                                        noteContent.length
-                                                                    }
-                                                                    /2000
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex gap-4">
-                                                                <label className="flex items-center gap-2 text-sm">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={
-                                                                            notePinned
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            setNotePinned(
-                                                                                e
-                                                                                    .target
-                                                                                    .checked,
-                                                                            )
-                                                                        }
-                                                                        className="rounded border-border"
-                                                                    />
-                                                                    Pin note
-                                                                </label>
-                                                                <label className="flex items-center gap-2 text-sm">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={
-                                                                            noteFollowup
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            setNoteFollowup(
-                                                                                e
-                                                                                    .target
-                                                                                    .checked,
-                                                                            )
-                                                                        }
-                                                                        className="rounded border-border"
-                                                                    />
-                                                                    Requires
-                                                                    follow-up
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                        <DialogFooter className="mt-6">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    setNoteOpen(
-                                                                        false,
-                                                                    )
-                                                                }
+                                                                        </DialogTitle>
+                                                                        <DialogDescription>
+                                                                            Record
+                                                                            an
+                                                                            observation,
+                                                                            action,
+                                                                            or
+                                                                            decision
+                                                                            for
+                                                                            this
+                                                                            shift.
+                                                                        </DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <div className="mt-4 space-y-4">
+                                                                        <div>
+                                                                            <Label>
+                                                                                Note
+                                                                                Type
+                                                                            </Label>
+                                                                            <Select
+                                                                                value={
+                                                                                    noteType
+                                                                                }
+                                                                                onValueChange={
+                                                                                    setNoteType
+                                                                                }
+                                                                            >
+                                                                                <SelectTrigger>
+                                                                                    <SelectValue />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    <SelectItem value="note">
+                                                                                        Note
+                                                                                    </SelectItem>
+                                                                                    <SelectItem value="action">
+                                                                                        Action
+                                                                                    </SelectItem>
+                                                                                    <SelectItem value="escalation">
+                                                                                        Escalation
+                                                                                    </SelectItem>
+                                                                                    <SelectItem value="decision">
+                                                                                        Decision
+                                                                                    </SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                        <div>
+                                                                            <Label htmlFor="note-content">
+                                                                                Content
+                                                                            </Label>
+                                                                            <Textarea
+                                                                                id="note-content"
+                                                                                value={
+                                                                                    noteContent
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    setNoteContent(
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                rows={
+                                                                                    4
+                                                                                }
+                                                                                maxLength={
+                                                                                    2000
+                                                                                }
+                                                                                required
+                                                                                placeholder="Enter note details..."
+                                                                            />
+                                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                                {
+                                                                                    noteContent.length
+                                                                                }
+                                                                                /2000
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="flex gap-4">
+                                                                            <label className="flex items-center gap-2 text-sm">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={
+                                                                                        notePinned
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        setNotePinned(
+                                                                                            e
+                                                                                                .target
+                                                                                                .checked,
+                                                                                        )
+                                                                                    }
+                                                                                    className="rounded border-border"
+                                                                                />
+                                                                                Pin
+                                                                                note
+                                                                            </label>
+                                                                            <label className="flex items-center gap-2 text-sm">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={
+                                                                                        noteFollowup
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        setNoteFollowup(
+                                                                                            e
+                                                                                                .target
+                                                                                                .checked,
+                                                                                        )
+                                                                                    }
+                                                                                    className="rounded border-border"
+                                                                                />
+                                                                                Requires
+                                                                                follow-up
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter className="mt-6">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                setNoteOpen(
+                                                                                    false,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Cancel
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="submit"
+                                                                            disabled={
+                                                                                !noteContent
+                                                                            }
+                                                                        >
+                                                                            Add
+                                                                            Note
+                                                                        </Button>
+                                                                    </DialogFooter>
+                                                                </form>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                        <Button
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            {/* Handover is a guided, stepped page — summary, notes, incoming team, confirm. */}
+                                                            <Link
+                                                                href={`/control-room/shifts/${activeShift.id}/handover`}
                                                             >
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={
-                                                                    !noteContent
-                                                                }
-                                                            >
-                                                                Add Note
-                                                            </Button>
-                                                        </DialogFooter>
-                                                    </form>
-                                                </DialogContent>
-                                            </Dialog>
-                                            <Button size="sm" asChild>
-                                                {/* Handover is a guided, stepped page — summary, notes, incoming team, confirm. */}
-                                                <Link
-                                                    href={`/control-room/shifts/${activeShift.id}/handover`}
-                                                >
-                                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                    {activeShift.handover_status ===
-                                                    'prepared'
-                                                        ? 'Review Prepared Handover'
-                                                        : 'Prepare Handover'}
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {activeShift.handover_status === 'prepared' && (
-                                    <div className="mb-5 flex items-center justify-between gap-6 rounded-lg border border-status-warning/30 bg-status-warning-bg/40 p-4">
-                                        <div>
-                                            <p className="font-semibold">
-                                                Ownership has not changed yet
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                Prepared for{' '}
-                                                {activeShift.incoming_lead
-                                                    ?.name ??
-                                                    'the incoming lead'}{' '}
-                                                on{' '}
-                                                {formatDateTime(
-                                                    activeShift.handover_prepared_at,
+                                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                                {activeShift.handover_status ===
+                                                                'prepared'
+                                                                    ? 'Review Prepared Handover'
+                                                                    : 'Prepare Handover'}
+                                                            </Link>
+                                                        </Button>
+                                                    </>
                                                 )}
-                                                . This shift remains active
-                                                until they accept.
-                                            </p>
+                                                {overflowButton}
+                                            </div>
                                         </div>
-                                        <Button asChild variant="outline">
-                                            <Link
-                                                href={`/control-room/shifts/${activeShift.id}/handover`}
-                                            >
-                                                Open handover
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                )}
-                                {/* Team Members */}
-                                {activeShift.team_members.length > 0 && (
-                                    <div className="mb-4 flex flex-wrap items-center gap-2">
-                                        <span className="text-xs font-medium text-muted-foreground">
-                                            Team:
-                                        </span>
-                                        {activeShift.team_members.map(
-                                            (member) => (
-                                                <Badge
-                                                    key={member.id}
-                                                    variant="secondary"
+                                    </CardHeader>
+                                    <CardContent>
+                                        {activeShift.handover_status ===
+                                            'prepared' && (
+                                            <div className="mb-5 flex items-center justify-between gap-6 rounded-lg border border-status-warning/30 bg-status-warning-bg/40 p-4">
+                                                <div>
+                                                    <p className="font-semibold">
+                                                        Ownership has not
+                                                        changed yet
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        Prepared for{' '}
+                                                        {activeShift
+                                                            .incoming_lead
+                                                            ?.name ??
+                                                            'the incoming lead'}{' '}
+                                                        on{' '}
+                                                        {formatDateTime(
+                                                            activeShift.handover_prepared_at,
+                                                        )}
+                                                        . This shift remains
+                                                        active until they
+                                                        accept.
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
                                                 >
-                                                    {member.name}
-                                                </Badge>
-                                            ),
+                                                    <Link
+                                                        href={`/control-room/shifts/${activeShift.id}/handover`}
+                                                    >
+                                                        Open handover
+                                                    </Link>
+                                                </Button>
+                                            </div>
                                         )}
-                                    </div>
-                                )}
-
-                                {/* Metrics Grid */}
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-lg border bg-muted/30 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                            <span className="text-xs text-muted-foreground">
-                                                Alerts Created
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-2xl font-bold">
-                                            {activeShift.alerts_created}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border bg-muted/30 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <CheckCircle className="h-4 w-4 text-status-success" />
-                                            <span className="text-xs text-muted-foreground">
-                                                Alerts Resolved
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-2xl font-bold">
-                                            {activeShift.alerts_resolved}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border bg-muted/30 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <TrendingUp className="h-4 w-4 text-status-warning" />
-                                            <span className="text-xs text-muted-foreground">
-                                                Alerts Escalated
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-2xl font-bold">
-                                            {activeShift.alerts_escalated}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border bg-muted/30 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <AlertTriangle className="h-4 w-4 text-status-critical" />
-                                            <span className="text-xs text-muted-foreground">
-                                                Open Alerts Now
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-2xl font-bold">
-                                            {openAlertsCount}
-                                            {criticalAlertsCount > 0 && (
-                                                <span className="ml-2 text-sm font-normal text-status-critical">
-                                                    ({criticalAlertsCount}{' '}
-                                                    critical)
+                                        {/* Team Members */}
+                                        {activeShift.team_members.length >
+                                            0 && (
+                                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    Team:
                                                 </span>
-                                            )}
+                                                {activeShift.team_members.map(
+                                                    (member) => (
+                                                        <Badge
+                                                            key={member.id}
+                                                            variant="secondary"
+                                                        >
+                                                            {member.name}
+                                                        </Badge>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                            <span>
+                                                {activeShift.alerts_created}{' '}
+                                                alerts created
+                                            </span>
+                                            <span aria-hidden>·</span>
+                                            <span>
+                                                {activeShift.alerts_resolved}{' '}
+                                                resolved
+                                            </span>
+                                            <span aria-hidden>·</span>
+                                            <span>
+                                                {activeShift.alerts_escalated}{' '}
+                                                escalated
+                                            </span>
                                         </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </ControlRoomRowActions>
                     ) : (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -897,85 +1019,97 @@ export default function ControlRoomShifts({
                         </div>
                     )}
 
-                    {/* Shift History Table */}
+                    {/* Shift history worklist */}
                     {recentShifts.length > 0 && (
-                        <div className="mt-6">
+                        <section
+                            className="mt-6"
+                            aria-labelledby="shift-history-heading"
+                        >
                             <h2 className="mb-3 text-lg font-semibold">
-                                Shift History
+                                <span id="shift-history-heading">
+                                    Shift History
+                                </span>
                             </h2>
-                            <div className="overflow-x-auto rounded-lg border">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Shift Name
-                                            </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Lead
-                                            </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Started
-                                            </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Ended
-                                            </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Duration
-                                            </th>
-                                            <th className="px-4 py-2 text-right font-medium">
-                                                Created
-                                            </th>
-                                            <th className="px-4 py-2 text-right font-medium">
-                                                Resolved
-                                            </th>
-                                            <th className="px-4 py-2 text-right font-medium">
-                                                Escalated
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {recentShifts.map((shift) => (
-                                            <tr
-                                                key={shift.id}
-                                                className="hover:bg-muted/30"
-                                            >
-                                                <td className="px-4 py-2 font-medium">
-                                                    {shift.name}
-                                                </td>
-                                                <td className="px-4 py-2 text-muted-foreground">
-                                                    {shift.shift_lead?.name ??
-                                                        '-'}
-                                                </td>
-                                                <td className="px-4 py-2 text-muted-foreground">
-                                                    {formatDateTime(
-                                                        shift.starts_at,
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2 text-muted-foreground">
-                                                    {formatDateTime(
-                                                        shift.ends_at,
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2 text-muted-foreground">
-                                                    {formatDuration(
-                                                        shift.duration_minutes,
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    {shift.alerts_created}
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    {shift.alerts_resolved}
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    {shift.alerts_escalated}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            {/* eslint-disable-next-line no-restricted-syntax -- This is a semantic worklist group; each child is its own interactive shift card. */}
+                            <div className="divide-y overflow-hidden rounded-xl border bg-card">
+                                {recentShifts.map((shift) => {
+                                    const actions: ControlRoomRowAction[] =
+                                        shift.actions.can_copy_summary
+                                            ? [
+                                                  {
+                                                      key: 'copy-summary',
+                                                      label: 'Copy shift summary',
+                                                      icon: Copy,
+                                                      onSelect: () =>
+                                                          void navigator.clipboard?.writeText(
+                                                              `${shift.name}: ${shift.alerts_created} created, ${shift.alerts_resolved} resolved, ${shift.alerts_escalated} escalated`,
+                                                          ),
+                                                  },
+                                              ]
+                                            : [];
+
+                                    return (
+                                        <ControlRoomRowActions
+                                            key={shift.id}
+                                            label={`Actions for ${shift.name}`}
+                                            items={actions}
+                                        >
+                                            {({ rowProps, overflowButton }) => (
+                                                <article
+                                                    {...rowProps}
+                                                    className="grid gap-3 p-4 hover:bg-muted/30 sm:grid-cols-[minmax(12rem,1.3fr)_minmax(12rem,1fr)_minmax(16rem,1.2fr)_auto] sm:items-center"
+                                                >
+                                                    <div>
+                                                        <p className="font-semibold">
+                                                            {shift.name}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Lead{' '}
+                                                            {shift.shift_lead
+                                                                ?.name ??
+                                                                'not recorded'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        <p>
+                                                            {formatDateTime(
+                                                                shift.starts_at,
+                                                            )}
+                                                        </p>
+                                                        <p>
+                                                            {formatDuration(
+                                                                shift.duration_minutes,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                                                        <span>
+                                                            {
+                                                                shift.alerts_created
+                                                            }{' '}
+                                                            created
+                                                        </span>
+                                                        <span>
+                                                            {
+                                                                shift.alerts_resolved
+                                                            }{' '}
+                                                            resolved
+                                                        </span>
+                                                        <span>
+                                                            {
+                                                                shift.alerts_escalated
+                                                            }{' '}
+                                                            escalated
+                                                        </span>
+                                                    </div>
+                                                    {overflowButton}
+                                                </article>
+                                            )}
+                                        </ControlRoomRowActions>
+                                    );
+                                })}
                             </div>
-                        </div>
+                        </section>
                     )}
                 </CommandCentrePage>
             </PageShell>

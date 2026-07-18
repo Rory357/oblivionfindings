@@ -68,6 +68,11 @@ class ControlRoomShiftController extends Controller
                     'id' => $activeShift->handedOverTo->id,
                     'name' => $activeShift->handedOverTo->name,
                 ] : null,
+                'actions' => [
+                    'can_open_handover' => $user->canDo('controlRoom.alerts.manage'),
+                    'can_add_note' => $user->canDo('controlRoom.alerts.manage'),
+                    'can_copy_summary' => true,
+                ],
             ];
 
             $notes = OperatorNote::where('shift_id', $activeShift->id)
@@ -113,6 +118,9 @@ class ControlRoomShiftController extends Controller
                 'alerts_resolved' => $shift->alerts_resolved ?? 0,
                 'alerts_escalated' => $shift->alerts_escalated ?? 0,
                 'duration_minutes' => $shift->getDuration(),
+                'actions' => [
+                    'can_copy_summary' => true,
+                ],
             ])
             ->all();
 

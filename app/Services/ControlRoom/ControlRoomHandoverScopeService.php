@@ -63,6 +63,14 @@ class ControlRoomHandoverScopeService
      */
     public function build(Shift $shift, User $viewer): array
     {
+        // The shared row presenter now emits record-level actions. Prime the
+        // permission graph before worklist/site checks so every capability
+        // decision in this uncapped scope reuses the same authorization data.
+        $viewer->loadMissing([
+            'permissionOverrides',
+            'roles.permissions',
+        ]);
+
         $criteriaAt = now();
         $nextExpectedShiftAt = $shift->expectedNextShiftAt($criteriaAt);
         $alerts = $this->visibleActiveAlerts($viewer);

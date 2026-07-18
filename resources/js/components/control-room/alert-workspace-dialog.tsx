@@ -785,6 +785,16 @@ export function AlertWorkspaceDialog({
                 />
                 {SEV_LABEL[a.severity] ?? titleCase(a.severity)}
             </span>
+            <span
+                className="inline-flex items-center gap-1 font-medium text-foreground"
+                aria-label={`Status: ${statusMeta.label}`}
+            >
+                <span
+                    className={`h-1.5 w-1.5 rounded-full ${DOT[statusMeta.tone] ?? DOT.neutral}`}
+                    aria-hidden
+                />
+                {statusMeta.label}
+            </span>
             <span className="text-muted-foreground">{d.journey_state}</span>
             {a.escalation_level > 0 ? (
                 <span className="font-medium text-status-warning">

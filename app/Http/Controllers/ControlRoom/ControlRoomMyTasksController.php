@@ -7,13 +7,14 @@ use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ControlRoomMyTasksController extends Controller
 {
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, AlertWorklistPresenter $presenter)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
@@ -26,34 +27,9 @@ class ControlRoomMyTasksController extends Controller
             ->orderByDesc('triggered_at')
             ->limit(50)
             ->get()
-            ->map(fn (ControlRoomAlert $a) => [
-                'id' => $a->id,
-                'reference_number' => $a->reference_number,
-                'source' => $a->source,
-                'alert_type' => $a->alert_type,
-                'severity' => $a->severity,
-                'status' => $a->status,
-                'escalation_level' => $a->escalation_level,
-                'triggered_at' => optional($a->triggered_at)->toISOString(),
-                'acknowledged_at' => optional($a->acknowledged_at)->toISOString(),
-                'asset' => $a->asset ? [
-                    'id' => $a->asset->id,
-                    'name' => $a->asset->name,
-                    'asset_tag' => $a->asset->asset_tag,
-                ] : null,
-                'client_name' => $a->client
-                    ? trim($a->client->first_name.' '.$a->client->last_name)
-                    : null,
-                'sla_status' => $a->sla?->isApplicable() ? (
-                    ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached)
-                        ? 'breached'
-                        : (
-                            (($a->sla->acknowledge_deadline && $a->sla->acknowledge_deadline->isPast())
-                                || ($a->sla->response_deadline && $a->sla->response_deadline->isPast()))
-                                ? 'at_risk'
-                                : 'on_track'
-                        )
-                ) : null,
+            ->map(fn (ControlRoomAlert $alert) => $presenter->present($alert, $user) + [
+                // Compatibility alias retained for the established page contract.
+                'sla_status' => $alert->sla?->isApplicable() ? $alert->sla->getStatus() : null,
             ])
             ->values();
 

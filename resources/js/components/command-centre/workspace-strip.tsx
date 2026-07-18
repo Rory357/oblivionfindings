@@ -62,11 +62,11 @@ export function WorkspaceStrip({
         <nav
             aria-label="Control Room workspace"
             className={cn(
-                'rounded-xl border bg-card p-1.5 shadow-sm',
+                'overflow-hidden rounded-xl border bg-card p-1.5 shadow-sm',
                 className,
             )}
         >
-            <div className="grid grid-cols-6 gap-1">
+            <div className="flex gap-1 overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:thin]">
                 {WORKSPACE_ITEMS.map((item) => {
                     const active = isActive(current, item.href);
                     const Icon = item.icon;
@@ -78,7 +78,7 @@ export function WorkspaceStrip({
                             href={item.href}
                             aria-current={active ? 'page' : undefined}
                             className={cn(
-                                'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none',
+                                'flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none',
                                 active
                                     ? 'bg-primary text-primary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',

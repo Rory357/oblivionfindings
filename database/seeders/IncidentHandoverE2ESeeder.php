@@ -83,7 +83,10 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'controlRoom.alerts.assign',
             'controlRoom.alerts.escalate',
         ]);
-        $this->deny($incoming, ['reports.viewAny']);
+        $this->deny($incoming, [
+            'incidents.create',
+            'reports.viewAny',
+        ]);
         $this->grant($worker, [
             'clients.viewAssigned',
             'incidents.create',

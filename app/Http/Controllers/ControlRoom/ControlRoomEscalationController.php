@@ -7,12 +7,14 @@ use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertPriorityService;
+use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use InvalidArgumentException;
 
@@ -20,91 +22,34 @@ class ControlRoomEscalationController extends Controller
 {
     private const TRANSACTION_ATTEMPTS = 3;
 
-    /**
-     * Display the escalation queue Kanban board.
-     */
-    public function index(Request $request)
-    {
+    private const QUEUE_CAPACITY = 20;
+
+    /** Display the bounded escalation priority worklist and queue pressure summary. */
+    public function index(
+        Request $request,
+        AlertPriorityService $priority,
+        AlertWorklistPresenter $presenter,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
+        $canManage = $user->canDo('controlRoom.alerts.manage');
 
-        $queues = TriageQueue::active()
+        $activeQueues = TriageQueue::active()
             ->orderBy('tier')
             ->orderBy('name')
-            ->get()
+            ->get();
+
+        $queues = $activeQueues
             ->map(function (TriageQueue $queue) use ($siteAccess, $user, $bypassPermissions) {
-                // Board columns show the top of the queue only — rendering every
-                // alert (dev data has 1,000+) makes the page unusable. The full
-                // count still drives the column badge and capacity bar.
-                $queueAlerts = ControlRoomAlert::query()
-                    ->unresolved()
-                    ->where('queue_id', $queue->id);
+                $queueAlerts = ControlRoomAlert::query()->unresolved()->where('queue_id', $queue->id);
                 $siteAccess->applyAlertScope($queueAlerts, $user, $bypassPermissions);
-
                 $totalCount = (clone $queueAlerts)->count();
-
-                $alerts = (clone $queueAlerts)
-                    ->with(['assignedTo:id,name', 'sla', 'client:id,first_name,last_name'])
-                    ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
-                    ->orderBy('triggered_at')
-                    ->limit(25)
-                    ->get();
-
-                $alertData = $alerts->map(function (ControlRoomAlert $alert) use ($queue) {
-                    // Get the current queue entry for time-in-queue
-                    $currentQueueEntry = AlertQueue::where('alert_id', $alert->id)
-                        ->where('queue_id', $queue->id)
-                        ->whereNull('exited_at')
-                        ->latest('entered_at')
-                        ->first();
-
-                    $enteredAt = $currentQueueEntry?->entered_at ?? $alert->triggered_at;
-
-                    $sla = $alert->sla;
-
-                    // Format alert_type nicely: replace dots/underscores with spaces, title case
-                    $formattedAlertType = Str::title(str_replace(['.', '_'], ' ', $alert->alert_type));
-
-                    // Build client name from relation
-                    $clientName = null;
-                    if ($alert->client) {
-                        $clientName = trim($alert->client->first_name.' '.$alert->client->last_name);
-                    }
-
-                    return [
-                        'id' => $alert->id,
-                        'reference_number' => $alert->reference_number,
-                        'severity' => $alert->severity,
-                        'alert_type' => $formattedAlertType,
-                        'alert_type_raw' => $alert->alert_type,
-                        'source' => $alert->source,
-                        'status' => $alert->status,
-                        'escalation_level' => $alert->escalation_level,
-                        'triggered_at' => $alert->triggered_at?->toISOString(),
-                        'acknowledged_at' => $alert->acknowledged_at?->toISOString(),
-                        'assigned_to' => $alert->assignedTo ? [
-                            'id' => $alert->assignedTo->id,
-                            'name' => $alert->assignedTo->name,
-                        ] : null,
-                        'client_name' => $clientName,
-                        'context' => $alert->context,
-                        'entered_queue_at' => $enteredAt?->toISOString(),
-                        'sla' => $sla ? [
-                            'acknowledge_deadline' => $sla->acknowledge_deadline?->toISOString(),
-                            'response_deadline' => $sla->response_deadline?->toISOString(),
-                            'resolution_deadline' => $sla->resolution_deadline?->toISOString(),
-                            'acknowledged_at' => $sla->acknowledged_at?->toISOString(),
-                            'responded_at' => $sla->responded_at?->toISOString(),
-                            'resolved_at' => $sla->resolved_at?->toISOString(),
-                            'acknowledge_breached' => $sla->acknowledge_breached ?? false,
-                            'response_breached' => $sla->response_breached ?? false,
-                            'resolution_breached' => $sla->resolution_breached ?? false,
-                            'status' => $sla->getStatus(),
-                        ] : null,
-                    ];
-                })->all();
+                $breachedCount = (clone $queueAlerts)
+                    ->whereHas('sla', fn ($sla) => $sla->breached())
+                    ->count();
+                $utilization = (int) round(($totalCount / self::QUEUE_CAPACITY) * 100);
 
                 return [
                     'id' => $queue->id,
@@ -115,16 +60,16 @@ class ControlRoomEscalationController extends Controller
                     'auto_escalate_after_minutes' => $queue->auto_escalate_after_minutes,
                     'escalate_to_queue_id' => $queue->escalate_to_queue_id,
                     'alert_count' => $totalCount,
-                    'alerts' => $alertData,
+                    'breached_count' => $breachedCount,
+                    'capacity' => self::QUEUE_CAPACITY,
+                    'utilization_percent' => $utilization,
+                    'pressure_label' => $this->pressureLabel($utilization),
+                    'capacity_explanation' => '20-alert operational display threshold; alerts remain paginated and no work is hidden.',
                 ];
             })
             ->all();
 
-        // All queues for the "move to" dropdown
-        $allQueues = TriageQueue::active()
-            ->orderBy('tier')
-            ->orderBy('name')
-            ->get()
+        $allQueues = $activeQueues
             ->map(fn (TriageQueue $q) => [
                 'id' => $q->id,
                 'name' => $q->name,
@@ -132,20 +77,103 @@ class ControlRoomEscalationController extends Controller
             ])
             ->all();
 
+        $filters = [
+            'queue_id' => $request->filled('queue_id') ? (string) $request->input('queue_id') : null,
+            'tier' => $request->filled('tier') ? (string) $request->input('tier') : null,
+            'severity' => $request->filled('severity') ? (string) $request->input('severity') : null,
+            'search' => $request->filled('search') ? trim((string) $request->input('search')) : null,
+        ];
+        $activeQueueIds = $activeQueues->pluck('id');
+
+        $summaryQuery = ControlRoomAlert::query()
+            ->unresolved()
+            ->whereIn('queue_id', $activeQueueIds);
+        $siteAccess->applyAlertScope($summaryQuery, $user, $bypassPermissions);
+        $summary = [
+            'active_queues' => $activeQueues->count(),
+            'total_alerts' => (clone $summaryQuery)->count(),
+            'breaches' => (clone $summaryQuery)->whereHas('sla', fn ($sla) => $sla->breached())->count(),
+            'urgent' => (clone $summaryQuery)->whereIn('severity', ['critical', 'high'])->count(),
+            'unassigned' => (clone $summaryQuery)->whereNull('assigned_to_user_id')->count(),
+        ];
+
+        $currentQueueEntries = AlertQueue::query()
+            ->select('alert_id', DB::raw('MAX(entered_at) as entered_queue_at'))
+            ->whereNull('exited_at')
+            ->groupBy('alert_id');
+        $worklistQuery = ControlRoomAlert::query()
+            ->unresolved()
+            ->whereIn('control_room_alerts.queue_id', $activeQueueIds)
+            ->join('control_room_triage_queues as worklist_queue', 'worklist_queue.id', '=', 'control_room_alerts.queue_id')
+            ->leftJoinSub($currentQueueEntries, 'current_queue_entry', fn ($join) => $join->on('current_queue_entry.alert_id', '=', 'control_room_alerts.id'))
+            ->with([
+                'assignedTo:id,name',
+                'sla',
+                'site:id,name',
+                'client:id,first_name,last_name,site_id,organization_id',
+                'client.site:id,name,tenant_id',
+                'queue:id,name,tier',
+                'playbookRun.playbook:id,name',
+                'clientIncident:id,reference_number,control_room_alert_id,status',
+                'hsEvent:id,reference_number,control_room_alert_id,handover_status,status',
+            ]);
+        $siteAccess->applyAlertScope($worklistQuery, $user, $bypassPermissions);
+
+        $worklistQuery
+            ->when($filters['queue_id'], fn ($query, $queueId) => $query->where('control_room_alerts.queue_id', (int) $queueId))
+            ->when($filters['tier'], fn ($query, $tier) => $query->where('worklist_queue.tier', (int) $tier))
+            ->when($filters['severity'], fn ($query, $severity) => $query->where('control_room_alerts.severity', $severity))
+            ->when($filters['search'], function ($query, $search) {
+                $query->where(function ($searchQuery) use ($search) {
+                    $searchQuery
+                        ->where('control_room_alerts.reference_number', 'like', "%{$search}%")
+                        ->orWhere('control_room_alerts.alert_type', 'like', "%{$search}%")
+                        ->orWhere('control_room_alerts.notes', 'like', "%{$search}%");
+                });
+            });
+
+        $worklist = $priority
+            ->applyEscalation($worklistQuery)
+            ->select('control_room_alerts.*')
+            ->addSelect('current_queue_entry.entered_queue_at')
+            ->paginate(30)
+            ->withQueryString();
+        $worklist->through(function (ControlRoomAlert $alert) use ($presenter, $user, $canManage) {
+            $row = $presenter->present($alert, $user, $canManage);
+            $enteredAt = $alert->getAttribute('entered_queue_at') ?? $alert->triggered_at;
+
+            return array_merge($row, [
+                'escalation_level' => (int) $alert->escalation_level,
+                'entered_queue_at' => $enteredAt ? Carbon::parse($enteredAt)->toIso8601String() : null,
+            ]);
+        });
+
         return Inertia::render('control-room/escalations', [
             'queues' => $queues,
             'allQueues' => $allQueues,
+            'worklist' => $worklist,
+            'summary' => $summary,
+            'filters' => $filters,
             'serverTime' => now()->toISOString(),
             'can' => [
-                'manage' => $user->canDo('controlRoom.alerts.manage'),
+                'manage' => $canManage,
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
             ],
-            // Workspace-over-list: when ?alert= is present the workspace dialog
-            // opens over the queue board (Inertia partial-reloads only this prop).
             'detail' => fn () => $request->filled('alert')
                 ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
                 : null,
         ]);
+    }
+
+    private function pressureLabel(int $utilization): string
+    {
+        return match (true) {
+            $utilization === 0 => 'Empty',
+            $utilization < 80 => 'Available',
+            $utilization <= 100 => 'Near capacity',
+            $utilization <= 200 => 'Over capacity',
+            default => 'Severe overload',
+        };
     }
 
     /**

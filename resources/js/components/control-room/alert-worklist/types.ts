@@ -41,5 +41,17 @@ export type AlertWorklistRow = {
         handover_status: string | null;
     };
     next_action: { label: string; href: string };
+    actions: {
+        can_claim: boolean;
+        can_acknowledge: boolean;
+        can_move_queue: boolean;
+        can_escalate: boolean;
+        can_create_incident: boolean;
+        can_snooze: boolean;
+        can_unsnooze: boolean;
+        can_copy_reference: boolean;
+        incident_href: string | null;
+        health_safety_href: string | null;
+    };
     href: string;
 };

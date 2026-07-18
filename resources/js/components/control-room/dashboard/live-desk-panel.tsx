@@ -1,5 +1,9 @@
 import { AlertStatus } from '@/components/control-room/alert-worklist/alert-status';
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -20,7 +24,7 @@ import {
     Search,
     UserRound,
 } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 export type DeskFilters = {
     q?: string;
@@ -54,6 +58,7 @@ export function LiveDeskPanel({
     queues,
     onFilter,
     onOpen,
+    getActions,
 }: {
     worklist: DeskWorklist;
     filters: DeskFilters;
@@ -62,6 +67,7 @@ export function LiveDeskPanel({
     queues: Array<{ id: number; name: string }>;
     onFilter: (filters: DeskFilters) => void;
     onOpen: (id: number) => void;
+    getActions: (row: AlertWorklistRow) => readonly ControlRoomRowAction[];
 }) {
     const [draft, setDraft] = useState<DeskFilters>(filters);
 
@@ -232,106 +238,128 @@ export function LiveDeskPanel({
                 ) : (
                     <ol className="divide-y">
                         {worklist.data.map((row) => (
-                            <li
+                            <ControlRoomRowActions
                                 key={row.id}
-                                className="grid gap-4 px-5 py-4 transition-colors hover:bg-muted/30 xl:grid-cols-[minmax(310px,1.4fr)_minmax(260px,1fr)_minmax(230px,0.9fr)_auto] xl:items-center"
+                                label={`Actions for ${row.reference_number ?? `alert ${row.id}`}`}
+                                items={getActions(row)}
                             >
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Link
-                                            href={row.href}
-                                            className="font-mono text-xs font-semibold text-primary hover:underline"
-                                        >
-                                            {row.reference_number ??
-                                                'Reference pending'}
-                                        </Link>
-                                        <span className="text-xs text-muted-foreground">
-                                            {row.source.label}
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 leading-5 font-semibold text-foreground">
-                                        {row.summary}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                        <span>
-                                            {row.site?.name ??
-                                                'Site not recorded'}
-                                        </span>
-                                        {row.person ? (
-                                            <span>{row.person.name}</span>
-                                        ) : null}
-                                        <span
-                                            title={formatDateTime(
-                                                row.triggered_at,
-                                            )}
-                                        >
-                                            {formatRelative(row.triggered_at)}
-                                        </span>
-                                    </div>
-                                </div>
+                                {({ rowProps, overflowButton }) => (
+                                    <li
+                                        {...rowProps}
+                                        className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/30 sm:px-5 xl:grid-cols-[minmax(310px,1.4fr)_minmax(260px,1fr)_minmax(230px,0.9fr)_auto] xl:items-center"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Link
+                                                    href={row.href}
+                                                    className="font-mono text-xs font-semibold text-primary hover:underline"
+                                                >
+                                                    {row.reference_number ??
+                                                        'Reference pending'}
+                                                </Link>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {row.source.label}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 leading-5 font-semibold text-foreground">
+                                                {row.summary}
+                                            </p>
+                                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                <span>
+                                                    {row.site?.name ??
+                                                        'Site not recorded'}
+                                                </span>
+                                                {row.person ? (
+                                                    <span>
+                                                        {row.person.name}
+                                                    </span>
+                                                ) : null}
+                                                <span
+                                                    title={formatDateTime(
+                                                        row.triggered_at,
+                                                    )}
+                                                >
+                                                    {formatRelative(
+                                                        row.triggered_at,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                <div className="space-y-2">
-                                    <AlertStatus
-                                        status={row.status}
-                                        severity={row.severity}
-                                        slaStatus={row.sla.status}
-                                    />
-                                    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                        <Clock3
-                                            className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                                            aria-hidden
-                                        />
-                                        <span>
-                                            {row.priority.reason}
-                                            {row.next_deadline_at
-                                                ? ` · deadline ${formatRelative(row.next_deadline_at)}`
-                                                : ''}
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2 text-xs">
-                                    <p className="flex items-center gap-1.5 text-muted-foreground">
-                                        <UserRound
-                                            className="h-3.5 w-3.5"
-                                            aria-hidden
-                                        />
-                                        {row.assignee?.name ??
-                                            'Unassigned — claim or assign'}
-                                    </p>
-                                    {row.playbook ? (
-                                        <p className="flex items-center gap-1.5 text-muted-foreground">
-                                            <BookOpenCheck
-                                                className="h-3.5 w-3.5"
-                                                aria-hidden
+                                        <div className="space-y-2">
+                                            <AlertStatus
+                                                status={row.status}
+                                                severity={row.severity}
+                                                slaStatus={row.sla.status}
                                             />
-                                            {row.playbook.name ??
-                                                'Response playbook'}{' '}
-                                            · {row.playbook.completed_steps}/
-                                            {row.playbook.total_steps} steps
-                                        </p>
-                                    ) : null}
-                                    <p className="text-muted-foreground">
-                                        {row.journey.incident_reference ??
-                                            'Incident record not started'}
-                                        {' · '}
-                                        {row.journey.health_safety_reference ??
-                                            'H&S not started'}
-                                    </p>
-                                </div>
+                                            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                                <Clock3
+                                                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
+                                                <span>
+                                                    {row.priority.reason}
+                                                    {row.next_deadline_at
+                                                        ? ` · deadline ${formatRelative(row.next_deadline_at)}`
+                                                        : ''}
+                                                </span>
+                                            </p>
+                                        </div>
 
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => onOpen(row.id)}
-                                >
-                                    {row.next_action.label}
-                                    <ArrowRight
-                                        className="h-4 w-4"
-                                        aria-hidden
-                                    />
-                                </Button>
-                            </li>
+                                        <div className="space-y-2 text-xs">
+                                            <p className="flex items-center gap-1.5 text-muted-foreground">
+                                                <UserRound
+                                                    className="h-3.5 w-3.5"
+                                                    aria-hidden
+                                                />
+                                                {row.assignee?.name ??
+                                                    'Unassigned — claim or assign'}
+                                            </p>
+                                            {row.playbook ? (
+                                                <p className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <BookOpenCheck
+                                                        className="h-3.5 w-3.5"
+                                                        aria-hidden
+                                                    />
+                                                    {row.playbook.name ??
+                                                        'Response playbook'}{' '}
+                                                    ·{' '}
+                                                    {
+                                                        row.playbook
+                                                            .completed_steps
+                                                    }
+                                                    /{row.playbook.total_steps}{' '}
+                                                    steps
+                                                </p>
+                                            ) : null}
+                                            <p className="text-muted-foreground">
+                                                {row.journey
+                                                    .incident_reference ??
+                                                    'Incident record not started'}
+                                                {' · '}
+                                                {row.journey
+                                                    .health_safety_reference ??
+                                                    'H&S not started'}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-end gap-1">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() => onOpen(row.id)}
+                                            >
+                                                {row.next_action.label}
+                                                <ArrowRight
+                                                    className="h-4 w-4"
+                                                    aria-hidden
+                                                />
+                                            </Button>
+                                            {overflowButton}
+                                        </div>
+                                    </li>
+                                )}
+                            </ControlRoomRowActions>
                         ))}
                     </ol>
                 )}
