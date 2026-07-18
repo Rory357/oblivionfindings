@@ -13,7 +13,7 @@ use BackedEnum;
 final class ItTicketContextPresenter
 {
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -40,7 +40,46 @@ final class ItTicketContextPresenter
             'alerts' => $alerts,
             'tasks' => $this->presentTasks($ticket, $viewer),
             'problems' => $this->presentProblems($ticket, $viewer),
+            'changes' => $this->presentChanges($ticket, $viewer),
         ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function presentChanges(ItTicket $ticket, User $viewer): array
+    {
+        if (! $viewer->canDo('it.view')) {
+            return [];
+        }
+
+        return $ticket->links
+            ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'related_change'
+                && $link->linkable instanceof ItTicket
+                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
+                && $link->linkable->work_type === 'change')
+            ->map(function (ItTicketLink $link): ?array {
+                $changeTicket = $link->linkable;
+                $changeTicket->loadMissing('changeProfile');
+                if (! $changeTicket->changeProfile) {
+                    return null;
+                }
+
+                return [
+                    'id' => $changeTicket->changeProfile->id,
+                    'reference' => $changeTicket->reference,
+                    'title' => $changeTicket->title,
+                    'workflow_state' => $changeTicket->workflow_state,
+                    'change_type' => $changeTicket->changeProfile->change_type,
+                    'risk_level' => $changeTicket->changeProfile->risk_level,
+                    'is_restricted' => $changeTicket->changeProfile->is_restricted,
+                    'maintenance_starts_at' => $changeTicket->changeProfile->maintenance_starts_at?->toIso8601String(),
+                    'maintenance_ends_at' => $changeTicket->changeProfile->maintenance_ends_at?->toIso8601String(),
+                    'href' => "/it/changes/{$changeTicket->changeProfile->id}",
+                    'ticket_href' => "/it/tickets/{$changeTicket->id}",
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** @return array<int, array<string, mixed>> */

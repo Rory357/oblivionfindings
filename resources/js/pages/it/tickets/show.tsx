@@ -10,6 +10,7 @@ import { SlaChip } from '@/components/it/sla-chip';
 import {
     TicketLinkedContext,
     type TicketLinkedAlert,
+    type TicketLinkedChange,
     type TicketLinkedDevice,
     type TicketLinkedProblem,
 } from '@/components/it/ticket-linked-context';
@@ -104,6 +105,7 @@ interface Props {
     linked_context: {
         devices: TicketLinkedDevice[];
         alerts: TicketLinkedAlert[];
+        changes: TicketLinkedChange[];
         problems: TicketLinkedProblem[];
     };
     can: {
@@ -591,6 +593,7 @@ export default function ItTicketShow({
                             recoveredAt={ticket.monitoring_recovered_at}
                             devices={linked_context.devices}
                             alerts={linked_context.alerts}
+                            changes={linked_context.changes}
                             problems={linked_context.problems}
                         />
 

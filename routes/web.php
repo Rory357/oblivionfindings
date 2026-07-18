@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
+use App\Http\Controllers\It\ItChangeController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItProblemController;
@@ -153,6 +154,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
     Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
     Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
+    Route::get('/it/changes', [ItChangeController::class, 'index'])->middleware('permission:it.view')->name('it.changes.index');
+    Route::get('/it/changes/{change}', [ItChangeController::class, 'show'])->middleware('permission:it.view')->name('it.changes.show');
     Route::get('/it/problems', [ItProblemController::class, 'index'])->middleware('permission:it.view')->name('it.problems.index');
     Route::get('/it/problems/{problem}', [ItProblemController::class, 'show'])->middleware('permission:it.view')->name('it.problems.show');
     // Self-service: raising a ticket needs it.request (or it.manage for
@@ -193,6 +196,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
+        Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
+        Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');
+        Route::post('/it/changes/{change}/transitions', [ItChangeController::class, 'transition'])->name('it.changes.transitions.store');
         Route::post('/it/problems', [ItProblemController::class, 'store'])->name('it.problems.store');
         Route::patch('/it/problems/{problem}', [ItProblemController::class, 'update'])->name('it.problems.update');
         Route::post('/it/problems/{problem}/transitions', [ItProblemController::class, 'transition'])->name('it.problems.transitions.store');

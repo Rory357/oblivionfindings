@@ -293,6 +293,11 @@ class ItTicket extends Model
         return $this->hasOne(ItProblem::class, 'ticket_id');
     }
 
+    public function changeProfile(): HasOne
+    {
+        return $this->hasOne(ItChange::class, 'ticket_id');
+    }
+
     public function linked(string $relationship): HasMany
     {
         return $this->links()->where('relationship', $relationship);

@@ -55,6 +55,20 @@ const problemFixture = {
     ticket_href: '/it/tickets/42',
 };
 
+const changeFixture = {
+    id: 9,
+    reference: 'IT-000052',
+    title: 'Replace gateway policy',
+    workflow_state: 'scheduled',
+    change_type: 'normal',
+    risk_level: 'high',
+    is_restricted: true,
+    maintenance_starts_at: '2026-07-19T22:00:00Z',
+    maintenance_ends_at: '2026-07-19T23:00:00Z',
+    href: '/it/changes/9',
+    ticket_href: '/it/tickets/52',
+};
+
 it('shows monitoring recovery and canonical deep links without raw payloads', () => {
     render(
         <TicketLinkedContext
@@ -62,6 +76,7 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
             devices={[deviceFixture]}
             alerts={[alertFixture]}
             problems={[problemFixture]}
+            changes={[changeFixture]}
         />,
     );
 
@@ -83,5 +98,10 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
     expect(
         screen.getByText(/Reconnect through the secondary gateway/i),
     ).toBeVisible();
+    expect(screen.getByRole('link', { name: /IT-000052/i })).toHaveAttribute(
+        'href',
+        '/it/changes/9',
+    );
+    expect(screen.getByText('Scheduled maintenance')).toBeVisible();
     expect(screen.queryByText(/signal_payload/i)).not.toBeInTheDocument();
 });

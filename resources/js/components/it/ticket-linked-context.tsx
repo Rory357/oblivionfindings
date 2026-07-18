@@ -6,6 +6,7 @@ import {
     Activity,
     AlertTriangle,
     BookOpenCheck,
+    CalendarClock,
     CheckCircle2,
     CircleAlert,
     CircleHelp,
@@ -49,11 +50,26 @@ export interface TicketLinkedProblem {
     ticket_href: string;
 }
 
+export interface TicketLinkedChange {
+    id: number;
+    reference: string;
+    title: string;
+    workflow_state: string;
+    change_type: string;
+    risk_level: string;
+    is_restricted: boolean;
+    maintenance_starts_at: string | null;
+    maintenance_ends_at: string | null;
+    href: string;
+    ticket_href: string;
+}
+
 interface Props {
     recoveredAt: string | null;
     devices: TicketLinkedDevice[];
     alerts: TicketLinkedAlert[];
     problems?: TicketLinkedProblem[];
+    changes?: TicketLinkedChange[];
 }
 
 interface StatusPresentation {
@@ -109,9 +125,13 @@ export function TicketLinkedContext({
     devices,
     alerts,
     problems = [],
+    changes = [],
 }: Props) {
     const hasLinks =
-        devices.length > 0 || alerts.length > 0 || problems.length > 0;
+        devices.length > 0 ||
+        alerts.length > 0 ||
+        problems.length > 0 ||
+        changes.length > 0;
 
     return (
         <section
@@ -306,6 +326,64 @@ export function TicketLinkedContext({
                                             {problem.workaround}
                                         </p>
                                     ) : null}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+
+            {changes.length > 0 ? (
+                <div className="mt-3">
+                    <h3 className="text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                        Scheduled maintenance
+                    </h3>
+                    <ul className="mt-1.5 space-y-2">
+                        {changes.map((change) => (
+                            <li
+                                key={change.id}
+                                className="overflow-hidden rounded-xl border border-primary/25 bg-primary/5"
+                            >
+                                <Link
+                                    href={change.href}
+                                    className="frontline-focus flex min-h-11 items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40"
+                                >
+                                    <CalendarClock
+                                        aria-hidden="true"
+                                        className="mt-0.5 h-4 w-4 flex-none text-primary"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span className="font-mono text-[12px] font-bold">
+                                                {change.reference}
+                                            </span>
+                                            <ExternalLink
+                                                aria-hidden="true"
+                                                className="h-3.5 w-3.5 text-muted-foreground"
+                                            />
+                                        </span>
+                                        <span className="mt-0.5 block truncate text-[11.5px] font-medium">
+                                            {change.title}
+                                        </span>
+                                    </span>
+                                </Link>
+                                <div className="space-y-1 border-t border-primary/15 px-3 py-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <ContextStatus
+                                            value={change.workflow_state}
+                                        />
+                                        <ContextStatus
+                                            value={change.risk_level}
+                                        />
+                                    </div>
+                                    <p className="text-[11.5px] text-muted-foreground">
+                                        {change.maintenance_starts_at &&
+                                        change.maintenance_ends_at
+                                            ? `${formatDateTime(change.maintenance_starts_at)} – ${formatDateTime(change.maintenance_ends_at)}`
+                                            : change.change_type === 'emergency'
+                                              ? 'Emergency execution; no planned window.'
+                                              : 'Maintenance window not recorded.'}
+                                    </p>
                                 </div>
                             </li>
                         ))}

@@ -146,11 +146,11 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create `resources/js/pages/it/changes/show.tsx`
 - Create focused component tests
 
-- [ ] Write failing tests for standard/normal/emergency changes; risk and impact; implementation, validation, and backout plans; maintenance window; approval; implementation; validation; failure/backout; actual outcome; and post-implementation review.
-- [ ] Link affected services, sites, devices, incidents, problems, monitoring alerts, and later command requests through typed links.
-- [ ] Enforce separation of duties for approval and high-risk/restricted changes.
-- [ ] Add queue and workspace UI with explicit next action and maintenance state.
-- [ ] Commit as `feat(it): add change management`.
+- [x] Write failing tests for standard/normal/emergency changes; risk and impact; implementation, validation, and backout plans; maintenance window; approval; implementation; validation; failure/backout; actual outcome; and post-implementation review.
+- [x] Link affected services, sites, devices, incidents, problems, monitoring alerts, and later command requests through typed links.
+- [x] Enforce separation of duties for approval and high-risk/restricted changes.
+- [x] Add queue and workspace UI with explicit next action and maintenance state.
+- [x] Commit as `feat(it): add change management` (focused backend: 8 tests, 172 assertions; integrated change/problem/ticket/transition/approval/monitoring regression: 64 tests, 597 assertions; frontend: 2 files, 3 tests; TypeScript, Wayfinder, routes, client build 4,970 modules, SSR build 1,622 modules, syntax, formatting, and diff checks pass).
 
 ## Task 7: Implement Major Incidents and communications
 
