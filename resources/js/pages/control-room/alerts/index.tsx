@@ -931,40 +931,44 @@ export default function AlertsIndex({
 
                     {/* Pagination */}
                     {alerts.links?.length > 3 && (
-                        <div className="flex items-center justify-between">
+                        <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-xs text-muted-foreground">
                                 Page {alerts.current_page} of {alerts.last_page}{' '}
                                 ({alerts.total} total alerts)
                             </p>
-                            <div className="flex gap-1">
-                                {alerts.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
-                                        size="sm"
-                                        className="h-8 min-w-[2rem] px-2 text-xs"
-                                        disabled={!link.url}
-                                        onClick={() =>
-                                            link.url &&
-                                            router.get(
-                                                link.url,
-                                                {},
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            )
-                                        }
-                                    >
-                                        <span
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    </Button>
-                                ))}
+                            <div className="max-w-full overflow-x-auto pb-1">
+                                <div className="flex w-max gap-1">
+                                    {alerts.links.map((link, i) => (
+                                        <Button
+                                            key={i}
+                                            variant={
+                                                link.active
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            size="sm"
+                                            className="h-8 min-w-[2rem] px-2 text-xs"
+                                            disabled={!link.url}
+                                            onClick={() =>
+                                                link.url &&
+                                                router.get(
+                                                    link.url,
+                                                    {},
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            <span
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}

@@ -78,6 +78,9 @@ describe('CommandCentrePage', () => {
         expect(screen.getByText('18')).toBeInTheDocument();
         expect(screen.getByText('Past SLA')).toBeInTheDocument();
         expect(screen.getByText('Report content')).toBeInTheDocument();
+        expect(screen.getByText('Report content').parentElement).toHaveClass(
+            'min-w-0',
+        );
         expect(
             screen.getByRole('navigation', { name: 'Control Room workspace' }),
         ).toBeInTheDocument();

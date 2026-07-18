@@ -42,7 +42,7 @@ export function CommandCentrePage({
     className?: string;
 }) {
     return (
-        <div className={cn('space-y-5', className)}>
+        <div className={cn('min-w-0 space-y-5', className)}>
             <ControlRoomWorkspaceHero
                 variant={variant}
                 icon={icon}
