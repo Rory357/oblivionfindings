@@ -463,7 +463,7 @@ git commit -m "feat(monitoring): confirm and ingest observations"
 - Test: `tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php`
 - Test: `tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php`
 
-- [ ] **Step 1: Write a failing end-to-end recovery test**
+- [x] **Step 1: Write a failing end-to-end recovery test**
 
 ```php
 it('resolves the offline alert and does not create a device-online alert', function () {
@@ -499,7 +499,7 @@ it('resolves the offline alert and does not create a device-online alert', funct
 });
 ```
 
-- [ ] **Step 2: Run the recovery test and verify RED**
+- [x] **Step 2: Run the recovery test and verify RED**
 
 Run:
 
@@ -509,7 +509,7 @@ php artisan test tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php
 
 Expected: FAIL because the online event currently creates a separate Control Room alert.
 
-- [ ] **Step 3: Add `processDeviceRecovery` to `SignalProcessingService`**
+- [x] **Step 3: Add `processDeviceRecovery` to `SignalProcessingService`**
 
 Add:
 
@@ -554,7 +554,7 @@ public function processDeviceRecovery(Signal $signal): int
 
 Use a grouped predicate that does not emit an empty `where()` when both identifiers are absent; in that case, resolve zero alerts and mark the recovery signal processed.
 
-- [ ] **Step 4: Route online events through recovery processing**
+- [x] **Step 4: Route online events through recovery processing**
 
 In `DeviceEventObserver::created()`:
 
@@ -571,11 +571,11 @@ if ($event->event_type === 'online') {
 
 Keep `processed_at`, event dispatch, logging, and the `alertCreated` contract intact.
 
-- [ ] **Step 5: Deactivate the online alert rule for fresh seeds**
+- [x] **Step 5: Deactivate the online alert rule for fresh seeds**
 
 Set the `device_online` rule to `is_active => false`. Recovery remains explicit even if a legacy environment still has the old active row because the observer no longer calls general alert processing for this signal.
 
-- [ ] **Step 6: Run recovery and existing signal-pipeline tests**
+- [x] **Step 6: Run recovery and existing signal-pipeline tests**
 
 Run:
 
@@ -585,7 +585,7 @@ php artisan test tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php tes
 
 Expected: PASS; offline still creates one alert, online resolves it, heartbeats remain suppressed, and unknown events still use the generic type.
 
-- [ ] **Step 7: Commit recovery semantics**
+- [x] **Step 7: Commit recovery semantics**
 
 ```powershell
 git add app/Services/ControlRoom/SignalProcessingService.php app/Observers/DeviceEventObserver.php database/seeders/SecurityDevicesSignalSeeder.php tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php

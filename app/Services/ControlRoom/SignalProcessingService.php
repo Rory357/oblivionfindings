@@ -33,6 +33,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class SignalProcessingService
 {
@@ -194,6 +195,55 @@ class SignalProcessingService
 
             // Create new alert
             return $this->createAlertForSignal($signal, $rule, $incident);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Resolve canonical device-offline alerts when monitoring confirms recovery.
+     */
+    public function processDeviceRecovery(Signal $signal): int
+    {
+        if ($signal->signal_type_code !== 'device_online') {
+            throw new InvalidArgumentException('Only device_online signals can use device recovery processing.');
+        }
+
+        return DB::transaction(function () use ($signal): int {
+            $canonicalDeviceId = (int) data_get($signal->normalized_data, 'canonical_device_id');
+
+            if (! $signal->device_id && $canonicalDeviceId <= 0) {
+                $signal->markProcessed(null, 'No device identity was available for recovery matching.');
+
+                return 0;
+            }
+
+            $alerts = ControlRoomAlert::query()
+                ->unresolved()
+                ->where('source', 'security_devices')
+                ->where(function ($query) use ($signal, $canonicalDeviceId): void {
+                    if ($signal->device_id) {
+                        $query->where('device_id', $signal->device_id);
+                    }
+
+                    if ($canonicalDeviceId > 0) {
+                        $method = $signal->device_id ? 'orWhere' : 'where';
+                        $query->{$method}('context->normalized_data->canonical_device_id', $canonicalDeviceId);
+                    }
+                })
+                ->whereHas('signals', fn ($query) => $query->where('signal_type_code', 'device_offline'))
+                ->get();
+
+            foreach ($alerts as $alert) {
+                $this->resolveAlert(
+                    $alert,
+                    'Monitoring confirmed that the device recovered.',
+                    'monitoring_recovery',
+                    ['recovery_signal_id' => $signal->id],
+                );
+            }
+
+            $signal->markProcessed(null, 'Resolved matching device-offline alerts.');
+
+            return $alerts->count();
         }, self::TRANSACTION_ATTEMPTS);
     }
 

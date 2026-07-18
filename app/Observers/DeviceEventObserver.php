@@ -66,6 +66,7 @@ class DeviceEventObserver
                 Log::info('DeviceEventObserver: security_devices signal source not seeded yet; skipping.', [
                     'device_event_id' => $event->id,
                 ]);
+
                 return;
             }
 
@@ -97,7 +98,13 @@ class DeviceEventObserver
             ];
 
             $signal = $this->processor->ingest($payload);
-            $alert = $this->processor->process($signal);
+            $alert = null;
+
+            if ($event->event_type === 'online') {
+                $this->processor->processDeviceRecovery($signal);
+            } else {
+                $alert = $this->processor->process($signal);
+            }
 
             $event->forceFill(['processed_at' => now()])->saveQuietly();
 
