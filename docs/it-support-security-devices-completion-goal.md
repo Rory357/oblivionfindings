@@ -67,7 +67,7 @@ Progress notes:
 - [ ] I05 Inbound/outbound email threading, delivery/bounce state, deduplication, spoofing controls, and attachment quarantine are complete.
 - [x] I06 Secure API for approved systems uses service identities, scoped fields, idempotency, rate limits, and audit.
 - [ ] I07 Queue views, saved filters, workload, SLA risk, waiting parties, bulk per-item results, and ticket workspace are complete.
-- [ ] I08 Joiner/mover/leaver provisioning covers accounts, licences, equipment, network, access control, reversals, and HR completion.
+- [x] I08 Joiner/mover/leaver provisioning covers accounts, licences, equipment, network, access control, reversals, and HR completion.
 - [ ] I09 Problems, known errors, workarounds, changes, validation/backout, knowledge lifecycle, major incidents, and reports are complete.
 - [ ] I10 Existing ticket/provisioning references, routes, history, attachments, HR bridge, and permissions survive migration.
 
@@ -149,3 +149,4 @@ Progress notes:
 - 2026-07-18: `vendor/bin/pint --dirty` and `git diff --check` passed. V01 and V08 remain open because only this vertical slice, not the full master-goal domain and release matrix, has been verified.
 - 2026-07-18: Foundation contract review found the monitor/observation identity, `ObservationInput` idempotency, online recovery routing, typed `ItTicketLink` ownership, single `DeviceSignalPublished` monitoring-to-ticket path, and permission-aware ticket context stable for dependent plans.
 - 2026-07-19: Secure service API Task 9 passed 10 focused tests / 198 assertions and the full IT regression at 229 tests / 2,147 assertions. TypeScript, targeted ESLint, 5 component tests, 2 desktop/mobile browser journeys, 4 versioned API routes plus 2 identity-admin routes, client build at 4,977 modules, SSR build at 1,629 modules, PHP syntax, targeted Pint, and diff checks passed. V01 and V08 remain open because the full master-goal domain and release matrix are not yet complete.
+- 2026-07-19: Joiner/mover/leaver Task 10 passed 11 focused tests / 144 assertions and the full IT regression at 239 tests / 2,264 assertions. Onboarding, offboarding, and employee-profile compatibility suites passed; the provisioning UI passed 6 component tests and 2 production-backed desktop/mobile browser journeys. TypeScript, targeted ESLint, client build at 4,978 modules, SSR build at 1,630 modules, PHP syntax, route, targeted Pint, and diff checks passed. I08 is proven; V01, V06, and V08 remain open until the complete master-goal domain, browser, and release matrices pass.

@@ -64,6 +64,7 @@ import {
     ChevronUp,
     Copy,
     Download,
+    GitMerge,
     Inbox,
     KeyRound,
     Laptop,
@@ -129,6 +130,7 @@ interface Summary {
     provisioning?: {
         pending: number;
         in_progress: number;
+        failed: number;
         done_30d: number;
         overdue: number;
         pending_over_7d: number;
@@ -182,6 +184,7 @@ interface KbPublishedRow {
 interface Props {
     /** Agent-only props — absent from self-service (requester) payloads. */
     requests?: Paginated<RequestRow> | null;
+    provisioningWorkflows?: ProvisioningWorkflowRow[];
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
     /** Tenant employee profiles for the manual provisioning-request picker. */
@@ -207,6 +210,17 @@ interface Props {
     can: { view: boolean; manage: boolean; request: boolean; edit_sla?: boolean };
 }
 
+interface ProvisioningWorkflowRow {
+    id: number;
+    lifecycle_type: string;
+    status: string;
+    effective_at: string | null;
+    source_type: string;
+    template: string | null;
+    employee: { id: number; name: string; role: string | null };
+    progress: { total: number; completed: number; failed: number };
+}
+
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Support', href: '/it' }];
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
@@ -225,6 +239,7 @@ const requestStatusVariant: Record<string, StatusVariant> = {
     in_progress: 'info',
     done: 'success',
     cancelled: 'neutral',
+    failed: 'critical',
 };
 
 const ticketStatusVariant: Record<string, StatusVariant> = {
@@ -251,7 +266,12 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const formatDue = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 
-const REQUEST_STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
+const formatDateTime = (value: string | null) =>
+    value
+        ? new Date(value).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+        : 'Not set';
+
+const REQUEST_STATUSES = ['pending', 'in_progress', 'failed', 'done', 'cancelled'];
 const REQUEST_TYPES = ['account', 'access', 'equipment', 'other'];
 const TICKET_STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
@@ -288,6 +308,7 @@ const readStoredView = (): string | null => {
 
 export default function ItIndex({
     requests,
+    provisioningWorkflows = [],
     tickets,
     assignees = [],
     employeeOptions = [],
@@ -357,7 +378,8 @@ export default function ItIndex({
                       tone: 'primary',
                       badge:
                           (summary.provisioning?.pending ?? 0) +
-                          (summary.provisioning?.in_progress ?? 0),
+                          (summary.provisioning?.in_progress ?? 0) +
+                          (summary.provisioning?.failed ?? 0),
                   },
                   {
                       id: 'knowledge',
@@ -697,7 +719,7 @@ export default function ItIndex({
     /* ---------------- row context menus ---------------- */
 
     const requestMenu = (r: RequestRow) => {
-        const open = r.status === 'pending' || r.status === 'in_progress';
+        const open = r.status === 'pending' || r.status === 'in_progress' || r.status === 'failed';
         return ctx.open([
             // Available on any request — a fulfilled item can still arrive broken.
             {
@@ -733,11 +755,26 @@ export default function ItIndex({
                           tone: 'success' as const,
                           onSelect: () => setModal({ type: 'fulfil', request: r }),
                       },
+                      ...(r.approval_required && r.approval_status !== 'approved'
+                          ? [{
+                                kind: 'item' as const,
+                                label: 'Approve step',
+                                icon: UserCog,
+                                onSelect: () => act('post', `/it/provisioning/${r.id}/approve`),
+                            }]
+                          : []),
                       {
                           kind: 'item' as const,
                           label: r.assignee ? 'Reassign…' : 'Assign…',
                           icon: UserCog,
                           onSelect: () => setModal({ type: 'assign-request', request: r }),
+                      },
+                      {
+                          kind: 'item' as const,
+                          label: 'Record failure…',
+                          icon: XCircle,
+                          tone: 'critical' as const,
+                          onSelect: () => setModal({ type: 'fail-request', request: r }),
                       },
                       { kind: 'divider' as const },
                       {
@@ -1043,6 +1080,72 @@ export default function ItIndex({
                 {/* ── Provisioning queue (agents) ── */}
                 {can.view && tab === 'provisioning' && (
                     <>
+                        <section className="rounded-2xl border border-border bg-card p-4 sm:p-5" aria-labelledby="jml-workflows-heading">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                                            <GitMerge className="h-4 w-4" />
+                                        </span>
+                                        <div>
+                                            <h2 id="jml-workflows-heading" className="text-sm font-bold text-foreground">
+                                                Joiner, mover & leaver workflows
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground">
+                                                HR starts the lifecycle event; IT fulfils only the minimum operational steps shown here.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button asChild size="sm" variant="outline">
+                                    <a href="/it/setup">Manage workflow templates</a>
+                                </Button>
+                            </div>
+                            {provisioningWorkflows.length > 0 ? (
+                                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    {provisioningWorkflows.map((workflow) => {
+                                        const progress = workflow.progress.total > 0
+                                            ? Math.round((workflow.progress.completed / workflow.progress.total) * 100)
+                                            : 0;
+                                        return (
+                                            <article key={workflow.id} className="rounded-xl border border-border bg-background p-3.5">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-[13px] font-bold text-foreground">{workflow.employee.name}</p>
+                                                        <p className="truncate text-[11.5px] text-muted-foreground">{workflow.employee.role ?? workflow.template ?? 'IT workflow'}</p>
+                                                    </div>
+                                                    <StatusBadge
+                                                        variant={workflow.status === 'completed' ? 'success' : workflow.status === 'partially_failed' ? 'critical' : 'info'}
+                                                        size="sm"
+                                                    >
+                                                        {label(workflow.lifecycle_type)}
+                                                    </StatusBadge>
+                                                </div>
+                                                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-label={`${progress}% complete`}>
+                                                    <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                                                    <span>{workflow.progress.completed} of {workflow.progress.total} complete</span>
+                                                    <span>{formatDateTime(workflow.effective_at)}</span>
+                                                </div>
+                                                {workflow.progress.failed > 0 ? (
+                                                    <p className="mt-2 text-[11px] font-semibold text-[color:var(--status-critical)]">
+                                                        {workflow.progress.failed} step{workflow.progress.failed === 1 ? '' : 's'} need recovery
+                                                    </p>
+                                                ) : null}
+                                            </article>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="mt-4 rounded-xl border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">
+                                    No lifecycle workflows yet. Create templates in Setup; matching HR onboarding, role/site changes, and offboarding events will appear automatically.
+                                </div>
+                            )}
+                            <p className="mt-3 text-[11px] text-muted-foreground">
+                                Asset custody remains in Assets, device assignments in Security & Devices, and employee identity in HR. This queue coordinates those canonical records without copying them.
+                            </p>
+                        </section>
                         <div className="flex flex-wrap items-center gap-2">
                             <FilterSelect
                                 ariaLabel="Filter by status"
@@ -1155,7 +1258,7 @@ export default function ItIndex({
                             {(requests?.data ?? []).map((r) => {
                                 const Icon = typeIcon[r.type] ?? Server;
                                 const actionable =
-                                    can.manage && (r.status === 'pending' || r.status === 'in_progress');
+                                    can.manage && (r.status === 'pending' || r.status === 'in_progress' || r.status === 'failed');
                                 const overdue =
                                     r.due_date != null &&
                                     r.status !== 'done' &&
@@ -1181,8 +1284,10 @@ export default function ItIndex({
                                                 {r.employee.name}
                                             </div>
                                             <div className="truncate text-[11.5px] text-muted-foreground">
-                                                {r.from_onboarding
-                                                    ? `Onboarding${r.employee.role ? ` · ${r.employee.role}` : ''}`
+                                                {r.workflow
+                                                    ? `${label(r.workflow.lifecycle_type)} workflow${r.employee.role ? ` · ${r.employee.role}` : ''}`
+                                                    : r.from_onboarding
+                                                      ? `Onboarding${r.employee.role ? ` · ${r.employee.role}` : ''}`
                                                     : (r.employee.role ?? '—')}
                                             </div>
                                         </div>
@@ -1192,6 +1297,14 @@ export default function ItIndex({
                                             </span>
                                             <span className="min-w-0">
                                                 <span className="block truncate text-[13px]">{r.item}</span>
+                                                {r.workflow ? (
+                                                    <span className="block truncate text-[10.5px] text-muted-foreground">
+                                                        Stage {r.stage ?? 1}
+                                                        {r.action ? ` · ${label(r.action)}` : ''}
+                                                        {r.approval_required ? ` · ${r.approval_status === 'approved' ? 'Approved' : 'Approval needed'}` : ''}
+                                                        {r.evidence_required ? ' · Evidence needed' : ''}
+                                                    </span>
+                                                ) : null}
                                                 {r.external_ref ? (
                                                     <span className="block truncate text-[11px] text-muted-foreground">
                                                         Ref: {r.external_ref}
@@ -1211,7 +1324,7 @@ export default function ItIndex({
                                             </span>
                                         </div>
                                         <span className="truncate text-[12.5px] text-muted-foreground">
-                                            {r.assignee?.name ?? 'Unassigned'}
+                                            {r.assignee?.name ?? r.responsible_team?.name ?? 'Unassigned'}
                                         </span>
                                         <span>
                                             <StatusBadge variant={priorityVariant[r.priority] ?? 'neutral'} size="sm">
@@ -1234,6 +1347,11 @@ export default function ItIndex({
                                                       ? `Raised ${r.created}`
                                                       : ''}
                                             </span>
+                                            {r.failure_reason ? (
+                                                <span className="max-w-[150px] truncate text-[10.5px] text-[color:var(--status-critical)]" title={r.failure_reason}>
+                                                    {r.failure_reason}
+                                                </span>
+                                            ) : null}
                                         </span>
                                         <span
                                             className={
@@ -1251,10 +1369,14 @@ export default function ItIndex({
                                             {actionable ? (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setModal({ type: 'fulfil', request: r })}
+                                                    onClick={() =>
+                                                        r.approval_required && r.approval_status !== 'approved'
+                                                            ? act('post', `/it/provisioning/${r.id}/approve`)
+                                                            : setModal({ type: 'fulfil', request: r })
+                                                    }
                                                     className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
                                                 >
-                                                    Fulfil
+                                                    {r.approval_required && r.approval_status !== 'approved' ? 'Approve' : 'Fulfil'}
                                                 </button>
                                             ) : null}
                                             {can.manage ? (
@@ -1275,7 +1397,7 @@ export default function ItIndex({
                                 <EmptyState
                                     icon={Inbox}
                                     title="No provisioning requests"
-                                    blurb="Onboarding IT tasks (accounts & access) land here automatically when a checklist is generated."
+                                    blurb="Matching HR joiner, mover and leaver events create ordered IT steps here automatically. Manual requests remain available when needed."
                                 />
                             ) : null}
                         </div>

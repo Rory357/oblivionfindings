@@ -8,6 +8,7 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
 use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
@@ -19,6 +20,7 @@ use App\Http\Requests\It\UpdateSlaPoliciesRequest;
 use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItProvisioningWorkflow;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
@@ -50,6 +52,7 @@ class ItProvisioningController extends Controller
         private readonly OnboardingService $onboardingService,
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketRoutingService $routingService,
+        private readonly ItProvisioningRequestLifecycleService $provisioningLifecycle,
     ) {}
 
     /* ================================================================== */
@@ -88,6 +91,7 @@ class ItProvisioningController extends Controller
         // and staff directory never reach a self-service payload.
         $agentProps = $isAgent ? [
             'requests' => $this->requestPage($tenantId, $filters),
+            'provisioningWorkflows' => $this->provisioningWorkflows($tenantId),
             'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
             'assignees' => $this->tenantUserOptions($tenantId),
             'employeeOptions' => $this->employeeOptions($tenantId),
@@ -283,7 +287,11 @@ class ItProvisioningController extends Controller
 
         $provisioning->update([
             'assigned_to_user_id' => (int) $validated['assigned_to_user_id'],
-            'status' => $provisioning->status === 'pending' ? 'in_progress' : $provisioning->status,
+            'status' => in_array($provisioning->status, ['pending', 'failed'], true)
+                ? 'in_progress'
+                : $provisioning->status,
+            'failure_reason' => null,
+            'failed_at' => null,
         ]);
 
         ItTicketEvent::record($provisioning, 'assigned', $user->id, [
@@ -303,45 +311,58 @@ class ItProvisioningController extends Controller
         $validated = $request->validate([
             'external_ref' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'evidence_summary' => ['nullable', 'string', 'max:4000'],
         ]);
 
-        if ($provisioning->status === 'done') {
-            return redirect()->back()->with('error', 'This request is already fulfilled.');
-        }
-        if ($provisioning->status === 'cancelled') {
-            return redirect()->back()->with('error', 'This request was cancelled — it can no longer be fulfilled.');
-        }
-
         try {
-            DB::transaction(function () use ($provisioning, $validated, $user) {
-                $provisioning->update([
-                    'status' => 'done',
-                    'external_ref' => $validated['external_ref'] ?? $provisioning->external_ref,
-                    'notes' => $validated['notes'] ?? $provisioning->notes,
-                    'fulfilled_at' => now(),
-                    'fulfilled_by' => $user->id,
-                ]);
-
-                // Cross-loop: fulfilment completes the source onboarding task
-                // (mirrors provisionAssetForTask so dependency/rollup/webhook
-                // all fire). Sign-off tasks record the fulfiller as sign-off.
-                $task = $provisioning->onboardingTask;
-                if ($task && $task->status !== 'completed') {
-                    $this->onboardingService->completeTask($task, $user->id, array_filter([
-                        'notes' => $validated['notes'] ?? null,
-                        'signed_off_by' => $task->sign_off_required ? $user->id : null,
-                    ], fn ($v) => $v !== null));
-                }
-
-                ItTicketEvent::record($provisioning, 'fulfilled', $user->id, array_filter([
-                    'external_ref' => $validated['external_ref'] ?? null,
-                ]));
-            });
-        } catch (\LogicException $exception) {
+            $this->provisioningLifecycle->fulfil($provisioning, $user, $validated);
+        } catch (DomainException|\LogicException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
         return redirect()->back()->with('success', "Fulfilled “{$provisioning->item}”.");
+    }
+
+    public function approve(Request $request, ItProvisioningRequest $provisioning)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('it.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        $validated = $request->validate([
+            'decision_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $this->provisioningLifecycle->approve(
+                $provisioning,
+                $user,
+                $validated['decision_note'] ?? null,
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Provisioning request approved.');
+    }
+
+    public function fail(Request $request, ItProvisioningRequest $provisioning)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('it.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        $validated = $request->validate([
+            'failure_reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->provisioningLifecycle->fail($provisioning, $user, $validated['failure_reason']);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Failure recorded; the workflow now shows partial completion.');
     }
 
     public function cancel(Request $request, ItProvisioningRequest $provisioning)
@@ -361,6 +382,7 @@ class ItProvisioningController extends Controller
         }
 
         $provisioning->update(['status' => 'cancelled']);
+        $this->provisioningLifecycle->reconcileWorkflow($provisioning->workflow);
 
         ItTicketEvent::record($provisioning, 'cancelled', $user->id, array_filter([
             'reason' => $reason,
@@ -536,7 +558,11 @@ class ItProvisioningController extends Controller
 
         $provisioning->update([
             'assigned_to_user_id' => $newId,
-            'status' => $provisioning->status === 'pending' ? 'in_progress' : $provisioning->status,
+            'status' => in_array($provisioning->status, ['pending', 'failed'], true)
+                ? 'in_progress'
+                : $provisioning->status,
+            'failure_reason' => null,
+            'failed_at' => null,
         ]);
 
         ItTicketEvent::record($provisioning, 'assigned', $actor->id, [
@@ -554,25 +580,8 @@ class ItProvisioningController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($provisioning, $actor) {
-                $provisioning->update([
-                    'status' => 'done',
-                    'fulfilled_at' => now(),
-                    'fulfilled_by' => $actor->id,
-                ]);
-
-                // Cross-loop: fulfilment completes the source onboarding task,
-                // exactly as the single fulfil route does (dependency/rollup all fire).
-                $task = $provisioning->onboardingTask;
-                if ($task && $task->status !== 'completed') {
-                    $this->onboardingService->completeTask($task, $actor->id, array_filter([
-                        'signed_off_by' => $task->sign_off_required ? $actor->id : null,
-                    ], fn ($v) => $v !== null));
-                }
-
-                ItTicketEvent::record($provisioning, 'fulfilled', $actor->id, ['via' => 'bulk']);
-            });
-        } catch (\LogicException) {
+            $this->provisioningLifecycle->fulfil($provisioning, $actor);
+        } catch (DomainException|\LogicException) {
             return false; // a blocked task can't complete — leave the request untouched
         }
 
@@ -1009,6 +1018,9 @@ class ItProvisioningController extends Controller
                 'employeeProfile:id,user_id,position_title,position_role',
                 'employeeProfile.user:id,name',
                 'assignee:id,name',
+                'responsibleTeam:id,name',
+                'approver:id,name',
+                'workflow:id,lifecycle_type,status,source_type,effective_at',
                 'onboardingTask:id,checklist_id,title,status,sign_off_required',
                 'linkedTickets:id,provisioning_request_id,reference,status',
             ])
@@ -1027,10 +1039,32 @@ class ItProvisioningController extends Controller
                 ],
                 'item' => $r->item,
                 'type' => $r->type,
+                'task_key' => $r->task_key,
+                'action' => $r->action,
+                'category' => $r->category,
                 'status' => $r->status,
                 'priority' => $r->priority,
                 'due_date' => $r->due_date?->toDateString(),
                 'assignee' => $r->assignee ? ['id' => $r->assignee->id, 'name' => $r->assignee->name] : null,
+                'responsible_team' => $r->responsibleTeam
+                    ? ['id' => $r->responsibleTeam->id, 'name' => $r->responsibleTeam->name]
+                    : null,
+                'stage' => $r->stage,
+                'dependency_request_ids' => $r->dependency_request_ids ?? [],
+                'approval_required' => $r->approval_required,
+                'approval_status' => $r->approval_status,
+                'approver' => $r->approver ? ['id' => $r->approver->id, 'name' => $r->approver->name] : null,
+                'evidence_required' => $r->evidence_required,
+                'evidence_summary' => $r->evidence_summary,
+                'failure_reason' => $r->failure_reason,
+                'fulfiller_context' => $r->fulfiller_context ?? [],
+                'workflow' => $r->workflow ? [
+                    'id' => $r->workflow->id,
+                    'lifecycle_type' => $r->workflow->lifecycle_type,
+                    'status' => $r->workflow->status,
+                    'source_type' => $r->workflow->source_type,
+                    'effective_at' => $r->workflow->effective_at?->toIso8601String(),
+                ] : null,
                 'external_ref' => $r->external_ref,
                 'notes' => $r->notes,
                 'from_onboarding' => $r->onboarding_task_id !== null,
@@ -1044,6 +1078,44 @@ class ItProvisioningController extends Controller
                     : null,
                 'linked_ticket_count' => $r->linkedTickets->count(),
             ]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function provisioningWorkflows(int $tenantId): array
+    {
+        if (! Schema::hasTable('it_provisioning_workflows')) {
+            return [];
+        }
+
+        return ItProvisioningWorkflow::query()
+            ->forTenant($tenantId)
+            ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name'])
+            ->withCount([
+                'requests',
+                'requests as completed_requests_count' => fn ($query) => $query->where('status', 'done'),
+                'requests as failed_requests_count' => fn ($query) => $query->whereIn('status', ['failed', 'cancelled']),
+            ])
+            ->latest('id')
+            ->limit(20)
+            ->get()
+            ->map(fn (ItProvisioningWorkflow $workflow) => [
+                'id' => $workflow->id,
+                'lifecycle_type' => $workflow->lifecycle_type,
+                'status' => $workflow->status,
+                'effective_at' => $workflow->effective_at?->toIso8601String(),
+                'source_type' => $workflow->source_type,
+                'template' => $workflow->template?->name,
+                'employee' => [
+                    'id' => $workflow->employee_profile_id,
+                    'name' => $workflow->employeeProfile?->user?->name ?? 'Unknown',
+                    'role' => $workflow->employeeProfile?->position_title,
+                ],
+                'progress' => [
+                    'total' => $workflow->requests_count,
+                    'completed' => $workflow->completed_requests_count,
+                    'failed' => $workflow->failed_requests_count,
+                ],
+            ])->values()->all();
     }
 
     /** @param array<string, mixed> $filters */
@@ -1199,8 +1271,9 @@ class ItProvisioningController extends Controller
                 ->selectRaw(
                     "SUM(status = 'pending') AS pending,
                      SUM(status = 'in_progress') AS in_progress,
+                     SUM(status = 'failed') AS failed,
                      SUM(status = 'done' AND fulfilled_at >= ?) AS done_30d,
-                     SUM(status IN ('pending', 'in_progress') AND due_date IS NOT NULL AND due_date < ?) AS overdue,
+                     SUM(status IN ('pending', 'in_progress', 'failed') AND due_date IS NOT NULL AND due_date < ?) AS overdue,
                      SUM(status = 'pending' AND created_at < ?) AS pending_over_7d",
                     [now()->subDays(30), now()->toDateString(), now()->subDays(7)],
                 )
@@ -1242,6 +1315,7 @@ class ItProvisioningController extends Controller
         $summary['provisioning'] = [
             'pending' => (int) ($requests->pending ?? 0),
             'in_progress' => (int) ($requests->in_progress ?? 0),
+            'failed' => (int) ($requests->failed ?? 0),
             'done_30d' => (int) ($requests->done_30d ?? 0),
             'overdue' => (int) ($requests->overdue ?? 0),
             'pending_over_7d' => (int) ($requests->pending_over_7d ?? 0),

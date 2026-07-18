@@ -25,6 +25,7 @@ use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OrgChartService;
 use App\Domain\Hr\Services\PositionService;
+use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreEmployeeRequest;
@@ -39,7 +40,9 @@ use App\Models\WorkplaceInjury;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
@@ -1125,8 +1128,11 @@ class EmployeeProfileController extends Controller
     /*  Update */
     /* ------------------------------------------------------------------ */
 
-    public function update(UpdateEmployeeProfileRequest $request, HrEmployeeProfile $profile)
-    {
+    public function update(
+        UpdateEmployeeProfileRequest $request,
+        HrEmployeeProfile $profile,
+        ItProvisioningWorkflowService $provisioningWorkflows,
+    ) {
         $user = $request->user();
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
@@ -1136,7 +1142,33 @@ class EmployeeProfileController extends Controller
             $validated['team'] = HrEmployeeProfile::canonicalTeamForTenant($validated['team'], $tenantId);
         }
         $validated['updated_by'] = $user->id;
-        $profile->update($validated);
+
+        DB::transaction(function () use ($profile, $validated, $user, $provisioningWorkflows): void {
+            $tracked = ['position_role', 'primary_site_id', 'employment_type'];
+            $before = collect($tracked)->mapWithKeys(fn (string $field) => [$field => $profile->{$field}])->all();
+            $profile->update($validated);
+            $profile->refresh();
+
+            $changes = [];
+            foreach ($tracked as $field) {
+                if (! array_key_exists($field, $validated) || $before[$field] == $profile->{$field}) {
+                    continue;
+                }
+                $changes[$field] = ['from' => $before[$field], 'to' => $profile->{$field}];
+            }
+
+            if ($changes !== [] && Schema::hasTable('it_provisioning_templates')) {
+                $digest = substr(hash('sha256', json_encode($changes, JSON_THROW_ON_ERROR)), 0, 20);
+                $stamp = $profile->updated_at?->format('YmdHis.u') ?? now()->format('YmdHis.u');
+                $provisioningWorkflows->tryLaunchMover(
+                    profile: $profile,
+                    changes: $changes,
+                    sourceEventKey: "hr-profile:{$profile->id}:{$stamp}:{$digest}",
+                    actorId: $user->id,
+                    effectiveAt: now(),
+                );
+            }
+        });
 
         return redirect()->back()->with('success', 'Employee profile updated successfully.');
     }

@@ -115,7 +115,7 @@ describe('IT & Support grouped navigation', () => {
         ).toHaveAttribute('aria-current', 'page');
     });
 
-    it('renders service management setup with workload and clear create actions', () => {
+    it('renders service management setup with workload and contextual create actions', async () => {
         render(
             <ItSetupIndex
                 teams={[
@@ -167,6 +167,7 @@ describe('IT & Support grouped navigation', () => {
                 sites={[]}
                 apiIdentities={[]}
                 oneTimeApiCredential={null}
+                provisioningTemplates={[]}
             />,
         );
 
@@ -176,12 +177,12 @@ describe('IT & Support grouped navigation', () => {
         expect(screen.getByText('Network operations')).toBeVisible();
         expect(screen.getAllByText('4 open')[0]).toBeVisible();
         expect(screen.getByRole('button', { name: /New team/i })).toBeVisible();
-        expect(
-            screen.getByRole('button', { name: /New queue/i }),
-        ).toBeVisible();
-        expect(
-            screen.getByRole('button', { name: /New service/i }),
-        ).toBeVisible();
+        expect(screen.queryByRole('button', { name: /New queue/i })).not.toBeInTheDocument();
+
+        const { fireEvent } = await import('@testing-library/react');
+        fireEvent.click(screen.getByRole('tab', { name: 'Queues' }));
+        expect(screen.getByRole('button', { name: /New queue/i })).toBeVisible();
+        expect(screen.queryByRole('button', { name: /New team/i })).not.toBeInTheDocument();
     });
 
     it('shows scoped API identity metadata and a one-time credential in setup', () => {
@@ -221,6 +222,7 @@ describe('IT & Support grouped navigation', () => {
                     name: 'Native monitoring',
                     token: 'ofi_public_secret-shown-once',
                 }}
+                provisioningTemplates={[]}
             />,
         );
 
@@ -229,7 +231,7 @@ describe('IT & Support grouped navigation', () => {
         ).toHaveAttribute('aria-selected', 'true');
 
         expect(
-            screen.getByRole('heading', { name: 'API identities' }),
+            screen.getByRole('heading', { name: 'API identities', level: 2 }),
         ).toBeVisible();
         expect(screen.getByText('Native monitoring')).toBeVisible();
         expect(screen.getByText('Signed')).toBeVisible();
@@ -237,6 +239,70 @@ describe('IT & Support grouped navigation', () => {
             'ofi_public_secret-shown-once',
         );
         expect(screen.queryByText('token_hash')).not.toBeInTheDocument();
+    });
+
+    it('makes joiner mover and leaver templates understandable from setup', async () => {
+        const { fireEvent } = await import('@testing-library/react');
+        render(
+            <ItSetupIndex
+                teams={[]}
+                queues={[]}
+                services={[]}
+                agents={[]}
+                sites={[]}
+                apiIdentities={[]}
+                oneTimeApiCredential={null}
+                provisioningTemplates={[
+                    {
+                        id: 4,
+                        name: 'Clinical joiner',
+                        description: 'Approved access for clinical staff.',
+                        lifecycle_type: 'joiner',
+                        position_role: 'Registered Nurse',
+                        site_id: null,
+                        site: null,
+                        employment_type: null,
+                        selection_priority: 50,
+                        is_active: true,
+                        tasks: [
+                            {
+                                task_key: 'healthcare',
+                                title: 'Grant approved healthcare system access',
+                                description: null,
+                                category: 'healthcare_access',
+                                action: 'grant',
+                                request_type: 'access',
+                                responsible_team_id: null,
+                                responsible_team: null,
+                                stage: 2,
+                                sort_order: 0,
+                                dependency_task_keys: [],
+                                trigger_fields: [],
+                                approval_required: true,
+                                evidence_required: true,
+                                due_offset_days: 0,
+                                fulfiller_fields: ['employee_number', 'position_role'],
+                            },
+                        ],
+                    },
+                ]}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Provisioning workflows' }));
+
+        expect(screen.getByRole('heading', { name: 'Lifecycle workflow templates' })).toBeVisible();
+        expect(screen.getByText('Clinical joiner')).toBeVisible();
+        expect(screen.getByText('Grant approved healthcare system access')).toBeVisible();
+        expect(screen.getByText('Role: Registered Nurse')).toBeVisible();
+
+        fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+        const dialog = screen.getByRole('dialog');
+        expect(dialog).toHaveTextContent('New lifecycle template');
+        expect(dialog).toHaveTextContent('Workflow steps');
+        expect(dialog).toHaveTextContent('Minimum employee details shown');
+        expect(dialog).toHaveTextContent('Approval required');
+        expect(dialog).toHaveTextContent('Evidence required');
     });
 
     it('turns the service catalogue into a searchable human workspace', async () => {

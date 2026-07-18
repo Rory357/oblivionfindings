@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
@@ -21,17 +22,37 @@ class ItProvisioningRequest extends Model
 
     public const TYPES = ['account', 'access', 'equipment', 'other'];
 
-    public const STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
+    public const STATUSES = ['pending', 'in_progress', 'failed', 'done', 'cancelled'];
 
     public const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
     protected $fillable = [
         'tenant_id',
         'employee_profile_id',
+        'provisioning_workflow_id',
+        'provisioning_template_task_id',
         'onboarding_task_id',
+        'offboarding_task_id',
         'type',
+        'task_key',
+        'action',
+        'category',
         'item',
         'assigned_to_user_id',
+        'responsible_team_id',
+        'stage',
+        'dependency_request_ids',
+        'approval_required',
+        'approval_status',
+        'approved_by_user_id',
+        'approved_at',
+        'evidence_required',
+        'evidence_summary',
+        'failure_reason',
+        'failed_at',
+        'fulfiller_context',
+        'canonical_target_type',
+        'canonical_target_id',
         'status',
         'priority',
         'due_date',
@@ -45,6 +66,13 @@ class ItProvisioningRequest extends Model
     protected $casts = [
         'fulfilled_at' => 'datetime',
         'due_date' => 'date',
+        'stage' => 'integer',
+        'dependency_request_ids' => 'array',
+        'approval_required' => 'boolean',
+        'approved_at' => 'datetime',
+        'evidence_required' => 'boolean',
+        'failed_at' => 'datetime',
+        'fulfiller_context' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -61,9 +89,34 @@ class ItProvisioningRequest extends Model
         return $this->belongsTo(HrOnboardingTask::class, 'onboarding_task_id');
     }
 
+    public function offboardingTask(): BelongsTo
+    {
+        return $this->belongsTo(HrOffboardingTask::class, 'offboarding_task_id');
+    }
+
+    public function workflow(): BelongsTo
+    {
+        return $this->belongsTo(ItProvisioningWorkflow::class, 'provisioning_workflow_id');
+    }
+
+    public function templateTask(): BelongsTo
+    {
+        return $this->belongsTo(ItProvisioningTemplateTask::class, 'provisioning_template_task_id');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function responsibleTeam(): BelongsTo
+    {
+        return $this->belongsTo(ItTeam::class, 'responsible_team_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id');
     }
 
     public function fulfilledBy(): BelongsTo

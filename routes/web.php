@@ -1,23 +1,23 @@
 <?php
 
 use App\Http\Controllers\Careers\CareerPortalController;
+use App\Http\Controllers\Careers\ReferenceController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItChangeController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItMajorIncidentController;
-use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItProblemController;
+use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
 use App\Http\Controllers\It\ItServiceManagementSetupController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\It\ItWorkTaskController;
-use App\Http\Controllers\QualityChecklistController;
-use App\Http\Controllers\RosterController;
-use App\Http\Controllers\TodayDashboardController;
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+use App\Http\Controllers\LegacyRouteRedirectController;
+use App\Http\Controllers\MyCalendarController;
+use App\Http\Controllers\MyDayActionsController;
+use App\Http\Controllers\MyDayMedicationsController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -46,6 +46,12 @@ use Inertia\Inertia;
 |
 */
 
+use App\Http\Controllers\MyTasksController;
+use App\Http\Controllers\QualityChecklistController;
+use App\Http\Controllers\RosterController;
+use App\Http\Controllers\TodayDashboardController;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/robots.txt', function () {
@@ -112,8 +118,8 @@ Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondT
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
-Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->middleware('throttle:30,1')->name('careers.reference.show');
-Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->middleware('throttle:10,1')->name('careers.reference.submit');
+Route::get('/careers/references/{token}', [ReferenceController::class, 'show'])->middleware('throttle:30,1')->name('careers.reference.show');
+Route::post('/careers/references/{token}', [ReferenceController::class, 'submit'])->middleware('throttle:10,1')->name('careers.reference.submit');
 Route::get('/careers/{slug}', fn () => redirect()->route('careers.index'))->where('slug', '^(?!application|offers|jobs|references).*$')->name('careers.show');
 
 // Authenticated routes
@@ -132,6 +138,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if (! $isAdmin && ! app()->environment(['local', 'testing'])) {
             abort(403);
         }
+
         return Inertia::render('internal/_design/page-hero');
     })->name('internal.design.page-hero');
 });
@@ -140,7 +147,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // `/my-day` is the single staff/frontline entry point. Legacy `/my-tasks`
 // links (including existing POST action endpoints) keep working via the
 // redirect below and the unchanged action routes.
-Route::get('/my-day', \App\Http\Controllers\MyTasksController::class)
+Route::get('/my-day', MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-day');
 
@@ -209,6 +216,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/services/{service}', [ItServiceManagementSetupController::class, 'updateService'])->name('it.setup.services.update');
         Route::post('/it/setup/api-identities', [ItServiceManagementSetupController::class, 'storeIdentity'])->name('it.setup.api-identities.store');
         Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
+        Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
+        Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
         Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');
@@ -224,7 +233,9 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         // above the {provisioning} routes so it is never bound as an id.
         Route::post('/it/provisioning/bulk', [ItProvisioningController::class, 'bulkProvisioning'])->name('it.provisioning.bulk');
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
+        Route::post('/it/provisioning/{provisioning}/approve', [ItProvisioningController::class, 'approve'])->name('it.provisioning.approve');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
+        Route::post('/it/provisioning/{provisioning}/fail', [ItProvisioningController::class, 'fail'])->name('it.provisioning.fail');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
         Route::post('/it/tickets/bulk', [ItTicketController::class, 'bulk'])->name('it.tickets.bulk');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
@@ -268,27 +279,27 @@ Route::redirect('/my-tasks', '/my-day')
 // which goes through AttendanceService and writes a real HrAttendanceSession and
 // draft Timesheet. Do not re-add quick-clock endpoints here.
 Route::middleware(['auth'])->group(function () {
-    Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
-    Route::post('/my-tasks/timesheet/ensure-today', [\App\Http\Controllers\MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
-    Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
+    Route::post('/my-tasks/shift-task/{task}/complete', [MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
+    Route::post('/my-tasks/timesheet/ensure-today', [MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
+    Route::post('/my-tasks/timesheet/{timesheet}/submit', [MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
 
     // PR 17 — frontline alert quick actions. Scoped to the alert's assignee so
     // a frontline worker can acknowledge or snooze an alert from /my-day
     // without reaching into the Control Room operator surface.
-    Route::post('/my-day/alerts/{alert}/ack', [\App\Http\Controllers\MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
-    Route::post('/my-day/alerts/{alert}/snooze', [\App\Http\Controllers\MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
+    Route::post('/my-day/alerts/{alert}/ack', [MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
+    Route::post('/my-day/alerts/{alert}/snooze', [MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
 
     // Site-first redesign — frontline medication quick actions. The same
     // ClientMedicationAdministration writes flow through here as via the full
     // eMAR, but UX-light: one click marks a dose given/refused; snooze hides
     // the row from this worker's /my-day for 15m without touching the record.
-    Route::post('/my-day/medications/{medication}/administer', [\App\Http\Controllers\MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
-    Route::post('/my-day/medications/{medication}/refuse', [\App\Http\Controllers\MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
-    Route::post('/my-day/medications/{medication}/snooze', [\App\Http\Controllers\MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
+    Route::post('/my-day/medications/{medication}/administer', [MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
+    Route::post('/my-day/medications/{medication}/refuse', [MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
+    Route::post('/my-day/medications/{medication}/snooze', [MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
 });
 
-Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
-Route::get('/my-calendar/events', [\App\Http\Controllers\MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
+Route::get('/my-calendar', [MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
+Route::get('/my-calendar/events', [MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
 
 // ── Operations module ────────────────────────────────────────────────
 require __DIR__.'/operations.php';
@@ -350,18 +361,18 @@ require __DIR__.'/api_medications.php';
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
-    Route::get('/shifts/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/shifts/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/shifts')
         ->defaults('status', 301);
-    Route::get('/timesheets/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/timesheets/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/timesheets')
         ->defaults('status', 301);
-    Route::get('/rostering', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/rostering', LegacyRouteRedirectController::class)
         ->defaults('destination', '/operations/rostering')
         ->defaults('status', 301);
-    Route::get('/rostering/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/rostering/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/rostering')
         ->defaults('status', 301);

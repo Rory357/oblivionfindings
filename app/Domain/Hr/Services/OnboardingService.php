@@ -17,6 +17,7 @@ use App\Domain\Hr\Notifications\OffboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingChecklistAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingChecklistCompletedNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
+use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\ItProvisioningRequest;
@@ -544,6 +545,12 @@ class OnboardingService
             return;
         }
 
+        if (Schema::hasTable('it_provisioning_templates')
+            && app(ItProvisioningWorkflowService::class)
+                ->tryLaunchFromOnboarding($checklist->load('employeeProfile', 'tasks'), $createdBy)) {
+            return;
+        }
+
         foreach ($tasks as $task) {
             if (($task->category ?: '') !== 'it') {
                 continue;
@@ -917,7 +924,13 @@ class OnboardingService
                 }
             }
 
-            return $checklist->load('tasks');
+            $checklist->load('employeeProfile', 'tasks');
+            if (Schema::hasTable('it_provisioning_templates')) {
+                app(ItProvisioningWorkflowService::class)
+                    ->tryLaunchFromOffboarding($checklist, $createdBy);
+            }
+
+            return $checklist;
         });
 
         // Notify assignees after commit (onboarding notifies too; without this,

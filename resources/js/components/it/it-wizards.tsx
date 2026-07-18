@@ -75,6 +75,26 @@ export interface RequestRow {
     priority: string;
     due_date: string | null;
     assignee: AssigneeOption | null;
+    task_key: string | null;
+    action: string | null;
+    category: string | null;
+    responsible_team: AssigneeOption | null;
+    stage: number | null;
+    dependency_request_ids: number[];
+    approval_required: boolean;
+    approval_status: string | null;
+    approver: AssigneeOption | null;
+    evidence_required: boolean;
+    evidence_summary: string | null;
+    failure_reason: string | null;
+    fulfiller_context: Record<string, unknown>;
+    workflow: {
+        id: number;
+        lifecycle_type: string;
+        status: string;
+        source_type: string;
+        effective_at: string | null;
+    } | null;
     external_ref: string | null;
     notes: string | null;
     from_onboarding: boolean;
@@ -157,6 +177,7 @@ export type ItModal =
     | { type: 'raise' }
     | { type: 'resolve'; ticket: { id: number; reference: string | null; title: string } }
     | { type: 'fulfil'; request: RequestRow }
+    | { type: 'fail-request'; request: RequestRow }
     | { type: 'assign-request'; request: RequestRow }
     | { type: 'assign-ticket'; ticket: TicketRow }
     | { type: 'new-request' }
@@ -246,6 +267,8 @@ export function ItWizard({
             return <ResolveTicketDialog ticket={modal.ticket} onDraftKb={onDraftKb} onClose={onClose} />;
         case 'fulfil':
             return <FulfilRequestDialog request={modal.request} onClose={onClose} />;
+        case 'fail-request':
+            return <FailRequestDialog request={modal.request} onClose={onClose} />;
         case 'assign-request':
             return (
                 <AssignDialog
@@ -2050,6 +2073,7 @@ function FulfilRequestDialog({
     const form = useForm({
         external_ref: request.external_ref ?? '',
         notes: request.notes ?? '',
+        evidence_summary: request.evidence_summary ?? '',
     });
 
     const submit = () => {
@@ -2111,6 +2135,22 @@ function FulfilRequestDialog({
                     blurb={`Record how ${request.employee.name}’s request was provisioned.`}
                 />
                 <div className="grid gap-3.5">
+                    {request.workflow ? (
+                        <InfoCard icon={GitMerge}>
+                            Stage {request.stage ?? 1} of the {request.workflow.lifecycle_type.replace('_', ' ')} workflow
+                            {request.responsible_team ? ` · owned by ${request.responsible_team.name}` : ''}.
+                        </InfoCard>
+                    ) : null}
+                    {request.approval_required ? (
+                        <InfoCard icon={UserCheck}>
+                            Approval is {request.approval_status === 'approved' ? `recorded${request.approver ? ` by ${request.approver.name}` : ''}` : 'required before fulfilment'}.
+                        </InfoCard>
+                    ) : null}
+                    {request.dependency_request_ids.length > 0 ? (
+                        <InfoCard icon={GitMerge}>
+                            Earlier workflow steps must be completed before this step can be fulfilled.
+                        </InfoCard>
+                    ) : null}
                     {request.from_onboarding ? (
                         <InfoCard icon={ClipboardCheck}>
                             Fulfilling this request also completes the linked onboarding task
@@ -2137,7 +2177,129 @@ function FulfilRequestDialog({
                             rows={4}
                         />
                     </Field>
+                    {request.evidence_required ? (
+                        <Field
+                            label="Completion evidence"
+                            hint="required — record what was checked or returned"
+                            error={form.errors.evidence_summary}
+                        >
+                            <Textarea
+                                value={form.data.evidence_summary}
+                                onChange={(e) => form.setData('evidence_summary', e.target.value)}
+                                placeholder="e.g. Account sign-in verified; laptop OF-104 returned and inspected"
+                                rows={3}
+                            />
+                        </Field>
+                    ) : null}
+                    {Object.keys(request.fulfiller_context).length > 0 ? (
+                        <div className="rounded-xl border border-border bg-muted/35 p-3">
+                            <p className="text-xs font-semibold text-foreground">Minimum details for fulfilment</p>
+                            <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                                {Object.entries(request.fulfiller_context).map(([key, value]) => (
+                                    <div key={key}>
+                                        <dt className="text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                            {key.replaceAll('_', ' ')}
+                                        </dt>
+                                        <dd className="text-xs text-foreground">{formatContextValue(value)}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        </div>
+                    ) : null}
                 </div>
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+function formatContextValue(value: unknown): string {
+    if (value == null || value === '') return '—';
+    if (Array.isArray(value)) return value.map(formatContextValue).join(', ');
+    if (typeof value !== 'object') return String(value);
+
+    const record = value as Record<string, unknown>;
+    if (typeof record.name === 'string') return record.name;
+    if ('from' in record || 'to' in record) {
+        return `${formatContextValue(record.from)} → ${formatContextValue(record.to)}`;
+    }
+
+    return Object.entries(record)
+        .map(([key, nested]) => `${key.replaceAll('_', ' ')}: ${formatContextValue(nested)}`)
+        .join(' · ');
+}
+
+/* ================================================================== */
+/*  Record request failure                                             */
+/* ================================================================== */
+
+const FAIL_STEPS: readonly WizardStep[] = [
+    { key: 'failure', label: 'Record failure', blurb: 'Explain the blocker', icon: X },
+];
+
+function FailRequestDialog({ request, onClose }: { request: RequestRow; onClose: () => void }) {
+    const [done, setDone] = useState(false);
+    const form = useForm({ failure_reason: request.failure_reason ?? '' });
+
+    const submit = () => {
+        form.post(`/it/provisioning/${request.id}/fail`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const err = pageFlashError(page);
+                if (err) {
+                    toast.error(err);
+                    return;
+                }
+                setDone(true);
+            },
+        });
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Record provisioning failure"
+            description={`Explain why “${request.item}” could not be completed.`}
+            railIcon={X}
+            railTitle="Failure"
+            railSub="Provisioning workflow"
+            steps={FAIL_STEPS}
+            stepIndex={0}
+            onStepClick={() => undefined}
+            maxHeight="min(76vh, 520px)"
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title="Failure recorded"
+                        blurb="The workflow is marked partially failed so the IT team can recover it without losing completed work."
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>Cancel</Button>
+                    <Button variant="destructive" onClick={submit} disabled={form.processing || form.data.failure_reason.trim().length < 3}>
+                        {form.processing ? 'Recording…' : 'Record failure'}
+                    </Button>
+                </>
+            }
+        >
+            <WizardStepPane>
+                <StepHead
+                    icon={X}
+                    title="What prevented completion?"
+                    blurb="Use a specific, operational reason. The employee’s private HR data is not included here."
+                />
+                <Field label="Failure reason" error={form.errors.failure_reason}>
+                    <Textarea
+                        value={form.data.failure_reason}
+                        onChange={(event) => form.setData('failure_reason', event.target.value)}
+                        placeholder="e.g. Supplier has no stock; delivery is now expected on 24 July"
+                        rows={5}
+                        maxLength={2000}
+                    />
+                </Field>
             </WizardStepPane>
         </WizardShell>
     );

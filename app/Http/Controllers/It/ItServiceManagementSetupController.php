@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Http\Controllers\Controller;
@@ -10,7 +12,9 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\SaveItQueueRequest;
 use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
+use App\Http\Requests\It\StoreItProvisioningTemplateRequest;
 use App\Http\Requests\It\StoreItServiceIdentityRequest;
+use App\Models\ItProvisioningTemplate;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItServiceIdentity;
@@ -29,6 +33,7 @@ class ItServiceManagementSetupController extends Controller
     public function __construct(
         private readonly ItServiceManagementSetupService $setupService,
         private readonly ItServiceIdentityCredentialService $identityCredentials,
+        private readonly ItProvisioningTemplateService $provisioningTemplates,
     ) {}
 
     public function index(Request $request)
@@ -139,12 +144,54 @@ class ItServiceManagementSetupController extends Controller
                 'is_active' => $identity->isActive(),
             ])->values();
 
+        $provisioningTemplates = ItProvisioningTemplate::query()
+            ->forTenant($tenantId)
+            ->with(['site:id,name', 'tasks.responsibleTeam:id,name'])
+            ->orderBy('lifecycle_type')
+            ->orderByDesc('selection_priority')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ItProvisioningTemplate $template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'description' => $template->description,
+                'lifecycle_type' => $template->lifecycle_type,
+                'position_role' => $template->position_role,
+                'site_id' => $template->site_id,
+                'site' => $template->site ? ['id' => $template->site->id, 'name' => $template->site->name] : null,
+                'employment_type' => $template->employment_type,
+                'selection_priority' => $template->selection_priority,
+                'is_active' => $template->is_active,
+                'tasks' => $template->tasks->map(fn ($task) => [
+                    'id' => $task->id,
+                    'task_key' => $task->task_key,
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'category' => $task->category,
+                    'action' => $task->action,
+                    'request_type' => $task->request_type,
+                    'responsible_team_id' => $task->responsible_team_id,
+                    'responsible_team' => $task->responsibleTeam
+                        ? ['id' => $task->responsibleTeam->id, 'name' => $task->responsibleTeam->name]
+                        : null,
+                    'stage' => $task->stage,
+                    'sort_order' => $task->sort_order,
+                    'dependency_task_keys' => $task->dependency_task_keys ?? [],
+                    'trigger_fields' => $task->trigger_fields ?? [],
+                    'approval_required' => $task->approval_required,
+                    'evidence_required' => $task->evidence_required,
+                    'due_offset_days' => $task->due_offset_days,
+                    'fulfiller_fields' => $task->fulfiller_fields ?? [],
+                ])->values(),
+            ])->values();
+
         return Inertia::render('it/setup/index', [
             'teams' => $teams,
             'queues' => $queues,
             'services' => $services,
             'apiIdentities' => $apiIdentities,
             'oneTimeApiCredential' => $request->session()->get('it_api_credential'),
+            'provisioningTemplates' => $provisioningTemplates,
             'agents' => ItStaffDirectory::agents($tenantId)
                 ->sortBy('name')
                 ->map(fn (User $user) => $this->userOption($user))
@@ -154,6 +201,14 @@ class ItServiceManagementSetupController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            'positionRoles' => HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('position_role')
+                ->where('position_role', '!=', '')
+                ->distinct()
+                ->orderBy('position_role')
+                ->pluck('position_role')
+                ->values(),
             'generatedAt' => now()->toIso8601String(),
         ]);
     }
@@ -237,6 +292,40 @@ class ItServiceManagementSetupController extends Controller
         $this->identityCredentials->revoke($identity, $request->user(), $tenantId);
 
         return redirect()->route('it.setup.index')->with('success', 'API identity revoked.');
+    }
+
+    public function storeProvisioningTemplate(StoreItProvisioningTemplateRequest $request)
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        try {
+            $this->provisioningTemplates->create($request->user(), $tenantId, $request->validated());
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('it.setup.index')
+            ->with('success', 'Provisioning template created.');
+    }
+
+    public function updateProvisioningTemplate(
+        StoreItProvisioningTemplateRequest $request,
+        ItProvisioningTemplate $template,
+    ) {
+        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
+        try {
+            $this->provisioningTemplates->update(
+                $template,
+                $request->user(),
+                $tenantId,
+                $request->validated(),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('it.setup.index')
+            ->with('success', 'Provisioning template updated.');
     }
 
     /** @param callable(int): mixed $action */

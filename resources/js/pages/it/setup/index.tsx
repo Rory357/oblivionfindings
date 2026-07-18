@@ -4,6 +4,10 @@ import {
     type OneTimeApiCredential,
 } from '@/components/it/it-api-identities';
 import { ItModuleShell } from '@/components/it/it-module-shell';
+import {
+    ItProvisioningTemplates,
+    type ProvisioningTemplate,
+} from '@/components/it/it-provisioning-templates';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -22,6 +26,7 @@ import { Head, useForm } from '@inertiajs/react';
 import {
     Boxes,
     KeyRound,
+    GitMerge,
     Network,
     Pencil,
     Plus,
@@ -90,8 +95,10 @@ interface Props {
     services: Service[];
     agents: Agent[];
     sites: Agent[];
+    positionRoles?: string[];
     apiIdentities: ItApiIdentity[];
     oneTimeApiCredential: OneTimeApiCredential | null;
+    provisioningTemplates: ProvisioningTemplate[];
     generatedAt?: string;
 }
 
@@ -121,11 +128,13 @@ export default function ItSetupIndex({
     services,
     agents,
     sites,
+    positionRoles = [],
     apiIdentities,
     oneTimeApiCredential,
+    provisioningTemplates,
     generatedAt,
 }: Props) {
-    const [tab, setTab] = useState<'teams' | 'queues' | 'services' | 'api'>(
+    const [tab, setTab] = useState<'teams' | 'queues' | 'services' | 'provisioning' | 'api'>(
         oneTimeApiCredential ? 'api' : 'teams',
     );
     const [teamOpen, setTeamOpen] = useState(false);
@@ -248,9 +257,22 @@ export default function ItSetupIndex({
         }
     };
 
+    const setupHeading = {
+        teams: 'Teams, queues & services',
+        queues: 'Teams, queues & services',
+        services: 'Teams, queues & services',
+        provisioning: 'Provisioning workflows',
+        api: 'API identities',
+    }[tab];
+    const setupDescription = tab === 'provisioning'
+        ? 'Turn HR joiner, mover and leaver events into governed, traceable IT work without copying employee, asset, or device ownership.'
+        : tab === 'api'
+          ? 'Manage authenticated machine identities with explicit scopes, field allowlists, signatures, rate limits, expiry, and revocation.'
+          : 'Define accountable ownership, workload routing, and safe default assignment without hiding where work went.';
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Teams, queues & services" />
+            <Head title={setupHeading} />
             <ItModuleShell>
                 <main className="space-y-6 py-2">
                     <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -267,12 +289,10 @@ export default function ItSetupIndex({
                                         IT & Support setup
                                     </p>
                                     <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                                        Teams, queues & services
+                                        {setupHeading}
                                     </h1>
                                     <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                                        Define accountable ownership, workload
-                                        routing, and safe default assignment
-                                        without hiding where work went.
+                                        {setupDescription}
                                     </p>
                                     <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                                         <RefreshCw
@@ -296,33 +316,9 @@ export default function ItSetupIndex({
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => openTeam()}
-                                >
-                                    <Plus
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />{' '}
-                                    New team
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => openQueue()}
-                                >
-                                    <Plus
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />{' '}
-                                    New queue
-                                </Button>
-                                <Button onClick={() => openService()}>
-                                    <Plus
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />{' '}
-                                    New service
-                                </Button>
+                                {tab === 'teams' ? <Button variant="outline" onClick={() => openTeam()}><Plus className="h-4 w-4" aria-hidden="true" /> New team</Button> : null}
+                                {tab === 'queues' ? <Button variant="outline" onClick={() => openQueue()}><Plus className="h-4 w-4" aria-hidden="true" /> New queue</Button> : null}
+                                {tab === 'services' ? <Button onClick={() => openService()}><Plus className="h-4 w-4" aria-hidden="true" /> New service</Button> : null}
                             </div>
                         </div>
                     </header>
@@ -352,6 +348,13 @@ export default function ItSetupIndex({
                             icon={Boxes}
                         >
                             Services
+                        </Tab>
+                        <Tab
+                            active={tab === 'provisioning'}
+                            onClick={() => setTab('provisioning')}
+                            icon={GitMerge}
+                        >
+                            Provisioning workflows
                         </Tab>
                         <Tab
                             active={tab === 'api'}
@@ -406,6 +409,14 @@ export default function ItSetupIndex({
                                 />
                             ))}
                         </Register>
+                    ) : null}
+                    {tab === 'provisioning' ? (
+                        <ItProvisioningTemplates
+                            templates={provisioningTemplates}
+                            teams={teams}
+                            sites={sites}
+                            positionRoles={positionRoles}
+                        />
                     ) : null}
                     {tab === 'api' ? (
                         <ItApiIdentities

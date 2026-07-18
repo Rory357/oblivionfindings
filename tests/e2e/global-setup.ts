@@ -76,6 +76,7 @@ async function globalSetup(): Promise<void> {
             // Map every permission row to the admin role so loginAsStaff
             // (admin@demo.test) can exercise every gated UI surface.
             'SeedAllPermissionsToAdminSeeder',
+            'ItProvisioningTemplateSeeder',
             'SystemCatalogSeeder',
             'SystemUsersSeeder',
             'SystemClientsSeeder',

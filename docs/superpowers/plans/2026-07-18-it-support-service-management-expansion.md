@@ -216,11 +216,11 @@ The missing service-management layers are governed type lifecycles, service cata
 - Modify the existing HR onboarding/offboarding bridges only through their canonical services
 - Modify provisioning payloads and UI
 
-- [ ] Write failing tests for role/site/employment-type template selection, ordered/parallel tasks, responsible teams, approvals, evidence, due targets, dependencies, reversal tasks, access revocation, asset recovery, partial failure, and idempotent HR event replay.
-- [ ] Cover accounts, groups, licences, email, devices, peripherals, network/Wi-Fi, door credentials, telephony, vehicle technology, and approved healthcare access with minimum-necessary fulfiller data.
-- [ ] Preserve existing onboarding task completion and cancellation behavior.
-- [ ] Add mover delta behavior and leaver reversal/recovery behavior without duplicating HR identity or Asset/Security & Devices ownership.
-- [ ] Commit as `feat(it): complete provisioning workflows`.
+- [x] Write failing tests for role/site/employment-type template selection, ordered/parallel tasks, responsible teams, approvals, evidence, due targets, dependencies, reversal tasks, access revocation, asset recovery, partial failure, and idempotent HR event replay.
+- [x] Cover accounts, groups, licences, email, devices, peripherals, network/Wi-Fi, door credentials, telephony, vehicle technology, and approved healthcare access with minimum-necessary fulfiller data.
+- [x] Preserve existing onboarding task completion and cancellation behavior.
+- [x] Add mover delta behavior and leaver reversal/recovery behavior without duplicating HR identity or Asset/Security & Devices ownership.
+- [x] Commit as `feat(it): complete provisioning workflows` (focused backend: 11 tests, 144 assertions; integrated IT regression: 239 tests, 2,264 assertions; HR compatibility: onboarding, offboarding, and employee profile regression suites pass; frontend: 1 file, 6 tests; browser: desktop and mobile, 2 tests; TypeScript, targeted ESLint, client build 4,978 modules, SSR build 1,630 modules, PHP syntax, routes, targeted Pint, and diff checks pass).
 
 ## Task 11: Complete knowledge, delivery visibility, reporting, and administration gaps
 

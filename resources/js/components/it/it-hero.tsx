@@ -26,6 +26,7 @@ export interface ItHeroSummary {
     };
     provisioning?: {
         pending: number;
+        failed: number;
         pending_over_7d: number;
     };
 }
@@ -111,6 +112,11 @@ export function ItHero({
                   key: 'aging',
                   label: `${p.pending_over_7d} provisioning pending >7d`,
                   href: '/it?tab=provisioning&status=pending',
+              },
+              p.failed > 0 && {
+                  key: 'provisioning-failed',
+                  label: `${p.failed} provisioning failed`,
+                  href: '/it?tab=provisioning&status=failed',
               },
           ].filter(Boolean) as NeedChip[])
         : [];

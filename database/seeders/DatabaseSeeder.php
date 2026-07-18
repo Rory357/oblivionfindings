@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
         // Run with: php artisan migrate:fresh --seed
         $this->call(RbacSeeder::class);
         $this->call(ItServiceCatalogSeeder::class);
+        $this->call(ItProvisioningTemplateSeeder::class);
         $this->call(SeedHrPermissionsSeeder::class);
         $this->call(OperationsPermissionsSeeder::class);
         $this->call(FinancePermissionsSeeder::class);
