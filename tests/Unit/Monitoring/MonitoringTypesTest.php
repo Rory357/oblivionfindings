@@ -11,3 +11,9 @@ it('defines focused models for collectors profiles monitors and observations', f
         ->and(class_exists('App\\Domain\\Monitoring\\Models\\Monitor'))->toBeTrue()
         ->and(class_exists('App\\Domain\\Monitoring\\Models\\MonitorObservation'))->toBeTrue();
 });
+
+it('defines the observation ingestion contract', function () {
+    expect(class_exists('App\\Domain\\Monitoring\\Data\\ObservationInput'))->toBeTrue()
+        ->and(class_exists('App\\Domain\\Monitoring\\Data\\ObservationResult'))->toBeTrue()
+        ->and(class_exists('App\\Domain\\Monitoring\\Services\\MonitoringObservationIngestor'))->toBeTrue();
+});

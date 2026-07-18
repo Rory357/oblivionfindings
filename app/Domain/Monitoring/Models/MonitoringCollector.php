@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Models;
 
 use App\Models\Site;
+use Database\Factories\MonitoringCollectorFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class MonitoringCollector extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): MonitoringCollectorFactory
+    {
+        return MonitoringCollectorFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',

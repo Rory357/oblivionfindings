@@ -278,7 +278,7 @@ git commit -m "feat(monitoring): add native monitoring foundation"
 - Create: `app/Domain/Monitoring/Services/MonitoringObservationIngestor.php`
 - Test: `tests/Feature/Monitoring/MonitoringObservationIngestorTest.php`
 
-- [ ] **Step 1: Write failing tests for idempotency, confirmation, unknown, and recovery**
+- [x] **Step 1: Write failing tests for idempotency, confirmation, unknown, and recovery**
 
 The test file must prove:
 
@@ -358,7 +358,7 @@ function observation(string $sourceKey, MonitorState $state): ObservationInput
 }
 ```
 
-- [ ] **Step 2: Run the ingestor tests and verify RED**
+- [x] **Step 2: Run the ingestor tests and verify RED**
 
 Run:
 
@@ -368,7 +368,7 @@ php artisan test tests/Feature/Monitoring/MonitoringObservationIngestorTest.php
 
 Expected: FAIL because the data objects and ingestor do not exist.
 
-- [ ] **Step 3: Add immutable input and result data objects**
+- [x] **Step 3: Add immutable input and result data objects**
 
 ```php
 final readonly class ObservationInput
@@ -400,7 +400,7 @@ final readonly class ObservationResult
 }
 ```
 
-- [ ] **Step 4: Implement transactional ingestion with row locking**
+- [x] **Step 4: Implement transactional ingestion with row locking**
 
 `MonitoringObservationIngestor::ingest(Monitor $monitor, ObservationInput $input): ObservationResult` must:
 
@@ -436,7 +436,7 @@ $deviceEvent = DeviceEvent::create([
 ]);
 ```
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run:
 
@@ -446,7 +446,7 @@ php artisan test tests/Feature/Monitoring/MonitoringObservationIngestorTest.php
 
 Expected: PASS with one offline and one online transition event in the relevant tests.
 
-- [ ] **Step 6: Commit observation ingestion**
+- [x] **Step 6: Commit observation ingestion**
 
 ```powershell
 git add app/Domain/Monitoring/Data app/Domain/Monitoring/Services tests/Feature/Monitoring/MonitoringObservationIngestorTest.php

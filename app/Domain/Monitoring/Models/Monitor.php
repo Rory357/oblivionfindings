@@ -5,6 +5,7 @@ namespace App\Domain\Monitoring\Models;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\SecurityDevices\Models\Device;
+use Database\Factories\MonitorFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Monitor extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): MonitorFactory
+    {
+        return MonitorFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',

@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Models;
 
 use App\Domain\Monitoring\Enums\MonitorState;
+use Database\Factories\MonitorObservationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MonitorObservation extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): MonitorObservationFactory
+    {
+        return MonitorObservationFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
