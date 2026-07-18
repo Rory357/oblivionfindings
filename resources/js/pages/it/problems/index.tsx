@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     Dialog,
     DialogContent,
@@ -108,6 +109,7 @@ export default function ItProblemsIndex({ problems, filters, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Problems & known errors" />
+            <ItModuleShell>
             <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
                 <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -292,6 +294,7 @@ export default function ItProblemsIndex({ problems, filters, can }: Props) {
                     ) : null}
                 </section>
             </main>
+            </ItModuleShell>
 
             <Dialog open={creating} onOpenChange={setCreating}>
                 <DialogContent className="sm:max-w-xl">

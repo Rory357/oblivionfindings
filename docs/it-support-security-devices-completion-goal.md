@@ -22,7 +22,7 @@ Security & Devices already provides the canonical `Device`, assignments, topolog
 | --- | --- | --- |
 | 1. Platform foundations | In progress | Native monitor persistence and idempotent observation ingestion: `496dbce8f`, `334c98ffa` |
 | 2. Connected monitoring-to-ticket lifecycle | In progress | L01-L04 vertical slice: `94a5f5830`, `21d5e0b93` |
-| 3. Complete IT & Support | In progress | Typed monitoring work links and permission-safe ticket context: `2bb1f5fd2`, `0c0a51410` |
+| 3. Complete IT & Support | In progress | Typed monitoring links, governed service-management lifecycles, grouped navigation, catalogue, teams, queues, routing, and service ownership: `2bb1f5fd2`, `0c0a51410`, Tasks 2-8 in the implementation plan |
 | 4. Complete Security & Devices workspaces | Planned | None recorded |
 | 5. Cross-module projections and privacy | Planned | None recorded |
 | 6. Production hardening and closure | Planned | None recorded |
@@ -60,7 +60,7 @@ Progress notes:
 
 ### IT & Support
 
-- [ ] I01 Navigation and labels use IT & Support with the approved Service Desk, Service Delivery, Operations, and Setup groups.
+- [x] I01 Navigation and labels use IT & Support with the approved Service Desk, Service Delivery, Operations, and Setup groups.
 - [ ] I02 Incidents, service requests, provisioning, problems, changes, security requests, and major incidents have governed lifecycles.
 - [ ] I03 Shared work supports context links, queues/teams, assignee/owner, SLA, conversations, attachments, watchers, tasks, approvals, and timeline.
 - [ ] I04 Help Centre, knowledge deflection, service catalogue, dynamic forms, My requests, and CSAT are end-to-end.

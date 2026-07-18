@@ -183,12 +183,12 @@ The missing service-management layers are governed type lifecycles, service cata
 - Modify shared application navigation labels
 - Create component and browser acceptance tests
 
-- [ ] Write failing payload/route tests for the approved Service Desk, Service Delivery, Operations, and Setup groups.
-- [ ] Add tenant-scoped teams, membership roles, queue routing rules, service ownership, default assignment, workload counts, and admin audit.
-- [ ] Preserve `/it` and existing tab/query deep links while adding understandable workspace routes.
-- [ ] Rename visible module copy from `IT & Provisioning` to `IT & Support`; retain Provisioning as a first-class destination.
-- [ ] Use grouped side navigation plus local tabs only where a workspace needs tabs. Meet focus, target-size, responsive, icon+text+colour, empty/error/freshness, and permission rules.
-- [ ] Commit as `feat(it): add service management navigation`.
+- [x] Write failing payload/route tests for the approved Service Desk, Service Delivery, Operations, and Setup groups.
+- [x] Add tenant-scoped teams, membership roles, queue routing rules, service ownership, default assignment, workload counts, and admin audit.
+- [x] Preserve `/it` and existing tab/query deep links while adding understandable workspace routes.
+- [x] Rename visible module copy from `IT & Provisioning` to `IT & Support`; retain Provisioning as a first-class destination.
+- [x] Use grouped side navigation plus local tabs only where a workspace needs tabs. Meet focus, target-size, responsive, icon+text+colour, empty/error/freshness, and permission rules.
+- [x] Commit as `feat(it): add service management navigation` (focused backend: 10 tests, 170 assertions; integrated IT regression: 89 tests, 903 assertions; frontend: 5 files, 11 tests; browser: desktop and mobile, 2 tests; TypeScript, targeted ESLint, Wayfinder, 7 routes, client build 4,976 modules, SSR build 1,628 modules, PHP syntax, targeted Pint, and diff checks pass).
 
 ## Task 9: Add secure API identities and idempotent work intake
 

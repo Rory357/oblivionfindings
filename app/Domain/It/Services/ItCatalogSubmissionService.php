@@ -17,6 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class ItCatalogSubmissionService
 {
+    public function __construct(
+        private readonly ItTicketRoutingService $routingService,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $input
      * @return array{submission: ItCatalogSubmission, result: Model, created: bool}
@@ -194,6 +198,8 @@ class ItCatalogSubmissionService
             'catalog_item_id' => $item->id,
             'form_schema_version' => $item->form_schema_version,
         ]);
+
+        $ticket = $this->routingService->route($ticket, $actor->id);
 
         return $ticket;
     }

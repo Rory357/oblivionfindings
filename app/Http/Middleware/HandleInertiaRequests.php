@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Finance\Services\FinanceHubCountsService;
+use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -149,6 +150,10 @@ class HandleInertiaRequests extends Middleware
             // own hub's slice from `financeHubCounts[hub]`.
             'financeHubCounts' => $user && str_starts_with((string) $request->route()?->getName(), 'finance.')
                 ? fn () => app(FinanceHubCountsService::class)->forOrganization($user->organization_id)
+                : null,
+
+            'itNavigation' => $user && str_starts_with((string) $request->route()?->getName(), 'it.')
+                ? fn () => ItModuleNavigation::forUser($user)
                 : null,
 
             'auth' => [

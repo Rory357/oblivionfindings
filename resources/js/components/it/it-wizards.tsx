@@ -1,4 +1,4 @@
-/* The IT & Provisioning dialogs — Log ticket (3-step), Fulfil request and
+/* The IT & Support dialogs — Log ticket (3-step), Fulfil request and
  * Assign owner (single-step). All built on the shared HR wizard kit
  * (WizardShell + primitives) so they are visually identical to the
  * Add-Client / Asset lifecycle modals. Zero confirm(): every action is a
@@ -2221,7 +2221,7 @@ function AssignDialog({
             description={`Pick who owns “${subject}”.`}
             railIcon={UserCheck}
             railTitle={heading}
-            railSub="IT & Provisioning"
+            railSub="IT & Support"
             steps={ASSIGN_STEPS}
             stepIndex={0}
             onStepClick={() => undefined}

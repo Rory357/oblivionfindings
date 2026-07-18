@@ -24,6 +24,7 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
+    usePage: () => ({ props: { itNavigation: [] }, url: '/it/major-incidents' }),
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),

@@ -10,6 +10,7 @@ use App\Http\Controllers\It\ItMajorIncidentController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItReportsController;
+use App\Http\Controllers\It\ItServiceManagementSetupController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\It\ItWorkTaskController;
 use App\Http\Controllers\QualityChecklistController;
@@ -147,7 +148,7 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
-// IT & Provisioning — self-service helpdesk (everyone on staff raises and
+// IT & Support — self-service helpdesk (everyone on staff raises and
 // tracks their own tickets) + the agent provisioning/ticket queues. Built
 // from docs/IT_PROVISIONING_WIREFRAME.md; ticketing per
 // docs/IT_TICKETING_GAP_ANALYSIS.md.
@@ -199,6 +200,13 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
 
     Route::middleware('permission:it.manage')->group(function () {
+        Route::get('/it/setup', [ItServiceManagementSetupController::class, 'index'])->name('it.setup.index');
+        Route::post('/it/setup/teams', [ItServiceManagementSetupController::class, 'storeTeam'])->name('it.setup.teams.store');
+        Route::patch('/it/setup/teams/{team}', [ItServiceManagementSetupController::class, 'updateTeam'])->name('it.setup.teams.update');
+        Route::post('/it/setup/queues', [ItServiceManagementSetupController::class, 'storeQueue'])->name('it.setup.queues.store');
+        Route::patch('/it/setup/queues/{queue}', [ItServiceManagementSetupController::class, 'updateQueue'])->name('it.setup.queues.update');
+        Route::post('/it/setup/services', [ItServiceManagementSetupController::class, 'storeService'])->name('it.setup.services.store');
+        Route::patch('/it/setup/services/{service}', [ItServiceManagementSetupController::class, 'updateService'])->name('it.setup.services.update');
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
         Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
         Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');

@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     Dialog,
     DialogContent,
@@ -142,6 +143,7 @@ export default function ItMajorIncidentsIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Major incidents" />
+            <ItModuleShell>
             <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
                 <header className="overflow-hidden rounded-2xl border border-status-critical/25 bg-card shadow-sm">
                     <div className="border-l-4 border-status-critical p-5">
@@ -345,6 +347,7 @@ export default function ItMajorIncidentsIndex({
                     )}
                 </section>
             </main>
+            </ItModuleShell>
 
             <Dialog open={creating} onOpenChange={setCreating}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">

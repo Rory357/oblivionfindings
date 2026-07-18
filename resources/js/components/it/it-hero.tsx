@@ -56,7 +56,7 @@ const go = (href: string) =>
     router.get(href, {}, { preserveState: true, preserveScroll: true, replace: true });
 
 /**
- * The IT & Provisioning hub hero — a brand-gradient command band above the tab
+ * The IT & Support hub hero — a brand-gradient command band above the tab
  * strip. Left: glanceable stat chips (each a deep-link into the filtered queue),
  * a "needs you" attention row and quick actions. Right (agents only): a toggle
  * between the live-queue status donut and a 30-day SLA-compliance ring, persisted
@@ -154,7 +154,7 @@ export function ItHero({
                             </span>
                             <div className="min-w-0">
                                 <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
-                                    IT &amp; Provisioning
+                                    IT &amp; Support
                                 </h1>
                                 <p className="mt-1.5 text-[13px] font-medium text-primary-foreground/75">
                                     {subtitle}

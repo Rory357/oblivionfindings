@@ -5,6 +5,7 @@
  * and toasts. Requesters get a read-only rail for their own ticket;
  * internal notes never reach their payload (server-side strip). */
 import { CsatRater, CsatStars } from '@/components/it/csat';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import { MergeTicketDialog, ResolveTicketDialog, type MergeTarget } from '@/components/it/it-wizards';
 import { SlaChip } from '@/components/it/sla-chip';
 import {
@@ -169,7 +170,7 @@ export default function ItTicketShow({
     const myId = page.props.auth?.user?.id ?? null;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'IT & Provisioning', href: '/it' },
+        { title: 'IT & Support', href: '/it' },
         { title: ticket.reference ?? `Ticket ${ticket.id}`, href: `/it/tickets/${ticket.id}` },
     ];
 
@@ -251,6 +252,7 @@ export default function ItTicketShow({
                 />
             ) : null}
 
+            <ItModuleShell>
             <div className="flex flex-col gap-5 p-4 sm:p-6">
                 {ticket.merged_into ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-[13px]">
@@ -686,6 +688,7 @@ export default function ItTicketShow({
                     </div>
                 </div>
             </div>
+            </ItModuleShell>
         </AppLayout>
     );
 }

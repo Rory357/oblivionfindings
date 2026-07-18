@@ -8,6 +8,7 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -48,6 +49,7 @@ class ItProvisioningController extends Controller
     public function __construct(
         private readonly OnboardingService $onboardingService,
         private readonly ItWorkTransitionService $transitionService,
+        private readonly ItTicketRoutingService $routingService,
     ) {}
 
     /* ================================================================== */
@@ -656,6 +658,9 @@ class ItProvisioningController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
             'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
+            'work_type' => ['nullable', Rule::in(['incident', 'service_request', 'security_request'])],
+            'it_service_id' => ['nullable', 'integer', Rule::exists('it_services', 'id')->where('tenant_id', $tenantId)],
+            'site_id' => ['nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
             // §N2 agent triage fields — dropped for self-service requesters below.
             'subcategory' => ['nullable', 'string', 'max:255'],
             // On-behalf-of: an agent logs a ticket for the person who actually
@@ -690,6 +695,9 @@ class ItProvisioningController extends Controller
         $provisioningRequestId = $isAgent ? ($validated['provisioning_request_id'] ?? null) : null;
         $subcategory = $isAgent ? ($validated['subcategory'] ?? null) : null;
         $assetId = $isAgent ? ($validated['asset_id'] ?? null) : null;
+        $workType = $isAgent ? ($validated['work_type'] ?? 'incident') : 'incident';
+        $serviceId = $isAgent ? ($validated['it_service_id'] ?? null) : null;
+        $siteId = $isAgent ? ($validated['site_id'] ?? null) : null;
         $watcherIds = $isAgent && ! empty($validated['watchers'])
             ? array_values(array_unique(array_map('intval', $validated['watchers'])))
             : [];
@@ -699,13 +707,18 @@ class ItProvisioningController extends Controller
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'requester_user_id' => $requesterId,
+            'requested_for_user_id' => $requesterId,
             'assigned_to_user_id' => $assigneeId,
             'asset_id' => $assetId,
+            'site_id' => $siteId,
+            'it_service_id' => $serviceId,
             'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
             'requires_approval' => ItTicket::categoryNeedsApproval($validated['category']),
             'subcategory' => $subcategory,
             'priority' => $validated['priority'],
+            'work_type' => $workType,
+            'workflow_state' => 'submitted',
             'source' => $isAgent ? 'agent' : 'portal',
             'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
@@ -727,6 +740,7 @@ class ItProvisioningController extends Controller
             'provisioning_request_id' => $provisioningRequestId,
             'on_behalf_of' => $requesterId !== $user->id ? $requesterId : null,
         ]));
+        $ticket = $this->routingService->route($ticket, $user->id);
 
         // Receipt to the REQUESTER — the actor when self-raised, the
         // on-behalf-of colleague when an agent logs it. Plus an urgent alert

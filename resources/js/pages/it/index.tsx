@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- The IT & Provisioning hub mirrors the
+/* eslint-disable no-restricted-syntax -- The IT & Support hub mirrors the
  * gold-standard HR hubs: bespoke table rows, hero stat chips and context-menu
  * triggers built from styled native elements. Every colour is a semantic
  * design token. */
@@ -19,8 +19,13 @@ import {
 } from '@/components/it/it-wizards';
 import { CsatRater, CsatStars } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
 import { ItReports } from '@/components/it/it-reports';
+import {
+    ItServiceCatalogue,
+    type CatalogItem,
+} from '@/components/it/it-service-catalogue';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
 import {
@@ -51,6 +56,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
     BarChart3,
+    BookMarked,
     BookOpen,
     CheckCircle2,
     ChevronDown,
@@ -193,13 +199,15 @@ interface Props {
     slaCalendar?: SlaCalendar | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
+    /** Permission-safe, published service requests for the catalogue workspace. */
+    catalogItems: CatalogItem[];
     /** Published KB articles for a requester's browse tab (§I). */
     kbPublished?: KbPublishedRow[];
     summary: Summary;
     can: { view: boolean; manage: boolean; request: boolean; edit_sla?: boolean };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Support', href: '/it' }];
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
 const ALL = 'all';
@@ -290,6 +298,7 @@ export default function ItIndex({
     slaPolicies,
     slaCalendar,
     myTickets,
+    catalogItems = [],
     kbPublished = [],
     summary,
     can,
@@ -301,6 +310,7 @@ export default function ItIndex({
     const tabIsAllowed = (id: string | null): id is string => {
         if (!id) return false;
         if (id === 'my-tickets') return can.request;
+        if (id === 'catalog') return can.request;
         if (id === 'knowledge') return can.view || can.request;
         return can.view; // overview / tickets / provisioning / reports
     };
@@ -366,6 +376,13 @@ export default function ItIndex({
             : []),
         ...(can.request
             ? ([
+                  {
+                      id: 'catalog',
+                      label: 'Service catalogue',
+                      icon: BookMarked,
+                      tone: 'primary',
+                      badge: catalogItems.length,
+                  },
                   {
                       id: 'my-tickets',
                       label: 'My tickets',
@@ -864,7 +881,7 @@ export default function ItIndex({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="IT & Provisioning" />
+            <Head title="IT & Support" />
             {ctx.element}
             <ItWizard
                 modal={modal}
@@ -988,6 +1005,7 @@ export default function ItIndex({
                 </AlertDialogContent>
             </AlertDialog>
 
+            <ItModuleShell>
             <div className="flex flex-col gap-5 p-4 sm:p-6">
                 <ItHero
                     summary={summary}
@@ -1571,6 +1589,11 @@ export default function ItIndex({
                     </>
                 )}
 
+                {/* ── Service catalogue (everyone with it.request) ── */}
+                {can.request && tab === 'catalog' ? (
+                    <ItServiceCatalogue items={catalogItems} />
+                ) : null}
+
                 {/* ── My tickets (everyone with it.request) ── */}
                 {can.request && tab === 'my-tickets' && (
                     <>
@@ -1869,6 +1892,7 @@ export default function ItIndex({
                     </>
                 )}
             </div>
+            </ItModuleShell>
         </AppLayout>
     );
 }

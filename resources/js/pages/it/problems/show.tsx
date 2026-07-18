@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     Dialog,
     DialogContent,
@@ -141,6 +142,7 @@ export default function ItProblemShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} — ${ticket.title}`} />
+            <ItModuleShell>
             <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
                 <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <Link
@@ -474,6 +476,7 @@ export default function ItProblemShow({
                     </aside>
                 </div>
             </main>
+            </ItModuleShell>
 
             <Dialog
                 open={transitioning !== null}

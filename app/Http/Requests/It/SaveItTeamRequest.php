@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Http\Requests\It;
+
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\ItTeam;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class SaveItTeamRequest extends FormRequest
+{
+    use ResolvesHrTenant;
+
+    public function authorize(): bool
+    {
+        return (bool) $this->user()?->canDo('it.manage');
+    }
+
+    public function rules(): array
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($this->user());
+        $team = $this->route('team');
+        $required = $team ? ['sometimes', 'required'] : ['required'];
+
+        return [
+            'name' => [
+                ...$required, 'string', 'max:255',
+                Rule::unique('it_teams', 'name')->where('tenant_id', $tenantId)->ignore($team?->id),
+            ],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'manager_user_id' => [
+                'nullable', 'integer',
+                Rule::exists('users', 'id')->where('organization_id', $tenantId),
+            ],
+            'is_active' => [...($team ? ['sometimes'] : ['required']), 'boolean'],
+            'members' => ['sometimes', 'array', 'max:200'],
+            'members.*.user_id' => [
+                'required', 'integer', 'distinct',
+                Rule::exists('users', 'id')->where('organization_id', $tenantId),
+            ],
+            'members.*.role' => ['required', Rule::in(ItTeam::MEMBER_ROLES)],
+        ];
+    }
+}

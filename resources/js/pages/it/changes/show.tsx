@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     Dialog,
     DialogContent,
@@ -192,6 +193,7 @@ export default function ItChangeShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} · Change`} />
+            <ItModuleShell>
             <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
                 <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <Link
@@ -481,6 +483,7 @@ export default function ItChangeShow({
                     </aside>
                 </div>
             </main>
+            </ItModuleShell>
 
             <Dialog open={editing} onOpenChange={setEditing}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
