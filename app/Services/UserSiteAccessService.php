@@ -1297,6 +1297,19 @@ class UserSiteAccessService
     protected function alertContextSiteExpression(Builder $query): string
     {
         $contextColumn = sprintf('`%s`.`context`', $query->getModel()->getTable());
+
+        if ($query->getConnection()->getDriverName() === 'sqlite') {
+            $siteValues = collect($this->alertContextSitePaths())
+                ->map(fn (string $jsonPath) => sprintf(
+                    "NULLIF(NULLIF(NULLIF(NULLIF(CAST(json_extract(%s, '%s') AS TEXT), ''), '0'), 'null'), 'false')",
+                    $contextColumn,
+                    $jsonPath,
+                ))
+                ->implode(', ');
+
+            return sprintf('CAST(COALESCE(%s) AS INTEGER)', $siteValues);
+        }
+
         $siteValues = collect($this->alertContextSitePaths())
             ->map(fn (string $jsonPath) => sprintf(
                 "NULLIF(NULLIF(NULLIF(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(%s, '%s')), ''), '0'), 'null'), 'false')",
