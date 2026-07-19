@@ -133,7 +133,7 @@ Progress notes:
 
 1. `docs/superpowers/plans/2026-07-18-it-support-monitoring-foundation-vertical-slice.md`
 2. `docs/superpowers/plans/2026-07-18-it-support-service-management-expansion.md`
-3. Security & Devices information-architecture and workspace plan, created after plan 1 projection review.
+3. `docs/superpowers/plans/2026-07-19-security-devices-information-architecture-workspaces.md`
 4. Native discovery, protocol, topology, and collector runtime plan, created after plan 1 runtime-contract review.
 5. Device management, command, secrets, and audit plan, created after plans 3 and 4 establish capabilities.
 6. Cross-module projections, privacy, hardening, and closeout plan, created after source contracts stabilise.
