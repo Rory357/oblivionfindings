@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-export type WorkspaceTabState = 'available' | 'not_configured';
+export type WorkspaceTabState = 'available' | 'not_configured' | 'restricted';
 
 export type SecurityDevicesWorkspaceTab = {
     key: string;
@@ -206,7 +206,10 @@ export function SecurityDevicesWorkspaceShell({
     const activeTab =
         workspace.tabs.find((tab) => tab.key === workspace.activeTab) ??
         workspace.tabs[0];
-    const unavailableMessage = `${activeTab.description.replace(/\.$/, '')} is not configured for this workspace yet.`;
+    const unavailableMessage =
+        activeTab.state === 'restricted'
+            ? 'Your role does not have permission to view this workspace detail.'
+            : `${activeTab.description.replace(/\.$/, '')} is not configured for this workspace yet.`;
 
     return (
         <div className="space-y-4">
@@ -228,7 +231,7 @@ export function SecurityDevicesWorkspaceShell({
                                     }`}
                                 >
                                     <span>{tab.label}</span>
-                                    {tab.state === 'not_configured' && (
+                                    {tab.state !== 'available' && (
                                         <Badge
                                             variant="outline"
                                             className={
@@ -256,7 +259,9 @@ export function SecurityDevicesWorkspaceShell({
                 <Card>
                     <CardContent className="flex min-h-40 flex-col items-start justify-center gap-2 p-6">
                         <Badge variant="outline">
-                            Capability not configured
+                            {activeTab.state === 'restricted'
+                                ? 'Permission required'
+                                : 'Capability not configured'}
                         </Badge>
                         <h2 className="text-lg font-semibold">
                             {activeTab.label}
@@ -265,8 +270,9 @@ export function SecurityDevicesWorkspaceShell({
                             {unavailableMessage}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                            No metrics or controls are shown until a canonical
-                            data source is available.
+                            {activeTab.state === 'restricted'
+                                ? 'No restricted event details or counts are shown.'
+                                : 'No metrics or controls are shown until a canonical data source is available.'}
                         </p>
                     </CardContent>
                 </Card>

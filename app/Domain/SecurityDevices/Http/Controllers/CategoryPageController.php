@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ class CategoryPageController extends Controller
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly WorkspacePresenter $workspacePresenter,
+        private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
     ) {}
 
     public function networkIt(Request $request)
@@ -222,7 +224,11 @@ class CategoryPageController extends Controller
                 clone $baseScope,
                 $workspaceConfig,
                 $activeTab,
+                $user,
             ),
+            'securityWorkspace' => $slug === 'security'
+                ? $this->securityWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                : null,
         ]);
     }
 

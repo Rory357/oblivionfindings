@@ -16,7 +16,8 @@ class WorkspaceConfig
      *         label: string,
      *         description: string,
      *         state: 'available'|'not_configured',
-     *         categories?: array<int, string>
+     *         categories?: array<int, string>,
+     *         requiredPermission?: string
      *     }>
      * }>
      */
@@ -50,7 +51,12 @@ class WorkspaceConfig
                     self::tab('cctv', 'CCTV', 'Cameras, recorders, and video infrastructure.', categories: ['cctv']),
                     self::tab('alarms', 'Alarms', 'Alarm panels, zones, sensors, sirens, and perimeter devices.', categories: ['alarm', 'perimeter']),
                     self::tab('access-control', 'Access Control', 'Doors, locks, readers, panels, and physical access hardware.', categories: ['access_control']),
-                    self::tab('events', 'Security events', 'Canonical device events and Control Room context.', 'not_configured'),
+                    self::tab(
+                        'events',
+                        'Security events',
+                        'Canonical device events and Control Room context.',
+                        requiredPermission: 'securityDevices.events.view',
+                    ),
                 ],
             ],
             'healthcare' => [
@@ -118,6 +124,7 @@ class WorkspaceConfig
         string $description,
         string $state = 'available',
         ?array $categories = null,
+        ?string $requiredPermission = null,
     ): array {
         return array_filter([
             'key' => $key,
@@ -125,6 +132,7 @@ class WorkspaceConfig
             'description' => $description,
             'state' => $state,
             'categories' => $categories,
+            'requiredPermission' => $requiredPermission,
         ], fn ($value) => $value !== null);
     }
 }

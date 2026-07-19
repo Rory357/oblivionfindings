@@ -6,6 +6,10 @@ import {
     WorkspaceDeviceList,
     WorkspaceFilterBar,
 } from '@/components/security-devices/security-devices-workspace-shell';
+import {
+    type SecurityWorkspaceData,
+    SecurityWorkspacePanels,
+} from '@/components/security-devices/security-workspace';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -67,6 +71,7 @@ type Props = {
     };
     pageConfig: PageConfig;
     workspace: SecurityDevicesWorkspace;
+    securityWorkspace?: SecurityWorkspaceData | null;
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -107,6 +112,7 @@ export default function CategoryPage({
     filterOptions,
     pageConfig,
     workspace,
+    securityWorkspace,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
@@ -177,6 +183,10 @@ export default function CategoryPage({
                     workspace={workspace}
                     filters={filters}
                 >
+                    {securityWorkspace ? (
+                        <SecurityWorkspacePanels data={securityWorkspace} />
+                    ) : null}
+
                     {/* Subcategory chips */}
                     {filterOptions.subcategories.length > 0 && (
                         <div className="flex flex-wrap gap-2">

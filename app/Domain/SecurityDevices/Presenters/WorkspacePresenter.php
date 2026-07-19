@@ -2,12 +2,13 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
 class WorkspacePresenter
 {
-    public function present(Builder $scope, array $config, array $activeTab): array
+    public function present(Builder $scope, array $config, array $activeTab, ?User $viewer = null): array
     {
         $deviceCount = (clone $scope)->count();
         $monitoredCount = (clone $scope)
@@ -21,13 +22,17 @@ class WorkspacePresenter
             'description' => $config['description'],
             'canonicalHref' => $config['canonicalHref'],
             'activeTab' => $activeTab['key'],
-            'activeTabState' => $activeTab['state'],
+            'activeTabState' => $this->tabState($activeTab, $viewer),
             'tabs' => collect($config['tabs'])->map(fn (array $tab) => [
                 'key' => $tab['key'],
                 'label' => $tab['label'],
                 'description' => $tab['description'],
-                'state' => $tab['state'],
-                'stateLabel' => $tab['state'] === 'available' ? 'Available' : 'Not configured',
+                'state' => $this->tabState($tab, $viewer),
+                'stateLabel' => match ($this->tabState($tab, $viewer)) {
+                    'available' => 'Available',
+                    'restricted' => 'Restricted',
+                    default => 'Not configured',
+                },
             ])->values(),
             'summary' => [
                 'devices' => $deviceCount,
@@ -44,6 +49,20 @@ class WorkspacePresenter
                     : null,
             ],
         ];
+    }
+
+    private function tabState(array $tab, ?User $viewer): string
+    {
+        if ($tab['state'] !== 'available') {
+            return $tab['state'];
+        }
+
+        if (isset($tab['requiredPermission'])
+            && (! $viewer || ! $viewer->canDo($tab['requiredPermission']))) {
+            return 'restricted';
+        }
+
+        return 'available';
     }
 
     private function freshnessState(mixed $latestObservation, int $deviceCount): string

@@ -108,4 +108,39 @@ describe('SecurityDevicesWorkspaceShell', () => {
             screen.queryByText('Fabricated traffic chart'),
         ).not.toBeInTheDocument();
     });
+
+    it('keeps a restricted specialist tab visible without leaking its content', () => {
+        render(
+            <SecurityDevicesWorkspaceShell
+                workspace={{
+                    ...workspace,
+                    activeTab: 'events',
+                    activeTabState: 'restricted',
+                    tabs: [
+                        ...workspace.tabs,
+                        {
+                            key: 'events',
+                            label: 'Security events',
+                            description: 'Canonical security-device events.',
+                            state: 'restricted',
+                            stateLabel: 'Restricted',
+                        },
+                    ],
+                }}
+                filters={{}}
+            >
+                <p>Restricted event details</p>
+            </SecurityDevicesWorkspaceShell>,
+        );
+
+        expect(screen.getByText('Permission required')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Your role does not have permission to view this workspace detail.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Restricted event details'),
+        ).not.toBeInTheDocument();
+    });
 });

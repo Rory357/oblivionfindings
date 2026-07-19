@@ -157,7 +157,7 @@ class DuskDatabaseSeeder extends Seeder
             'training.enrol', 'training.exempt', 'training.manageCourses', 'training.record', 'training.viewAny',
             'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.create',
             'securityDevices.devices.update', 'securityDevices.devices.delete', 'securityDevices.devices.assign',
-            'securityDevices.groups.manage', 'securityDevices.events.view',
+            'securityDevices.groups.manage', 'securityDevices.events.view', 'securityDevices.cctv.media.view',
             'securityDevices.maintenance.view', 'securityDevices.maintenance.manage',
             'securityDevices.integrations.view', 'securityDevices.integrations.manage',
             'securityDevices.reports.view',

@@ -30,6 +30,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.devices.assign', 'description' => 'Assign, reassign, or release devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.groups.manage', 'description' => 'Manage device groups', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.events.view', 'description' => 'View device events and alerts', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.cctv.media.view', 'description' => 'Open authorised CCTV media links', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.maintenance.view', 'description' => 'View device maintenance records', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.maintenance.manage', 'description' => 'Create and manage device maintenance', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.integrations.view', 'description' => 'View integration status and synced devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
@@ -129,12 +130,12 @@ class SecurityDevicesPermissionsSeeder extends Seeder
     private function attachToRole(string $roleName, array $permissionKeysOrIds): void
     {
         $role = Role::where('name', $roleName)->first();
-        if (!$role) {
+        if (! $role) {
             return;
         }
 
         // Accept either an array of permission IDs (ints) or key strings.
-        if (!empty($permissionKeysOrIds) && is_string($permissionKeysOrIds[0])) {
+        if (! empty($permissionKeysOrIds) && is_string($permissionKeysOrIds[0])) {
             $ids = Permission::whereIn('key', $permissionKeysOrIds)->pluck('id')->toArray();
         } else {
             $ids = $permissionKeysOrIds;
