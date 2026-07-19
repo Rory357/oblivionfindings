@@ -4,12 +4,23 @@ namespace App\Domain\SecurityDevices\Http\Controllers\Concerns;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 trait MapsDevicesForList
 {
     protected function mapDeviceForList(Device $d): array
     {
         $activeAssignment = $d->assignments->first(fn ($a) => $a->released_at === null);
+        $hasMonitoringCounts = array_key_exists('enabled_monitors_count', $d->getAttributes());
+        $monitorCount = $hasMonitoringCounts ? (int) $d->enabled_monitors_count : null;
+        $monitoringState = match (true) {
+            ! $hasMonitoringCounts => null,
+            $monitorCount === 0 => 'unmonitored',
+            (int) $d->failing_monitors_count > 0 => 'attention',
+            (int) $d->uncertain_monitors_count > 0 => 'unknown',
+            default => 'healthy',
+        };
 
         return [
             'id' => $d->id,
@@ -24,11 +35,14 @@ trait MapsDevicesForList
             'health_status' => $d->health_status?->value,
             'provider' => $d->provider,
             'last_seen_at' => $d->last_seen_at?->toISOString(),
+            'last_changed_at' => $d->updated_at?->toISOString(),
             'battery_level' => $d->battery_level,
             'assigned_to' => $activeAssignment
                 ? $this->resolveAssignableName($activeAssignment)
                 : null,
             'assignment_type' => $activeAssignment?->assignable_type,
+            'monitor_count' => $monitorCount,
+            'monitoring_state' => $monitoringState,
         ];
     }
 
@@ -41,7 +55,7 @@ trait MapsDevicesForList
             'room' => $entity?->name ?? "Room #{$assignment->assignable_id}",
             'vehicle' => $entity?->name ?? "Vehicle #{$assignment->assignable_id}",
             'staff' => $entity?->name ?? "Staff #{$assignment->assignable_id}",
-            'client' => trim(($entity?->first_name ?? '') . ' ' . ($entity?->last_name ?? '')) ?: "Client #{$assignment->assignable_id}",
+            'client' => trim(($entity?->first_name ?? '').' '.($entity?->last_name ?? '')) ?: "Client #{$assignment->assignable_id}",
             default => "{$assignment->assignable_type} #{$assignment->assignable_id}",
         };
     }
@@ -49,7 +63,7 @@ trait MapsDevicesForList
     /**
      * Apply common filters (status, health, provider, assigned, search) to a Device query.
      */
-    protected function applyCommonFilters(\Illuminate\Http\Request $request, \Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    protected function applyCommonFilters(Request $request, Builder $query): Builder
     {
         if ($request->filled('status') && $request->input('status') !== 'all') {
             $query->byStatus($request->input('status'));
@@ -90,16 +104,16 @@ trait MapsDevicesForList
     /**
      * Apply common sorting to a Device query.
      */
-    protected function applyCommonSort(\Illuminate\Http\Request $request, \Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    protected function applyCommonSort(Request $request, Builder $query): Builder
     {
         $allowedSorts = ['name', 'device_uid', 'domain', 'category', 'status', 'health_status', 'last_seen_at'];
         $sort = $request->input('sort', 'name');
         $direction = $request->input('direction', 'asc');
 
-        if (!in_array($sort, $allowedSorts)) {
+        if (! in_array($sort, $allowedSorts)) {
             $sort = 'name';
         }
-        if (!in_array($direction, ['asc', 'desc'])) {
+        if (! in_array($direction, ['asc', 'desc'])) {
             $direction = 'asc';
         }
 

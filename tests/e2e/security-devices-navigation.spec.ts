@@ -7,9 +7,9 @@ import {
 } from './helpers';
 
 const destinations = [
-    ['/security-devices', 'Security & Devices'],
+    ['/security-devices', 'Security & Devices estate'],
     ['/security-devices/sites', 'Sites'],
-    ['/security-devices/devices', 'Devices'],
+    ['/security-devices/devices', 'All devices'],
     ['/security-devices/network-it', 'Network & IT'],
     ['/security-devices/security', 'Security'],
     ['/security-devices/healthcare', 'Healthcare'],

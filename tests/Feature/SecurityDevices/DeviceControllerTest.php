@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\SecurityDevices;
 
-use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -17,7 +22,9 @@ class DeviceControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -136,7 +143,7 @@ class DeviceControllerTest extends TestCase
         $assigned = Device::factory()->create();
         $unassigned = Device::factory()->create();
 
-        \App\Domain\SecurityDevices\Models\DeviceAssignment::create([
+        DeviceAssignment::create([
             'device_id' => $assigned->id,
             'assignable_type' => 'site',
             'assignable_id' => 1,
@@ -151,6 +158,97 @@ class DeviceControllerTest extends TestCase
             ->has('devices.data', 1)
             ->where('devices.data.0.id', $unassigned->id)
         );
+    }
+
+    public function test_index_scopes_inventory_stats_saved_views_and_provider_options_to_the_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+        $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+        $monitored = Device::factory()->create([
+            'tenant_id' => 42,
+            'name' => 'Monitored device',
+            'provider' => 'tenant-provider',
+        ]);
+        $unmonitored = Device::factory()->create([
+            'tenant_id' => 42,
+            'name' => 'Unmonitored device',
+            'provider' => 'tenant-provider',
+        ]);
+        Device::factory()->create([
+            'tenant_id' => 77,
+            'name' => 'Foreign device',
+            'provider' => 'foreign-provider',
+        ]);
+        Monitor::factory()->create([
+            'tenant_id' => 42,
+            'profile_id' => $profile->id,
+            'device_id' => $monitored->id,
+            'current_state' => MonitorState::Healthy,
+            'is_enabled' => true,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get('/security-devices/devices?view=unmonitored');
+
+        $response->assertOk()->assertInertia(function ($page) use ($unmonitored): void {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame([$unmonitored->id], collect($props['devices']['data'])->pluck('id')->all());
+            $this->assertSame(2, $props['stats']['total']);
+            $this->assertSame(1, collect($props['savedViews'])->firstWhere('key', 'unmonitored')['count']);
+            $this->assertSame(['tenant-provider'], $props['filterOptions']['providers']);
+            $this->assertTrue($props['can']['export']);
+            $this->assertSame('unmonitored', $props['filters']['view']);
+        });
+    }
+
+    public function test_inventory_and_device_direct_links_honour_site_access(): void
+    {
+        $this->viewer->forceFill(['organization_id' => 42])->save();
+        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => 42,
+            'user_id' => $this->viewer->id,
+            'primary_site_id' => $allowedSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $allowed = Device::factory()->create(['tenant_id' => 42, 'name' => 'Allowed device']);
+        $hidden = Device::factory()->create(['tenant_id' => 42, 'name' => 'Hidden device']);
+        foreach ([[$allowed, $allowedSite], [$hidden, $hiddenSite]] as [$device, $site]) {
+            DeviceAssignment::create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'assigned_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($this->viewer)
+            ->get('/security-devices/devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('devices.data', 1)
+                ->where('devices.data.0.id', $allowed->id)
+                ->where('can.export', false));
+
+        $this->actingAs($this->viewer)
+            ->get("/security-devices/devices/{$allowed->id}")
+            ->assertOk();
+
+        $this->actingAs($this->viewer)
+            ->get("/security-devices/devices/{$hidden->id}")
+            ->assertNotFound();
+    }
+
+    public function test_cross_tenant_device_direct_link_is_non_revealing(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+        $foreign = Device::factory()->create(['tenant_id' => 77]);
+
+        $this->actingAs($this->admin)
+            ->get("/security-devices/devices/{$foreign->id}")
+            ->assertNotFound();
     }
 
     // ── Show ──────────────────────────────────────────────────────
@@ -193,6 +291,12 @@ class DeviceControllerTest extends TestCase
     public function test_show_includes_permission_flags(): void
     {
         $device = Device::factory()->create();
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_STAFF,
+            'assignable_id' => $this->viewer->id,
+            'assigned_at' => now(),
+        ]);
 
         // Viewer (support_worker) should not have update/delete/assign.
         $response = $this->actingAs($this->viewer)

@@ -21,6 +21,131 @@ export const ROSTERING_DEMO_SUGGESTION_TARGET = {
     siteId: 9001,
 } as const;
 
+export function seedSecurityDevicesOperationsReadinessFixtures() {
+    return runLaravelJson<{
+        siteId: number;
+        siteName: string;
+        deviceId: number;
+        deviceName: string;
+    }>(`
+$admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
+$tenantId = (int) ($admin->organization_id ?? 1);
+$site = \\App\\Models\\Site::query()
+    ->where('tenant_id', $tenantId)
+    ->where('archived', false)
+    ->orderBy('id')
+    ->first();
+
+if (! $site) {
+    $site = \\App\\Models\\Site::factory()->create([
+        'tenant_id' => $tenantId,
+        'name' => 'Playwright Technology Site',
+    ]);
+}
+
+$device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
+    ->where('tenant_id', $tenantId)
+    ->where('device_uid', 'PW-ESTATE-EDGE')
+    ->first();
+
+if (! $device) {
+    $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
+        'tenant_id' => $tenantId,
+        'device_uid' => 'PW-ESTATE-EDGE',
+    ]);
+} elseif ($device->trashed()) {
+    $device->restore();
+}
+
+$device->forceFill([
+    'name' => 'Playwright SD-WAN edge',
+    'domain' => 'it_infrastructure',
+    'category' => 'network',
+    'subcategory' => 'edge_router',
+    'manufacturer' => 'Oblivion Demo',
+    'model' => 'Native Edge',
+    'status' => 'offline',
+    'health_status' => 'critical',
+    'last_seen_at' => now()->subMinutes(20),
+    'provider' => 'oblivion_native',
+])->save();
+
+\\App\\Domain\\SecurityDevices\\Models\\DeviceAssignment::query()
+    ->where('device_id', $device->id)
+    ->delete();
+\\App\\Domain\\SecurityDevices\\Models\\DeviceAssignment::create([
+    'device_id' => $device->id,
+    'assignable_type' => \\App\\Domain\\SecurityDevices\\Models\\DeviceAssignment::TARGET_SITE,
+    'assignable_id' => $site->id,
+    'assigned_at' => now(),
+]);
+
+$profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->firstOrCreate(
+    ['tenant_id' => $tenantId, 'name' => 'Playwright native monitoring'],
+    [
+        'description' => 'Deterministic Security and Devices browser fixture',
+        'interval_seconds' => 60,
+        'failure_confirmations' => 3,
+        'recovery_confirmations' => 2,
+        'stale_after_seconds' => 300,
+        'is_active' => true,
+    ],
+);
+
+\\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
+    [
+        'tenant_id' => $tenantId,
+        'device_id' => $device->id,
+        'name' => 'Playwright ICMP availability',
+    ],
+    [
+        'profile_id' => $profile->id,
+        'kind' => 'icmp',
+        'target' => '192.0.2.10',
+        'config' => [],
+        'current_state' => 'failed',
+        'pending_state' => null,
+        'pending_count' => 0,
+        'affects_availability' => true,
+        'is_enabled' => true,
+        'last_observation_at' => now(),
+        'last_state_changed_at' => now(),
+    ],
+);
+
+\\App\\Domain\\SecurityDevices\\Models\\DeviceEvent::query()
+    ->where('device_id', $device->id)
+    ->where('source', 'playwright_task2')
+    ->delete();
+\\App\\Domain\\SecurityDevices\\Models\\DeviceEvent::create([
+    'device_id' => $device->id,
+    'event_type' => 'availability_failed',
+    'severity' => 'critical',
+    'source' => 'playwright_task2',
+    'occurred_at' => now(),
+]);
+
+\\App\\Domain\\SecurityDevices\\Models\\DeviceMaintenanceRecord::query()->updateOrCreate(
+    [
+        'device_id' => $device->id,
+        'type' => 'repair',
+        'description' => 'Playwright overdue WAN recovery',
+    ],
+    [
+        'status' => 'scheduled',
+        'scheduled_for' => now()->subDay()->toDateString(),
+    ],
+);
+
+echo json_encode([
+    'siteId' => $site->id,
+    'siteName' => $site->name,
+    'deviceId' => $device->id,
+    'deviceName' => $device->name,
+]);
+`);
+}
+
 export function resetMedicationReadinessFixtures() {
     runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
 }

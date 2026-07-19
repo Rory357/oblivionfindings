@@ -26,6 +26,7 @@ class ReportsExportTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
 
     protected function setUp(): void
@@ -146,5 +147,23 @@ class ReportsExportTest extends TestCase
         $this->actingAs($this->viewer)
             ->get('/security-devices/reports/maintenance.csv')
             ->assertForbidden();
+    }
+
+    public function test_selected_device_export_is_tenant_scoped_and_contains_only_requested_rows(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+        $selected = Device::factory()->create(['tenant_id' => 42, 'name' => 'Selected device']);
+        Device::factory()->create(['tenant_id' => 42, 'name' => 'Unselected device']);
+        $foreign = Device::factory()->create(['tenant_id' => 77, 'name' => 'Foreign device']);
+
+        $response = $this->actingAs($this->admin)
+            ->get("/security-devices/reports/devices.csv?ids={$selected->id},{$foreign->id}");
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('Selected device', $content);
+        $this->assertStringNotContainsString('Unselected device', $content);
+        $this->assertStringNotContainsString('Foreign device', $content);
     }
 }

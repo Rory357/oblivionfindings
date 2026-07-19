@@ -2,16 +2,18 @@
 
 namespace App\Domain\SecurityDevices\Models;
 
+use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
-use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\DeviceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -33,9 +35,9 @@ use Illuminate\Support\Str;
  */
 class Device extends Model
 {
+    use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
-    use AuditableChanges;
 
     protected $table = 'devices';
 
@@ -104,16 +106,16 @@ class Device extends Model
         });
     }
 
-    protected static function newFactory(): \Database\Factories\DeviceFactory
+    protected static function newFactory(): DeviceFactory
     {
-        return \Database\Factories\DeviceFactory::new();
+        return DeviceFactory::new();
     }
 
     public static function generateUid(?string $domain, ?string $category): string
     {
         $prefix = strtoupper(substr($category ?? $domain ?? 'DEV', 0, 3));
 
-        return $prefix . '-' . strtoupper(Str::random(8));
+        return $prefix.'-'.strtoupper(Str::random(8));
     }
 
     // ── Relationships ─────────────────────────────────────────────
@@ -158,7 +160,7 @@ class Device extends Model
         return $this->hasMany(DeviceRelationship::class, 'parent_device_id');
     }
 
-    public function groups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function groups(): BelongsToMany
     {
         return $this->belongsToMany(DeviceGroup::class, 'device_group_members');
     }
@@ -171,6 +173,11 @@ class Device extends Model
     public function maintenanceRecords(): HasMany
     {
         return $this->hasMany(DeviceMaintenanceRecord::class);
+    }
+
+    public function monitors(): HasMany
+    {
+        return $this->hasMany(Monitor::class);
     }
 
     public function documents(): HasMany
