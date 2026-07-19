@@ -92,11 +92,41 @@ class WorkspaceConfig
                 'domain' => 'tracking',
                 'tabs' => [
                     self::tab('overview', 'Overview', 'Tracking hardware posture separated by operational purpose.'),
-                    self::tab('personal-safety', 'Personal safety', 'Authorised personal-safety tracker context.', 'not_configured'),
-                    self::tab('fleet', 'Fleet', 'Vehicle tracker hardware and Fleet links.', 'not_configured'),
-                    self::tab('assets', 'Assets', 'Asset tracker assignments and technical state.', 'not_configured'),
-                    self::tab('geofences', 'Geofences', 'Purpose-aware geofence definitions and state.', 'not_configured'),
-                    self::tab('history', 'History', 'Permission and retention-aware tracking history.', 'not_configured'),
+                    self::tab(
+                        'personal-safety',
+                        'Personal safety',
+                        'Authorised client and lone-worker tracker context.',
+                        requiredAnyPermission: [
+                            'hazards.view',
+                            'fleet.viewAny',
+                            'assets.viewAny',
+                            'assets.viewAssigned',
+                        ],
+                    ),
+                    self::tab(
+                        'fleet',
+                        'Fleet',
+                        'Vehicle tracker hardware and canonical Fleet links.',
+                        requiredPermission: 'fleet.viewAny',
+                    ),
+                    self::tab(
+                        'assets',
+                        'Assets',
+                        'Asset tracker assignments and technical state.',
+                        requiredAnyPermission: ['assets.viewAny', 'assets.viewAssigned'],
+                    ),
+                    self::tab(
+                        'geofences',
+                        'Geofences',
+                        'Purpose-aware geofence definitions and state.',
+                        requiredAnyPermission: ['fleet.viewAny', 'assets.viewAny'],
+                    ),
+                    self::tab(
+                        'history',
+                        'History',
+                        'Permission and retention-aware tracking history.',
+                        requiredPermission: 'assets.telemetry.view',
+                    ),
                 ],
             ],
             'facilities-iot' => [

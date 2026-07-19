@@ -645,6 +645,8 @@ class DeviceController extends Controller
     private function mapDeviceForDetail(Device $d): array
     {
         $isHealthcareDevice = $d->domain === 'iot_healthcare';
+        $isTrackingDevice = $d->domain === 'tracking';
+        $hasPrivacySensitiveProviderPayload = $isHealthcareDevice || $isTrackingDevice;
 
         return [
             'id' => $d->id,
@@ -677,12 +679,14 @@ class DeviceController extends Controller
             // provider envelopes. The generic device page never serialises
             // those raw bags; its dedicated workspace presents an explicit
             // technical allowlist instead.
-            'external_ref' => $isHealthcareDevice ? null : $d->external_ref,
-            'config' => $isHealthcareDevice ? null : $d->config,
-            'meta' => $isHealthcareDevice ? null : $d->meta,
-            'latitude' => $d->latitude,
-            'longitude' => $d->longitude,
-            'location_description' => $d->location_description,
+            'external_ref' => $hasPrivacySensitiveProviderPayload ? null : $d->external_ref,
+            'config' => $hasPrivacySensitiveProviderPayload ? null : $d->config,
+            'meta' => $hasPrivacySensitiveProviderPayload ? null : $d->meta,
+            // Tracking locations are exposed only through the purpose-aware
+            // Tracking workspace and canonical Client/H&S/Fleet/Asset views.
+            'latitude' => $isTrackingDevice ? null : $d->latitude,
+            'longitude' => $isTrackingDevice ? null : $d->longitude,
+            'location_description' => $isTrackingDevice ? null : $d->location_description,
             'notes' => $d->notes,
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,

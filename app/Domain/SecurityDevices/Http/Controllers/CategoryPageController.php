@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
+use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,6 +32,7 @@ class CategoryPageController extends Controller
         private readonly WorkspacePresenter $workspacePresenter,
         private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
         private readonly HealthcareWorkspacePresenter $healthcareWorkspacePresenter,
+        private readonly TrackingWorkspacePresenter $trackingWorkspacePresenter,
     ) {}
 
     public function networkIt(Request $request)
@@ -233,6 +235,9 @@ class CategoryPageController extends Controller
                 : null,
             'healthcareWorkspace' => $slug === 'healthcare'
                 ? $this->healthcareWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                : null,
+            'trackingWorkspace' => $slug === 'tracking'
+                ? $this->trackingWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,
         ]);
     }

@@ -14,6 +14,10 @@ import {
     type SecurityWorkspaceData,
     SecurityWorkspacePanels,
 } from '@/components/security-devices/security-workspace';
+import {
+    type TrackingWorkspaceData,
+    TrackingWorkspacePanels,
+} from '@/components/security-devices/tracking-workspace';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -77,6 +81,7 @@ type Props = {
     workspace: SecurityDevicesWorkspace;
     securityWorkspace?: SecurityWorkspaceData | null;
     healthcareWorkspace?: HealthcareWorkspaceData | null;
+    trackingWorkspace?: TrackingWorkspaceData | null;
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -119,6 +124,7 @@ export default function CategoryPage({
     workspace,
     securityWorkspace,
     healthcareWorkspace,
+    trackingWorkspace,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
@@ -194,6 +200,9 @@ export default function CategoryPage({
                     ) : null}
                     {healthcareWorkspace ? (
                         <HealthcareWorkspacePanels data={healthcareWorkspace} />
+                    ) : null}
+                    {trackingWorkspace ? (
+                        <TrackingWorkspacePanels data={trackingWorkspace} />
                     ) : null}
 
                     {/* Subcategory chips */}

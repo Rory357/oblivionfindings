@@ -3,7 +3,9 @@
 namespace App\Domain\SecurityDevices\Services;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
 use App\Models\Client;
 use App\Models\SiteRoom;
 use App\Models\User;
@@ -41,6 +43,8 @@ class SecurityDevicesAccessService
         $tenantId = $this->tenantId($user);
         $query = Device::query()->forTenant($tenantId);
         $clientIds = $this->accessibleAssignedClientIds($user);
+        $staffIds = $this->accessibleAssignedStaffIds($user);
+        $assetIds = $this->accessibleAssetIds($user);
 
         if ($this->canViewAllTenantSites($user)) {
             return $query->where(function (Builder $visibility) use ($clientIds): void {
@@ -62,9 +66,9 @@ class SecurityDevicesAccessService
             ? collect()
             : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id');
 
-        return $query->where(function (Builder $visibility) use ($user, $siteIds, $roomIds, $clientIds): void {
-            $visibility->whereHas('assignments', function (Builder $assignment) use ($user, $siteIds, $roomIds, $clientIds): void {
-                $assignment->active()->where(function (Builder $target) use ($user, $siteIds, $roomIds, $clientIds): void {
+        return $query->where(function (Builder $visibility) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
+            $visibility->whereHas('assignments', function (Builder $assignment) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
+                $assignment->active()->where(function (Builder $target) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
                     if ($siteIds !== []) {
                         $target->where(function (Builder $siteTarget) use ($siteIds): void {
                             $siteTarget
@@ -89,6 +93,14 @@ class SecurityDevicesAccessService
                             ->where('assignable_id', $user->id);
                     });
 
+                    if ($staffIds !== []) {
+                        $target->orWhere(function (Builder $staffTarget) use ($staffIds): void {
+                            $staffTarget
+                                ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+                                ->whereIn('assignable_id', $staffIds);
+                        });
+                    }
+
                     if ($clientIds !== []) {
                         $target->orWhere(function (Builder $clientTarget) use ($clientIds): void {
                             $clientTarget
@@ -96,14 +108,125 @@ class SecurityDevicesAccessService
                                 ->whereIn('assignable_id', $clientIds);
                         });
                     }
+
+                    if ($assetIds !== []) {
+                        $target->orWhere(function (Builder $vehicleTarget) use ($assetIds): void {
+                            $vehicleTarget
+                                ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+                                ->whereIn('assignable_id', $assetIds);
+                        });
+                    }
                 });
             });
+
+            if ($assetIds !== []) {
+                $visibility->orWhereHas('activeAssetLinks', fn (Builder $link) => $link
+                    ->whereIn('asset_id', $assetIds));
+            }
 
             if ($user->canDo('securityDevices.devices.assign')
                 || $user->canDo('securityDevices.devices.update')) {
                 $visibility->orWhereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active());
             }
         });
+    }
+
+    /**
+     * Staff tracking remains a projection of the H&S staff boundary. A device
+     * permission by itself never expands the visible staff population.
+     *
+     * @return array<int, int>
+     */
+    private function accessibleAssignedStaffIds(User $user): array
+    {
+        if (! $user->canDo('hazards.view') || ! $user->canDo('staff.viewAny')) {
+            return [];
+        }
+
+        $candidateIds = DeviceAssignment::query()
+            ->active()
+            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+            ->whereHas('device', fn (Builder $device) => $device->forTenant($this->tenantId($user)))
+            ->distinct()
+            ->pluck('assignable_id');
+
+        if ($candidateIds->isEmpty()) {
+            return [];
+        }
+
+        $query = User::query()
+            ->whereKey($candidateIds)
+            ->whereNotNull('approved_at');
+        $this->siteAccess->applyStaffScope(
+            $query,
+            $user,
+            ['healthSafety.viewAllSites'],
+        );
+
+        return $query
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Resolve Fleet/Asset targets through their canonical destination policy
+     * and tenant provenance. A device link by itself never grants access to an
+     * otherwise foreign asset.
+     *
+     * @return array<int, int>
+     */
+    public function accessibleAssetIds(User $user): array
+    {
+        $tenantId = $this->tenantId($user);
+        $linkedIds = DeviceAssetLink::query()
+            ->active()
+            ->whereHas('device', fn (Builder $device) => $device->forTenant($tenantId))
+            ->pluck('asset_id');
+        $assignedVehicleIds = DeviceAssignment::query()
+            ->active()
+            ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+            ->whereHas('device', fn (Builder $device) => $device->forTenant($tenantId))
+            ->pluck('assignable_id');
+        $candidateIds = $linkedIds
+            ->merge($assignedVehicleIds)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($candidateIds->isEmpty()) {
+            return [];
+        }
+
+        return Asset::query()
+            ->whereKey($candidateIds)
+            ->with([
+                'site:id,tenant_id',
+                'homeSite:id,tenant_id',
+                'client:id,organization_id',
+                'categoryRef:id,slug',
+            ])
+            ->get()
+            ->filter(function (Asset $asset) use ($user, $tenantId): bool {
+                $sameTenant = (int) ($asset->site?->tenant_id ?? 0) === $tenantId
+                    || (int) ($asset->homeSite?->tenant_id ?? 0) === $tenantId
+                    || (int) ($asset->client?->organization_id ?? 0) === $tenantId;
+
+                if (! $sameTenant) {
+                    return false;
+                }
+
+                $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
+                    || $asset->categoryRef?->slug === 'vehicle';
+
+                return ($isVehicle && $user->canDo('fleet.viewAny'))
+                    || Gate::forUser($user)->allows('view', $asset);
+            })
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 
     /**
