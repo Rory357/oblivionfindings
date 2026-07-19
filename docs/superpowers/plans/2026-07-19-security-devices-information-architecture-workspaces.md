@@ -165,13 +165,15 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Reuse Fleet tracking, resident/client location, geofence, and canonical device services
 - Add purpose/consent-aware tests
 
-- [ ] Overview separates personal safety, Fleet, and asset tracking with distinct counts and required actions.
-- [ ] Personal safety projects authorised resident/staff tracker state and deep-links to the canonical Client/HR workflow.
-- [ ] Fleet tracking projects vehicle/device health and deep-links to Fleet journeys/operations.
-- [ ] Asset tracking projects canonical device/asset assignments and deep-links to Asset/Fleet records.
-- [ ] Geofences and History use shared map infrastructure but apply each source domain's permissions, purpose, consent, retention, and export rules.
-- [ ] Unknown/withdrawn/expired consent cannot be represented as active permission.
-- [ ] Commit as `feat(security-devices): add tracking workspace`.
+- [x] Overview separates personal safety, Fleet, and asset tracking with distinct counts and required actions.
+- [x] Personal safety projects authorised resident/staff tracker state and deep-links to the canonical Client/HR workflow.
+- [x] Fleet tracking projects vehicle/device health and deep-links to Fleet journeys/operations.
+- [x] Asset tracking projects canonical device/asset assignments and deep-links to Asset/Fleet records.
+- [x] Geofences and History use shared map infrastructure but apply each source domain's permissions, purpose, consent, retention, and export rules.
+- [x] Unknown/withdrawn/expired consent cannot be represented as active permission.
+- [x] Commit as `feat(security-devices): add tracking workspace`.
+
+**Task 6 evidence (2026-07-19):** Implementation committed as `bc89731b5`. Purpose-scoped Client, staff, Fleet, and Asset projections; canonical deep links; consent expiry/withdrawal/refusal handling; retained/redacted history; geofences; direct-device location and provider-payload redaction; foreign-tenant denial; and truthful 100-device safety-cap reporting passed 155 connected backend tests / 1,407 assertions. Seven Security & Devices frontend files passed 24 component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,990 modules), SSR build (1,642 modules), and diff checks passed. The current-commit production-backed six-tab journey passed on desktop and Pixel 7 with direct-URL privacy assertions, canonical Client/H&S/Fleet/Asset links, no console errors, and no horizontal overflow. The global browser setup's unrelated Rostering demo reseed warned about the isolated worktree encryption key; both scoped Tracking journeys still executed and passed.
 
 ## Task 7: Complete the Network & IT workspace on the native monitoring foundation
 
