@@ -219,12 +219,14 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Modify maintenance controller/page into the canonical route/tab model
 - Create operations pages and tests
 
-- [ ] Monitoring shows active monitor states/findings, coverage, missing/unsupported/paused checks, dependencies, trends available from retained observations, and data-collection freshness.
-- [ ] Maintenance separates overdue, due soon, planned, in progress, completed, calibration, and firmware/configuration work with reconcilable device/site filters.
-- [ ] Discovery & collectors shows current collectors, assignment, heartbeat/lag, monitor load, site/path scope, and unsupported/not-configured state from the existing foundation.
-- [ ] No discovery-run or candidate UI is shown until the following runtime plan provides canonical records.
-- [ ] Collector failure cannot silently present every downstream device as independently failed.
-- [ ] Commit as `feat(security-devices): add monitoring operations workspaces`.
+- [x] Monitoring shows active monitor states/findings, coverage, missing/unsupported/paused checks, dependencies, trends available from retained observations, and data-collection freshness.
+- [x] Maintenance separates overdue, due soon, planned, in progress, completed, calibration, and firmware/configuration work with reconcilable device/site filters.
+- [x] Discovery & collectors shows current collectors, assignment, heartbeat/lag, monitor load, site/path scope, and unsupported/not-configured state from the existing foundation.
+- [x] No discovery-run or candidate UI is shown until the following runtime plan provides canonical records.
+- [x] Collector failure cannot silently present every downstream device as independently failed.
+- [x] Commit as `feat(security-devices): add monitoring operations workspaces`.
+
+**Task 9 evidence (2026-07-19):** Implementation committed as `faf8f6a71`. Canonical Monitoring, Maintenance, and Discovery & collectors workspaces now use the visible device/site estate, retained safe observation summaries, real collector heartbeat/load/path evidence, and canonical maintenance records. An unavailable collector is presented as one collection-path finding with downstream states marked collection unavailable; raw targets, configurations, messages, metrics, notes, and costs are excluded. The compatibility matrix passed 61 backend tests / 603 assertions and the focused frontend suite passed 3 tests. TypeScript, targeted ESLint/Prettier/Pint, client build (4,994 modules), SSR build (1,646 modules), and diff checks passed. The final current-commit journey passed on desktop and Pixel 7 across every operations tab with no raw sentinel, console errors, premature discovery controls, or horizontal overflow. This closes the three operational presentation workspaces only: discovery runs/candidates, runtime/protocol breadth, capability-driven device management, Integrations, Settings & audit, cross-module projections, and governed commands remain open.
 
 ## Task 10: Make the device profile capability-driven
 
