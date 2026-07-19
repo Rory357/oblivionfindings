@@ -77,7 +77,7 @@ Progress notes:
 - [x] S02 Estate overview, Sites, and All devices answer health, change, coverage, site impact, and required action.
 - [ ] S03 Network & IT workspace includes map, devices, interfaces, services, traffic/capacity, configuration, and firmware.
 - [x] S04 Security workspace includes CCTV, Alarms, Access Control, and Security events.
-- [ ] S05 Healthcare workspace includes client/shared devices, connectivity/data flow, calibration, and maintenance without clinical-value duplication.
+- [x] S05 Healthcare workspace includes client/shared devices, connectivity/data flow, calibration, and maintenance without clinical-value duplication.
 - [ ] S06 Tracking workspace separately covers personal safety, Fleet, assets, geofences, and history with purpose/consent controls.
 - [ ] S07 Facilities & IoT covers environmental sensors, building systems, utilities, automations, and history.
 - [ ] S08 Monitoring, Maintenance, Discovery & collectors, Integrations, and Settings & audit are complete operational workspaces.
@@ -93,7 +93,7 @@ Progress notes:
 - [ ] M05 Secret-manager references, rotation, runtime delivery, collector encryption, and log redaction are proven.
 - [ ] M06 Cross-module projections pass both source-domain and destination-context permission decisions.
 - [ ] M07 Personal/client/staff tracking purpose, consent, expiry, withdrawal, retention, direct-link, export, and cached-access controls are proven.
-- [ ] M08 Healthcare technical telemetry remains separate from clinical readings; CCTV/media access and export are governed.
+- [x] M08 Healthcare technical telemetry remains separate from clinical readings; CCTV/media access and export are governed.
 
 ### Cross-module projections
 
@@ -110,7 +110,7 @@ Progress notes:
 - [x] E02 Email creation, threading, deduplication, safe attachments, outbound delivery, and bounce visibility.
 - [x] E03 Joiner, mover, and leaver provisioning with HR and asset/access reconciliation.
 - [ ] E04 Network failure confirmation, topology suppression, Control Room correlation, one IT incident, recovery, and technician resolution.
-- [ ] E05 Healthcare device assignment, technical/data-flow projection, calibration/maintenance, IT link, and clinical separation.
+- [x] E05 Healthcare device assignment, technical/data-flow projection, calibration/maintenance, IT link, and clinical separation.
 - [ ] E06 Tracking consent withdrawal removes collection/access across UI, API, export, direct URL, and cache.
 - [ ] E07 Door command with reason, step-up, approval, signed dispatch, reconciliation, denial, and immutable audit.
 - [ ] E08 Collector outage, stale state, one correlation, buffering, ordered return, and gap visibility.
@@ -158,3 +158,4 @@ Progress notes:
 - 2026-07-19: Security & Devices estate operations milestone committed as `aef51ae39`. S02 is proven by 73 backend tests with 717 assertions across estate/site operations, device inventory, selected export, dashboard compatibility, and navigation routes. Three component tests, TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build at 4,986 modules, SSR build at 1,638 modules, and diff checks passed. Production-backed Estate-to-site-to-device and complete 13-destination navigation journeys passed separately on desktop and Pixel 7 with permission, console, and horizontal-overflow checks. S03-S10 and the master verification gates remain open.
 - 2026-07-19: Shared specialist workspace shell committed as `afeb5807c`. Canonical and legacy compatibility, permission denials, query/device-context preservation, honest unavailable states, and active-tab reconciliation passed 55 backend tests / 404 assertions and six component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build at 4,987 modules, SSR build at 1,639 modules, diff checks, and production-backed desktop/Pixel 7 browser journeys passed. This is foundation evidence only: S03-S10 and the master verification gates remain open.
 - 2026-07-19: Security workspace committed as `61fe23aa5`. Overview, CCTV, alarms, physical access control, canonical device events, Control Room context, observed-only provider evidence, maintenance, and permission-gated internal CCTV media links passed 86 connected backend tests / 676 assertions and 12 frontend tests across four files. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build at 4,988 modules, SSR build at 1,640 modules, and diff checks passed. The production-backed five-tab journey passed against rebuilt assets on desktop and Pixel 7 with no console errors, overflow, duplicate alert actions, or premature device commands. S04 is complete; S03 and S05-S10 remain open, as do the master verification gates.
+- 2026-07-19: Healthcare workspace committed as `4f3149a05`. Minimum-necessary client identity, shared/site responsibility, explicit offline/integration/stale/unsupported/healthy flow states, canonical maintenance and calibration, authorised IT links, and persistent clinical separation passed 146 connected backend tests / 1,179 assertions plus a final 15-assertion count regression and five Healthcare component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build at 4,989 modules, SSR build at 1,641 modules, and diff checks passed. The production-backed five-tab journey passed on desktop and Pixel 7 with client-policy enforcement, clinical sentinels absent from category/detail/export payloads, no console errors, and no horizontal overflow. S05, M08, and E05 are complete; X02 remains open until the Client Profile projection is implemented and accepted, and S03/S06-S10 plus the remaining master verification gates remain open.

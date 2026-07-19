@@ -147,13 +147,15 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Extend permission-safe assignment/maintenance/event presentation
 - Add healthcare technical-state tests
 
-- [ ] Client devices show minimum-necessary client identity, device assignment, technical health, battery, connectivity, last successful data delivery, integration status, calibration/maintenance, support contact, and authorised IT links.
-- [ ] Shared/site devices show location and service responsibility without implying a client assignment.
-- [ ] Connectivity & data flow distinguishes device offline, integration failure, stale delivery, unsupported monitoring, and healthy flow.
-- [ ] Calibration & maintenance reconciles to canonical maintenance records.
-- [ ] Clinical values, clinical thresholds, diagnoses, medication data, and clinical review are absent from all payloads and exports.
-- [ ] Direct URLs and counts enforce both device-domain and client-context permissions.
-- [ ] Commit as `feat(security-devices): add healthcare device workspace`.
+- [x] Client devices show minimum-necessary client identity, device assignment, technical health, battery, connectivity, last successful data delivery, integration status, calibration/maintenance, support contact, and authorised IT links.
+- [x] Shared/site devices show location and service responsibility without implying a client assignment.
+- [x] Connectivity & data flow distinguishes device offline, integration failure, stale delivery, unsupported monitoring, and healthy flow.
+- [x] Calibration & maintenance reconciles to canonical maintenance records.
+- [x] Clinical values, clinical thresholds, diagnoses, medication data, and clinical review are absent from all payloads and exports.
+- [x] Direct URLs and counts enforce both device-domain and client-context permissions.
+- [x] Commit as `feat(security-devices): add healthcare device workspace`.
+
+**Task 5 evidence (2026-07-19):** Implementation committed as `4f3149a05`. The Healthcare workspace and connected Security & Devices regressions passed 146 backend tests with 1,179 assertions; the final non-overlapping overview-count regression passed separately with 15 assertions. Five Healthcare component tests, TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,989 modules), SSR build (1,641 modules), and diff checks passed. The production-backed Overview → Client devices → Shared & site devices → Connectivity & data flow → Calibration & maintenance journey passed against rebuilt assets on desktop and Pixel 7 with canonical assignment, IT, Site, Client Health Monitoring, and maintenance links, clinical-sentinel absence, client-policy enforcement, no console errors, and no horizontal overflow.
 
 ## Task 6: Complete the Tracking workspace without duplicating Fleet or Client records
 
