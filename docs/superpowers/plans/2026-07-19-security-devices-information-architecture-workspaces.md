@@ -129,13 +129,15 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Reuse category, event, assignment, and relationship services
 - Add focused backend/frontend/browser tests
 
-- [ ] Overview reconciles CCTV, alarms, access control, security events, unhealthy devices, sites affected, and required actions.
-- [ ] CCTV covers cameras, recorders, stream/recording health when observed, assignments, maintenance, and authorised links without exposing media to users lacking media permission.
-- [ ] Alarms covers panels, zones/sensors, state, events, sites, maintenance, and canonical Control Room alerts.
-- [ ] Access Control remains a first-class tab covering doors, locks, readers, panels, credentials/schedules/history where integrations provide them; software RBAC is excluded.
-- [ ] Security events reuses canonical `DeviceEvent` and Control Room context rather than creating another alert register.
-- [ ] Command buttons remain hidden until the management-command plan supplies capability/risk controls.
-- [ ] Commit as `feat(security-devices): complete security workspace`.
+- [x] Overview reconciles CCTV, alarms, access control, security events, unhealthy devices, sites affected, and required actions.
+- [x] CCTV covers cameras, recorders, stream/recording health when observed, assignments, maintenance, and authorised links without exposing media to users lacking media permission.
+- [x] Alarms covers panels, zones/sensors, state, events, sites, maintenance, and canonical Control Room alerts.
+- [x] Access Control remains a first-class tab covering doors, locks, readers, panels, credentials/schedules/history where integrations provide them; software RBAC is excluded.
+- [x] Security events reuses canonical `DeviceEvent` and Control Room context rather than creating another alert register.
+- [x] Command buttons remain hidden until the management-command plan supplies capability/risk controls.
+- [x] Commit as `feat(security-devices): complete security workspace`.
+
+**Task 4 evidence (2026-07-19):** Implementation committed as `61fe23aa5`. The Security workspace and connected category, compatibility, event-signal, and maintenance regression passed 86 backend tests with 676 assertions. Four frontend files passed 12 component/contract tests; TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,988 modules), SSR build (1,640 modules), and `git diff --check` passed. The production-backed Overview → CCTV → Alarms → Access Control → Security events journey passed against the rebuilt production assets on desktop and Pixel 7 with canonical Control Room links, explicit media permission, no management commands, console checks, and horizontal-overflow checks.
 
 ## Task 5: Complete the Healthcare workspace with clinical separation
 
