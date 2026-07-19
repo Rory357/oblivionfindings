@@ -278,7 +278,7 @@ class DeviceControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('security-devices/devices/show')
             ->where('device.name', 'Dome Camera 1')
-            ->has('device.device_uid')
+            ->has('profile.header.identity.uid')
             ->has('activeAssignment')
             ->has('assetLinks')
             ->has('recentEvents')

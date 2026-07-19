@@ -12,7 +12,9 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -20,7 +22,6 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\SiteRoom;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -35,6 +36,7 @@ class DeviceController extends Controller
         private readonly DeviceRegistryService $registry,
         private readonly DeviceLinkService $linkService,
         private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceProfilePresenter $profilePresenter,
     ) {}
 
     public function index(Request $request)
@@ -134,17 +136,65 @@ class DeviceController extends Controller
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
 
-        $device->load([
+        $canViewEvents = $user->canDo('securityDevices.events.view');
+        $canViewMaintenance = $user->canDo('securityDevices.maintenance.view');
+        $relations = [
             'assignments' => fn ($q) => $q->with(['assignedBy:id,name', 'releasedBy:id,name'])->latest('assigned_at')->limit(20),
             'activeAssetLinks.asset',
-            'maintenanceRecords' => fn ($q) => $q->latest()->limit(10),
-            'events' => fn ($q) => $q->latest('occurred_at')->limit(20),
             'documents',
             'parentRelationships.parent',
             'childRelationships.child',
             'groups',
             'createdBy',
-        ]);
+        ];
+        if ($canViewEvents) {
+            $relations['events'] = fn ($q) => $q->latest('occurred_at')->limit(20);
+            $relations['monitors'] = fn ($q) => $q
+                ->where('tenant_id', $device->tenant_id)
+                ->with([
+                    'profile' => fn ($profile) => $profile
+                        ->where('tenant_id', $device->tenant_id)
+                        ->select('id', 'name', 'interval_seconds', 'stale_after_seconds'),
+                    'collector' => fn ($collector) => $collector
+                        ->where('tenant_id', $device->tenant_id)
+                        ->select('id', 'name', 'status', 'last_seen_at'),
+                ])
+                ->orderBy('name');
+        }
+        if ($canViewMaintenance) {
+            $relations['maintenanceRecords'] = fn ($q) => $q->latest()->limit(10);
+        }
+        $device->load($relations);
+
+        $device->setRelation('assignments', $device->assignments
+            ->filter(fn ($assignment): bool => $this->access->canAccessAssignmentTarget(
+                $user,
+                $device,
+                $assignment->assignable_type,
+                (int) $assignment->assignable_id,
+            ))
+            ->values());
+        $accessibleAssetIds = $this->access->accessibleAssetIds($user);
+        $device->setRelation('activeAssetLinks', $device->activeAssetLinks
+            ->filter(fn ($link): bool => in_array((int) $link->asset_id, $accessibleAssetIds, true))
+            ->values());
+        $relatedIds = $device->parentRelationships->pluck('parent_device_id')
+            ->merge($device->childRelationships->pluck('child_device_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+        $visibleRelatedIds = $relatedIds->isEmpty()
+            ? collect()
+            : $this->access->visibleDevices($user)
+                ->whereIn('id', $relatedIds)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id);
+        $device->setRelation('parentRelationships', $device->parentRelationships
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->parent_device_id))
+            ->values());
+        $device->setRelation('childRelationships', $device->childRelationships
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->child_device_id))
+            ->values());
 
         $activeAssignment = $device->assignments->first(fn ($a) => $a->released_at === null);
         $tenantId = $this->access->tenantId($user);
@@ -164,16 +214,21 @@ class DeviceController extends Controller
                 ->whereIn('site_id', $siteIds)
                 ->orderBy('name')
                 ->get(['id', 'site_id', 'name']),
-            'staff' => User::query()
-                ->where('organization_id', $tenantId)
-                ->whereNotNull('approved_at')
+            'staff' => $this->access->assignableStaff($user)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'clients' => Client::query()
                 ->where('organization_id', $tenantId)
                 ->whereIn('site_id', $siteIds)
                 ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']),
+                ->get(['id', 'first_name', 'last_name', 'organization_id', 'site_id'])
+                ->filter(fn (Client $client): bool => $this->access->canAccessAssignmentTarget(
+                    $user,
+                    $device,
+                    DeviceAssignment::TARGET_CLIENT,
+                    (int) $client->id,
+                ))
+                ->values(),
             'vehicles' => Asset::query()
                 ->where(function ($query) use ($siteIds) {
                     $query->whereIn('site_id', $siteIds)
@@ -182,7 +237,14 @@ class DeviceController extends Controller
                 })
                 ->vehicles()
                 ->orderBy('name')
-                ->get(['id', 'name', 'registration_number']),
+                ->get(['id', 'name', 'registration_number'])
+                ->filter(fn (Asset $asset): bool => $this->access->canAccessAssignmentTarget(
+                    $user,
+                    $device,
+                    DeviceAssignment::TARGET_VEHICLE,
+                    (int) $asset->id,
+                ))
+                ->values(),
         ] : [
             'sites' => [],
             'rooms' => [],
@@ -222,8 +284,15 @@ class DeviceController extends Controller
                 ])
             : collect();
 
+        $profile = $this->profilePresenter->present($user, $device, $activeAssignment);
+
         return Inertia::render('security-devices/devices/show', [
-            'device' => $this->mapDeviceForDetail($device),
+            'device' => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'status' => $device->status?->value,
+            ],
+            'profile' => $profile,
             'activeAssignment' => $activeAssignment ? [
                 'id' => $activeAssignment->id,
                 'assignable_type' => $activeAssignment->assignable_type,
@@ -293,14 +362,14 @@ class DeviceController extends Controller
                 ['value' => 'network_diagram', 'label' => 'Network diagram'],
                 ['value' => 'other', 'label' => 'Other'],
             ],
-            'recentEvents' => $device->events->map(fn ($e) => [
+            'recentEvents' => ! $canViewEvents ? [] : $device->events->map(fn ($e) => [
                 'id' => $e->id,
                 'event_type' => $e->event_type,
                 'severity' => $e->severity,
                 'occurred_at' => $e->occurred_at?->toISOString(),
                 'source' => $e->source,
             ]),
-            'maintenanceRecords' => $device->maintenanceRecords->map(fn ($m) => [
+            'maintenanceRecords' => ! $canViewMaintenance ? [] : $device->maintenanceRecords->map(fn ($m) => [
                 'id' => $m->id,
                 'type' => $m->type,
                 'status' => $m->status,
@@ -324,11 +393,12 @@ class DeviceController extends Controller
                     'port' => $r->port,
                 ]),
             ],
-            'groups' => $device->groups->map(fn ($g) => ['id' => $g->id, 'name' => $g->name]),
             'can' => [
-                'update' => $canUpdate,
+                'update' => $profile['capabilities']['registry']['available'],
                 'delete' => $user->canDo('securityDevices.devices.delete'),
-                'assign' => $canAssign,
+                'assign' => $profile['capabilities']['assignment']['available'],
+                'viewEvents' => $canViewEvents,
+                'manageMaintenance' => $profile['capabilities']['maintenance']['available'],
             ],
         ]);
     }
@@ -386,6 +456,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
@@ -394,6 +465,7 @@ class DeviceController extends Controller
         ]);
 
         $asset = Asset::findOrFail($validated['asset_id']);
+        $this->access->assertCanUseAsset($user, $device, $asset->id);
 
         try {
             $this->linkService->link(
@@ -421,6 +493,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'other_device_id' => ['required', 'integer', 'different:device', 'exists:devices,id'],
@@ -431,6 +504,7 @@ class DeviceController extends Controller
         ]);
 
         $other = Device::findOrFail($validated['other_device_id']);
+        $this->access->assertCanViewDevice($user, $other);
 
         // Tenant guard — prevent cross-tenant relationships.
         if ($device->tenant_id && $other->tenant_id && $device->tenant_id !== $other->tenant_id) {
@@ -469,6 +543,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         // Relationship must involve this device on at least one side.
         abort_unless(
@@ -477,6 +552,12 @@ class DeviceController extends Controller
             404,
             'This relationship does not involve this device.',
         );
+
+        $otherDeviceId = $relationship->parent_device_id === $device->id
+            ? $relationship->child_device_id
+            : $relationship->parent_device_id;
+        $otherDevice = Device::query()->findOrFail($otherDeviceId);
+        $this->access->assertCanViewDevice($user, $otherDevice);
 
         $relationship->delete();
 
@@ -492,12 +573,14 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         abort_unless(
             $link->device_id === $device->id,
             404,
             'This asset link does not belong to this device.',
         );
+        $this->access->assertCanUseAsset($user, $device, (int) $link->asset_id);
 
         try {
             $this->linkService->unlink($link);
@@ -563,6 +646,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         return Inertia::render('security-devices/devices/edit', [
             'device' => $this->mapDeviceForDetail($device),
@@ -583,6 +667,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -600,6 +685,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -631,6 +717,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.delete'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $device->update(['status' => DeviceStatus::Decommissioned->value]);
         $device->delete(); // soft delete
@@ -644,10 +731,6 @@ class DeviceController extends Controller
 
     private function mapDeviceForDetail(Device $d): array
     {
-        $isHealthcareDevice = $d->domain === 'iot_healthcare';
-        $isTrackingDevice = $d->domain === 'tracking';
-        $hasPrivacySensitiveProviderPayload = $isHealthcareDevice || $isTrackingDevice;
-
         return [
             'id' => $d->id,
             'device_uid' => $d->device_uid,
@@ -675,19 +758,6 @@ class DeviceController extends Controller
             'expected_lifespan_months' => $d->expected_lifespan_months,
             'purchase_price' => $d->purchase_price,
             'provider' => $d->provider,
-            // Healthcare integrations frequently receive clinical material in
-            // provider envelopes. The generic device page never serialises
-            // those raw bags; its dedicated workspace presents an explicit
-            // technical allowlist instead.
-            'external_ref' => $hasPrivacySensitiveProviderPayload ? null : $d->external_ref,
-            'config' => $hasPrivacySensitiveProviderPayload ? null : $d->config,
-            'meta' => $hasPrivacySensitiveProviderPayload ? null : $d->meta,
-            // Tracking locations are exposed only through the purpose-aware
-            // Tracking workspace and canonical Client/H&S/Fleet/Asset views.
-            'latitude' => $isTrackingDevice ? null : $d->latitude,
-            'longitude' => $isTrackingDevice ? null : $d->longitude,
-            'location_description' => $isTrackingDevice ? null : $d->location_description,
-            'notes' => $d->notes,
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,
         ];

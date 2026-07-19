@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,10 +31,15 @@ class DeviceDocumentController extends Controller
 
     private const MAX_SIZE_KB = 20480; // 20 MB
 
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+    ) {}
+
     public function store(Request $request, Device $device)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:'.self::MAX_SIZE_KB],
@@ -76,6 +82,7 @@ class DeviceDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
+        $this->access->assertCanViewDevice($user, $device);
         abort_unless($document->device_id === $device->id, 404);
 
         return Storage::disk($document->storage_disk)
@@ -86,6 +93,7 @@ class DeviceDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
         abort_unless($document->device_id === $device->id, 404);
 
         // Remove the underlying blob first; only delete the row if it succeeds

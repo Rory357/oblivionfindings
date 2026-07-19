@@ -236,13 +236,15 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Refactor `resources/js/pages/security-devices/devices/show.tsx` into purpose-driven sections/components
 - Add permission/capability/component/browser tests
 
-- [ ] Concise header shows identity, location/assignment, health, freshness, provider observation, and required action.
-- [ ] Sections cover Health, Monitors, Topology, Interfaces/sensors, Configuration, Assignments, Tickets, Events, Maintenance, Documents, and Audit.
-- [ ] Existing assignment, relationship, event, maintenance, and document workflows remain functional.
-- [ ] IT and Control Room context is permission-safe and uses canonical deep links.
-- [ ] Capability-specific read/configure/control actions appear only when supported and authorised; high-risk actions remain unavailable until Task Plan 5.
-- [ ] Mobile navigation avoids a horizontally overflowing wall of tabs.
-- [ ] Commit as `feat(security-devices): expand device profile`.
+- [x] Concise header shows identity, location/assignment, health, freshness, provider observation, and required action.
+- [x] Sections cover Health, Monitors, Topology, Interfaces/sensors, Configuration, Assignments, Tickets, Events, Maintenance, Documents, and Audit.
+- [x] Existing assignment, relationship, event, maintenance, and document workflows remain functional.
+- [x] IT and Control Room context is permission-safe and uses canonical deep links.
+- [x] Capability-specific read/configure/control actions appear only when supported and authorised; high-risk actions remain unavailable until Task Plan 5.
+- [x] Mobile navigation avoids a horizontally overflowing wall of tabs.
+- [x] Commit as `feat(security-devices): expand device profile`.
+
+**Task 10 evidence (2026-07-20):** The device profile now presents one concise, capability-driven operating view with purpose-grouped desktop navigation and a compact mobile section picker. Safe projections cover health/freshness, monitors, topology, sanitised interfaces and sensors, configuration, assignments, canonical IT tickets and Control Room alerts, events, maintenance, document lifecycle, and audit context without exposing raw provider configuration, metadata, targets, or external references. Picker population, mutation authorization, and post-transfer visibility use the same canonical Client, HR, Fleet, tenant, and site boundaries; unsupported or unauthorised actions are omitted, and high-risk controls remain unavailable. The authoritative compatibility matrix passed 79 backend tests / 683 assertions, with the focused navigation suite passing 2 tests. TypeScript, targeted ESLint/Prettier/Pint, client build (4,996 modules), SSR build (1,648 modules), and diff checks passed. Current compiled assets passed the device-profile acceptance journey on desktop and Pixel 7 with canonical links, no raw sentinel, no high-risk commands, and no horizontal overflow. Independent final review reported no Critical or Important findings. This closes the capability-driven profile only; Integrations, Settings & audit, runtime/protocol breadth, governed commands, and final cross-module/privacy acceptance remain open.
 
 ## Task 11: Reconcile Integrations and add Settings & audit
 

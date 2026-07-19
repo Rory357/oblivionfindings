@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
@@ -36,6 +37,21 @@ class SecurityDevicesAccessService
     public function canViewAllTenantSites(User $user): bool
     {
         return $user->canDo('securityDevices.integrations.manage');
+    }
+
+    public function assignableStaff(User $user): Builder
+    {
+        $query = User::query()
+            ->where('organization_id', $this->tenantId($user))
+            ->whereNotNull('approved_at');
+
+        if (! $user->canDo('staff.viewAny') || ! $user->canDo('hazards.view')) {
+            return $query->whereKey($user->id);
+        }
+
+        $this->siteAccess->applyStaffScope($query, $user, ['securityDevices.integrations.manage']);
+
+        return $query;
     }
 
     public function visibleDevices(User $user): Builder
@@ -266,6 +282,150 @@ class SecurityDevicesAccessService
             $this->visibleDevices($user)->whereKey($device->getKey())->exists(),
             404,
         );
+    }
+
+    public function assertCanAssignTarget(User $user, Device $device, string $targetType, int $targetId): void
+    {
+        abort_unless($this->canAccessAssignmentTarget($user, $device, $targetType, $targetId), 404);
+    }
+
+    public function assertCanManageActiveAssignment(User $user, Device $device, bool $lockForUpdate = false): void
+    {
+        $query = $device->assignments()->active();
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $assignment = $query->first();
+        if (! $assignment) {
+            return;
+        }
+
+        abort_unless($this->canAccessAssignmentTarget(
+            $user,
+            $device,
+            $assignment->assignable_type,
+            (int) $assignment->assignable_id,
+        ), 404);
+    }
+
+    public function canAccessAssignmentTarget(User $user, Device $device, string $targetType, int $targetId): bool
+    {
+        $siteIds = $this->accessibleSiteIds($user);
+        $isPlatformAdmin = $this->siteAccess->isUnrestrictedPlatformUser($user);
+        $tenantId = (int) $device->tenant_id;
+
+        return match ($targetType) {
+            DeviceAssignment::TARGET_SITE => Site::query()
+                ->whereKey($targetId)
+                ->where('tenant_id', $tenantId)
+                ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('id', $siteIds))
+                ->exists(),
+            DeviceAssignment::TARGET_ROOM => SiteRoom::query()
+                ->whereKey($targetId)
+                ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
+                ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
+                ->exists(),
+            DeviceAssignment::TARGET_CLIENT => $this->canAssignClient(
+                $user,
+                $tenantId,
+                $targetId,
+                $siteIds,
+                $isPlatformAdmin,
+            ),
+            DeviceAssignment::TARGET_STAFF => (
+                $targetId === (int) $user->id
+                && (int) ($user->organization_id ?? 1) === $tenantId
+            ) || $this->canAssignStaff($user, $tenantId, $targetId),
+            DeviceAssignment::TARGET_VEHICLE => $this->canUseAsset($user, $device, $targetId, true),
+            default => false,
+        };
+    }
+
+    public function assertCanUseAsset(User $user, Device $device, int $assetId): void
+    {
+        abort_unless($this->canUseAsset($user, $device, $assetId), 404);
+    }
+
+    private function canAssignStaff(User $user, int $tenantId, int $staffId): bool
+    {
+        if (! $user->canDo('staff.viewAny') || ! $user->canDo('hazards.view')) {
+            return false;
+        }
+
+        $isPlatformAdmin = $this->siteAccess->isUnrestrictedPlatformUser($user);
+        $query = User::query()
+            ->whereKey($staffId)
+            ->whereNotNull('approved_at')
+            ->where(function (Builder $organization) use ($isPlatformAdmin, $tenantId): void {
+                $organization->where('organization_id', $tenantId);
+                if ($isPlatformAdmin && $tenantId === 1) {
+                    $organization->orWhereNull('organization_id');
+                }
+            });
+
+        $this->siteAccess->applyStaffScope($query, $user, ['securityDevices.integrations.manage']);
+
+        return $query->exists();
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function canAssignClient(
+        User $user,
+        int $tenantId,
+        int $clientId,
+        array $siteIds,
+        bool $isPlatformAdmin,
+    ): bool {
+        $client = Client::query()
+            ->whereKey($clientId)
+            ->where(function (Builder $organization) use ($isPlatformAdmin, $tenantId): void {
+                $organization->where('organization_id', $tenantId);
+                if ($isPlatformAdmin && $tenantId === 1) {
+                    $organization->orWhereNull('organization_id');
+                }
+            })
+            ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
+            ->first();
+
+        return $client !== null && Gate::forUser($user)->allows('view', $client);
+    }
+
+    private function canUseAsset(User $user, Device $device, int $assetId, bool $vehicleOnly = false): bool
+    {
+        $siteIds = $this->accessibleSiteIds($user);
+        $tenantId = (int) $device->tenant_id;
+        $query = Asset::query()
+            ->whereKey($assetId)
+            ->where(function (Builder $tenant) use ($tenantId): void {
+                $tenant->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
+                    ->orWhereHas('homeSite', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
+                    ->orWhereHas('client', fn (Builder $client): Builder => $client->where('organization_id', $tenantId));
+            });
+
+        if (! $this->siteAccess->isUnrestrictedPlatformUser($user)) {
+            if ($siteIds === []) {
+                return false;
+            }
+
+            $query->where(function (Builder $site) use ($siteIds): void {
+                $site->whereIn('site_id', $siteIds)
+                    ->orWhereIn('home_site_id', $siteIds)
+                    ->orWhereHas('client', fn (Builder $client): Builder => $client->whereIn('site_id', $siteIds));
+            });
+        }
+
+        if ($vehicleOnly) {
+            $query->vehicles();
+        }
+
+        $asset = $query->first();
+        if (! $asset) {
+            return false;
+        }
+
+        return ($vehicleOnly && $user->canDo('fleet.viewAny'))
+            || Gate::forUser($user)->allows('view', $asset);
     }
 
     public function assertCanViewSite(User $user, int $siteId): void

@@ -5,7 +5,6 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -19,7 +18,9 @@ class DeviceAssignmentControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -143,7 +144,11 @@ class DeviceAssignmentControllerTest extends TestCase
     public function test_client_assign_requires_consent(): void
     {
         $device = Device::factory()->tracking()->create();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/assign", [

@@ -180,9 +180,9 @@ class HealthcareWorkspaceTest extends TestCase
                 $props = $page->toArray()['props'];
                 $payload = json_encode($props, JSON_THROW_ON_ERROR);
 
-                $this->assertNull($props['device']['config']);
-                $this->assertNull($props['device']['meta']);
-                $this->assertNull($props['device']['external_ref']);
+                $this->assertArrayNotHasKey('config', $props['device']);
+                $this->assertArrayNotHasKey('meta', $props['device']);
+                $this->assertArrayNotHasKey('external_ref', $props['device']);
                 foreach ([
                     'CLINICAL-READING-SENTINEL',
                     'CLINICAL-THRESHOLD-SENTINEL',

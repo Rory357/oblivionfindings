@@ -7,9 +7,12 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ClientConsent;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 
 class DeviceAssignmentController extends Controller
 {
@@ -17,6 +20,7 @@ class DeviceAssignmentController extends Controller
 
     public function __construct(
         private readonly DeviceAssignmentService $service,
+        private readonly SecurityDevicesAccessService $access,
     ) {}
 
     /**
@@ -26,6 +30,8 @@ class DeviceAssignmentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.assign'), 403);
+        $this->access->assertCanViewDevice($user, $device);
+        $this->access->assertCanManageActiveAssignment($user, $device);
 
         $validated = $request->validate([
             'assignable_type' => ['required', 'string', 'in:'.implode(',', DeviceAssignment::VALID_TARGETS)],
@@ -35,6 +41,12 @@ class DeviceAssignmentController extends Controller
             'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+        $this->access->assertCanAssignTarget(
+            $user,
+            $device,
+            $validated['assignable_type'],
+            (int) $validated['assignable_id'],
+        );
 
         try {
             $this->enforceConsentForClientTracker(
@@ -44,16 +56,19 @@ class DeviceAssignmentController extends Controller
                 isset($validated['consent_id']) ? (int) $validated['consent_id'] : null,
             );
 
-            $this->service->assign(
-                device: $device,
-                assignableType: $validated['assignable_type'],
-                assignableId: $validated['assignable_id'],
-                assignedByUserId: $user->id,
-                assignmentType: AssignmentType::tryFrom($validated['assignment_type'] ?? 'permanent') ?? AssignmentType::Permanent,
-                expectedReturnAt: isset($validated['expected_return_at']) ? new \DateTime($validated['expected_return_at']) : null,
-                consentId: $validated['consent_id'] ?? null,
-                notes: $validated['notes'] ?? null,
-            );
+            DB::transaction(function () use ($device, $user, $validated): void {
+                $this->access->assertCanManageActiveAssignment($user, $device, true);
+                $this->service->assign(
+                    device: $device,
+                    assignableType: $validated['assignable_type'],
+                    assignableId: $validated['assignable_id'],
+                    assignedByUserId: $user->id,
+                    assignmentType: AssignmentType::tryFrom($validated['assignment_type'] ?? 'permanent') ?? AssignmentType::Permanent,
+                    expectedReturnAt: isset($validated['expected_return_at']) ? new \DateTime($validated['expected_return_at']) : null,
+                    consentId: $validated['consent_id'] ?? null,
+                    notes: $validated['notes'] ?? null,
+                );
+            });
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['assignable_type' => $e->getMessage()]);
         }
@@ -116,8 +131,14 @@ class DeviceAssignmentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.assign'), 403);
+        $this->access->assertCanViewDevice($user, $device);
+        $this->access->assertCanManageActiveAssignment($user, $device);
 
-        $released = $this->service->release($device, $user->id);
+        $released = DB::transaction(function () use ($device, $user) {
+            $this->access->assertCanManageActiveAssignment($user, $device, true);
+
+            return $this->service->release($device, $user->id);
+        });
 
         if (! $released) {
             return back()->with('info', 'Device has no active assignment to release.');
@@ -133,12 +154,27 @@ class DeviceAssignmentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
-        $assignments = $device->assignments()
+        $visibleAssignments = $device->assignments()
             ->with(['assignedBy:id,name', 'releasedBy:id,name'])
             ->latest('assigned_at')
-            ->paginate(20)
-            ->withQueryString();
+            ->get()
+            ->filter(fn (DeviceAssignment $assignment): bool => $this->access->canAccessAssignmentTarget(
+                $user,
+                $device,
+                $assignment->assignable_type,
+                (int) $assignment->assignable_id,
+            ))
+            ->values();
+        $page = max(1, $request->integer('page', 1));
+        $assignments = new LengthAwarePaginator(
+            $visibleAssignments->forPage($page, 20)->values(),
+            $visibleAssignments->count(),
+            20,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
 
         return response()->json([
             'data' => $assignments->getCollection()->map(fn (DeviceAssignment $a) => [
