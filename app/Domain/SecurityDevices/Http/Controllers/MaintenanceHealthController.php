@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class MaintenanceHealthController extends Controller
 {
+    use ResolvesDeviceTenant;
+
     /**
      * Maintenance & Health dashboard page.
      */
@@ -19,21 +22,23 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.view'), 403);
+        $tenantId = $this->resolveDeviceTenantId($user);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $stats = [
-            'overdue' => DeviceMaintenanceRecord::overdue()->count(),
-            'upcoming' => DeviceMaintenanceRecord::upcoming(14)->count(),
-            'offline' => Device::where('status', DeviceStatus::Offline->value)->count(),
-            'degraded' => Device::where('status', DeviceStatus::Degraded->value)->count(),
-            'lowBattery' => Device::lowBattery()->count(),
-            'critical' => Device::where('health_status', HealthStatus::Critical->value)->count(),
+            'overdue' => DeviceMaintenanceRecord::query()->forTenant($tenantId)->overdue()->count(),
+            'upcoming' => DeviceMaintenanceRecord::query()->forTenant($tenantId)->upcoming(14)->count(),
+            'offline' => Device::query()->forTenant($tenantId)->where('status', DeviceStatus::Offline->value)->count(),
+            'degraded' => Device::query()->forTenant($tenantId)->where('status', DeviceStatus::Degraded->value)->count(),
+            'lowBattery' => Device::query()->forTenant($tenantId)->lowBattery()->count(),
+            'critical' => Device::query()->forTenant($tenantId)->where('health_status', HealthStatus::Critical->value)->count(),
         ];
 
         // ── Maintenance records (filterable) ──────────────────────
 
         $mQuery = DeviceMaintenanceRecord::query()
+            ->forTenant($tenantId)
             ->with(['device:id,name,device_uid,domain,category', 'performedBy:id,name']);
 
         if ($request->filled('status') && $request->input('status') !== 'all') {
@@ -60,15 +65,21 @@ class MaintenanceHealthController extends Controller
         $sort = $request->input('sort', 'scheduled_for');
         $direction = $request->input('direction', 'asc');
         $allowedSorts = ['scheduled_for', 'completed_at', 'type', 'status', 'created_at'];
-        if (!in_array($sort, $allowedSorts)) { $sort = 'scheduled_for'; }
-        if (!in_array($direction, ['asc', 'desc'])) { $direction = 'asc'; }
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'scheduled_for';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'asc';
+        }
         $mQuery->orderBy($sort, $direction);
 
         $records = $mQuery->paginate(30)->withQueryString();
 
         // ── Devices needing health attention ──────────────────────
 
-        $attentionDevices = Device::needingAttention()
+        $attentionDevices = Device::query()
+            ->forTenant($tenantId)
+            ->needingAttention()
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderByRaw("FIELD(health_status, 'critical', 'warning', 'unknown', 'healthy')")
             ->limit(20)
@@ -87,7 +98,9 @@ class MaintenanceHealthController extends Controller
 
         // ── Low battery devices ───────────────────────────────────
 
-        $lowBatteryDevices = Device::lowBattery()
+        $lowBatteryDevices = Device::query()
+            ->forTenant($tenantId)
+            ->lowBattery()
             ->operational()
             ->orderBy('battery_level')
             ->limit(15)
@@ -101,6 +114,17 @@ class MaintenanceHealthController extends Controller
             ]);
 
         return Inertia::render('security-devices/maintenance-health', [
+            'pageMeta' => $request->routeIs('security-devices.maintenance')
+                ? [
+                    'title' => 'Maintenance',
+                    'description' => 'Device servicing, calibration, repair, and health-related work across the estate.',
+                    'href' => '/security-devices/maintenance',
+                ]
+                : [
+                    'title' => 'Maintenance & Health',
+                    'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
+                    'href' => '/security-devices/maintenance-health',
+                ],
             'stats' => $stats,
             'records' => [
                 'data' => $records->getCollection()->map(fn (DeviceMaintenanceRecord $r) => [
@@ -142,6 +166,7 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        abort_unless((int) $device->tenant_id === $this->resolveDeviceTenantId($user), 404);
 
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
@@ -176,6 +201,8 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        $record->loadMissing('device:id,tenant_id');
+        abort_unless($record->device && (int) $record->device->tenant_id === $this->resolveDeviceTenantId($user), 404);
 
         $validated = $request->validate([
             'type' => ['sometimes', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
@@ -191,7 +218,7 @@ class MaintenanceHealthController extends Controller
         if (($validated['status'] ?? '') === 'completed' && empty($validated['completed_at'])) {
             $validated['completed_at'] = now();
         }
-        if (($validated['status'] ?? '') === 'completed' && !$record->performed_by_user_id) {
+        if (($validated['status'] ?? '') === 'completed' && ! $record->performed_by_user_id) {
             $validated['performed_by_user_id'] = $user->id;
         }
 
@@ -207,6 +234,8 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        $record->loadMissing('device:id,tenant_id');
+        abort_unless($record->device && (int) $record->device->tenant_id === $this->resolveDeviceTenantId($user), 404);
 
         $record->update([
             'status' => 'completed',

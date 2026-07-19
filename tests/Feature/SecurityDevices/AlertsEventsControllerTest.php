@@ -16,7 +16,9 @@ class AlertsEventsControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -324,6 +326,41 @@ class AlertsEventsControllerTest extends TestCase
             $types = $page->toArray()['props']['filterOptions']['eventTypes'];
             $this->assertContains('alarm_trigger', $types);
             $this->assertContains('heartbeat', $types);
+        });
+    }
+
+    public function test_events_stats_and_filter_options_are_scoped_to_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        $tenantDevice = Device::factory()->create(['tenant_id' => 42, 'name' => 'Tenant sensor']);
+        $foreignDevice = Device::factory()->create(['tenant_id' => 77, 'name' => 'Foreign sensor']);
+
+        DeviceEvent::create([
+            'device_id' => $tenantDevice->id,
+            'event_type' => 'tenant_event',
+            'severity' => 'critical',
+            'source' => 'tenant-source',
+            'occurred_at' => now(),
+        ]);
+        DeviceEvent::create([
+            'device_id' => $foreignDevice->id,
+            'event_type' => 'foreign_event',
+            'severity' => 'critical',
+            'source' => 'foreign-source',
+            'occurred_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/monitoring');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(1, $props['stats']['total24h']);
+            $this->assertSame(1, $props['stats']['critical24h']);
+            $this->assertSame(['Tenant sensor'], collect($props['events']['data'])->pluck('device_name')->all());
+            $this->assertSame(['tenant_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['tenant-source'], $props['filterOptions']['sources']);
         });
     }
 

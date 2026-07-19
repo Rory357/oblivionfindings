@@ -7,35 +7,92 @@ use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class CategoryPageController extends Controller
 {
     use MapsDevicesForList;
+    use ResolvesDeviceTenant;
 
-    public function alarms(Request $request)            { return $this->buildCategoryPage($request, 'alarms'); }
-    public function cctv(Request $request)              { return $this->buildCategoryPage($request, 'cctv'); }
-    public function accessControl(Request $request)     { return $this->buildCategoryPage($request, 'access-control'); }
-    public function trackingDevices(Request $request)   { return $this->buildCategoryPage($request, 'tracking-devices'); }
-    public function smartIotHealthcare(Request $request) { return $this->buildCategoryPage($request, 'smart-iot-healthcare'); }
-    public function itInfrastructure(Request $request)  { return $this->buildCategoryPage($request, 'it-infrastructure'); }
-    public function facilities(Request $request)        { return $this->buildCategoryPage($request, 'facilities'); }
+    public function networkIt(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'network-it');
+    }
 
-    private function buildCategoryPage(Request $request, string $slug): \Inertia\Response
+    public function security(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'security');
+    }
+
+    public function healthcare(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'healthcare');
+    }
+
+    public function tracking(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'tracking');
+    }
+
+    public function facilitiesIot(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'facilities-iot');
+    }
+
+    public function alarms(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'alarms');
+    }
+
+    public function cctv(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'cctv');
+    }
+
+    public function accessControl(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'access-control');
+    }
+
+    public function trackingDevices(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'tracking-devices');
+    }
+
+    public function smartIotHealthcare(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'smart-iot-healthcare');
+    }
+
+    public function itInfrastructure(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'it-infrastructure');
+    }
+
+    public function facilities(Request $request)
+    {
+        return $this->buildCategoryPage($request, 'facilities');
+    }
+
+    private function buildCategoryPage(Request $request, string $slug): Response
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
 
         $config = CategoryPageConfig::get($slug);
         abort_unless($config !== null, 404);
+        $tenantId = $this->resolveDeviceTenantId($user);
 
         // ── Base scope ────────────────────────────────────────────
 
         $query = Device::query()
+            ->forTenant($tenantId)
             ->with(['assignments' => fn ($q) => $q->active()])
             ->byDomain($config['domain']);
 
@@ -64,7 +121,7 @@ class CategoryPageController extends Controller
 
         // ── Scoped stats ──────────────────────────────────────────
 
-        $statsBase = fn (): Builder => $this->scopedBaseQuery($config);
+        $statsBase = fn (): Builder => $this->scopedBaseQuery($config, $tenantId);
 
         $stats = [
             'total' => $statsBase()->count(),
@@ -144,9 +201,11 @@ class CategoryPageController extends Controller
      * Build an unfiltered base query scoped to the page's domain + categories.
      * Used for stats so they always reflect the full scope, regardless of user filters.
      */
-    private function scopedBaseQuery(array $config): Builder
+    private function scopedBaseQuery(array $config, int $tenantId): Builder
     {
-        $query = Device::query()->byDomain($config['domain']);
+        $query = Device::query()
+            ->forTenant($tenantId)
+            ->byDomain($config['domain']);
 
         if ($config['categories'] !== null) {
             $query->whereIn('category', $config['categories']);

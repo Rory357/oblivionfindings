@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -45,6 +46,11 @@ class DeviceMaintenanceRecord extends Model
     }
 
     // ── Scopes ────────────────────────────────────────────────────
+
+    public function scopeForTenant(Builder $query, int $tenantId): Builder
+    {
+        return $query->whereHas('device', fn (Builder $deviceQuery) => $deviceQuery->forTenant($tenantId));
+    }
 
     public function scopeOverdue($query)
     {

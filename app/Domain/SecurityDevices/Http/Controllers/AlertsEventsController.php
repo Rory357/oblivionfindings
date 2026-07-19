@@ -2,6 +2,8 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use Illuminate\Http\Request;
@@ -10,26 +12,29 @@ use Inertia\Inertia;
 
 class AlertsEventsController extends Controller
 {
+    use ResolvesDeviceTenant;
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.events.view'), 403);
+        $tenantId = $this->resolveDeviceTenantId($user);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $last24h = now()->subHours(24);
-        $last7d = now()->subDays(7);
 
         $stats = [
-            'total24h' => DeviceEvent::since($last24h)->count(),
-            'critical24h' => DeviceEvent::since($last24h)->bySeverity('critical')->count(),
-            'warning24h' => DeviceEvent::since($last24h)->bySeverity('warning')->count(),
-            'unprocessed' => DeviceEvent::unprocessed()->count(),
+            'total24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->count(),
+            'critical24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->bySeverity('critical')->count(),
+            'warning24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->bySeverity('warning')->count(),
+            'unprocessed' => DeviceEvent::query()->forTenant($tenantId)->unprocessed()->count(),
         ];
 
         // ── Event query ───────────────────────────────────────────
 
         $query = DeviceEvent::query()
+            ->forTenant($tenantId)
             ->with(['device:id,name,device_uid,domain,category']);
 
         // Severity filter.
@@ -71,7 +76,7 @@ class AlertsEventsController extends Controller
             $query->where('occurred_at', '>=', $request->input('from'));
         }
         if ($request->filled('to')) {
-            $query->where('occurred_at', '<=', $request->input('to') . ' 23:59:59');
+            $query->where('occurred_at', '<=', $request->input('to').' 23:59:59');
         }
 
         // Search across event_type and source.
@@ -89,18 +94,33 @@ class AlertsEventsController extends Controller
 
         // ── Filter options ────────────────────────────────────────
 
-        $eventTypes = DeviceEvent::select('event_type')
+        $eventTypes = DeviceEvent::query()
+            ->forTenant($tenantId)
+            ->select('event_type')
             ->distinct()
             ->orderBy('event_type')
             ->pluck('event_type');
 
-        $sources = DeviceEvent::whereNotNull('source')
+        $sources = DeviceEvent::query()
+            ->forTenant($tenantId)
+            ->whereNotNull('source')
             ->select('source')
             ->distinct()
             ->orderBy('source')
             ->pluck('source');
 
         return Inertia::render('security-devices/alerts-events', [
+            'pageMeta' => $request->routeIs('security-devices.monitoring')
+                ? [
+                    'title' => 'Monitoring',
+                    'description' => 'Active device events and collection signals. Control Room remains the place for operational triage and escalation.',
+                    'href' => '/security-devices/monitoring',
+                ]
+                : [
+                    'title' => 'Alerts & Events',
+                    'description' => 'Read-only device event stream. For alert triage and escalation, use Control Room.',
+                    'href' => '/security-devices/alerts-events',
+                ],
             'stats' => $stats,
             'events' => [
                 'data' => $events->getCollection()->map(fn (DeviceEvent $e) => [
@@ -127,7 +147,7 @@ class AlertsEventsController extends Controller
             'filterOptions' => [
                 'eventTypes' => $eventTypes,
                 'sources' => $sources,
-                'domains' => collect(\App\Domain\SecurityDevices\Enums\DeviceDomain::cases())
+                'domains' => collect(DeviceDomain::cases())
                     ->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
             ],
         ]);

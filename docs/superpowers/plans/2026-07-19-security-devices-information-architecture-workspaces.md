@@ -26,10 +26,10 @@
 
 1. Global navigation has one Security & Devices entry.
 2. Module navigation has exactly four permission-aware groups:
-   - **Overview:** Estate overview, Sites, All devices.
-   - **Workspaces:** Network & IT, Security, Healthcare, Tracking, Facilities & IoT.
-   - **Operations:** Monitoring, Maintenance.
-   - **Setup:** Discovery & collectors, Integrations, Settings & audit.
+    - **Overview:** Estate overview, Sites, All devices.
+    - **Workspaces:** Network & IT, Security, Healthcare, Tracking, Facilities & IoT.
+    - **Operations:** Monitoring, Maintenance.
+    - **Setup:** Discovery & collectors, Integrations, Settings & audit.
 3. Local tabs divide specialist work without adding more application-level destinations.
 4. Every count is tenant/site/permission scoped and uses the same query definition as its destination.
 5. Empty, unsupported, paused, stale, and not-configured states are explicit. No page describes future capability as if it is live.
@@ -41,22 +41,22 @@
 
 ## Approved route map
 
-| Destination | Canonical route | Local tabs / purpose |
-| --- | --- | --- |
-| Estate overview | `/security-devices` | health, change, coverage, affected sites, action |
-| Sites | `/security-devices/sites` | searchable site technology posture |
-| Site technology | `/security-devices/sites/{site}` | WAN path, topology, devices, alerts, IT work, maintenance, collector, changes |
-| All devices | `/security-devices/devices` | inventory, saved views, bulk selection, export |
-| Network & IT | `/security-devices/network-it` | overview, map, devices, interfaces, services, traffic, configuration |
-| Security | `/security-devices/security` | overview, CCTV, alarms, access control, events |
-| Healthcare | `/security-devices/healthcare` | overview, client devices, shared/site devices, data flow, calibration |
-| Tracking | `/security-devices/tracking` | overview, personal safety, Fleet, assets, geofences, history |
-| Facilities & IoT | `/security-devices/facilities-iot` | overview, environment, building systems, utilities, automations, history |
-| Monitoring | `/security-devices/monitoring` | findings/state, coverage, dependencies, trends, data collection |
-| Maintenance | `/security-devices/maintenance` | due, overdue, planned, completed, calibration |
-| Discovery & collectors | `/security-devices/discovery` | current collectors/coverage now; scopes, candidates, runs after runtime plan |
-| Integrations | `/security-devices/integrations` | provider connections, mappings, sync, exceptions |
-| Settings & audit | `/security-devices/settings` | policies, defaults, data quality, audit |
+| Destination            | Canonical route                    | Local tabs / purpose                                                          |
+| ---------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| Estate overview        | `/security-devices`                | health, change, coverage, affected sites, action                              |
+| Sites                  | `/security-devices/sites`          | searchable site technology posture                                            |
+| Site technology        | `/security-devices/sites/{site}`   | WAN path, topology, devices, alerts, IT work, maintenance, collector, changes |
+| All devices            | `/security-devices/devices`        | inventory, saved views, bulk selection, export                                |
+| Network & IT           | `/security-devices/network-it`     | overview, map, devices, interfaces, services, traffic, configuration          |
+| Security               | `/security-devices/security`       | overview, CCTV, alarms, access control, events                                |
+| Healthcare             | `/security-devices/healthcare`     | overview, client devices, shared/site devices, data flow, calibration         |
+| Tracking               | `/security-devices/tracking`       | overview, personal safety, Fleet, assets, geofences, history                  |
+| Facilities & IoT       | `/security-devices/facilities-iot` | overview, environment, building systems, utilities, automations, history      |
+| Monitoring             | `/security-devices/monitoring`     | findings/state, coverage, dependencies, trends, data collection               |
+| Maintenance            | `/security-devices/maintenance`    | due, overdue, planned, completed, calibration                                 |
+| Discovery & collectors | `/security-devices/discovery`      | current collectors/coverage now; scopes, candidates, runs after runtime plan  |
+| Integrations           | `/security-devices/integrations`   | provider connections, mappings, sync, exceptions                              |
+| Settings & audit       | `/security-devices/settings`       | policies, defaults, data quality, audit                                       |
 
 Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices`, `/smart-iot-healthcare`, `/it-infrastructure`, `/facilities`, `/maintenance-health`, `/alerts-events`) remain compatible and resolve to the corresponding canonical workspace/tab without losing query filters.
 
@@ -70,13 +70,15 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Modify `resources/js/pages/security-devices/dashboard.tsx`
 - Add component/contract tests
 
-- [ ] Write failing tests for the four approved groups, exact destination order, permission filtering, active-state matching, and one global entry.
-- [ ] Extract the Security & Devices navigation definition from the large application sidebar so module shell, app flyout, command search, and tests share one source.
-- [ ] Render grouped secondary navigation in the existing app flyout and a compact in-module context/header suitable for desktop and mobile.
-- [ ] Keep icons plus text, keyboard focus, 44px mobile targets, active state, and no horizontal overflow.
-- [ ] Remove `Skeleton`, `Future home`, and contradictory phase-only copy from every reachable production page.
-- [ ] Verify component tests, TypeScript, targeted ESLint/Prettier, client build, SSR build, and desktop/mobile navigation.
-- [ ] Commit as `feat(security-devices): group module navigation`.
+- [x] Write failing tests for the four approved groups, exact destination order, permission filtering, active-state matching, and one global entry.
+- [x] Extract the Security & Devices navigation definition from the large application sidebar so module shell, app flyout, command search, and tests share one source.
+- [x] Render grouped secondary navigation in the existing app flyout and a compact in-module context/header suitable for desktop and mobile.
+- [x] Keep icons plus text, keyboard focus, 44px mobile targets, active state, and no horizontal overflow.
+- [x] Remove `Skeleton`, `Future home`, and contradictory phase-only copy from every reachable production page.
+- [x] Verify component tests, TypeScript, targeted ESLint/Prettier, client build, SSR build, and desktop/mobile navigation.
+- [x] Commit as `feat(security-devices): group module navigation`.
+
+**Task 1 evidence (2026-07-19):** 20 route/navigation tests with 247 assertions and the five affected controller suites with 95 tests and 741 assertions passed. The controller proof includes six tenant-isolation regressions with 77 assertions covering estate, workspace, monitoring, maintenance, integration, and cross-tenant mutation boundaries. Three frontend files passed 9 tests; TypeScript, targeted ESLint/Prettier/Pint, client build (4,985 modules), SSR build (1,637 modules), and `git diff --check` passed. Every one of the 13 destinations passed the navigation, heading, console, and horizontal-overflow matrix on desktop and Pixel 7; the final desktop and mobile runs were executed separately to isolate a transient test-login fixture flake.
 
 ## Task 2: Make Estate overview, Sites, and All devices operational
 

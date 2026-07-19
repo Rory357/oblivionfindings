@@ -20,6 +20,7 @@ class DashboardControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -261,5 +262,55 @@ class DashboardControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->get('/security-devices');
 
         $response->assertInertia(fn ($page) => $page->where('groupCount', 2));
+    }
+
+    public function test_dashboard_data_is_scoped_to_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        $tenantDevice = Device::factory()->security()->create([
+            'tenant_id' => 42,
+            'name' => 'Tenant camera',
+            'health_status' => HealthStatus::Critical,
+        ]);
+        $foreignDevice = Device::factory()->security()->create([
+            'tenant_id' => 77,
+            'name' => 'Foreign camera',
+            'health_status' => HealthStatus::Critical,
+        ]);
+
+        foreach ([$tenantDevice, $foreignDevice] as $device) {
+            DeviceEvent::create([
+                'device_id' => $device->id,
+                'event_type' => 'offline',
+                'severity' => 'critical',
+                'source' => 'unifi',
+                'occurred_at' => now(),
+            ]);
+            DeviceMaintenanceRecord::create([
+                'device_id' => $device->id,
+                'type' => 'inspection',
+                'status' => 'scheduled',
+                'description' => $device->name.' maintenance',
+                'scheduled_for' => now()->subDay(),
+            ]);
+        }
+
+        DeviceGroup::create(['tenant_id' => 42, 'name' => 'Tenant group', 'type' => 'custom']);
+        DeviceGroup::create(['tenant_id' => 77, 'name' => 'Foreign group', 'type' => 'custom']);
+
+        $response = $this->actingAs($this->admin)->get('/security-devices');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(1, $props['stats']['totalDevices']);
+            $this->assertSame(1, $props['stats']['criticalEvents24h']);
+            $this->assertSame(1, $props['stats']['overdueMaintenance']);
+            $this->assertSame(1, $props['groupCount']);
+            $this->assertSame(['Tenant camera'], collect($props['attentionDevices'])->pluck('name')->all());
+            $this->assertSame(['Tenant camera'], collect($props['recentEvents'])->pluck('device_name')->all());
+            $this->assertSame(['Tenant camera maintenance'], collect($props['overdueMaintenance'])->pluck('description')->all());
+        });
     }
 }

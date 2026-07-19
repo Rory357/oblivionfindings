@@ -18,7 +18,9 @@ class MaintenanceHealthControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -141,6 +143,50 @@ class MaintenanceHealthControllerTest extends TestCase
         );
     }
 
+    public function test_maintenance_health_data_is_scoped_to_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        $tenantDevice = Device::factory()->create([
+            'tenant_id' => 42,
+            'name' => 'Tenant sensor',
+            'health_status' => HealthStatus::Critical,
+            'status' => DeviceStatus::Active,
+            'battery_level' => 10,
+            'battery_updated_at' => now(),
+        ]);
+        $foreignDevice = Device::factory()->create([
+            'tenant_id' => 77,
+            'name' => 'Foreign sensor',
+            'health_status' => HealthStatus::Critical,
+            'status' => DeviceStatus::Active,
+            'battery_level' => 10,
+            'battery_updated_at' => now(),
+        ]);
+
+        foreach ([$tenantDevice, $foreignDevice] as $device) {
+            DeviceMaintenanceRecord::create([
+                'device_id' => $device->id,
+                'type' => 'inspection',
+                'status' => 'scheduled',
+                'description' => $device->name.' maintenance',
+                'scheduled_for' => now()->subDay(),
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/maintenance');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(1, $props['stats']['overdue']);
+            $this->assertSame(1, $props['stats']['critical']);
+            $this->assertSame(['Tenant sensor maintenance'], collect($props['records']['data'])->pluck('description')->all());
+            $this->assertSame(['Tenant sensor'], collect($props['attentionDevices'])->pluck('name')->all());
+            $this->assertSame(['Tenant sensor'], collect($props['lowBatteryDevices'])->pluck('name')->all());
+        });
+    }
+
     public function test_index_filters_by_status(): void
     {
         $device = Device::factory()->create();
@@ -232,6 +278,43 @@ class MaintenanceHealthControllerTest extends TestCase
                 'description' => 'Test',
             ])
             ->assertSessionHasErrors(['type']);
+    }
+
+    public function test_maintenance_mutations_reject_resources_outside_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
+        $foreignRecord = DeviceMaintenanceRecord::create([
+            'device_id' => $foreignDevice->id,
+            'type' => 'inspection',
+            'status' => 'scheduled',
+            'description' => 'Foreign maintenance',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$foreignDevice->id}/maintenance", [
+                'type' => 'inspection',
+                'description' => 'Should not be created',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$foreignRecord->id}", [
+                'description' => 'Should not be updated',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/maintenance/{$foreignRecord->id}/complete")
+            ->assertNotFound();
+
+        $foreignRecord->refresh();
+        $this->assertSame('Foreign maintenance', $foreignRecord->description);
+        $this->assertSame('scheduled', $foreignRecord->status);
+        $this->assertDatabaseMissing('device_maintenance_records', [
+            'device_id' => $foreignDevice->id,
+            'description' => 'Should not be created',
+        ]);
     }
 
     // ── Update ────────────────────────────────────────────────────

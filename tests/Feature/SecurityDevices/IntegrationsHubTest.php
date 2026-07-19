@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Role;
 use App\Models\User;
@@ -21,6 +23,7 @@ class IntegrationsHubTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
 
     protected function setUp(): void
@@ -114,5 +117,52 @@ class IntegrationsHubTest extends TestCase
             ->where('stats.providers_connected', 1)
             ->where('stats.providers_errored', 1)
         );
+    }
+
+    public function test_connection_state_device_and_event_rollups_are_scoped_to_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        IntegrationTenantSecret::create([
+            'tenant_id' => 42,
+            'provider' => 'unifi',
+            'secret_encrypted' => 'tenant-secret',
+            'secret_last4' => '0042',
+            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+        ]);
+        IntegrationTenantSecret::create([
+            'tenant_id' => 77,
+            'provider' => 'milesight',
+            'secret_encrypted' => 'foreign-secret',
+            'secret_last4' => '0077',
+            'status' => IntegrationTenantSecret::STATUS_ERROR,
+        ]);
+
+        $tenantDevice = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
+        $foreignDevice = Device::factory()->create(['tenant_id' => 77, 'provider' => 'milesight']);
+
+        foreach ([['device' => $tenantDevice, 'source' => 'unifi'], ['device' => $foreignDevice, 'source' => 'milesight']] as $event) {
+            DeviceEvent::create([
+                'device_id' => $event['device']->id,
+                'event_type' => 'heartbeat',
+                'severity' => 'info',
+                'source' => $event['source'],
+                'occurred_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+            $providers = collect($props['providers']);
+
+            $this->assertSame(1, $props['stats']['providers_connected']);
+            $this->assertSame(0, $props['stats']['providers_errored']);
+            $this->assertSame(1, $props['stats']['imported_devices']);
+            $this->assertSame(1, $props['stats']['events_24h']);
+            $this->assertSame('connected', $providers->firstWhere('slug', 'unifi')['connection_status']);
+            $this->assertSame('not_configured', $providers->firstWhere('slug', 'milesight')['connection_status']);
+        });
     }
 }

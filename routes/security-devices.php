@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
+use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
@@ -14,6 +15,8 @@ use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
+use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
+use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -109,6 +112,38 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.update')
         ->name('security-devices.devices.documents.destroy');
 
+    // ── Approved grouped-navigation destinations ─────────────────
+    // These canonical routes reuse today's production-backed controllers.
+    // Later workspace tasks expand their local tabs without changing URLs.
+
+    Route::get('/sites', [SiteTechnologyController::class, 'index'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.sites.index');
+
+    Route::get('/sites/{site}', [SiteTechnologyController::class, 'show'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.sites.show');
+
+    Route::get('/network-it', [CategoryPageController::class, 'networkIt'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.network-it');
+
+    Route::get('/security', [CategoryPageController::class, 'security'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.security');
+
+    Route::get('/healthcare', [CategoryPageController::class, 'healthcare'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.healthcare');
+
+    Route::get('/tracking', [CategoryPageController::class, 'tracking'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.tracking');
+
+    Route::get('/facilities-iot', [CategoryPageController::class, 'facilitiesIot'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.facilities-iot');
+
     // ── Category pages ────────────────────────────────────────────
 
     Route::get('/alarms', [CategoryPageController::class, 'alarms'])
@@ -187,9 +222,17 @@ Route::middleware([
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.alerts-events');
 
+    Route::get('/monitoring', [AlertsEventsController::class, 'index'])
+        ->middleware('permission:securityDevices.events.view')
+        ->name('security-devices.monitoring');
+
     Route::get('/maintenance-health', [MaintenanceHealthController::class, 'index'])
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance-health');
+
+    Route::get('/maintenance', [MaintenanceHealthController::class, 'index'])
+        ->middleware('permission:securityDevices.maintenance.view')
+        ->name('security-devices.maintenance');
 
     Route::post('/devices/{device}/maintenance', [MaintenanceHealthController::class, 'store'])
         ->middleware('permission:securityDevices.maintenance.manage')
@@ -206,6 +249,13 @@ Route::middleware([
     Route::get('/integrations', IntegrationsHubController::class)
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.integrations');
+
+    Route::get('/discovery', DiscoveryCollectorController::class)
+        ->middleware('permission:securityDevices.integrations.view')
+        ->name('security-devices.discovery');
+
+    Route::get('/settings', SettingsAuditController::class)
+        ->name('security-devices.settings');
 
     // ── UniFi provider configuration ─────────────────────────────
     // Was previously at /settings/integrations/unifi; kept behind the

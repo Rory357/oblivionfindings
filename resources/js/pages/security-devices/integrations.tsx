@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -129,27 +129,35 @@ function humanCapability(slug: string): string {
 export default function IntegrationsHub({ providers, stats, can }: Props) {
     const breadcrumbs = [
         { title: 'Security & Devices', href: '/security-devices' },
-        { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+        { title: 'Integrations', href: '/security-devices/integrations' },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="APIs & Integrations - Security & Devices" />
+            <Head title="Integrations - Security & Devices" />
 
             <PageShell>
                 <PageHero
                     icon={Plug}
-                    title="APIs & Integrations"
+                    title="Integrations"
                     description="Provider credentials, site mapping, sync controls, and exceptions. Devices pages show the result of sync; this hub controls it."
                     stats={[
-                        { label: 'Connected', value: stats.providers_connected },
+                        {
+                            label: 'Connected',
+                            value: stats.providers_connected,
+                        },
                         { label: 'Imported', value: stats.imported_devices },
                         { label: 'Events 24h', value: stats.events_24h },
                         { label: 'Errored', value: stats.providers_errored },
                     ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">Source of truth</Badge>
+                            <Badge
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm"
+                            >
+                                Source of truth
+                            </Badge>
                             {stats.providers_errored > 0 ? (
                                 <Badge variant="destructive" className="gap-1">
                                     <AlertTriangle className="h-3 w-3" />
@@ -216,7 +224,7 @@ export default function IntegrationsHub({ providers, stats, can }: Props) {
                             <CardContent className="space-y-4">
                                 {/* Capabilities */}
                                 <div className="space-y-2">
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                         Capabilities
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
@@ -234,7 +242,7 @@ export default function IntegrationsHub({ providers, stats, can }: Props) {
 
                                 {/* Device scope */}
                                 <div className="space-y-2">
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                         Device scope
                                     </p>
                                     <p className="text-sm leading-6 text-muted-foreground">
@@ -290,8 +298,8 @@ export default function IntegrationsHub({ providers, stats, can }: Props) {
 
                                 {/* Actions */}
                                 <div className="flex flex-wrap items-center gap-2 pt-1">
-                                    {provider.implementation_status === 'live' &&
-                                    provider.docs_href ? (
+                                    {provider.implementation_status ===
+                                        'live' && provider.docs_href ? (
                                         <Button asChild size="sm">
                                             <Link href={provider.docs_href}>
                                                 {provider.connected

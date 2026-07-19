@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
@@ -15,35 +16,41 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
+    use ResolvesDeviceTenant;
+
     public function __invoke(Request $request)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.viewAny'), 403);
 
+        $tenantId = $this->resolveDeviceTenantId($user);
         $last24h = now()->subHours(24);
+        $devices = fn () => Device::query()->forTenant($tenantId);
+        $events = fn () => DeviceEvent::query()->forTenant($tenantId);
+        $maintenanceRecords = fn () => DeviceMaintenanceRecord::query()->forTenant($tenantId);
 
         // ── Top-level stats ───────────────────────────────────────
 
         $stats = [
-            'totalDevices' => Device::count(),
-            'active' => Device::where('status', DeviceStatus::Active->value)->count(),
-            'offline' => Device::where('status', DeviceStatus::Offline->value)->count(),
-            'degraded' => Device::where('status', DeviceStatus::Degraded->value)->count(),
-            'lowBattery' => Device::lowBattery()->count(),
-            'overdueMaintenance' => DeviceMaintenanceRecord::overdue()->count(),
-            'serviceDueOverdue' => Device::whereNotNull('next_service_due')
+            'totalDevices' => $devices()->count(),
+            'active' => $devices()->where('status', DeviceStatus::Active->value)->count(),
+            'offline' => $devices()->where('status', DeviceStatus::Offline->value)->count(),
+            'degraded' => $devices()->where('status', DeviceStatus::Degraded->value)->count(),
+            'lowBattery' => $devices()->lowBattery()->count(),
+            'overdueMaintenance' => $maintenanceRecords()->overdue()->count(),
+            'serviceDueOverdue' => $devices()->whereNotNull('next_service_due')
                 ->where('next_service_due', '<', now()->toDateString())
                 ->count(),
-            'serviceDueIn30d' => Device::whereNotNull('next_service_due')
+            'serviceDueIn30d' => $devices()->whereNotNull('next_service_due')
                 ->whereBetween('next_service_due', [now()->toDateString(), now()->addDays(30)->toDateString()])
                 ->count(),
-            'criticalEvents24h' => DeviceEvent::since($last24h)->bySeverity('critical')->count(),
-            'warningEvents24h' => DeviceEvent::since($last24h)->bySeverity('warning')->count(),
+            'criticalEvents24h' => $events()->since($last24h)->bySeverity('critical')->count(),
+            'warningEvents24h' => $events()->since($last24h)->bySeverity('warning')->count(),
         ];
 
         // ── Domain distribution ───────────────────────────────────
 
-        $domainDistribution = Device::query()
+        $domainDistribution = $devices()
             ->selectRaw('domain, count(*) as count')
             ->groupBy('domain')
             ->pluck('count', 'domain')
@@ -61,7 +68,7 @@ class DashboardController extends Controller
 
         // ── Health distribution ────────────────────────────────────
 
-        $healthDistribution = Device::query()
+        $healthDistribution = $devices()
             ->selectRaw('health_status, count(*) as count')
             ->groupBy('health_status')
             ->pluck('count', 'health_status')
@@ -78,7 +85,7 @@ class DashboardController extends Controller
 
         // ── Devices needing attention (top 10) ────────────────────
 
-        $attentionDevices = Device::needingAttention()
+        $attentionDevices = $devices()->needingAttention()
             ->orderByRaw("FIELD(health_status, 'critical', 'warning', 'unknown', 'healthy')")
             ->limit(10)
             ->get()
@@ -96,7 +103,7 @@ class DashboardController extends Controller
 
         // ── Recent critical/warning events (top 10) ───────────────
 
-        $recentEvents = DeviceEvent::query()
+        $recentEvents = $events()
             ->with('device:id,name,device_uid')
             ->whereIn('severity', ['critical', 'warning'])
             ->latest('occurred_at')
@@ -114,7 +121,7 @@ class DashboardController extends Controller
 
         // ── Overdue maintenance (top 10) ──────────────────────────
 
-        $overdueMaintenance = DeviceMaintenanceRecord::overdue()
+        $overdueMaintenance = $maintenanceRecords()->overdue()
             ->with('device:id,name,device_uid')
             ->orderBy('scheduled_for')
             ->limit(10)
@@ -131,7 +138,7 @@ class DashboardController extends Controller
 
         // ── Group count ───────────────────────────────────────────
 
-        $groupCount = DeviceGroup::count();
+        $groupCount = DeviceGroup::query()->forTenant($tenantId)->count();
 
         return Inertia::render('security-devices/dashboard', [
             'stats' => $stats,

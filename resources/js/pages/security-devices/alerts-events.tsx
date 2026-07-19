@@ -1,24 +1,34 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState, EmptySearch } from '@/components/ui/empty-state';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { PageHero } from '@/components/page';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
     Bell,
-    Clock,
     Loader,
     Search,
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { type FilterOption, type Paginated, FilterSelect, StatCard } from './devices/shared';
+import {
+    type FilterOption,
+    type Paginated,
+    FilterSelect,
+    StatCard,
+} from './devices/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -37,6 +47,7 @@ type EventItem = {
 };
 
 type Props = {
+    pageMeta?: { title: string; description: string; href: string };
     stats: {
         total24h: number;
         critical24h: number;
@@ -54,27 +65,39 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function severityVariant(severity: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function severityVariant(
+    severity: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (severity) {
-        case 'critical': return 'destructive';
-        case 'warning': return 'outline';
-        default: return 'secondary';
+        case 'critical':
+            return 'destructive';
+        case 'warning':
+            return 'outline';
+        default:
+            return 'secondary';
     }
 }
 
 function severityIcon(severity: string) {
     switch (severity) {
-        case 'critical': return <AlertTriangle className="h-3.5 w-3.5" />;
-        case 'warning': return <Zap className="h-3.5 w-3.5" />;
-        default: return <Activity className="h-3.5 w-3.5" />;
+        case 'critical':
+            return <AlertTriangle className="h-3.5 w-3.5" />;
+        case 'warning':
+            return <Zap className="h-3.5 w-3.5" />;
+        default:
+            return <Activity className="h-3.5 w-3.5" />;
     }
 }
 
 function formatDateTime(iso: string | null): string {
     if (!iso) return '-';
     return new Date(iso).toLocaleString('en-NZ', {
-        day: 'numeric', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
     });
 }
 
@@ -91,12 +114,26 @@ function formatTimeSince(iso: string): string {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function AlertsEvents({ stats, events, filters, filterOptions }: Props) {
+export default function AlertsEvents({
+    pageMeta,
+    stats,
+    events,
+    filters,
+    filterOptions,
+}: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
-    const pageUrl = '/security-devices/alerts-events';
+    const pageTitle = pageMeta?.title ?? 'Alerts & Events';
+    const pageDescription =
+        pageMeta?.description ??
+        'Read-only device event stream. For alert triage and escalation, use Control Room.';
+    const pageUrl = pageMeta?.href ?? '/security-devices/alerts-events';
 
     const applyFilters = (newFilters: Record<string, string>) => {
-        router.get(pageUrl, { ...filters, ...newFilters, page: '1' }, { preserveState: true });
+        router.get(
+            pageUrl,
+            { ...filters, ...newFilters, page: '1' },
+            { preserveState: true },
+        );
     };
 
     const clearFilters = () => {
@@ -104,22 +141,24 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
         setSearch('');
     };
 
-    const hasActiveFilters = Object.values(filters).some((v) => v && v !== 'all' && v !== '');
+    const hasActiveFilters = Object.values(filters).some(
+        (v) => v && v !== 'all' && v !== '',
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'Alerts & Events', href: pageUrl },
+                { title: pageTitle, href: pageUrl },
             ]}
         >
-            <Head title="Alerts & Events - Security & Devices" />
+            <Head title={`${pageTitle} - Security & Devices`} />
 
             <PageShell>
                 <PageHero
                     icon={Bell}
-                    title="Alerts & Events"
-                    description="Read-only device event stream. For alert triage and escalation, use Control Room."
+                    title={pageTitle}
+                    description={pageDescription}
                     stats={[
                         { label: 'Events (24h)', value: stats.total24h },
                         { label: 'Critical', value: stats.critical24h },
@@ -130,21 +169,42 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
 
                 {/* Stats */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Events (24h)" value={stats.total24h} icon={Activity} />
-                    <StatCard label="Critical (24h)" value={stats.critical24h} icon={AlertTriangle} variant={stats.critical24h > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Warning (24h)" value={stats.warning24h} icon={Zap} variant={stats.warning24h > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Unprocessed" value={stats.unprocessed} icon={Loader} variant={stats.unprocessed > 0 ? 'warning' : 'default'} />
+                    <StatCard
+                        label="Events (24h)"
+                        value={stats.total24h}
+                        icon={Activity}
+                    />
+                    <StatCard
+                        label="Critical (24h)"
+                        value={stats.critical24h}
+                        icon={AlertTriangle}
+                        variant={stats.critical24h > 0 ? 'warning' : 'default'}
+                    />
+                    <StatCard
+                        label="Warning (24h)"
+                        value={stats.warning24h}
+                        icon={Zap}
+                        variant={stats.warning24h > 0 ? 'warning' : 'default'}
+                    />
+                    <StatCard
+                        label="Unprocessed"
+                        value={stats.unprocessed}
+                        icon={Loader}
+                        variant={stats.unprocessed > 0 ? 'warning' : 'default'}
+                    />
                 </div>
 
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search event type, source, device..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search })}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && applyFilters({ search })
+                            }
                             className="pl-9"
                         />
                     </div>
@@ -164,7 +224,10 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                             value={filters.event_type}
                             onChange={(v) => applyFilters({ event_type: v })}
                             placeholder="Event type"
-                            options={filterOptions.eventTypes.map((t) => ({ value: t, label: t.replace(/_/g, ' ') }))}
+                            options={filterOptions.eventTypes.map((t) => ({
+                                value: t,
+                                label: t.replace(/_/g, ' '),
+                            }))}
                         />
                     )}
                     <FilterSelect
@@ -178,7 +241,10 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                             value={filters.source}
                             onChange={(v) => applyFilters({ source: v })}
                             placeholder="Source"
-                            options={filterOptions.sources.map((s) => ({ value: s, label: s }))}
+                            options={filterOptions.sources.map((s) => ({
+                                value: s,
+                                label: s,
+                            }))}
                         />
                     )}
                     <FilterSelect
@@ -208,7 +274,13 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                     />
 
                     {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                        >
+                            Clear
+                        </Button>
                     )}
                 </div>
 
@@ -217,7 +289,10 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                     <Card>
                         <CardHeader>
                             <CardTitle>Device Events</CardTitle>
-                            <CardDescription>{events.meta.total} event{events.meta.total !== 1 ? 's' : ''} found</CardDescription>
+                            <CardDescription>
+                                {events.meta.total} event
+                                {events.meta.total !== 1 ? 's' : ''} found
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-1">
@@ -225,9 +300,11 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                                     <div
                                         key={evt.id}
                                         className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
-                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' :
-                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30' :
-                                            ''
+                                            evt.severity === 'critical'
+                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
+                                                : evt.severity === 'warning'
+                                                  ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
+                                                  : ''
                                         }`}
                                     >
                                         <div className="mt-0.5 shrink-0">
@@ -235,15 +312,32 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <Badge variant={severityVariant(evt.severity)} className="text-[10px]">
+                                                <Badge
+                                                    variant={severityVariant(
+                                                        evt.severity,
+                                                    )}
+                                                    className="text-[10px]"
+                                                >
                                                     {evt.severity}
                                                 </Badge>
-                                                <span className="font-medium">{evt.event_type.replace(/_/g, ' ')}</span>
+                                                <span className="font-medium">
+                                                    {evt.event_type.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </span>
                                                 {evt.source && (
-                                                    <span className="text-xs text-muted-foreground">via {evt.source}</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        via {evt.source}
+                                                    </span>
                                                 )}
                                                 {!evt.processed_at && (
-                                                    <Badge variant="outline" className="text-[10px]">unprocessed</Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-[10px]"
+                                                    >
+                                                        unprocessed
+                                                    </Badge>
                                                 )}
                                             </div>
                                             <div className="mt-1 flex flex-wrap items-center gap-x-4 text-xs text-muted-foreground">
@@ -252,11 +346,18 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                                                         href={`/security-devices/devices/${evt.device_id}`}
                                                         className="text-primary hover:underline"
                                                     >
-                                                        {evt.device_name} ({evt.device_uid})
+                                                        {evt.device_name} (
+                                                        {evt.device_uid})
                                                     </Link>
                                                 )}
-                                                <span title={formatDateTime(evt.occurred_at)}>
-                                                    {formatTimeSince(evt.occurred_at)}
+                                                <span
+                                                    title={formatDateTime(
+                                                        evt.occurred_at,
+                                                    )}
+                                                >
+                                                    {formatTimeSince(
+                                                        evt.occurred_at,
+                                                    )}
                                                 </span>
                                             </div>
                                         </div>
@@ -266,7 +367,10 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                         </CardContent>
                     </Card>
                 ) : hasActiveFilters ? (
-                    <EmptySearch onClear={clearFilters} title="No matching events" />
+                    <EmptySearch
+                        onClear={clearFilters}
+                        title="No matching events"
+                    />
                 ) : (
                     <EmptyState
                         icon={Bell}
@@ -285,7 +389,14 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                                 variant={link.active ? 'default' : 'outline'}
                                 size="sm"
                                 disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                onClick={() =>
+                                    link.url &&
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        { preserveState: true },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}

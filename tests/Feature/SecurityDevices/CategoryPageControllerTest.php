@@ -16,6 +16,7 @@ class CategoryPageControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -159,6 +160,31 @@ class CategoryPageControllerTest extends TestCase
             ->where('stats.total', 2)
             ->where('stats.active', 1)
             ->where('stats.offline', 1)
+        );
+    }
+
+    public function test_category_inventory_stats_and_providers_are_scoped_to_the_users_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 42,
+            'name' => 'Tenant switch',
+            'provider' => 'tenant-provider',
+        ]);
+        Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 77,
+            'name' => 'Foreign switch',
+            'provider' => 'foreign-provider',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/network-it');
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('devices.data', 1)
+            ->where('devices.data.0.name', 'Tenant switch')
+            ->where('stats.total', 1)
+            ->where('filterOptions.providers', ['tenant-provider'])
         );
     }
 

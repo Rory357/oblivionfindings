@@ -1,10 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { EmptyState, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
+import PageShell from '@/components/page-shell';
+import { Button } from '@/components/ui/button';
+import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -24,11 +23,11 @@ import {
 import { useState } from 'react';
 
 import {
+    DeviceCard,
     type DeviceListItem,
     type FilterOption,
-    type Paginated,
-    DeviceCard,
     FilterSelect,
+    type Paginated,
     StatCard,
 } from './devices/shared';
 
@@ -70,13 +69,18 @@ type Props = {
 // ── Icon map ──────────────────────────────────────────────────────
 
 const iconMap: Record<string, LucideIcon> = {
-    'alarms': Siren,
-    'cctv': Cctv,
+    'network-it': Server,
+    security: Cctv,
+    healthcare: HeartPulse,
+    tracking: Smartphone,
+    'facilities-iot': Building2,
+    alarms: Siren,
+    cctv: Cctv,
     'access-control': Key,
     'tracking-devices': Smartphone,
     'smart-iot-healthcare': HeartPulse,
     'it-infrastructure': Server,
-    'facilities': Building2,
+    facilities: Building2,
 };
 
 function singularizeTitle(title: string): string {
@@ -93,11 +97,21 @@ function singularizeTitle(title: string): string {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function CategoryPage({ devices, stats, filters, filterOptions, pageConfig }: Props) {
+export default function CategoryPage({
+    devices,
+    stats,
+    filters,
+    filterOptions,
+    pageConfig,
+}: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
     const pageUrl = `/security-devices/${pageConfig.slug}`;
-    const registerLabel = `Register ${singularizeTitle(pageConfig.title)}`;
+    const registerLabel =
+        pageConfig.slug.includes('-') ||
+        ['security', 'healthcare', 'tracking'].includes(pageConfig.slug)
+            ? 'Register device'
+            : `Register ${singularizeTitle(pageConfig.title)}`;
 
     const applyFilters = (newFilters: Record<string, string>) => {
         router.get(
@@ -112,7 +126,9 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
         setSearch('');
     };
 
-    const hasActiveFilters = Object.values(filters).some((v) => v && v !== 'all');
+    const hasActiveFilters = Object.values(filters).some(
+        (v) => v && v !== 'all',
+    );
 
     return (
         <AppLayout
@@ -124,7 +140,8 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
             <Head title={`${pageConfig.title} - Security & Devices`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    variant="compact"
                     title={
                         <span className="flex items-center gap-3">
                             <PageIcon className="h-6 w-6 text-primary" />
@@ -134,7 +151,9 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                     description={pageConfig.description}
                     actions={
                         <Button asChild size="sm">
-                            <Link href={`/security-devices/devices/create?domain=${pageConfig.domain}`}>
+                            <Link
+                                href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 {registerLabel}
                             </Link>
@@ -144,10 +163,27 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
 
                 {/* Stats cards */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label={`Total ${pageConfig.title}`} value={stats.total} icon={PageIcon} />
-                    <StatCard label="Active" value={stats.active} icon={Activity} />
-                    <StatCard label="Offline" value={stats.offline} icon={MonitorOff} />
-                    <StatCard label="Needing Attention" value={stats.attention} icon={AlertTriangle} variant={stats.attention > 0 ? 'warning' : 'default'} />
+                    <StatCard
+                        label={`Total ${pageConfig.title}`}
+                        value={stats.total}
+                        icon={PageIcon}
+                    />
+                    <StatCard
+                        label="Active"
+                        value={stats.active}
+                        icon={Activity}
+                    />
+                    <StatCard
+                        label="Offline"
+                        value={stats.offline}
+                        icon={MonitorOff}
+                    />
+                    <StatCard
+                        label="Needing Attention"
+                        value={stats.attention}
+                        icon={AlertTriangle}
+                        variant={stats.attention > 0 ? 'warning' : 'default'}
+                    />
                 </div>
 
                 {/* Subcategory chips */}
@@ -159,13 +195,16 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                             size="xs"
                             onClick={() => applyFilters({ subcategory: 'all' })}
                             className={`h-auto rounded-full px-3 py-1 ${
-                                !filters.subcategory || filters.subcategory === 'all'
+                                !filters.subcategory ||
+                                filters.subcategory === 'all'
                                     ? 'border-primary bg-primary/10 text-primary'
                                     : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                             }`}
                         >
                             All
-                            <span className="ml-1 text-muted-foreground">({stats.total})</span>
+                            <span className="ml-1 text-muted-foreground">
+                                ({stats.total})
+                            </span>
                         </Button>
                         {filterOptions.subcategories.map((sub) => {
                             const count = stats.bySubcategory[sub.value] ?? 0;
@@ -176,7 +215,9 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                                     type="button"
                                     variant="outline"
                                     size="xs"
-                                    onClick={() => applyFilters({ subcategory: sub.value })}
+                                    onClick={() =>
+                                        applyFilters({ subcategory: sub.value })
+                                    }
                                     className={`h-auto rounded-full px-3 py-1 ${
                                         isActive
                                             ? 'border-primary bg-primary/10 text-primary'
@@ -184,7 +225,11 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                                     }`}
                                 >
                                     {sub.label}
-                                    {count > 0 && <span className="ml-1 text-muted-foreground/70">({count})</span>}
+                                    {count > 0 && (
+                                        <span className="ml-1 text-muted-foreground/70">
+                                            ({count})
+                                        </span>
+                                    )}
                                 </Button>
                             );
                         })}
@@ -192,49 +237,57 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                 )}
 
                 {/* Category filter (for multi-category or whole-domain pages) */}
-                {filterOptions.categories && filterOptions.categories.length > 1 && (
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            onClick={() => applyFilters({ category: 'all' })}
-                            className={`h-auto rounded-full px-3 py-1 ${
-                                !filters.category || filters.category === 'all'
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                            }`}
-                        >
-                            All categories
-                        </Button>
-                        {filterOptions.categories.map((cat) => (
+                {filterOptions.categories &&
+                    filterOptions.categories.length > 1 && (
+                        <div className="flex flex-wrap gap-2">
                             <Button
-                                key={cat.value}
                                 type="button"
                                 variant="outline"
                                 size="xs"
-                                onClick={() => applyFilters({ category: cat.value })}
+                                onClick={() =>
+                                    applyFilters({ category: 'all' })
+                                }
                                 className={`h-auto rounded-full px-3 py-1 ${
-                                    filters.category === cat.value
+                                    !filters.category ||
+                                    filters.category === 'all'
                                         ? 'border-primary bg-primary/10 text-primary'
                                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >
-                                {cat.label}
+                                All categories
                             </Button>
-                        ))}
-                    </div>
-                )}
+                            {filterOptions.categories.map((cat) => (
+                                <Button
+                                    key={cat.value}
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
+                                    onClick={() =>
+                                        applyFilters({ category: cat.value })
+                                    }
+                                    className={`h-auto rounded-full px-3 py-1 ${
+                                        filters.category === cat.value
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                    }`}
+                                >
+                                    {cat.label}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
 
                 {/* Filter bar */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder={`Search ${pageConfig.title.toLowerCase()}...`}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search })}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && applyFilters({ search })
+                            }
                             className="pl-9"
                         />
                     </div>
@@ -256,7 +309,9 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                             value={filters.provider}
                             onChange={(v) => applyFilters({ provider: v })}
                             placeholder="Provider"
-                            options={filterOptions.providers.map((p: string) => ({ value: p, label: p }))}
+                            options={filterOptions.providers.map(
+                                (p: string) => ({ value: p, label: p }),
+                            )}
                         />
                     )}
                     <FilterSelect
@@ -270,7 +325,11 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                     />
 
                     {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                        >
                             Clear filters
                         </Button>
                     )}
@@ -296,7 +355,9 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                         description={pageConfig.emptyDescription}
                         action={
                             <Button asChild size="sm">
-                                <Link href={`/security-devices/devices/create?domain=${pageConfig.domain}`}>
+                                <Link
+                                    href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                                >
                                     {registerLabel}
                                 </Link>
                             </Button>
@@ -313,7 +374,14 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                                 variant={link.active ? 'default' : 'outline'}
                                 size="sm"
                                 disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                onClick={() =>
+                                    link.url &&
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        { preserveState: true },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}

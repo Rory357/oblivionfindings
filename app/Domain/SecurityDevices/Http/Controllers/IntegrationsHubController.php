@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Integration\IntegrationTenantSecret;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class IntegrationsHubController extends Controller
 {
+    use ResolvesDeviceTenant;
+
     /**
      * Catalog of providers the module plans to support.
      * Kept in code (not DB) so the hub can surface providers that have no credentials yet.
@@ -56,11 +59,11 @@ class IntegrationsHubController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.integrations.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveDeviceTenantId($user);
 
         // Pull real connection state. Keyed by provider slug for fast lookup.
         $secrets = IntegrationTenantSecret::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->forTenant($tenantId)
             ->get()
             ->keyBy('provider');
 
@@ -68,7 +71,7 @@ class IntegrationsHubController extends Controller
 
         // Per-provider device and event counts — one grouped query each.
         $deviceCountsByProvider = Device::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->forTenant($tenantId)
             ->whereNotNull('provider')
             ->selectRaw('provider, count(*) as count')
             ->groupBy('provider')
@@ -76,7 +79,7 @@ class IntegrationsHubController extends Controller
             ->toArray();
 
         $eventCountsByProvider = DeviceEvent::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->forTenant($tenantId)
             ->whereNotNull('source')
             ->where('occurred_at', '>=', $last24h)
             ->selectRaw('source, count(*) as count')

@@ -1,30 +1,31 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PageHero } from '@/components/page';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Battery,
     BatteryLow,
     Bell,
     Building2,
     Cctv,
     Cpu,
-    FileText,
     GitBranch,
     HeartPulse,
-    Key,
-    Link2,
     MonitorOff,
     Plus,
     Server,
     Shield,
-    Siren,
     Smartphone,
     Wrench,
     Zap,
@@ -50,18 +51,32 @@ type Props = {
     domainSummary: Array<{ domain: string; label: string; count: number }>;
     healthSummary: Array<{ status: string; label: string; count: number }>;
     attentionDevices: Array<{
-        id: number; name: string; device_uid: string; domain: string;
-        category: string; status: string; health_status: string;
-        battery_level: number | null; last_seen_at: string | null;
+        id: number;
+        name: string;
+        device_uid: string;
+        domain: string;
+        category: string;
+        status: string;
+        health_status: string;
+        battery_level: number | null;
+        last_seen_at: string | null;
     }>;
     recentEvents: Array<{
-        id: number; device_id: number; device_name: string | null;
-        device_uid: string | null; event_type: string; severity: string;
+        id: number;
+        device_id: number;
+        device_name: string | null;
+        device_uid: string | null;
+        event_type: string;
+        severity: string;
         occurred_at: string;
     }>;
     overdueMaintenance: Array<{
-        id: number; device_id: number; device_name: string | null;
-        device_uid: string | null; type: string; description: string;
+        id: number;
+        device_id: number;
+        device_name: string | null;
+        device_uid: string | null;
+        type: string;
+        description: string;
         scheduled_for: string | null;
     }>;
     groupCount: number;
@@ -69,16 +84,46 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function healthVariant(h: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (h) { case 'healthy': return 'default'; case 'warning': return 'outline'; case 'critical': return 'destructive'; default: return 'secondary'; }
+function healthVariant(
+    h: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+    switch (h) {
+        case 'healthy':
+            return 'default';
+        case 'warning':
+            return 'outline';
+        case 'critical':
+            return 'destructive';
+        default:
+            return 'secondary';
+    }
 }
 
-function statusVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (s) { case 'active': return 'default'; case 'offline': case 'decommissioned': return 'secondary'; default: return 'outline'; }
+function statusVariant(
+    s: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+    switch (s) {
+        case 'active':
+            return 'default';
+        case 'offline':
+        case 'decommissioned':
+            return 'secondary';
+        default:
+            return 'outline';
+    }
 }
 
-function severityVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (s) { case 'critical': return 'destructive'; case 'warning': return 'outline'; default: return 'secondary'; }
+function severityVariant(
+    s: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+    switch (s) {
+        case 'critical':
+            return 'destructive';
+        case 'warning':
+            return 'outline';
+        default:
+            return 'secondary';
+    }
 }
 
 function formatTimeSince(iso: string | null): string {
@@ -94,12 +139,21 @@ function formatTimeSince(iso: string | null): string {
 
 function formatDate(iso: string | null): string {
     if (!iso) return '-';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    });
 }
 
-const domainIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-    security: Shield, tracking: Smartphone, iot_healthcare: HeartPulse,
-    it_infrastructure: Server, facilities: Building2,
+const domainIcons: Record<
+    string,
+    React.ComponentType<{ className?: string }>
+> = {
+    security: Shield,
+    tracking: Smartphone,
+    iot_healthcare: HeartPulse,
+    it_infrastructure: Server,
+    facilities: Building2,
 };
 
 const domainHrefs: Record<string, string> = {
@@ -112,11 +166,23 @@ const domainHrefs: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function Dashboard({ stats, domainSummary, healthSummary, attentionDevices, recentEvents, overdueMaintenance, groupCount }: Props) {
+export default function Dashboard({
+    stats,
+    domainSummary,
+    healthSummary,
+    attentionDevices,
+    recentEvents,
+    overdueMaintenance,
+    groupCount,
+}: Props) {
     const totalAttention = stats.offline + stats.degraded + stats.lowBattery;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Security & Devices', href: '/security-devices' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Security & Devices', href: '/security-devices' },
+            ]}
+        >
             <Head title="Dashboard - Security & Devices" />
 
             <PageShell>
@@ -132,11 +198,21 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                     ]}
                     actions={
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                <Link href="/security-devices/devices"><Cpu className="mr-2 h-4 w-4" /> All Devices</Link>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/security-devices/devices">
+                                    <Cpu className="mr-2 h-4 w-4" /> All Devices
+                                </Link>
                             </Button>
                             <Button size="sm" asChild>
-                                <Link href="/security-devices/devices/create"><Plus className="mr-2 h-4 w-4" /> Register Device</Link>
+                                <Link href="/security-devices/devices/create">
+                                    <Plus className="mr-2 h-4 w-4" /> Register
+                                    Device
+                                </Link>
                             </Button>
                         </div>
                     }
@@ -144,49 +220,111 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
 
                 {/* ── Stats row ─────────────────────────────────── */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Total Devices" value={stats.totalDevices} icon={Cpu} />
-                    <StatCard label="Active" value={stats.active} icon={Activity} />
-                    <StatCard label="Offline / Degraded" value={stats.offline + stats.degraded} icon={MonitorOff} variant={totalAttention > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Overdue Maintenance" value={stats.overdueMaintenance} icon={Wrench} variant={stats.overdueMaintenance > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Service Due (overdue)" value={stats.serviceDueOverdue} icon={Wrench} variant={stats.serviceDueOverdue > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Service Due (30d)" value={stats.serviceDueIn30d} icon={Wrench} />
+                    <StatCard
+                        label="Total Devices"
+                        value={stats.totalDevices}
+                        icon={Cpu}
+                    />
+                    <StatCard
+                        label="Active"
+                        value={stats.active}
+                        icon={Activity}
+                    />
+                    <StatCard
+                        label="Offline / Degraded"
+                        value={stats.offline + stats.degraded}
+                        icon={MonitorOff}
+                        variant={totalAttention > 0 ? 'warning' : 'default'}
+                    />
+                    <StatCard
+                        label="Overdue Maintenance"
+                        value={stats.overdueMaintenance}
+                        icon={Wrench}
+                        variant={
+                            stats.overdueMaintenance > 0 ? 'warning' : 'default'
+                        }
+                    />
+                    <StatCard
+                        label="Service Due (overdue)"
+                        value={stats.serviceDueOverdue}
+                        icon={Wrench}
+                        variant={
+                            stats.serviceDueOverdue > 0 ? 'warning' : 'default'
+                        }
+                    />
+                    <StatCard
+                        label="Service Due (30d)"
+                        value={stats.serviceDueIn30d}
+                        icon={Wrench}
+                    />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Low Battery" value={stats.lowBattery} icon={BatteryLow} variant={stats.lowBattery > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Critical Events (24h)" value={stats.criticalEvents24h} icon={AlertTriangle} variant={stats.criticalEvents24h > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Warning Events (24h)" value={stats.warningEvents24h} icon={Zap} variant={stats.warningEvents24h > 0 ? 'warning' : 'default'} />
-                    <StatCard label="Device Groups" value={groupCount} icon={GitBranch} />
+                    <StatCard
+                        label="Low Battery"
+                        value={stats.lowBattery}
+                        icon={BatteryLow}
+                        variant={stats.lowBattery > 0 ? 'warning' : 'default'}
+                    />
+                    <StatCard
+                        label="Critical Events (24h)"
+                        value={stats.criticalEvents24h}
+                        icon={AlertTriangle}
+                        variant={
+                            stats.criticalEvents24h > 0 ? 'warning' : 'default'
+                        }
+                    />
+                    <StatCard
+                        label="Warning Events (24h)"
+                        value={stats.warningEvents24h}
+                        icon={Zap}
+                        variant={
+                            stats.warningEvents24h > 0 ? 'warning' : 'default'
+                        }
+                    />
+                    <StatCard
+                        label="Device Groups"
+                        value={groupCount}
+                        icon={GitBranch}
+                    />
                 </div>
 
                 {/* ── Main content grid ─────────────────────────── */}
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-
                     {/* Left column */}
                     <div className="space-y-6">
-
                         {/* Domain distribution */}
                         <Card>
                             <CardHeader>
                                 <CardTitle>Device Estate by Domain</CardTitle>
-                                <CardDescription>Distribution across hardware domains</CardDescription>
+                                <CardDescription>
+                                    Distribution across hardware domains
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {stats.totalDevices > 0 ? (
                                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                         {domainSummary.map((d) => {
-                                            const Icon = domainIcons[d.domain] ?? Cpu;
+                                            const Icon =
+                                                domainIcons[d.domain] ?? Cpu;
                                             return (
                                                 <Link
                                                     key={d.domain}
-                                                    href={domainHrefs[d.domain] ?? '/security-devices/devices'}
+                                                    href={
+                                                        domainHrefs[d.domain] ??
+                                                        '/security-devices/devices'
+                                                    }
                                                     className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
                                                 >
                                                     <div className="rounded-md bg-muted p-2">
                                                         <Icon className="h-4 w-4 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-xl font-semibold">{d.count}</p>
-                                                        <p className="text-xs text-muted-foreground">{d.label}</p>
+                                                        <p className="text-xl font-semibold">
+                                                            {d.count}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {d.label}
+                                                        </p>
                                                     </div>
                                                 </Link>
                                             );
@@ -198,7 +336,13 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                         title="No devices registered"
                                         description="Register your first device to see the domain distribution."
                                         variant="compact"
-                                        action={<Button size="sm" asChild><Link href="/security-devices/devices/create">Register Device</Link></Button>}
+                                        action={
+                                            <Button size="sm" asChild>
+                                                <Link href="/security-devices/devices/create">
+                                                    Register Device
+                                                </Link>
+                                            </Button>
+                                        }
                                     />
                                 )}
                             </CardContent>
@@ -209,11 +353,18 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="flex items-center gap-2"><Bell className="h-4 w-4" /> Recent Events</CardTitle>
-                                        <CardDescription>Critical and warning events</CardDescription>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Bell className="h-4 w-4" /> Recent
+                                            Events
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Critical and warning events
+                                        </CardDescription>
                                     </div>
                                     <Button variant="outline" size="sm" asChild>
-                                        <Link href="/security-devices/alerts-events">View all</Link>
+                                        <Link href="/security-devices/alerts-events">
+                                            View all
+                                        </Link>
                                     </Button>
                                 </div>
                             </CardHeader>
@@ -224,25 +375,47 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                             <div
                                                 key={evt.id}
                                                 className={`flex items-center justify-between rounded-md border p-3 text-sm ${
-                                                    evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' :
-                                                    'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
+                                                    evt.severity === 'critical'
+                                                        ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
+                                                        : 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <Badge variant={severityVariant(evt.severity)} className="text-[10px] shrink-0">{evt.severity}</Badge>
-                                                    <span className="font-medium truncate">{evt.event_type.replace(/_/g, ' ')}</span>
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <Badge
+                                                        variant={severityVariant(
+                                                            evt.severity,
+                                                        )}
+                                                        className="shrink-0 text-[10px]"
+                                                    >
+                                                        {evt.severity}
+                                                    </Badge>
+                                                    <span className="truncate font-medium">
+                                                        {evt.event_type.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
+                                                    </span>
                                                     {evt.device_name && (
-                                                        <Link href={`/security-devices/devices/${evt.device_id}`} className="text-xs text-primary hover:underline truncate">
+                                                        <Link
+                                                            href={`/security-devices/devices/${evt.device_id}`}
+                                                            className="truncate text-xs text-primary hover:underline"
+                                                        >
                                                             {evt.device_name}
                                                         </Link>
                                                     )}
                                                 </div>
-                                                <span className="text-xs text-muted-foreground shrink-0 ml-2">{formatTimeSince(evt.occurred_at)}</span>
+                                                <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                                                    {formatTimeSince(
+                                                        evt.occurred_at,
+                                                    )}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground italic">No critical or warning events recently.</p>
+                                    <p className="text-sm text-muted-foreground italic">
+                                        No critical or warning events recently.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
@@ -252,11 +425,22 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Overdue Maintenance</CardTitle>
-                                        <CardDescription>{stats.overdueMaintenance} record{stats.overdueMaintenance !== 1 ? 's' : ''} overdue</CardDescription>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Wrench className="h-4 w-4" />{' '}
+                                            Overdue Maintenance
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {stats.overdueMaintenance} record
+                                            {stats.overdueMaintenance !== 1
+                                                ? 's'
+                                                : ''}{' '}
+                                            overdue
+                                        </CardDescription>
                                     </div>
                                     <Button variant="outline" size="sm" asChild>
-                                        <Link href="/security-devices/maintenance-health">View all</Link>
+                                        <Link href="/security-devices/maintenance-health">
+                                            View all
+                                        </Link>
                                     </Button>
                                 </div>
                             </CardHeader>
@@ -264,27 +448,54 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                 {overdueMaintenance.length > 0 ? (
                                     <div className="space-y-2">
                                         {overdueMaintenance.map((m) => (
-                                            <div key={m.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 p-3 text-sm">
+                                            <div
+                                                key={m.id}
+                                                className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm dark:border-status-warning/30"
+                                            >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-medium">{m.type.replace(/_/g, ' ')}</span>
-                                                        <Badge variant="destructive" className="text-[10px]">Overdue</Badge>
+                                                        <span className="font-medium">
+                                                            {m.type.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
+                                                        </span>
+                                                        <Badge
+                                                            variant="destructive"
+                                                            className="text-[10px]"
+                                                        >
+                                                            Overdue
+                                                        </Badge>
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground truncate">{m.description}</p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {m.description}
+                                                    </p>
                                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                                                         {m.device_name && (
-                                                            <Link href={`/security-devices/devices/${m.device_id}`} className="text-primary hover:underline">
+                                                            <Link
+                                                                href={`/security-devices/devices/${m.device_id}`}
+                                                                className="text-primary hover:underline"
+                                                            >
                                                                 {m.device_name}
                                                             </Link>
                                                         )}
-                                                        {m.scheduled_for && <span>Due: {formatDate(m.scheduled_for)}</span>}
+                                                        {m.scheduled_for && (
+                                                            <span>
+                                                                Due:{' '}
+                                                                {formatDate(
+                                                                    m.scheduled_for,
+                                                                )}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground italic">No overdue maintenance. All clear.</p>
+                                    <p className="text-sm text-muted-foreground italic">
+                                        No overdue maintenance. All clear.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
@@ -292,20 +503,33 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
 
                     {/* Right sidebar */}
                     <div className="space-y-6">
-
                         {/* Health distribution */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Health Distribution</CardTitle>
+                                <CardTitle className="text-base">
+                                    Health Distribution
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-2">
                                     {healthSummary.map((h) => (
-                                        <div key={h.status} className="flex items-center justify-between text-sm">
+                                        <div
+                                            key={h.status}
+                                            className="flex items-center justify-between text-sm"
+                                        >
                                             <div className="flex items-center gap-2">
-                                                <Badge variant={healthVariant(h.status)} className="text-[10px] w-16 justify-center">{h.label}</Badge>
+                                                <Badge
+                                                    variant={healthVariant(
+                                                        h.status,
+                                                    )}
+                                                    className="w-16 justify-center text-[10px]"
+                                                >
+                                                    {h.label}
+                                                </Badge>
                                             </div>
-                                            <span className="font-semibold">{h.count}</span>
+                                            <span className="font-semibold">
+                                                {h.count}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -317,68 +541,57 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <AlertTriangle className="h-4 w-4 text-status-warning" /> Attention Required
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />{' '}
+                                        Attention Required
                                     </CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {attentionDevices.length > 0 ? (
-                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                    <div className="max-h-96 space-y-2 overflow-y-auto">
                                         {attentionDevices.map((d) => (
                                             <Link
                                                 key={d.id}
                                                 href={`/security-devices/devices/${d.id}`}
-                                                className="flex items-center justify-between rounded-md border p-2.5 text-sm hover:bg-muted/50 transition-colors"
+                                                className="flex items-center justify-between rounded-md border p-2.5 text-sm transition-colors hover:bg-muted/50"
                                             >
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="font-medium truncate">{d.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground">{d.category.replace(/_/g, ' ')}</p>
+                                                    <p className="truncate font-medium">
+                                                        {d.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {d.category.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
+                                                    </p>
                                                 </div>
-                                                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                                                    <Badge variant={statusVariant(d.status)} className="text-[10px]">{d.status}</Badge>
-                                                    <Badge variant={healthVariant(d.health_status)} className="text-[10px]">{d.health_status}</Badge>
+                                                <div className="flex shrink-0 flex-col items-end gap-0.5">
+                                                    <Badge
+                                                        variant={statusVariant(
+                                                            d.status,
+                                                        )}
+                                                        className="text-[10px]"
+                                                    >
+                                                        {d.status}
+                                                    </Badge>
+                                                    <Badge
+                                                        variant={healthVariant(
+                                                            d.health_status,
+                                                        )}
+                                                        className="text-[10px]"
+                                                    >
+                                                        {d.health_status}
+                                                    </Badge>
                                                 </div>
                                             </Link>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground italic">All devices healthy.</p>
+                                    <p className="text-sm text-muted-foreground italic">
+                                        All devices healthy.
+                                    </p>
                                 )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Quick links */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Quick Links</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-1">
-                                    {[
-                                        { href: '/security-devices/devices', label: 'All Devices', icon: Cpu },
-                                        { href: '/security-devices/alarms', label: 'Alarms', icon: Siren },
-                                        { href: '/security-devices/cctv', label: 'CCTV', icon: Cctv },
-                                        { href: '/security-devices/access-control', label: 'Access Control', icon: Key },
-                                        { href: '/security-devices/tracking-devices', label: 'Tracking', icon: Smartphone },
-                                        { href: '/security-devices/smart-iot-healthcare', label: 'IoT & Healthcare', icon: HeartPulse },
-                                        { href: '/security-devices/it-infrastructure', label: 'IT Infrastructure', icon: Server },
-                                        { href: '/security-devices/facilities', label: 'Facilities', icon: Building2 },
-                                        { href: '/security-devices/device-groups', label: 'Device Groups', icon: GitBranch },
-                                        { href: '/security-devices/maintenance-health', label: 'Maintenance & Health', icon: Wrench },
-                                        { href: '/security-devices/alerts-events', label: 'Alerts & Events', icon: Bell },
-                                        { href: '/security-devices/integrations', label: 'APIs & Integrations', icon: Link2 },
-                                        { href: '/security-devices/reports', label: 'Reports', icon: FileText },
-                                    ].map(({ href, label, icon: Icon }) => (
-                                        <Link
-                                            key={href}
-                                            href={href}
-                                            className="flex items-center gap-3 rounded-md p-2 text-sm transition-colors hover:bg-muted/50"
-                                        >
-                                            <Icon className="h-4 w-4 text-muted-foreground" />
-                                            <span>{label}</span>
-                                        </Link>
-                                    ))}
-                                </div>
                             </CardContent>
                         </Card>
                     </div>
