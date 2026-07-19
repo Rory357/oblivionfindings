@@ -112,12 +112,14 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Modify `routes/security-devices.php`
 - Add route/payload/component tests
 
-- [ ] Write failing tests for every canonical workspace route and legacy path.
-- [ ] Add URL-driven, keyboard-accessible local tabs with a compact summary and a consistent action/filter area.
-- [ ] Preserve query strings and device deep links across legacy redirects.
-- [ ] Use one production-backed device/event/maintenance query contract across workspaces.
-- [ ] Ensure unsupported tabs/metrics are absent or explicitly not configured, never fabricated.
-- [ ] Commit as `feat(security-devices): add specialist workspace shell`.
+- [x] Write failing tests for every canonical workspace route and legacy path.
+- [x] Add URL-driven, keyboard-accessible local tabs with a compact summary and a consistent action/filter area.
+- [x] Preserve query strings and device deep links across legacy redirects.
+- [x] Use one production-backed device/event/maintenance query contract across workspaces.
+- [x] Ensure unsupported tabs/metrics are absent or explicitly not configured, never fabricated.
+- [x] Commit as `feat(security-devices): add specialist workspace shell`.
+
+**Task 3 evidence (2026-07-19):** Implementation committed as `afeb5807c`. The final workspace and category contract passed 55 backend tests with 404 assertions, including canonical and legacy routes, permission denials, query/device-context preservation, active-tab count reconciliation, and honest unavailable states. Three frontend files passed 6 component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,987 modules), SSR build (1,639 modules), and `git diff --check` passed. The production-backed legacy-CCTV-to-Security and Network & IT compatibility journeys passed separately on desktop and Pixel 7 with query preservation, console, and horizontal-overflow checks. This closes the shared shell only; S03-S07 remain open until each specialist workspace is complete.
 
 ## Task 4: Complete the Security workspace
 
