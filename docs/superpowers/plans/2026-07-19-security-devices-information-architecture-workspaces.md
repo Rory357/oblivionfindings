@@ -91,14 +91,16 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Modify/create estate, sites, site-show, and inventory pages
 - Add focused feature and component tests
 
-- [ ] Write failing tenant/site/permission tests before changing queries.
-- [ ] Estate overview answers: what is unhealthy, what changed, what is unmonitored, which sites are affected, and what needs action.
-- [ ] Sites lists permission-scoped health, device/monitor coverage, active findings/events, open IT work, maintenance, collector state, and last change.
-- [ ] Site technology shows WAN/SD-WAN context when known, relationship/topology summary, device groups, devices, monitoring state, canonical Control Room alerts, linked IT work, maintenance, collectors, changes, and contacts.
-- [ ] All devices supports clear ownership/context columns, saved views, permission-gated bulk selection/export, and stable filters without duplicating devices.
-- [ ] Counts and drill-down results reconcile exactly.
-- [ ] Add empty/stale/unknown states that never look healthy by default.
-- [ ] Commit as `feat(security-devices): add estate and site operations`.
+- [x] Write failing tenant/site/permission tests before changing queries.
+- [x] Estate overview answers: what is unhealthy, what changed, what is unmonitored, which sites are affected, and what needs action.
+- [x] Sites lists permission-scoped health, device/monitor coverage, active findings/events, open IT work, maintenance, collector state, and last change.
+- [x] Site technology shows WAN/SD-WAN context when known, relationship/topology summary, device groups, devices, monitoring state, canonical Control Room alerts, linked IT work, maintenance, collectors, changes, and contacts.
+- [x] All devices supports clear ownership/context columns, saved views, permission-gated bulk selection/export, and stable filters without duplicating devices.
+- [x] Counts and drill-down results reconcile exactly.
+- [x] Add empty/stale/unknown states that never look healthy by default.
+- [x] Commit as `feat(security-devices): add estate and site operations`.
+
+**Task 2 evidence (2026-07-19):** Implementation committed as `aef51ae39`. The five affected Security & Devices suites passed 73 tests with 717 assertions, covering tenant, site, direct-link, permission, count-reconciliation, selected-export, stale, unknown, and unmonitored behavior. Two frontend files passed 3 component tests; TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,986 modules), SSR build (1,638 modules), and `git diff --check` passed. The production-backed Estate → Sites → Site technology → All devices journey and the complete 13-destination navigation matrix both passed separately on desktop and Pixel 7 with console and horizontal-overflow checks.
 
 ## Task 3: Add the shared specialist-workspace shell and compatibility routing
 
