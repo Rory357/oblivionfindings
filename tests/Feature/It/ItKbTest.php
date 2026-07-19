@@ -25,23 +25,25 @@ test('an agent creates a KB article with a tenant-unique slug', function () {
         'title' => 'Reset your password',
         'category' => 'account',
         'body' => 'Go to the portal and click Forgot password.',
-        'status' => 'published',
     ])->assertRedirect();
 
     $article = ItKbArticle::query()->firstWhere('title', 'Reset your password');
     expect($article)->not->toBeNull();
     expect($article->slug)->toBe('reset-your-password');
-    expect($article->status)->toBe('published');
+    expect($article->status)->toBe('draft');
     expect($article->category)->toBe('account');
     expect((int) $article->author_user_id)->toBe($this->hr->id);
     expect((int) $article->tenant_id)->toBe(1);
+
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review")->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish")->assertRedirect();
+    expect($article->fresh()->status)->toBe('published');
 
     // A second article with the same title gets a de-duplicated slug.
     $this->actingAs($this->hr)->post('/it/kb', [
         'title' => 'Reset your password',
         'category' => 'account',
         'body' => 'Another way in.',
-        'status' => 'draft',
     ])->assertRedirect();
 
     expect(
@@ -49,20 +51,15 @@ test('an agent creates a KB article with a tenant-unique slug', function () {
     )->toBe(['reset-your-password', 'reset-your-password-2']);
 });
 
-test('agents edit articles and flip the publish state; the slug stays stable', function () {
+test('agents edit articles and use the governed publish lifecycle while the slug stays stable', function () {
     $article = ItKbArticle::factory()->create(['status' => 'draft']);
     $slug = $article->slug;
 
-    // Status-only PATCH — the Publish toggle.
-    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", ['status' => 'published'])->assertRedirect();
-    expect($article->fresh()->status)->toBe('published');
-
-    // Full edit (title/category/body/status together).
+    // Content edits never bypass the explicit review/publish lifecycle.
     $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", [
         'title' => 'Edited title',
         'category' => 'network',
         'body' => 'Edited body.',
-        'status' => 'draft',
     ])->assertRedirect();
 
     $article->refresh();
@@ -70,6 +67,16 @@ test('agents edit articles and flip the publish state; the slug stays stable', f
     expect($article->category)->toBe('network');
     expect($article->status)->toBe('draft');
     expect($article->slug)->toBe($slug); // a title edit never churns the slug
+
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review")->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish")->assertRedirect();
+    expect($article->fresh()->status)->toBe('published');
+
+    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", [
+        'body' => 'Published guidance corrected without bypassing lifecycle state.',
+    ])->assertRedirect();
+    expect($article->fresh()->status)->toBe('published')
+        ->and($article->fresh()->slug)->toBe($slug);
 });
 
 test('KB authoring is agent-only and tenant-scoped', function () {
@@ -79,14 +86,15 @@ test('KB authoring is agent-only and tenant-scoped', function () {
 
     // Self-service requesters (no it.manage) cannot author, edit or delete.
     $this->actingAs($worker)->post('/it/kb', [
-        'title' => 'Nope', 'category' => 'other', 'body' => 'x', 'status' => 'draft',
+        'title' => 'Nope', 'category' => 'other', 'body' => 'x',
     ])->assertForbidden();
-    $this->actingAs($worker)->patch("/it/kb/{$mine->id}", ['status' => 'published'])->assertForbidden();
+    $this->actingAs($worker)->patch("/it/kb/{$mine->id}", ['title' => 'Nope'])->assertForbidden();
     $this->actingAs($worker)->delete("/it/kb/{$mine->id}")->assertForbidden();
 
     // An agent cannot reach a foreign-tenant article — 404, not 403, so the
     // guard never leaks that the article exists in another organisation.
-    $this->actingAs($this->hr)->patch("/it/kb/{$foreign->id}", ['status' => 'published'])->assertNotFound();
+    $this->actingAs($this->hr)->patch("/it/kb/{$foreign->id}", ['title' => 'Foreign edit'])->assertNotFound();
+    $this->actingAs($this->hr)->post("/it/kb/{$foreign->id}/submit-review")->assertNotFound();
     $this->actingAs($this->hr)->delete("/it/kb/{$foreign->id}")->assertNotFound();
     expect($foreign->fresh()->status)->toBe('draft'); // untouched
 

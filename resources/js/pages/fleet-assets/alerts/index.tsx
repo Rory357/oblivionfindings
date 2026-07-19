@@ -237,6 +237,7 @@ export function ResolveAlertWizard({
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
+                    {/* eslint-disable-next-line no-restricted-syntax -- Custom wizard review surface, not a standalone content card. */}
                     <div className="space-y-3 rounded-xl border border-border bg-card/70 p-4">
                         <h3 className="font-semibold">Resolution notes</h3>
                         <p className="text-sm whitespace-pre-wrap text-muted-foreground">

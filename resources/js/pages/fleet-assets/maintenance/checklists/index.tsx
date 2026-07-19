@@ -274,6 +274,7 @@ export default function ChecklistsIndex({ templates, recent_runs, stats, can }: 
                             </WizardStepPane>
                         ) : (
                             <WizardStepPane>
+                                {/* eslint-disable-next-line no-restricted-syntax -- Custom wizard review surface, not a standalone content card. */}
                                 <div className="space-y-4 rounded-xl border border-border bg-card/70 p-4">
                                     <div>
                                         <p className="text-sm text-muted-foreground">Template</p>

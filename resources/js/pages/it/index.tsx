@@ -1450,6 +1450,12 @@ export default function ItIndex({
                                                         <div
                                                             className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
                                                             aria-label={`${progress}% complete`}
+                                                            aria-valuemin={0}
+                                                            aria-valuemax={100}
+                                                            aria-valuenow={
+                                                                progress
+                                                            }
+                                                            role="progressbar"
                                                         >
                                                             <div
                                                                 className="h-full rounded-full bg-primary"

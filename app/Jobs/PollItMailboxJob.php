@@ -30,8 +30,13 @@ class PollItMailboxJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(InboundEmailIngestor $ingestor, ItAutomationRunRecorder $recorder): void
-    {
+    public function handle(
+        InboundEmailIngestor $ingestor,
+        ?ItAutomationRunRecorder $recorder = null,
+    ): void {
+        // Keep the original direct-call contract used by operational tools
+        // and tests while Laravel still injects the recorder in queued work.
+        $recorder ??= app(ItAutomationRunRecorder::class);
         $startedAt = microtime(true);
         $run = $recorder->begin('it.poll-mailbox', '0 * * * *');
         try {

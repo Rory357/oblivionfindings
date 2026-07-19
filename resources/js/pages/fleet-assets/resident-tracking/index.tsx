@@ -775,6 +775,7 @@ export function AssignTrackerDialog({
                 </WizardStepPane>
             ) : stepIndex === 1 ? (
                 <WizardStepPane>
+                    {/* eslint-disable-next-line no-restricted-syntax -- Custom wizard consent surface, not a standalone content card. */}
                     <div className="space-y-4 rounded-xl border border-border bg-card/70 p-5">
                         <div className="flex items-start gap-3">
                             <Shield className="mt-0.5 h-5 w-5 text-primary" />
