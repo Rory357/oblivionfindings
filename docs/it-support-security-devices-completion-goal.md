@@ -61,15 +61,15 @@ Progress notes:
 ### IT & Support
 
 - [x] I01 Navigation and labels use IT & Support with the approved Service Desk, Service Delivery, Operations, and Setup groups.
-- [ ] I02 Incidents, service requests, provisioning, problems, changes, security requests, and major incidents have governed lifecycles.
-- [ ] I03 Shared work supports context links, queues/teams, assignee/owner, SLA, conversations, attachments, watchers, tasks, approvals, and timeline.
-- [ ] I04 Help Centre, knowledge deflection, service catalogue, dynamic forms, My requests, and CSAT are end-to-end.
-- [ ] I05 Inbound/outbound email threading, delivery/bounce state, deduplication, spoofing controls, and attachment quarantine are complete.
+- [x] I02 Incidents, service requests, provisioning, problems, changes, security requests, and major incidents have governed lifecycles.
+- [x] I03 Shared work supports context links, queues/teams, assignee/owner, SLA, conversations, attachments, watchers, tasks, approvals, and timeline.
+- [x] I04 Help Centre, knowledge deflection, service catalogue, dynamic forms, My requests, and CSAT are end-to-end.
+- [x] I05 Inbound/outbound email threading, delivery/bounce state, deduplication, spoofing controls, and attachment quarantine are complete.
 - [x] I06 Secure API for approved systems uses service identities, scoped fields, idempotency, rate limits, and audit.
-- [ ] I07 Queue views, saved filters, workload, SLA risk, waiting parties, bulk per-item results, and ticket workspace are complete.
+- [x] I07 Queue views, saved filters, workload, SLA risk, waiting parties, bulk per-item results, and ticket workspace are complete.
 - [x] I08 Joiner/mover/leaver provisioning covers accounts, licences, equipment, network, access control, reversals, and HR completion.
-- [ ] I09 Problems, known errors, workarounds, changes, validation/backout, knowledge lifecycle, major incidents, and reports are complete.
-- [ ] I10 Existing ticket/provisioning references, routes, history, attachments, HR bridge, and permissions survive migration.
+- [x] I09 Problems, known errors, workarounds, changes, validation/backout, knowledge lifecycle, major incidents, and reports are complete.
+- [x] I10 Existing ticket/provisioning references, routes, history, attachments, HR bridge, and permissions survive migration.
 
 ### Security & Devices experience
 
@@ -106,9 +106,9 @@ Progress notes:
 
 ## End-to-end acceptance scenarios
 
-- [ ] E01 Self-service request from knowledge/catalogue through fulfilment, closure, and CSAT.
-- [ ] E02 Email creation, threading, deduplication, safe attachments, outbound delivery, and bounce visibility.
-- [ ] E03 Joiner, mover, and leaver provisioning with HR and asset/access reconciliation.
+- [x] E01 Self-service request from knowledge/catalogue through fulfilment, closure, and CSAT.
+- [x] E02 Email creation, threading, deduplication, safe attachments, outbound delivery, and bounce visibility.
+- [x] E03 Joiner, mover, and leaver provisioning with HR and asset/access reconciliation.
 - [ ] E04 Network failure confirmation, topology suppression, Control Room correlation, one IT incident, recovery, and technician resolution.
 - [ ] E05 Healthcare device assignment, technical/data-flow projection, calibration/maintenance, IT link, and clinical separation.
 - [ ] E06 Tracking consent withdrawal removes collection/access across UI, API, export, direct URL, and cache.
@@ -150,3 +150,7 @@ Progress notes:
 - 2026-07-18: Foundation contract review found the monitor/observation identity, `ObservationInput` idempotency, online recovery routing, typed `ItTicketLink` ownership, single `DeviceSignalPublished` monitoring-to-ticket path, and permission-aware ticket context stable for dependent plans.
 - 2026-07-19: Secure service API Task 9 passed 10 focused tests / 198 assertions and the full IT regression at 229 tests / 2,147 assertions. TypeScript, targeted ESLint, 5 component tests, 2 desktop/mobile browser journeys, 4 versioned API routes plus 2 identity-admin routes, client build at 4,977 modules, SSR build at 1,629 modules, PHP syntax, targeted Pint, and diff checks passed. V01 and V08 remain open because the full master-goal domain and release matrix are not yet complete.
 - 2026-07-19: Joiner/mover/leaver Task 10 passed 11 focused tests / 144 assertions and the full IT regression at 239 tests / 2,264 assertions. Onboarding, offboarding, and employee-profile compatibility suites passed; the provisioning UI passed 6 component tests and 2 production-backed desktop/mobile browser journeys. TypeScript, targeted ESLint, client build at 4,978 modules, SSR build at 1,630 modules, PHP syntax, route, targeted Pint, and diff checks passed. I08 is proven; V01, V06, and V08 remain open until the complete master-goal domain, browser, and release matrices pass.
+- 2026-07-19: Service-operations Task 11 committed as `46aaa2360` and passed 18 focused tests / 207 assertions, 7 component tests, 2 desktop/mobile browser journeys, TypeScript, targeted ESLint, client build at 4,979 modules, SSR build at 1,631 modules, PHP syntax, routes/schedules, targeted Pint, diff checks, and Critical/Important review. Knowledge governance, delivery/bounce/retry visibility, automation-run audit, reconcilable reporting, and setup audit are operational.
+- 2026-07-19: Complete IT & Support verification passed 272 backend tests / 2,583 assertions across IT, native monitoring, and the DeviceEvent signal pipeline; the focused secure API rerun passed 6 tests / 101 assertions. Frontend proof passed 94 files / 371 tests, TypeScript, repository-wide ESLint, client build at 4,979 modules, SSR build at 1,631 modules, targeted Prettier, targeted Pint, PHP syntax, and diff checks.
+- 2026-07-19: Production-backed browser acceptance passed 7 journeys across desktop and Pixel 7 with 1 deliberate duplicate mobile accessibility scan skipped. Requester catalogue/knowledge/My requests/email isolation, technician incident/problem/change/major-incident/JML/API/delivery workspaces, denial behavior, responsive navigation, and a 10-route axe matrix with no serious or critical violations are proven. I01-I10 and E01-E03 are complete. X06 remains open until frozen incident-time evidence is implemented and accepted; E09 remains open for the whole-platform sensitive-domain and command-denial matrix.
+- 2026-07-19: Repository-wide `npm run format:check` still reports 1,328 pre-existing files across unrelated modules. No bulk rewrite was performed; the new IT acceptance files pass targeted Prettier. V01 and V06-V08 remain open because their definitions cover the unfinished master Security & Devices/monitoring goal, and V08 additionally requires the repository format baseline to be resolved.

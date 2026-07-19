@@ -11,7 +11,7 @@
 
 **Branch:** `codex/it-security-monitoring-design`
 
-**Status:** In progress
+**Status:** Completed (IT & Support stream; master Security & Devices goal remains active)
 
 ## Preservation and ownership contract
 
@@ -239,14 +239,14 @@ The missing service-management layers are governed type lifecycles, service cata
 
 ## Task 12: Verify the complete IT & Support stream and update the master ledger
 
-- [ ] Run all `tests/Feature/It` plus monitoring and DeviceEvent integration tests.
-- [ ] Run versioned secure API and tenant/field denial suites.
-- [ ] Run all frontend tests, types, lint, client build, and SSR build.
-- [ ] Run browser journeys for self-service catalogue, email thread, technician incident, problem/change, major incident, provisioning JML, secure API, and denial cases with production-backed fixtures.
-- [ ] Run accessibility checks on Help Centre, grouped navigation, queues, ticket, catalogue, problem, change, major incident, provisioning, and setup.
-- [ ] Run Pint and diff checks.
-- [ ] Update only exact proven I01-I10, relevant X06/E01-E03/E09, and verification-gate evidence in `docs/it-support-security-devices-completion-goal.md`.
-- [ ] Commit as `docs(it): record service management evidence`.
+- [x] Run all `tests/Feature/It` plus monitoring and DeviceEvent integration tests (272 tests, 2,583 assertions).
+- [x] Run versioned secure API and tenant/field denial suites (6 tests, 101 assertions in the final focused rerun).
+- [x] Run all frontend tests, types, lint, client build, and SSR build (94 files / 371 tests; TypeScript and repository-wide ESLint pass; client 4,979 modules; SSR 1,631 modules).
+- [x] Run browser journeys for self-service catalogue, email thread, technician incident, problem/change, major incident, provisioning JML, secure API, and denial cases with production-backed fixtures (7 passed across desktop and Pixel 7; 1 deliberate duplicate mobile accessibility scan skipped).
+- [x] Run accessibility checks on Help Centre, grouped navigation, queues, ticket, catalogue, problem, change, major incident, provisioning, and setup (10-route desktop axe matrix with no serious or critical violations).
+- [x] Run Pint and diff checks.
+- [x] Update only exact proven I01-I10, relevant X06/E01-E03/E09, and verification-gate evidence in `docs/it-support-security-devices-completion-goal.md`; X06 and E09 remain open for later master-goal streams.
+- [x] Commit as `docs(it): record service management evidence`.
 
 ## Execution rule
 
