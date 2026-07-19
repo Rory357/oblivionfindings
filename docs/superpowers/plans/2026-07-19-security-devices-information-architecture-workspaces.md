@@ -202,12 +202,14 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Reuse devices, events, maintenance, site, and integration records
 - Add focused tests
 
-- [ ] Overview reconciles environment, building systems, utilities, active events, maintenance, sites affected, and data freshness.
-- [ ] Environmental sensors distinguish current technical state, data freshness, threshold-event evidence, and unmonitored state.
-- [ ] Building systems covers safety/building equipment without duplicating Site maintenance records.
-- [ ] Utilities and Automations show supported integrations and last execution/state truthfully.
-- [ ] History uses canonical events/observations with filters and permission-gated export.
-- [ ] Commit as `feat(security-devices): add facilities and iot workspace`.
+- [x] Overview reconciles environment, building systems, utilities, active events, maintenance, sites affected, and data freshness.
+- [x] Environmental sensors distinguish current technical state, data freshness, threshold-event evidence, and unmonitored state.
+- [x] Building systems covers safety/building equipment without duplicating Site maintenance records.
+- [x] Utilities and Automations show supported integrations and last execution/state truthfully.
+- [x] History uses canonical events/observations with filters and permission-gated export.
+- [x] Commit as `feat(security-devices): add facilities and iot workspace`.
+
+**Task 8 evidence (2026-07-19):** Implementation committed as `2f1a17cc1`. Canonical facility grouping, site impact, native monitor/observation freshness, append-only threshold events, shared maintenance references, safe integration/sync projections, explicit read-only automation evidence, filtered history, and permission-gated export passed 6 focused backend tests / 115 assertions. The broader connected matrix passed 140 tests / 1,556 assertions across Facilities, the shared category/workspace contract, canonical devices, estate/site operations, Security, Healthcare, Tracking, Network, reports, canonical integration history, and the native monitoring persistence/recovery foundation. Nine Security & Devices frontend files passed 34 component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,992 modules), SSR build (1,644 modules), and diff checks passed. The current-commit six-tab journey passed on desktop and Pixel 7 with raw device, provider, event, maintenance, observation, integration, and automation sentinels absent; no console errors; no horizontal overflow; and no automation command controls. This closes the Facilities & IoT presentation milestone only: operational workspaces, native collection/runtime breadth, capability-driven device management, integrations/settings, cross-module projections, and governed commands remain open.
 
 ## Task 9: Add operational Monitoring, Maintenance, and Discovery & collectors views
 

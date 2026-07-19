@@ -79,7 +79,7 @@ Progress notes:
 - [x] S04 Security workspace includes CCTV, Alarms, Access Control, and Security events.
 - [x] S05 Healthcare workspace includes client/shared devices, connectivity/data flow, calibration, and maintenance without clinical-value duplication.
 - [x] S06 Tracking workspace separately covers personal safety, Fleet, assets, geofences, and history with purpose/consent controls.
-- [ ] S07 Facilities & IoT covers environmental sensors, building systems, utilities, automations, and history.
+- [x] S07 Facilities & IoT covers environmental sensors, building systems, utilities, automations, and history.
 - [ ] S08 Monitoring, Maintenance, Discovery & collectors, Integrations, and Settings & audit are complete operational workspaces.
 - [ ] S09 Device profile is capability-driven and includes health, monitors, topology, interfaces/sensors, configuration, assignments, tickets, events, maintenance, documents, and audit.
 - [ ] S10 Existing UniFi, Milesight, and Queclink capabilities operate through expanded common contracts.
