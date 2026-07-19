@@ -351,7 +351,7 @@ class AlertsEventsControllerTest extends TestCase
             'occurred_at' => now(),
         ]);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/monitoring');
+        $response = $this->actingAs($this->admin)->get('/security-devices/alerts-events');
 
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];

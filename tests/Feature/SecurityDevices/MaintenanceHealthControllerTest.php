@@ -174,7 +174,7 @@ class MaintenanceHealthControllerTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/maintenance');
+        $response = $this->actingAs($this->admin)->get('/security-devices/maintenance-health');
 
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];

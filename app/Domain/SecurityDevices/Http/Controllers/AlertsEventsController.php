@@ -4,8 +4,8 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
-use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -14,28 +14,34 @@ class AlertsEventsController extends Controller
 {
     use ResolvesDeviceTenant;
 
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.events.view'), 403);
         $tenantId = $this->resolveDeviceTenantId($user);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $eventScope = fn () => DeviceEvent::query()
+            ->forTenant($tenantId)
+            ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $last24h = now()->subHours(24);
 
         $stats = [
-            'total24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->count(),
-            'critical24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->bySeverity('critical')->count(),
-            'warning24h' => DeviceEvent::query()->forTenant($tenantId)->since($last24h)->bySeverity('warning')->count(),
-            'unprocessed' => DeviceEvent::query()->forTenant($tenantId)->unprocessed()->count(),
+            'total24h' => $eventScope()->since($last24h)->count(),
+            'critical24h' => $eventScope()->since($last24h)->bySeverity('critical')->count(),
+            'warning24h' => $eventScope()->since($last24h)->bySeverity('warning')->count(),
+            'unprocessed' => $eventScope()->unprocessed()->count(),
         ];
 
         // ── Event query ───────────────────────────────────────────
 
-        $query = DeviceEvent::query()
-            ->forTenant($tenantId)
-            ->with(['device:id,name,device_uid,domain,category']);
+        $query = $eventScope()->with(['device:id,name,device_uid,domain,category']);
 
         // Severity filter.
         if ($request->filled('severity') && $request->input('severity') !== 'all') {
@@ -94,15 +100,13 @@ class AlertsEventsController extends Controller
 
         // ── Filter options ────────────────────────────────────────
 
-        $eventTypes = DeviceEvent::query()
-            ->forTenant($tenantId)
+        $eventTypes = $eventScope()
             ->select('event_type')
             ->distinct()
             ->orderBy('event_type')
             ->pluck('event_type');
 
-        $sources = DeviceEvent::query()
-            ->forTenant($tenantId)
+        $sources = $eventScope()
             ->whereNotNull('source')
             ->select('source')
             ->distinct()
@@ -134,7 +138,6 @@ class AlertsEventsController extends Controller
                     'source' => $e->source,
                     'occurred_at' => $e->occurred_at?->toISOString(),
                     'processed_at' => $e->processed_at?->toISOString(),
-                    'payload' => $e->payload,
                 ]),
                 'links' => $events->linkCollection()->toArray(),
                 'meta' => [

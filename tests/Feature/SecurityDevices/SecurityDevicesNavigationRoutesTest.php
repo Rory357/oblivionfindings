@@ -67,8 +67,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             'healthcare' => ['/security-devices/healthcare', 'security-devices/category'],
             'tracking' => ['/security-devices/tracking', 'security-devices/category'],
             'facilities and IoT' => ['/security-devices/facilities-iot', 'security-devices/category'],
-            'monitoring' => ['/security-devices/monitoring', 'security-devices/alerts-events'],
-            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance-health'],
+            'monitoring' => ['/security-devices/monitoring', 'security-devices/monitoring'],
+            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance'],
             'discovery' => ['/security-devices/discovery', 'security-devices/discovery'],
             'settings' => ['/security-devices/settings', 'security-devices/settings'],
         ];
@@ -119,8 +119,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
     public static function canonicalOperationsProvider(): array
     {
         return [
-            'monitoring' => ['/security-devices/monitoring', 'security-devices/alerts-events', 'Monitoring'],
-            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance-health', 'Maintenance'],
+            'monitoring' => ['/security-devices/monitoring', 'security-devices/monitoring', 'Monitoring'],
+            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance', 'Maintenance'],
         ];
     }
 
@@ -150,10 +150,10 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/discovery')
-                ->has('collectors', 2)
-                ->where('summary.collectors', 2)
-                ->where('summary.online', 1)
-                ->where('summary.stale', 1)
+                ->has('workspace.collectors', 2)
+                ->where('workspace.summary.collectors', 2)
+                ->where('workspace.summary.online_collectors', 1)
+                ->where('workspace.summary.collection_paths_unavailable', 1)
             );
     }
 

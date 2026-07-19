@@ -43,7 +43,6 @@ type EventItem = {
     source: string | null;
     occurred_at: string;
     processed_at: string | null;
-    payload: Record<string, unknown> | null;
 };
 
 type Props = {

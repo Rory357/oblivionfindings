@@ -14,6 +14,8 @@ use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubControll
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
+use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
@@ -224,7 +226,7 @@ Route::middleware([
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.alerts-events');
 
-    Route::get('/monitoring', [AlertsEventsController::class, 'index'])
+    Route::get('/monitoring', MonitoringOperationsController::class)
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.monitoring');
 
@@ -232,7 +234,7 @@ Route::middleware([
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance-health');
 
-    Route::get('/maintenance', [MaintenanceHealthController::class, 'index'])
+    Route::get('/maintenance', MaintenanceOperationsController::class)
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance');
 

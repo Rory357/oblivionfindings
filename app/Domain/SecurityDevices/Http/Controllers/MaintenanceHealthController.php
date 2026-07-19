@@ -7,6 +7,8 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Domain\SecurityDevices\Presenters\MaintenanceOperationsPresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -14,6 +16,10 @@ use Inertia\Inertia;
 class MaintenanceHealthController extends Controller
 {
     use ResolvesDeviceTenant;
+
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+    ) {}
 
     /**
      * Maintenance & Health dashboard page.
@@ -23,23 +29,25 @@ class MaintenanceHealthController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.view'), 403);
         $tenantId = $this->resolveDeviceTenantId($user);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $maintenanceScope = fn () => DeviceMaintenanceRecord::query()
+            ->forTenant($tenantId)
+            ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $stats = [
-            'overdue' => DeviceMaintenanceRecord::query()->forTenant($tenantId)->overdue()->count(),
-            'upcoming' => DeviceMaintenanceRecord::query()->forTenant($tenantId)->upcoming(14)->count(),
-            'offline' => Device::query()->forTenant($tenantId)->where('status', DeviceStatus::Offline->value)->count(),
-            'degraded' => Device::query()->forTenant($tenantId)->where('status', DeviceStatus::Degraded->value)->count(),
-            'lowBattery' => Device::query()->forTenant($tenantId)->lowBattery()->count(),
-            'critical' => Device::query()->forTenant($tenantId)->where('health_status', HealthStatus::Critical->value)->count(),
+            'overdue' => $maintenanceScope()->overdue()->count(),
+            'upcoming' => $maintenanceScope()->upcoming(14)->count(),
+            'offline' => $this->access->visibleDevices($user)->where('status', DeviceStatus::Offline->value)->count(),
+            'degraded' => $this->access->visibleDevices($user)->where('status', DeviceStatus::Degraded->value)->count(),
+            'lowBattery' => $this->access->visibleDevices($user)->lowBattery()->count(),
+            'critical' => $this->access->visibleDevices($user)->where('health_status', HealthStatus::Critical->value)->count(),
         ];
 
         // ── Maintenance records (filterable) ──────────────────────
 
-        $mQuery = DeviceMaintenanceRecord::query()
-            ->forTenant($tenantId)
-            ->with(['device:id,name,device_uid,domain,category', 'performedBy:id,name']);
+        $mQuery = $maintenanceScope()->with(['device:id,name,device_uid,domain,category', 'performedBy:id,name']);
 
         if ($request->filled('status') && $request->input('status') !== 'all') {
             $mQuery->where('status', $request->input('status'));
@@ -77,8 +85,7 @@ class MaintenanceHealthController extends Controller
 
         // ── Devices needing health attention ──────────────────────
 
-        $attentionDevices = Device::query()
-            ->forTenant($tenantId)
+        $attentionDevices = $this->access->visibleDevices($user)
             ->needingAttention()
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderByRaw("FIELD(health_status, 'critical', 'warning', 'unknown', 'healthy')")
@@ -98,8 +105,7 @@ class MaintenanceHealthController extends Controller
 
         // ── Low battery devices ───────────────────────────────────
 
-        $lowBatteryDevices = Device::query()
-            ->forTenant($tenantId)
+        $lowBatteryDevices = $this->access->visibleDevices($user)
             ->lowBattery()
             ->operational()
             ->orderBy('battery_level')
@@ -166,10 +172,10 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
-        abort_unless((int) $device->tenant_id === $this->resolveDeviceTenantId($user), 404);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
+            'type' => ['required', 'string', 'in:'.implode(',', MaintenanceOperationsPresenter::TYPES)],
             'status' => ['nullable', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['required', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
@@ -202,10 +208,11 @@ class MaintenanceHealthController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
         $record->loadMissing('device:id,tenant_id');
-        abort_unless($record->device && (int) $record->device->tenant_id === $this->resolveDeviceTenantId($user), 404);
+        abort_unless($record->device, 404);
+        $this->access->assertCanViewDevice($user, $record->device);
 
         $validated = $request->validate([
-            'type' => ['sometimes', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
+            'type' => ['sometimes', 'string', 'in:'.implode(',', MaintenanceOperationsPresenter::TYPES)],
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['sometimes', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
@@ -235,7 +242,8 @@ class MaintenanceHealthController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
         $record->loadMissing('device:id,tenant_id');
-        abort_unless($record->device && (int) $record->device->tenant_id === $this->resolveDeviceTenantId($user), 404);
+        abort_unless($record->device, 404);
+        $this->access->assertCanViewDevice($user, $record->device);
 
         $record->update([
             'status' => 'completed',
