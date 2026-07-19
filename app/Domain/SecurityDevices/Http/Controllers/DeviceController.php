@@ -644,6 +644,8 @@ class DeviceController extends Controller
 
     private function mapDeviceForDetail(Device $d): array
     {
+        $isHealthcareDevice = $d->domain === 'iot_healthcare';
+
         return [
             'id' => $d->id,
             'device_uid' => $d->device_uid,
@@ -671,9 +673,13 @@ class DeviceController extends Controller
             'expected_lifespan_months' => $d->expected_lifespan_months,
             'purchase_price' => $d->purchase_price,
             'provider' => $d->provider,
-            'external_ref' => $d->external_ref,
-            'config' => $d->config,
-            'meta' => $d->meta,
+            // Healthcare integrations frequently receive clinical material in
+            // provider envelopes. The generic device page never serialises
+            // those raw bags; its dedicated workspace presents an explicit
+            // technical allowlist instead.
+            'external_ref' => $isHealthcareDevice ? null : $d->external_ref,
+            'config' => $isHealthcareDevice ? null : $d->config,
+            'meta' => $isHealthcareDevice ? null : $d->meta,
             'latitude' => $d->latitude,
             'longitude' => $d->longitude,
             'location_description' => $d->location_description,

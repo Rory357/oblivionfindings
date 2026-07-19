@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    type HealthcareWorkspaceData,
+    HealthcareWorkspacePanels,
+} from '@/components/security-devices/healthcare-workspace';
+import {
     type SecurityDevicesWorkspace,
     SecurityDevicesWorkspaceShell,
     WorkspaceDeviceList,
@@ -72,6 +76,7 @@ type Props = {
     pageConfig: PageConfig;
     workspace: SecurityDevicesWorkspace;
     securityWorkspace?: SecurityWorkspaceData | null;
+    healthcareWorkspace?: HealthcareWorkspaceData | null;
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ export default function CategoryPage({
     pageConfig,
     workspace,
     securityWorkspace,
+    healthcareWorkspace,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
@@ -185,6 +191,9 @@ export default function CategoryPage({
                 >
                     {securityWorkspace ? (
                         <SecurityWorkspacePanels data={securityWorkspace} />
+                    ) : null}
+                    {healthcareWorkspace ? (
+                        <HealthcareWorkspacePanels data={healthcareWorkspace} />
                     ) : null}
 
                     {/* Subcategory chips */}

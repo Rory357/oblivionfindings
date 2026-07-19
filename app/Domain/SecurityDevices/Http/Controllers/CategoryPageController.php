@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -29,6 +30,7 @@ class CategoryPageController extends Controller
         private readonly SecurityDevicesAccessService $access,
         private readonly WorkspacePresenter $workspacePresenter,
         private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
+        private readonly HealthcareWorkspacePresenter $healthcareWorkspacePresenter,
     ) {}
 
     public function networkIt(Request $request)
@@ -228,6 +230,9 @@ class CategoryPageController extends Controller
             ),
             'securityWorkspace' => $slug === 'security'
                 ? $this->securityWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                : null,
+            'healthcareWorkspace' => $slug === 'healthcare'
+                ? $this->healthcareWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,
         ]);
     }

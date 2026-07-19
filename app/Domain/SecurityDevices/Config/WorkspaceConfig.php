@@ -17,7 +17,8 @@ class WorkspaceConfig
      *         description: string,
      *         state: 'available'|'not_configured',
      *         categories?: array<int, string>,
-     *         requiredPermission?: string
+     *         requiredPermission?: string,
+     *         requiredAnyPermission?: array<int, string>
      *     }>
      * }>
      */
@@ -67,10 +68,20 @@ class WorkspaceConfig
                 'domain' => 'iot_healthcare',
                 'tabs' => [
                     self::tab('overview', 'Overview', 'Healthcare-device technical posture without clinical values.'),
-                    self::tab('client-devices', 'Client devices', 'Permission-safe client assignments and technical state.', 'not_configured'),
-                    self::tab('shared-site-devices', 'Shared & site devices', 'Shared equipment, location, and service responsibility.', 'not_configured'),
-                    self::tab('data-flow', 'Connectivity & data flow', 'Connectivity, integration, and delivery freshness.', 'not_configured'),
-                    self::tab('calibration-maintenance', 'Calibration & maintenance', 'Calibration and maintenance evidence.', 'not_configured'),
+                    self::tab(
+                        'client-devices',
+                        'Client devices',
+                        'Permission-safe client assignments and technical state.',
+                        requiredAnyPermission: ['clients.viewAny', 'clients.viewAssigned'],
+                    ),
+                    self::tab('shared-site-devices', 'Shared & site devices', 'Shared equipment, location, and service responsibility.'),
+                    self::tab('data-flow', 'Connectivity & data flow', 'Connectivity, integration, and delivery freshness.'),
+                    self::tab(
+                        'calibration-maintenance',
+                        'Calibration & maintenance',
+                        'Calibration and maintenance evidence.',
+                        requiredPermission: 'securityDevices.maintenance.view',
+                    ),
                 ],
             ],
             'tracking' => [
@@ -125,6 +136,7 @@ class WorkspaceConfig
         string $state = 'available',
         ?array $categories = null,
         ?string $requiredPermission = null,
+        ?array $requiredAnyPermission = null,
     ): array {
         return array_filter([
             'key' => $key,
@@ -133,6 +145,7 @@ class WorkspaceConfig
             'state' => $state,
             'categories' => $categories,
             'requiredPermission' => $requiredPermission,
+            'requiredAnyPermission' => $requiredAnyPermission,
         ], fn ($value) => $value !== null);
     }
 }

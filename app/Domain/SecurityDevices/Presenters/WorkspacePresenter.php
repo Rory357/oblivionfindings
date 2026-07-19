@@ -62,6 +62,13 @@ class WorkspacePresenter
             return 'restricted';
         }
 
+        if (isset($tab['requiredAnyPermission'])
+            && (! $viewer || ! collect($tab['requiredAnyPermission'])->contains(
+                fn (string $permission): bool => $viewer->canDo($permission),
+            ))) {
+            return 'restricted';
+        }
+
         return 'available';
     }
 

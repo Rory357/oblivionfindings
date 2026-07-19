@@ -55,7 +55,9 @@ trait MapsDevicesForList
             'room' => $entity?->name ?? "Room #{$assignment->assignable_id}",
             'vehicle' => $entity?->name ?? "Vehicle #{$assignment->assignable_id}",
             'staff' => $entity?->name ?? "Staff #{$assignment->assignable_id}",
-            'client' => trim(($entity?->first_name ?? '').' '.($entity?->last_name ?? '')) ?: "Client #{$assignment->assignable_id}",
+            'client' => $entity?->preferred_name
+                ?: $entity?->first_name
+                ?: "Client #{$assignment->assignable_id}",
             default => "{$assignment->assignable_type} #{$assignment->assignable_id}",
         };
     }
