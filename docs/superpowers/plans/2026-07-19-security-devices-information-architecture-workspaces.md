@@ -183,14 +183,16 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 - Reuse canonical Device, Monitor, Observation, relationship, IT-link, and provider data
 - Add topology/coverage/capacity presentation tests
 
-- [ ] Overview shows sites, network device health, WAN-path knowledge, active monitoring state, capacity warnings, firmware/configuration drift evidence, and open technical work.
-- [ ] Network map renders known device relationships and clearly labels incomplete discovery/topology.
-- [ ] Devices and Interfaces present currently observed identifiers/counters without provider-specific navigation.
-- [ ] Services shows monitor coverage, current state, dependency context, and missing/unsupported checks.
-- [ ] Traffic & capacity displays only retained metrics that exist; collection gaps are visible.
-- [ ] Configuration & firmware shows observed/desired state only where supported; management controls wait for the command plan.
-- [ ] Full native discovery, SNMP/flow breadth, remote collector runtime, and topology inference remain traceable to the following runtime plan, not falsely checked here.
-- [ ] Commit as `feat(security-devices): add network operations workspace`.
+- [x] Overview shows sites, network device health, WAN-path knowledge, active monitoring state, capacity warnings, firmware/configuration drift evidence, and open technical work.
+- [x] Network map renders known device relationships and clearly labels incomplete discovery/topology.
+- [x] Devices and Interfaces present currently observed identifiers/counters without provider-specific navigation.
+- [x] Services shows monitor coverage, current state, dependency context, and missing/unsupported checks.
+- [x] Traffic & capacity displays only retained metrics that exist; collection gaps are visible.
+- [x] Configuration & firmware shows observed/desired state only where supported; management controls wait for the command plan.
+- [x] Full native discovery, SNMP/flow breadth, remote collector runtime, and topology inference remain traceable to the following runtime plan, not falsely checked here.
+- [x] Commit as `feat(security-devices): add network operations workspace`.
+
+**Task 7 evidence (2026-07-19):** Implementation committed as `d5cf7261b`. Canonical device/site/WAN posture, explicit relationship topology, native monitor and service state, allowlisted retained SNMP interface/capacity evidence, permission-gated IT links, and read-only configuration/firmware drift passed 61 focused backend tests / 519 assertions. The broader connected matrix passed 124 tests / 1,368 assertions across Network, the shared category/workspace contract, canonical devices, estate/site operations, Security, Healthcare, Tracking, and the native monitoring persistence/recovery foundation. Eight Security & Devices frontend files passed 29 component tests. TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build (4,991 modules), SSR build (1,643 modules), and diff checks passed. The current-commit seven-tab journey passed on desktop and Pixel 7 with raw-provider sentinels absent, no console errors, no horizontal overflow, and no ungoverned management controls. This closes the Network & IT presentation milestone only: E04, discovery/protocol/flow breadth, remote collector runtime, inferred topology, and governed command execution remain open for the following runtime and command plans.
 
 ## Task 8: Complete the Facilities & IoT workspace
 
