@@ -50,18 +50,18 @@ test.describe('Security & Devices specialist workspace shell', () => {
         ).toBeVisible();
         await expect(
             page.getByRole('heading', {
-                name: 'Traffic & capacity',
+                name: 'Traffic and capacity evidence',
                 level: 2,
             }),
         ).toBeVisible();
         await expect(
             page.getByText(
-                'Retained traffic and utilisation evidence is not configured for this workspace yet.',
+                'No retained traffic or capacity metrics are available.',
             ),
         ).toBeVisible();
         await expect(
             page.getByText(
-                'No metrics or controls are shown until a canonical data source is available.',
+                /Missing discovery, protocol, interface, capacity, configuration, or firmware collection stays visible/,
             ),
         ).toBeVisible();
 

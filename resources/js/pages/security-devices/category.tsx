@@ -5,6 +5,10 @@ import {
     HealthcareWorkspacePanels,
 } from '@/components/security-devices/healthcare-workspace';
 import {
+    type NetworkItWorkspaceData,
+    NetworkItWorkspacePanels,
+} from '@/components/security-devices/network-it-workspace';
+import {
     type SecurityDevicesWorkspace,
     SecurityDevicesWorkspaceShell,
     WorkspaceDeviceList,
@@ -79,6 +83,7 @@ type Props = {
     };
     pageConfig: PageConfig;
     workspace: SecurityDevicesWorkspace;
+    networkItWorkspace?: NetworkItWorkspaceData | null;
     securityWorkspace?: SecurityWorkspaceData | null;
     healthcareWorkspace?: HealthcareWorkspaceData | null;
     trackingWorkspace?: TrackingWorkspaceData | null;
@@ -122,6 +127,7 @@ export default function CategoryPage({
     filterOptions,
     pageConfig,
     workspace,
+    networkItWorkspace,
     securityWorkspace,
     healthcareWorkspace,
     trackingWorkspace,
@@ -195,6 +201,9 @@ export default function CategoryPage({
                     workspace={workspace}
                     filters={filters}
                 >
+                    {networkItWorkspace ? (
+                        <NetworkItWorkspacePanels data={networkItWorkspace} />
+                    ) : null}
                     {securityWorkspace ? (
                         <SecurityWorkspacePanels data={securityWorkspace} />
                     ) : null}

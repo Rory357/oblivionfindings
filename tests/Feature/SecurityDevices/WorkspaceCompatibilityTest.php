@@ -104,15 +104,17 @@ class WorkspaceCompatibilityTest extends TestCase
             );
     }
 
-    public function test_future_runtime_tabs_are_explicitly_not_configured(): void
+    public function test_network_runtime_tabs_are_available_with_honest_collection_gaps(): void
     {
         $this->actingAs($this->admin)
             ->get('/security-devices/network-it?tab=traffic-capacity')
             ->assertInertia(fn ($page) => $page
                 ->where('workspace.activeTab', 'traffic-capacity')
-                ->where('workspace.activeTabState', 'not_configured')
-                ->where('workspace.tabs.5.state', 'not_configured')
-                ->where('workspace.tabs.5.stateLabel', 'Not configured')
+                ->where('workspace.activeTabState', 'available')
+                ->where('workspace.tabs.5.state', 'available')
+                ->where('workspace.tabs.5.stateLabel', 'Available')
+                ->where('networkItWorkspace.activeTab.traffic', [])
+                ->where('networkItWorkspace.boundary.title', 'Native monitoring, honest evidence')
             );
     }
 

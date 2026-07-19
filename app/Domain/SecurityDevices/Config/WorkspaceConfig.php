@@ -33,12 +33,12 @@ class WorkspaceConfig
                 'domain' => 'it_infrastructure',
                 'tabs' => [
                     self::tab('overview', 'Overview', 'Network and IT technology posture across authorised sites.'),
-                    self::tab('map', 'Map', 'Discovered relationships and topology evidence.', 'not_configured'),
+                    self::tab('map', 'Map', 'Known relationships and topology evidence.'),
                     self::tab('devices', 'Devices', 'Canonical network and IT device inventory.'),
-                    self::tab('interfaces', 'Interfaces', 'Observed ports, interfaces, links, and counters.', 'not_configured'),
-                    self::tab('services', 'Services', 'Service checks, dependencies, and monitoring coverage.', 'not_configured'),
-                    self::tab('traffic-capacity', 'Traffic & capacity', 'Retained traffic and utilisation evidence.', 'not_configured'),
-                    self::tab('configuration-firmware', 'Configuration & firmware', 'Observed configuration, drift, and firmware evidence.', 'not_configured'),
+                    self::tab('interfaces', 'Interfaces', 'Observed ports, interfaces, links, and counters.'),
+                    self::tab('services', 'Services', 'Service checks, dependencies, and monitoring coverage.'),
+                    self::tab('traffic-capacity', 'Traffic & capacity', 'Retained traffic and utilisation evidence.'),
+                    self::tab('configuration-firmware', 'Configuration & firmware', 'Observed configuration, drift, and firmware evidence.'),
                 ],
             ],
             'security' => [

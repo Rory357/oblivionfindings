@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
+use App\Domain\SecurityDevices\Presenters\NetworkItWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
@@ -30,6 +31,7 @@ class CategoryPageController extends Controller
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly WorkspacePresenter $workspacePresenter,
+        private readonly NetworkItWorkspacePresenter $networkItWorkspacePresenter,
         private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
         private readonly HealthcareWorkspacePresenter $healthcareWorkspacePresenter,
         private readonly TrackingWorkspacePresenter $trackingWorkspacePresenter,
@@ -235,6 +237,9 @@ class CategoryPageController extends Controller
                 : null,
             'healthcareWorkspace' => $slug === 'healthcare'
                 ? $this->healthcareWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                : null,
+            'networkItWorkspace' => $slug === 'network-it'
+                ? $this->networkItWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,
             'trackingWorkspace' => $slug === 'tracking'
                 ? $this->trackingWorkspacePresenter->present($user, clone $baseScope, $activeTab)
